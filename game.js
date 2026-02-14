@@ -2969,7 +2969,7 @@
         : activeEnemies
             .reduce((acc, e) => {
               const distance = dist(state.player, e);
-              if (distance < 10 && acc.length < 8) {
+              if (distance < 10) {
                 acc.push({
                   id: e.id,
                   x: Math.round(e.x * 100) / 100,
@@ -2991,7 +2991,7 @@
         : activeResources
             .reduce((acc, r) => {
               const distance = dist(state.player, r);
-              if (distance < 9 && acc.length < 12) {
+              if (distance < 9) {
                 acc.push({
                   id: r.id,
                   type: r.type,
