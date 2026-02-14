@@ -92,3 +92,29 @@ Original prompt: Build a 3D role playing game, sandbox, thats single player
   - `output/web-game/state-1.json`
   - `output/web-game/state-2.json`
 - New run produced no fresh `errors-*.json` artifacts.
+
+## Visual Polish Pass (Current)
+- Increased texture resolution from `64` to `96` for crisper wall/water sampling.
+- Reworked procedural wall/water textures:
+  - Stone now has varied block tone, mortar lines, cracks, and subtle moss tinting.
+  - Water now has richer ripple/eddy contrast and occasional foam highlights.
+- Added foreground world richness:
+  - Horizon tree-line silhouette for layered depth.
+  - Ground detail pass with grass tufts + pebble speckle tied to weather/wind.
+  - Stronger wall base occlusion for improved depth/weight.
+- Reworked first-person weapon presentation:
+  - Clear two-hand grip around the hilt (fingers/thumbs visible).
+  - Sleeve/forearm layering for stronger first-person character presence.
+  - Refined blade/guard/grip shading for better material readability.
+
+## Validation (Polish Pass)
+- Smoke capture rerun passed:
+  - `output/web-game/shot-0.png`
+  - `output/web-game/shot-1.png`
+  - `output/web-game/shot-2.png`
+- Quest-flow regression rerun passed:
+  - `output/web-game-quest/shot-0.png`
+  - `output/web-game-quest/shot-1.png`
+  - `output/web-game-quest/state-0.json`
+  - `output/web-game-quest/state-1.json`
+- No fresh quest-run `errors-*.json` files were produced.

@@ -1,15 +1,32 @@
 {
-  "name": "new-game",
+  "name": "westward-rpg",
   "version": "1.0.0",
-  "description": "",
+  "description": "Single-player first-person sandbox RPG prototype built with vanilla HTML and JavaScript.",
   "main": "game.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "python3 -m http.server 5173",
+    "dev": "python3 -m http.server 5173",
+    "test": "node --check game.js && node --check web_game_playwright_client.mjs"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "rpg",
+    "game",
+    "first-person",
+    "raycasting",
+    "javascript",
+    "html5"
+  ],
+  "author": "coleyrockin <coleyrockin@aol.com>",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coleyrockin/WestWardRPG.git"
+  },
+  "bugs": {
+    "url": "https://github.com/coleyrockin/WestWardRPG/issues"
+  },
+  "homepage": "https://github.com/coleyrockin/WestWardRPG#readme",
   "dependencies": {
-    "playwright": "^1.39.0"
+    "playwright": "^1.58.2"
   }
 }

@@ -3,6 +3,9 @@ node_modules/
 
 # Build/test artifacts
 output/
+coverage/
+dist/
+build/
 
 # OS/editor noise
 .DS_Store
@@ -11,3 +14,9 @@ output/
 
 # Optional local notes
 *.log
+.env
+.env.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
