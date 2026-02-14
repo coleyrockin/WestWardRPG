@@ -40,3 +40,21 @@ Original prompt: Build a 3D role playing game, sandbox, thats single player
 - Automated smoke render run completed with no console errors:
   - `output/web-game-graphics-final/shot-0.png`
   - `output/web-game-graphics-final/state-0.json`
+
+## Major Gameplay Rewrite (Sword + House + 3 Quests)
+- Rebuilt combat feel for first-person sword play: chained 3-hit combo, stamina-costed swings, lunge, stagger, knockback, hit pulse, and blocking with reduced incoming damage.
+- Added dedicated house ownership flow: third quest unlocks player house, enterable interior, bed rest interaction, and workbench/stash interaction.
+- Expanded and clarified the 3-quest progression:
+  - `1) Valley Survey` (collect Crystal Shards)
+  - `2) Marsh Cleansing` (defeat slimes)
+  - `3) Raise Your House` (collect Wood + Stone)
+- Added more in-world NPCs and interaction roles (quest givers, merchant, innkeeper) with roaming idle behavior.
+- Added Stone resource nodes and integrated resource/quest requirements for house construction.
+- Upgraded environment and rendering integration for world + interior maps while keeping deterministic hooks (`advanceTime` and `render_game_to_text`).
+- Adjusted NPC placement so first interact naturally starts Quest 1 with Elder Nira.
+- Fixed pointer-lock request to be safe in headless/automation contexts (no `WrongDocumentError` pageerror).
+
+## Validation (Post-Refactor)
+- `output/web-game-realism-smoke2`: no console/page errors.
+- `output/web-game-realism-queststart`: Quest 1 activates (`crystal.status = active`) from initial Elder interaction.
+- `output/web-game-realism-combat2`: combat/block scenario executes without console/page errors.
