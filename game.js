@@ -3,6 +3,7 @@
   const ctx = canvas.getContext("2d");
   const menu = document.getElementById("menu");
   const startBtn = document.getElementById("start-btn");
+  const continueBtn = document.getElementById("continue-btn");
 
   const TAU = Math.PI * 2;
   const FOV = Math.PI / 2.75;
@@ -11,6 +12,9 @@
   const PLAYER_SPEED = 3.95;
   const PLAYER_ROT_SPEED = 2.75;
   const PLAYER_MAX_HP = 120;
+  const SAVE_KEY = "dustward-save-v1";
+  const AUTOSAVE_INTERVAL = 30;
+  const QUEST_STATUSES = new Set(["locked", "active", "complete", "turned_in"]);
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -40,6 +44,10 @@
 
   function choice(list) {
     return list[Math.floor(Math.random() * list.length)];
+  }
+
+  function numberOr(value, fallback) {
+    return Number.isFinite(value) ? value : fallback;
   }
 
   function noise2D(x, y, seed) {
@@ -277,6 +285,14 @@
     mouseLook: 0,
     showMap: true,
     msg: [],
+    weather: {
+      kind: "clear",
+      rain: 0,
+      fog: 0.1,
+      wind: 0.18,
+      lightning: 0,
+      timer: 22,
+    },
     player: {
       x: 9.5,
       y: 8.5,
@@ -411,6 +427,10 @@
     },
   };
 
+  let hasSaveData = false;
+  let lastSaveAt = null;
+  let autoSaveTimer = 0;
+
   function currentMap() {
     return state.player.inHouse ? houseInteriorMap : worldMap;
   }
@@ -459,6 +479,242 @@
 
   spawnEnemies();
   spawnResources();
+
+  function refreshContinueButton() {
+    if (!continueBtn) return;
+    continueBtn.style.display = hasSaveData ? "inline-block" : "none";
+  }
+
+  function readSaveData() {
+    try {
+      const raw = window.localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || parsed.version !== 1) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  function syncSaveStateFromStorage() {
+    const save = readSaveData();
+    hasSaveData = Boolean(save);
+    lastSaveAt = save ? numberOr(save.savedAt, Date.now()) : null;
+    refreshContinueButton();
+  }
+
+  function captureSaveData() {
+    return {
+      version: 1,
+      savedAt: Date.now(),
+      time: state.time,
+      player: {
+        x: state.player.x,
+        y: state.player.y,
+        angle: state.player.angle,
+        hp: state.player.hp,
+        maxHp: state.player.maxHp,
+        level: state.player.level,
+        xp: state.player.xp,
+        nextXp: state.player.nextXp,
+        stamina: state.player.stamina,
+        gold: state.player.gold,
+        deaths: state.player.deaths,
+        inHouse: state.player.inHouse,
+      },
+      inventory: {
+        "Crystal Shard": state.inventory["Crystal Shard"],
+        Wood: state.inventory.Wood,
+        Stone: state.inventory.Stone,
+        Potion: state.inventory.Potion,
+        "Slime Core": state.inventory["Slime Core"],
+      },
+      quests: {
+        crystal: { status: state.quests.crystal.status, progress: state.quests.crystal.progress },
+        slime: { status: state.quests.slime.status, progress: state.quests.slime.progress },
+        wood: { status: state.quests.wood.status, progress: state.quests.wood.progress },
+      },
+      house: {
+        unlocked: state.house.unlocked,
+        built: state.house.built,
+        visits: state.house.visits,
+      },
+      world: {
+        chest: {
+          x: state.chest.x,
+          y: state.chest.y,
+          opened: state.chest.opened,
+          respawn: state.chest.respawn,
+        },
+        harvestedResourceIds: state.resources.filter((resource) => resource.harvested).map((resource) => resource.id),
+        defeatedEnemyIds: state.enemies.filter((enemy) => !enemy.alive).map((enemy) => enemy.id),
+      },
+      showMap: state.showMap,
+    };
+  }
+
+  function applyQuestState(key, questData) {
+    const quest = state.quests[key];
+    if (!quest || !questData) return;
+    const nextStatus = QUEST_STATUSES.has(questData.status) ? questData.status : quest.status;
+    const nextProgress = Math.floor(numberOr(questData.progress, quest.progress));
+    quest.status = nextStatus;
+    quest.progress = clamp(nextProgress, 0, quest.need);
+  }
+
+  function applySaveData(save) {
+    if (!save || save.version !== 1) return false;
+
+    resetWorld({ countDeath: false, silent: true });
+    state.time = Math.max(0, numberOr(save.time, state.time));
+
+    const player = save.player || {};
+    state.player.maxHp = Math.max(40, Math.floor(numberOr(player.maxHp, state.player.maxHp)));
+    state.player.level = Math.max(1, Math.floor(numberOr(player.level, state.player.level)));
+    state.player.xp = Math.max(0, Math.floor(numberOr(player.xp, state.player.xp)));
+    state.player.nextXp = Math.max(50, Math.floor(numberOr(player.nextXp, state.player.nextXp)));
+    state.player.hp = clamp(numberOr(player.hp, state.player.maxHp), 0, state.player.maxHp);
+    state.player.stamina = clamp(numberOr(player.stamina, 100), 0, 100);
+    state.player.gold = Math.max(0, Math.floor(numberOr(player.gold, state.player.gold)));
+    state.player.deaths = Math.max(0, Math.floor(numberOr(player.deaths, state.player.deaths)));
+
+    const inventory = save.inventory || {};
+    state.inventory["Crystal Shard"] = Math.max(0, Math.floor(numberOr(inventory["Crystal Shard"], 0)));
+    state.inventory.Wood = Math.max(0, Math.floor(numberOr(inventory.Wood, 0)));
+    state.inventory.Stone = Math.max(0, Math.floor(numberOr(inventory.Stone, 0)));
+    state.inventory.Potion = Math.max(0, Math.floor(numberOr(inventory.Potion, 0)));
+    state.inventory["Slime Core"] = Math.max(0, Math.floor(numberOr(inventory["Slime Core"], 0)));
+
+    applyQuestState("crystal", save.quests?.crystal);
+    applyQuestState("slime", save.quests?.slime);
+    applyQuestState("wood", save.quests?.wood);
+
+    state.house.unlocked = Boolean(save.house?.unlocked);
+    state.house.built = Boolean(save.house?.built || state.house.unlocked);
+    state.house.visits = Math.max(0, Math.floor(numberOr(save.house?.visits, state.house.visits)));
+
+    state.showMap = typeof save.showMap === "boolean" ? save.showMap : state.showMap;
+
+    const harvested = new Set(Array.isArray(save.world?.harvestedResourceIds) ? save.world.harvestedResourceIds : []);
+    for (const resource of state.resources) {
+      if (harvested.has(resource.id)) {
+        resource.harvested = true;
+        resource.respawn = Math.max(1, numberOr(resource.respawn, 14));
+      }
+    }
+
+    const defeated = new Set(Array.isArray(save.world?.defeatedEnemyIds) ? save.world.defeatedEnemyIds : []);
+    for (const enemy of state.enemies) {
+      if (defeated.has(enemy.id)) {
+        enemy.alive = false;
+        enemy.hp = 0;
+        enemy.stagger = 0;
+        enemy.attackCooldown = 0;
+        enemy.respawn = 8 + Math.random() * 8;
+      }
+    }
+
+    if (save.world?.chest) {
+      const chest = save.world.chest;
+      state.chest.opened = Boolean(chest.opened);
+      state.chest.respawn = state.chest.opened ? clamp(numberOr(chest.respawn, 24), 1, 80) : 0;
+      const chestX = clamp(numberOr(chest.x, state.chest.x), 1.2, worldMap[0].length - 1.2);
+      const chestY = clamp(numberOr(chest.y, state.chest.y), 1.2, worldMap.length - 1.2);
+      if (!isInHouseLot(chestX, chestY)) {
+        state.chest.x = chestX;
+        state.chest.y = chestY;
+      }
+    }
+
+    const wantsHouse = Boolean(player.inHouse && state.house.unlocked);
+    state.player.inHouse = wantsHouse;
+
+    const activeMap = state.player.inHouse ? houseInteriorMap : worldMap;
+    const fallback = state.player.inHouse ? { x: 9.5, y: 14.2, angle: -Math.PI / 2 } : { x: 9.5, y: 8.5, angle: 0 };
+    const px = clamp(numberOr(player.x, fallback.x), 1.2, activeMap[0].length - 1.2);
+    const py = clamp(numberOr(player.y, fallback.y), 1.2, activeMap.length - 1.2);
+    if (isBlocking(px, py)) {
+      state.player.x = fallback.x;
+      state.player.y = fallback.y;
+    } else {
+      state.player.x = px;
+      state.player.y = py;
+    }
+    state.player.angle = normalizeAngle(numberOr(player.angle, fallback.angle));
+
+    updateQuestProgressFromInventory();
+    return true;
+  }
+
+  function saveGame(options = {}) {
+    const { silent = false } = options;
+    if (state.mode !== "playing" && state.mode !== "gameover") {
+      if (!silent) logMsg("Start your journey before saving.");
+      return false;
+    }
+
+    const payload = captureSaveData();
+    try {
+      window.localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+    } catch {
+      if (!silent) logMsg("Save failed: local storage unavailable.");
+      return false;
+    }
+
+    hasSaveData = true;
+    lastSaveAt = payload.savedAt;
+    autoSaveTimer = 0;
+    refreshContinueButton();
+    if (!silent) logMsg("Progress saved.");
+    return true;
+  }
+
+  function loadGame(options = {}) {
+    const { silent = false, fromMenu = false } = options;
+    const payload = readSaveData();
+    if (!payload) {
+      hasSaveData = false;
+      refreshContinueButton();
+      if (!silent) logMsg("No saved journey found.");
+      return false;
+    }
+
+    if (!applySaveData(payload)) {
+      if (!silent) logMsg("Save file is incompatible.");
+      return false;
+    }
+
+    hasSaveData = true;
+    lastSaveAt = numberOr(payload.savedAt, Date.now());
+    autoSaveTimer = 0;
+    refreshContinueButton();
+
+    if (fromMenu || state.mode !== "playing") {
+      beginSession({ fromLoad: true });
+    }
+
+    if (!silent) logMsg("Journey loaded.");
+    return true;
+  }
+
+  function beginSession(options = {}) {
+    const { fromLoad = false } = options;
+    state.mode = "playing";
+    menu.style.display = "none";
+    autoSaveTimer = 0;
+    if (!fromLoad) {
+      logMsg("Welcome to Dustward. Take the 3 quests and claim your house.");
+    }
+    canvas.focus();
+  }
+
+  function tickAutoSave(dt) {
+    autoSaveTimer += dt;
+    if (autoSaveTimer >= AUTOSAVE_INTERVAL) {
+      saveGame({ silent: true });
+    }
+  }
 
   function logMsg(text) {
     state.msg.unshift({ text, ttl: 8 });
@@ -971,7 +1227,8 @@
     }
   }
 
-  function resetWorld() {
+  function resetWorld(options = {}) {
+    const { countDeath = true, silent = false } = options;
     state.player.x = 9.5;
     state.player.y = 8.5;
     state.player.angle = 0;
@@ -987,7 +1244,7 @@
     state.player.inHouse = false;
     state.player.blocking = false;
     state.player.stamina = 100;
-    state.player.deaths += 1;
+    if (countDeath) state.player.deaths += 1;
     state.mouseButtons.right = false;
 
     spawnEnemies();
@@ -995,7 +1252,61 @@
 
     state.chest.opened = false;
     state.chest.respawn = 0;
-    logMsg("You recover at camp. The valley reshapes itself.");
+    if (!silent) logMsg("You recover at camp. The valley reshapes itself.");
+  }
+
+  function weatherLabel(kind) {
+    if (kind === "mist") return "Mist";
+    if (kind === "rain") return "Rain";
+    if (kind === "storm") return "Storm";
+    return "Clear";
+  }
+
+  function updateWeather(dt) {
+    const weather = state.weather;
+    weather.timer -= dt;
+
+    if (weather.timer <= 0) {
+      const roll = Math.random();
+      if (roll < 0.45) {
+        weather.kind = "clear";
+      } else if (roll < 0.67) {
+        weather.kind = "mist";
+      } else if (roll < 0.9) {
+        weather.kind = "rain";
+      } else {
+        weather.kind = "storm";
+      }
+      weather.timer = 16 + Math.random() * 26;
+    }
+
+    let targetRain = 0;
+    let targetFog = 0.11;
+    let targetWind = 0.2;
+
+    if (weather.kind === "mist") {
+      targetRain = 0;
+      targetFog = 0.32;
+      targetWind = 0.12;
+    } else if (weather.kind === "rain") {
+      targetRain = 0.48;
+      targetFog = 0.22;
+      targetWind = 0.32;
+    } else if (weather.kind === "storm") {
+      targetRain = 0.86;
+      targetFog = 0.36;
+      targetWind = 0.56;
+    }
+
+    const blend = clamp(dt * 0.65, 0, 1);
+    weather.rain = lerp(weather.rain, targetRain, blend);
+    weather.fog = lerp(weather.fog, targetFog, blend);
+    weather.wind = lerp(weather.wind, targetWind, blend * 0.8);
+    weather.lightning = Math.max(0, weather.lightning - dt * 1.7);
+
+    if (weather.kind === "storm" && weather.lightning <= 0 && Math.random() < dt * 0.08) {
+      weather.lightning = 1;
+    }
   }
 
   function updateNPCs(dt) {
@@ -1043,6 +1354,7 @@
     player.swingTimer = Math.max(0, player.swingTimer - dt);
     player.hitPulse = Math.max(0, player.hitPulse - dt * 2.4);
     player.cameraKick = Math.max(0, player.cameraKick - dt * 1.8);
+    updateWeather(dt);
 
     if (state.mode !== "playing") return;
 
@@ -1066,6 +1378,8 @@
 
     if (player.blocking) speedFactor *= 0.62;
     if (player.inHouse) speedFactor *= 0.85;
+    if (!player.inHouse && state.weather.rain > 0.45) speedFactor *= 0.93;
+    if (!player.inHouse && player.stamina < 20) speedFactor *= 0.9;
 
     const vx = (Math.cos(player.angle) * forward + Math.cos(player.angle + Math.PI / 2) * strafe) * PLAYER_SPEED * speedFactor * dt;
     const vy = (Math.sin(player.angle) * forward + Math.sin(player.angle + Math.PI / 2) * strafe) * PLAYER_SPEED * speedFactor * dt;
@@ -1078,9 +1392,11 @@
 
     if (player.inHouse) {
       updateQuestProgressFromInventory();
+      tickAutoSave(dt);
       return;
     }
 
+    const weatherPursuitMult = 1 - state.weather.rain * 0.18;
     for (const enemy of state.enemies) {
       if (!enemy.alive) {
         enemy.respawn -= dt;
@@ -1107,8 +1423,8 @@
       if (d < 9.5 && enemy.stagger <= 0) {
         const nx = dx / (d + 1e-6);
         const ny = dy / (d + 1e-6);
-        const nextX = enemy.x + nx * enemy.speed * dt;
-        const nextY = enemy.y + ny * enemy.speed * dt;
+        const nextX = enemy.x + nx * enemy.speed * weatherPursuitMult * dt;
+        const nextY = enemy.y + ny * enemy.speed * weatherPursuitMult * dt;
 
         if (!isBlocking(nextX, enemy.y)) enemy.x = nextX;
         if (!isBlocking(enemy.x, nextY)) enemy.y = nextY;
@@ -1170,6 +1486,7 @@
     }
 
     updateQuestProgressFromInventory();
+    tickAutoSave(dt);
   }
 
   function drawInteriorBackdrop(width, height) {
@@ -1205,29 +1522,64 @@
       return drawInteriorBackdrop(width, height);
     }
 
-    const day = 0.58 + Math.sin(state.time * 0.02) * 0.22;
+    const weather = state.weather;
+    const day = 0.5 + Math.sin(state.time * 0.014) * 0.45;
     const horizon = Math.floor(height * 0.5);
+    const stormShade = weather.rain * 0.28 + weather.fog * 0.24;
 
     const skyGrad = ctx.createLinearGradient(0, 0, 0, horizon);
-    skyGrad.addColorStop(0, `rgb(${Math.floor(lerp(24, 109, day))}, ${Math.floor(lerp(36, 164, day))}, ${Math.floor(lerp(62, 220, day))})`);
-    skyGrad.addColorStop(1, `rgb(${Math.floor(lerp(74, 182, day))}, ${Math.floor(lerp(103, 204, day))}, ${Math.floor(lerp(126, 235, day))})`);
+    skyGrad.addColorStop(
+      0,
+      `rgb(${Math.floor(lerp(9, 109, day) * (1 - stormShade))}, ${Math.floor(lerp(16, 164, day) * (1 - stormShade * 0.9))}, ${Math.floor(
+        lerp(32, 220, day) * (1 - stormShade * 0.7),
+      )})`,
+    );
+    skyGrad.addColorStop(
+      1,
+      `rgb(${Math.floor(lerp(40, 182, day) * (1 - stormShade * 0.9))}, ${Math.floor(lerp(62, 204, day) * (1 - stormShade * 0.82))}, ${Math.floor(
+        lerp(94, 235, day) * (1 - stormShade * 0.65),
+      )})`,
+    );
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, width, horizon);
+
+    if (day < 0.35) {
+      const starAlpha = clamp((0.35 - day) / 0.35, 0, 1) * (1 - weather.rain * 0.75);
+      ctx.fillStyle = `rgba(232, 241, 255, ${0.58 * starAlpha})`;
+      for (let i = 0; i < 90; i++) {
+        const sx = ((i * 137 + 53) % (width + 23)) - 12;
+        const sy = (i * 97 + 31) % Math.floor(horizon * 0.85);
+        const twinkle = 0.4 + Math.sin(state.time * 0.9 + i * 2.7) * 0.35;
+        const size = twinkle > 0.62 ? 2 : 1;
+        ctx.globalAlpha = clamp(starAlpha * twinkle, 0, 1);
+        ctx.fillRect(sx, sy, size, size);
+      }
+      ctx.globalAlpha = 1;
+    }
 
     const sunX = width * (0.16 + (Math.sin(state.time * 0.006) * 0.5 + 0.5) * 0.68);
     const sunY = horizon * (0.2 + Math.cos(state.time * 0.006) * 0.08);
     const sunR = lerp(30, 56, day);
-    const sunGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 2.8);
-    sunGrad.addColorStop(0, `rgba(255, 247, 204, ${0.68 * day})`);
-    sunGrad.addColorStop(1, "rgba(255, 247, 204, 0)");
-    ctx.fillStyle = sunGrad;
-    ctx.fillRect(0, 0, width, horizon);
+    if (day > 0.16) {
+      const sunGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 2.8);
+      sunGrad.addColorStop(0, `rgba(255, 247, 204, ${0.68 * day * (1 - weather.rain * 0.7)})`);
+      sunGrad.addColorStop(1, "rgba(255, 247, 204, 0)");
+      ctx.fillStyle = sunGrad;
+      ctx.fillRect(0, 0, width, horizon);
+    } else {
+      const moonGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 2.2);
+      moonGrad.addColorStop(0, "rgba(220, 234, 255, 0.52)");
+      moonGrad.addColorStop(1, "rgba(220, 234, 255, 0)");
+      ctx.fillStyle = moonGrad;
+      ctx.fillRect(0, 0, width, horizon);
+    }
 
-    for (let i = 0; i < 7; i++) {
-      const cx = ((i * 260 + state.time * (6 + i)) % (width + 320)) - 140;
+    const cloudCount = 7 + Math.floor(weather.fog * 10);
+    for (let i = 0; i < cloudCount; i++) {
+      const cx = ((i * 260 + state.time * (6 + i) + state.weather.wind * 230) % (width + 320)) - 140;
       const cy = 58 + (i % 3) * 34 + Math.sin(state.time * 0.1 + i) * 8;
       const cloud = ctx.createRadialGradient(cx, cy, 4, cx, cy, 72);
-      cloud.addColorStop(0, `rgba(255,255,255,${0.16 + day * 0.18})`);
+      cloud.addColorStop(0, `rgba(255,255,255,${0.12 + day * 0.14 + weather.fog * 0.22})`);
       cloud.addColorStop(1, "rgba(255,255,255,0)");
       ctx.fillStyle = cloud;
       ctx.fillRect(cx - 90, cy - 55, 180, 110);
@@ -1247,12 +1599,22 @@
       ctx.fill();
     };
 
-    ridge(13, state.time * 0.03, horizon - 44, `rgba(70, 108, 120, ${0.4 + day * 0.2})`);
-    ridge(18, state.time * 0.04 + 1.4, horizon - 18, `rgba(52, 84, 98, ${0.52 + day * 0.22})`);
+    ridge(13, state.time * 0.03, horizon - 44, `rgba(70, 108, 120, ${0.28 + day * 0.2 + weather.fog * 0.3})`);
+    ridge(18, state.time * 0.04 + 1.4, horizon - 18, `rgba(52, 84, 98, ${0.36 + day * 0.2 + weather.fog * 0.24})`);
 
     const groundGrad = ctx.createLinearGradient(0, horizon, 0, height);
-    groundGrad.addColorStop(0, `rgb(${Math.floor(lerp(68, 132, day))}, ${Math.floor(lerp(86, 178, day))}, ${Math.floor(lerp(68, 116, day))})`);
-    groundGrad.addColorStop(1, `rgb(${Math.floor(lerp(42, 90, day))}, ${Math.floor(lerp(56, 126, day))}, ${Math.floor(lerp(48, 86, day))})`);
+    groundGrad.addColorStop(
+      0,
+      `rgb(${Math.floor(lerp(50, 132, day) * (1 - weather.rain * 0.22))}, ${Math.floor(lerp(68, 178, day) * (1 - weather.rain * 0.28))}, ${Math.floor(
+        lerp(56, 116, day) * (1 - weather.rain * 0.2),
+      )})`,
+    );
+    groundGrad.addColorStop(
+      1,
+      `rgb(${Math.floor(lerp(34, 90, day) * (1 - weather.rain * 0.18))}, ${Math.floor(lerp(46, 126, day) * (1 - weather.rain * 0.2))}, ${Math.floor(
+        lerp(38, 86, day) * (1 - weather.rain * 0.14),
+      )})`,
+    );
     ctx.fillStyle = groundGrad;
     ctx.fillRect(0, horizon, width, height - horizon);
 
@@ -1267,7 +1629,50 @@
       ctx.stroke();
     }
 
+    if (weather.fog > 0.06) {
+      const haze = ctx.createLinearGradient(0, horizon - 20, 0, height);
+      haze.addColorStop(0, `rgba(204, 219, 232, ${weather.fog * 0.2})`);
+      haze.addColorStop(1, `rgba(204, 219, 232, ${weather.fog * 0.34})`);
+      ctx.fillStyle = haze;
+      ctx.fillRect(0, horizon - 20, width, height - horizon + 20);
+    }
+
     return horizon;
+  }
+
+  function drawWeatherOverlay() {
+    if (state.player.inHouse) return;
+
+    const weather = state.weather;
+    if (weather.rain > 0.03) {
+      const streaks = Math.floor(canvas.width * (0.03 + weather.rain * 0.1));
+      ctx.strokeStyle = `rgba(196, 218, 238, ${0.1 + weather.rain * 0.2})`;
+      ctx.lineWidth = 1.1;
+      for (let i = 0; i < streaks; i++) {
+        const x = ((i * 29 + state.time * (300 + weather.wind * 500)) % (canvas.width + 80)) - 40;
+        const y = ((i * 53 + state.time * (590 + weather.rain * 700)) % (canvas.height + 100)) - 50;
+        const len = 12 + weather.rain * 11;
+        const dx = 3 + weather.wind * 18;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + dx, y + len);
+        ctx.stroke();
+      }
+    }
+
+    if (weather.fog > 0.08) {
+      const fog = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      fog.addColorStop(0, `rgba(214, 226, 236, ${weather.fog * 0.08})`);
+      fog.addColorStop(1, `rgba(214, 226, 236, ${weather.fog * 0.2})`);
+      ctx.fillStyle = fog;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    if (weather.lightning > 0.01) {
+      const flash = clamp(weather.lightning, 0, 1);
+      ctx.fillStyle = `rgba(242, 247, 255, ${flash * 0.28})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
   }
 
   function drawBillboardSprite(sprite, left, top, spriteWidth, spriteHeight, lightFactor) {
@@ -1446,8 +1851,64 @@
     ctx.fillStyle = "rgba(255,255,255,0.35)";
     ctx.fillRect(19, -112, 3, 112);
 
-    ctx.fillStyle = "#d2b39b";
-    ctx.fillRect(12, 52, 25, 18);
+    const forearm = ctx.createLinearGradient(4, 52, 52, 102);
+    forearm.addColorStop(0, "#d7b49b");
+    forearm.addColorStop(1, "#b98970");
+    ctx.fillStyle = forearm;
+    ctx.beginPath();
+    ctx.moveTo(8, 56);
+    ctx.lineTo(40, 56);
+    ctx.lineTo(56, 98);
+    ctx.lineTo(3, 102);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(82, 46, 30, 0.2)";
+    ctx.beginPath();
+    ctx.moveTo(11, 60);
+    ctx.lineTo(35, 60);
+    ctx.lineTo(46, 94);
+    ctx.lineTo(12, 96);
+    ctx.closePath();
+    ctx.fill();
+
+    const palm = ctx.createLinearGradient(8, 38, 40, 75);
+    palm.addColorStop(0, "#e1bfa7");
+    palm.addColorStop(1, "#c99880");
+    ctx.fillStyle = palm;
+    ctx.beginPath();
+    ctx.moveTo(9, 44);
+    ctx.lineTo(35, 44);
+    ctx.lineTo(39, 64);
+    ctx.lineTo(12, 70);
+    ctx.closePath();
+    ctx.fill();
+
+    for (let i = 0; i < 4; i++) {
+      const fx = 11 + i * 6;
+      ctx.fillStyle = i % 2 === 0 ? "#dcb89f" : "#d3ad94";
+      ctx.fillRect(fx, 42, 5, 16);
+      ctx.fillStyle = "rgba(96, 62, 45, 0.22)";
+      ctx.fillRect(fx, 55, 5, 2);
+    }
+
+    ctx.fillStyle = "#c89278";
+    ctx.beginPath();
+    ctx.moveTo(34, 51);
+    ctx.lineTo(43, 56);
+    ctx.lineTo(39, 67);
+    ctx.lineTo(31, 62);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#465a72";
+    ctx.beginPath();
+    ctx.moveTo(4, 84);
+    ctx.lineTo(53, 82);
+    ctx.lineTo(58, 98);
+    ctx.lineTo(2, 103);
+    ctx.closePath();
+    ctx.fill();
 
     ctx.restore();
   }
@@ -1498,7 +1959,7 @@
       if (!state.player.inHouse) {
         const fog = clamp((correctedDist - 5) / (MAX_RAY_DIST - 5), 0, 1);
         if (fog > 0) {
-          ctx.fillStyle = `rgba(132, 150, 164, ${fog * 0.45})`;
+          ctx.fillStyle = `rgba(132, 150, 164, ${fog * (0.38 + state.weather.fog * 0.5)})`;
           ctx.fillRect(x, y, 1, wallHeight);
         }
       }
@@ -1744,7 +2205,8 @@
 
     const location = state.player.inHouse ? "Player House" : "Valley";
     const houseStatus = state.house.unlocked ? "Owned" : "Locked";
-    ctx.fillText(`Location: ${location}   House: ${houseStatus}`, 24, 34);
+    const weatherText = state.player.inHouse ? "Sheltered" : weatherLabel(state.weather.kind);
+    ctx.fillText(`Location: ${location}   House: ${houseStatus}   Weather: ${weatherText}`, 24, 34);
 
     let msgY = 54;
     const shown = state.msg.slice(0, 4);
@@ -1768,12 +2230,13 @@
 
     ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
     ctx.font = "12px Georgia";
-    ctx.fillText("LMB/Space: Swing  RMB: Block  E: Interact  Q: Potion  M: Map  F: Fullscreen", 20, canvas.height - 8);
+    ctx.fillText("LMB/Space: Swing  RMB: Block  E: Interact  Q: Potion  K: Save  L: Load  M: Map  F: Fullscreen", 20, canvas.height - 8);
   }
 
   function render() {
     render3D();
     drawWeaponOverlay();
+    drawWeatherOverlay();
     drawMiniMap();
     drawHud();
   }
@@ -1789,12 +2252,15 @@
 
   window.addEventListener("resize", resize);
   resize();
+  syncSaveStateFromStorage();
 
   startBtn.addEventListener("click", () => {
-    state.mode = "playing";
-    menu.style.display = "none";
-    logMsg("Welcome to Dustward. Take the 3 quests and claim your house.");
-    canvas.focus();
+    beginSession();
+  });
+  continueBtn?.addEventListener("click", () => {
+    if (!loadGame({ fromMenu: true })) {
+      beginSession();
+    }
   });
 
   document.addEventListener("keydown", (event) => {
@@ -1811,6 +2277,16 @@
 
     if (event.code === "KeyQ") {
       usePotion();
+    }
+
+    if (event.code === "KeyK") {
+      saveGame();
+      event.preventDefault();
+    }
+
+    if (event.code === "KeyL") {
+      loadGame();
+      event.preventDefault();
     }
 
     if (event.code === "KeyM") {
@@ -1943,7 +2419,17 @@
         y_direction: "positive y moves south/down",
       },
       mode: state.mode,
+      save: {
+        has_save: hasSaveData,
+        last_saved_at: lastSaveAt,
+      },
       location: state.player.inHouse ? "house" : "valley",
+      weather: {
+        kind: state.player.inHouse ? "sheltered" : state.weather.kind,
+        rain: Number(state.weather.rain.toFixed(2)),
+        fog: Number(state.weather.fog.toFixed(2)),
+        wind: Number(state.weather.wind.toFixed(2)),
+      },
       player: {
         x: Number(state.player.x.toFixed(2)),
         y: Number(state.player.y.toFixed(2)),

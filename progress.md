@@ -58,3 +58,37 @@ Original prompt: Build a 3D role playing game, sandbox, thats single player
 - `output/web-game-realism-smoke2`: no console/page errors.
 - `output/web-game-realism-queststart`: Quest 1 activates (`crystal.status = active`) from initial Elder interaction.
 - `output/web-game-realism-combat2`: combat/block scenario executes without console/page errors.
+
+## Save/Load Safety Pass (Current)
+- Added player-facing save/load controls:
+  - New menu `Continue Journey` button (shown only when a compatible save exists).
+  - New quick-save (`K`) and quick-load (`L`) keybinds during play.
+- Implemented guarded localStorage persistence (`dustward-save-v1`) with:
+  - Versioned payload format.
+  - Validation/clamping on load for player stats, inventory, quest progress, and positions.
+  - Safe fallback behavior when storage is unavailable or save data is missing/incompatible.
+- Added 30-second silent autosave timer while actively playing.
+- Extended `render_game_to_text` payload with save metadata (`has_save`, `last_saved_at`).
+
+## Realism Upgrade Pass (Atmosphere + World Feel)
+- Added dynamic weather simulation that transitions between `clear`, `mist`, `rain`, and `storm`.
+- Integrated weather into rendering:
+  - Sky now blends day/night + storm shading.
+  - Night stars and moon glow appear at low daylight.
+  - Fog density now varies with weather and affects distant wall haze.
+  - Rain streaks and storm lightning overlays added for outdoor scenes.
+- Integrated weather into gameplay feel:
+  - Heavy rain slightly reduces player sprint effectiveness.
+  - Heavy rain slightly slows enemy pursuit speed.
+- HUD now displays active weather state.
+- `render_game_to_text` now reports weather telemetry (`kind`, `rain`, `fog`, `wind`) for deterministic validation.
+
+## Validation (Atmosphere Pass)
+- Ran Playwright gameplay loop successfully:
+  - `output/web-game/shot-0.png`
+  - `output/web-game/shot-1.png`
+  - `output/web-game/shot-2.png`
+  - `output/web-game/state-0.json`
+  - `output/web-game/state-1.json`
+  - `output/web-game/state-2.json`
+- New run produced no fresh `errors-*.json` artifacts.
