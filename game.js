@@ -1864,6 +1864,10 @@
     return horizon;
   }
 
+  // Cache for gradients to avoid recreation every frame
+  let cachedCloudGradient = null;
+  let lastCloudOpacity = -1;
+
   function drawSkyAndGround(width, height) {
     if (state.player.inHouse) {
       return drawInteriorBackdrop(width, height);
@@ -1922,14 +1926,26 @@
     }
 
     const cloudCount = 7 + Math.floor(weather.fog * 10);
+    const cloudOpacity = 0.12 + day * 0.14 + weather.fog * 0.22;
+    
+    // Cache cloud gradient if opacity hasn't changed significantly
+    if (!cachedCloudGradient || Math.abs(lastCloudOpacity - cloudOpacity) > 0.01) {
+      cachedCloudGradient = ctx.createRadialGradient(0, 0, 4, 0, 0, 72);
+      cachedCloudGradient.addColorStop(0, `rgba(255,255,255,${cloudOpacity})`);
+      cachedCloudGradient.addColorStop(1, "rgba(255,255,255,0)");
+      lastCloudOpacity = cloudOpacity;
+    }
+    
     for (let i = 0; i < cloudCount; i++) {
       const cx = ((i * 260 + state.time * (6 + i) + state.weather.wind * 230) % (width + 320)) - 140;
       const cy = 58 + (i % 3) * 34 + Math.sin(state.time * 0.1 + i) * 8;
-      const cloud = ctx.createRadialGradient(cx, cy, 4, cx, cy, 72);
-      cloud.addColorStop(0, `rgba(255,255,255,${0.12 + day * 0.14 + weather.fog * 0.22})`);
-      cloud.addColorStop(1, "rgba(255,255,255,0)");
-      ctx.fillStyle = cloud;
-      ctx.fillRect(cx - 90, cy - 55, 180, 110);
+      
+      // Use cached gradient with translation
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.fillStyle = cachedCloudGradient;
+      ctx.fillRect(-90, -55, 180, 110);
+      ctx.restore();
     }
 
     const ridge = (amp, offset, elev, color) => {
@@ -2347,14 +2363,22 @@
     }
 
     const projected = [];
+    const MAX_RAY_DIST_SQ = MAX_RAY_DIST * MAX_RAY_DIST;
+    const MIN_DIST_SQ = 0.12 * 0.12;
+    
     for (const sprite of sprites) {
       const dx = sprite.x - state.player.x;
       const dy = sprite.y - state.player.y;
-      const d = Math.hypot(dx, dy);
+      
+      // Quick distance check using squared distance (avoids sqrt)
+      const distSq = dx * dx + dy * dy;
+      if (distSq < MIN_DIST_SQ || distSq > MAX_RAY_DIST_SQ) continue;
+      
       const ang = normalizeAngle(Math.atan2(dy, dx) - state.player.angle);
       if (Math.abs(ang) > FOV * 0.72) continue;
-      if (d < 0.12 || d > MAX_RAY_DIST) continue;
-
+      
+      // Only compute actual distance when needed
+      const d = Math.sqrt(distSq);
       const sx = ((ang + FOV / 2) / FOV) * width;
       const scale = (height / (d + 0.01)) * sprite.size * 0.58;
       projected.push({ ...sprite, sx, distToPlayer: d, scale });
@@ -2906,43 +2930,58 @@
       nearby_npcs: state.player.inHouse
         ? []
         : state.npcs
-            .map((n) => ({
-              id: n.id,
-              name: n.name,
-              x: Number(n.x.toFixed(2)),
-              y: Number(n.y.toFixed(2)),
-              distance: Number(dist(state.player, n).toFixed(2)),
-            }))
-            .filter((n) => n.distance < 8)
+            .reduce((acc, n) => {
+              const distance = dist(state.player, n);
+              if (distance < 8) {
+                acc.push({
+                  id: n.id,
+                  name: n.name,
+                  x: Math.round(n.x * 100) / 100,
+                  y: Math.round(n.y * 100) / 100,
+                  distance: Math.round(distance * 100) / 100,
+                });
+              }
+              return acc;
+            }, [])
             .sort((a, b) => a.distance - b.distance),
       nearby_enemies: state.player.inHouse
         ? []
         : activeEnemies
-            .map((e) => ({
-              id: e.id,
-              x: Number(e.x.toFixed(2)),
-              y: Number(e.y.toFixed(2)),
-              hp: e.hp,
-              distance: Number(dist(state.player, e).toFixed(2)),
-            }))
-            .filter((e) => e.distance < 10)
+            .reduce((acc, e) => {
+              const distance = dist(state.player, e);
+              if (distance < 10 && acc.length < 8) {
+                acc.push({
+                  id: e.id,
+                  x: Math.round(e.x * 100) / 100,
+                  y: Math.round(e.y * 100) / 100,
+                  hp: e.hp,
+                  distance: Math.round(distance * 100) / 100,
+                });
+              }
+              return acc;
+            }, [])
             .sort((a, b) => a.distance - b.distance)
             .slice(0, 8),
       nearby_resources: state.player.inHouse
         ? [
-            { id: "bed", type: "bed", x: state.house.bed.x, y: state.house.bed.y, distance: Number(dist(state.player, state.house.bed).toFixed(2)) },
-            { id: "stash", type: "stash", x: state.house.stash.x, y: state.house.stash.y, distance: Number(dist(state.player, state.house.stash).toFixed(2)) },
-            { id: "exit", type: "exit-door", x: state.house.interiorDoor.x, y: state.house.interiorDoor.y, distance: Number(dist(state.player, state.house.interiorDoor).toFixed(2)) },
+            { id: "bed", type: "bed", x: state.house.bed.x, y: state.house.bed.y, distance: Math.round(dist(state.player, state.house.bed) * 100) / 100 },
+            { id: "stash", type: "stash", x: state.house.stash.x, y: state.house.stash.y, distance: Math.round(dist(state.player, state.house.stash) * 100) / 100 },
+            { id: "exit", type: "exit-door", x: state.house.interiorDoor.x, y: state.house.interiorDoor.y, distance: Math.round(dist(state.player, state.house.interiorDoor) * 100) / 100 },
           ]
         : activeResources
-            .map((r) => ({
-              id: r.id,
-              type: r.type,
-              x: Number(r.x.toFixed(2)),
-              y: Number(r.y.toFixed(2)),
-              distance: Number(dist(state.player, r).toFixed(2)),
-            }))
-            .filter((r) => r.distance < 9)
+            .reduce((acc, r) => {
+              const distance = dist(state.player, r);
+              if (distance < 9 && acc.length < 12) {
+                acc.push({
+                  id: r.id,
+                  type: r.type,
+                  x: Math.round(r.x * 100) / 100,
+                  y: Math.round(r.y * 100) / 100,
+                  distance: Math.round(distance * 100) / 100,
+                });
+              }
+              return acc;
+            }, [])
             .sort((a, b) => a.distance - b.distance)
             .slice(0, 12),
       messages: state.msg.slice(0, 4).map((m) => m.text),
