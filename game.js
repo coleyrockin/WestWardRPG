@@ -1445,9 +1445,15 @@
       return;
     }
 
-    const targets = state.enemies
-      .filter((enemy) => enemy.alive)
-      .sort((a, b) => dist(state.player, a) - dist(state.player, b));
+    // Optimize enemy targeting by using squared distances to avoid sqrt
+    const targets = state.enemies.filter(e => e.alive);
+    const px = state.player.x;
+    const py = state.player.y;
+    targets.sort((a, b) => {
+      const daSq = (a.x - px) * (a.x - px) + (a.y - py) * (a.y - py);
+      const dbSq = (b.x - px) * (b.x - px) + (b.y - py) * (b.y - py);
+      return daSq - dbSq;
+    });
 
     let hitCount = 0;
     for (const enemy of targets) {
@@ -1659,7 +1665,12 @@
     for (const m of state.msg) {
       m.ttl -= dt;
     }
-    state.msg = state.msg.filter((m) => m.ttl > 0);
+    // Use reverse loop to remove expired messages without creating new array
+    for (let i = state.msg.length - 1; i >= 0; i--) {
+      if (state.msg[i].ttl <= 0) {
+        state.msg.splice(i, 1);
+      }
+    }
 
     const player = state.player;
     player.attackCooldown = Math.max(0, player.attackCooldown - dt);
@@ -1695,8 +1706,14 @@
     if (!player.inHouse && state.weather.rain > 0.45) speedFactor *= 0.93;
     if (!player.inHouse && player.stamina < 20) speedFactor *= 0.9;
 
-    const vx = (Math.cos(player.angle) * forward + Math.cos(player.angle + Math.PI / 2) * strafe) * PLAYER_SPEED * speedFactor * dt;
-    const vy = (Math.sin(player.angle) * forward + Math.sin(player.angle + Math.PI / 2) * strafe) * PLAYER_SPEED * speedFactor * dt;
+    // Pre-compute trigonometric values to avoid duplicate calculations
+    const cosAngle = Math.cos(player.angle);
+    const sinAngle = Math.sin(player.angle);
+    const cos90 = -sinAngle; // cos(angle + PI/2) = -sin(angle)
+    const sin90 = cosAngle;  // sin(angle + PI/2) = cos(angle)
+    
+    const vx = (cosAngle * forward + cos90 * strafe) * PLAYER_SPEED * speedFactor * dt;
+    const vy = (sinAngle * forward + sin90 * strafe) * PLAYER_SPEED * speedFactor * dt;
     moveWithCollision(vx, vy);
 
     const moving = Math.abs(forward) + Math.abs(strafe) > 0;
@@ -1757,10 +1774,13 @@
       const d = Math.hypot(dx, dy);
 
       if (d < 9.5 && enemy.stagger <= 0) {
-        const nx = dx / (d + 1e-6);
-        const ny = dy / (d + 1e-6);
-        const nextX = enemy.x + nx * enemy.speed * weatherPursuitMult * dt;
-        const nextY = enemy.y + ny * enemy.speed * weatherPursuitMult * dt;
+        // Pre-compute inverse distance to avoid division in both calculations
+        const invD = 1 / (d + 1e-6);
+        const nx = dx * invD;
+        const ny = dy * invD;
+        const move = enemy.speed * weatherPursuitMult * dt;
+        const nextX = enemy.x + nx * move;
+        const nextY = enemy.y + ny * move;
 
         if (!isBlocking(nextX, enemy.y)) enemy.x = nextX;
         if (!isBlocking(enemy.x, nextY)) enemy.y = nextY;
