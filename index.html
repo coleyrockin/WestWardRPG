@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dustward - Single Player 3D Sandbox RPG</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23253c40'/%3E%3Ccircle cx='8' cy='8' r='5' fill='%23e38655'/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        --bg-a: #d6e8ff;
+        --bg-b: #8dc2a3;
+        --ui: #f4efe0;
+        --accent: #ce6a3f;
+        --ink: #1e2a2f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+        background: radial-gradient(circle at 15% 10%, #ffffff 0%, var(--bg-a) 38%, var(--bg-b) 100%);
+        color: var(--ink);
+        overflow: hidden;
+      }
+
+      #app {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      #game {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      #menu {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(140deg, rgba(255, 247, 230, 0.95), rgba(188, 222, 210, 0.78));
+        z-index: 10;
+      }
+
+      .menu-card {
+        width: min(640px, 92vw);
+        border: 3px solid #334f54;
+        background: rgba(255, 254, 249, 0.95);
+        box-shadow: 0 18px 0 rgba(35, 57, 61, 0.2);
+        padding: 1.5rem;
+      }
+
+      h1 {
+        margin: 0 0 0.6rem;
+        font-size: clamp(2rem, 5.4vw, 3.2rem);
+        letter-spacing: 0.05em;
+      }
+
+      .subtitle {
+        margin: 0 0 1rem;
+      }
+
+      ul {
+        margin: 0.5rem 0 1.1rem;
+        padding-left: 1.2rem;
+      }
+
+      #start-btn {
+        border: 0;
+        cursor: pointer;
+        font-size: 1.05rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        padding: 0.75rem 1.2rem;
+        color: #fff;
+        background: linear-gradient(180deg, #e38655, var(--accent));
+      }
+
+      #start-btn:hover {
+        filter: brightness(1.08);
+      }
+
+      #hint {
+        font-size: 0.95rem;
+        margin-top: 0.8rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game" width="1280" height="720" aria-label="3D sandbox RPG canvas"></canvas>
+      <div id="menu">
+        <div class="menu-card">
+          <h1>DUSTWARD</h1>
+          <p class="subtitle">Single-player 3D sandbox RPG prototype.</p>
+          <ul>
+            <li>Move: WASD or Arrow keys</li>
+            <li>Look: Mouse (click game to lock pointer) or Arrow Left/Right</li>
+            <li>Attack: Space</li>
+            <li>Interact: E</li>
+            <li>Use potion: Q</li>
+            <li>Toggle map: M, Fullscreen: F</li>
+          </ul>
+          <button id="start-btn">Enter The Wilds</button>
+          <div id="hint">Goal: accept quests from villagers, gather crystals and wood, hunt slimes, level up.</div>
+        </div>
+      </div>
+    </div>
+    <script src="game.js"></script>
+  </body>
+</html>
