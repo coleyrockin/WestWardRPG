@@ -80,6 +80,7 @@
         padding: 0.75rem 1.2rem;
         color: #fff;
         background: linear-gradient(180deg, #e38655, var(--accent));
+        transition: transform 0.1s;
       }
 
       #continue-btn {
@@ -92,6 +93,7 @@
         color: #fff;
         background: linear-gradient(180deg, #5e8b9b, #3f6070);
         display: none;
+        transition: transform 0.1s;
       }
 
       .menu-actions {
@@ -102,10 +104,12 @@
 
       #start-btn:hover {
         filter: brightness(1.08);
+        transform: scale(1.04);
       }
 
       #continue-btn:hover {
         filter: brightness(1.08);
+        transform: scale(1.04);
       }
 
       #hint {
@@ -119,23 +123,23 @@
       <canvas id="game" width="1280" height="720" aria-label="3D sandbox RPG canvas"></canvas>
       <div id="menu">
         <div class="menu-card">
-          <h1>DUSTWARD</h1>
-          <p class="subtitle">Single-player 3D sandbox RPG prototype.</p>
+          <h1>🏜️ DUSTWARD</h1>
+          <p class="subtitle">A comically realistic 3D sandbox RPG. Swords, slimes, and questionable life choices.</p>
           <ul>
-            <li>Move: WASD or Arrow keys</li>
-            <li>Look: Mouse (click game to lock pointer) or Arrow Left/Right</li>
-            <li>Attack: Left Mouse or Space (3-hit combo)</li>
-            <li>Block: Right Mouse (or C)</li>
-            <li>Interact: E</li>
-            <li>Use potion: Q</li>
-            <li>Toggle map: M, Fullscreen: F</li>
-            <li>Quick save: K, Quick load: L</li>
+            <li>🎮 Move: WASD or Arrow keys</li>
+            <li>👀 Look: Mouse (click to lock pointer) or Arrow Left/Right</li>
+            <li>⚔️ Attack: Left Mouse or Space (3-hit combo!)</li>
+            <li>🛡️ Block: Right Mouse or C</li>
+            <li>💬 Interact / Shop: E (talk to NPCs, browse shops)</li>
+            <li>🧪 Use potion: Q</li>
+            <li>🗺️ Toggle map: M, 🔇 Sound: N, 📺 Fullscreen: F</li>
+            <li>💾 Quick save: K, Quick load: L</li>
           </ul>
           <div class="menu-actions">
-            <button id="start-btn">Enter The Wilds</button>
-            <button id="continue-btn">Continue Journey</button>
+            <button id="start-btn">⚔️ Enter The Wilds</button>
+            <button id="continue-btn">📜 Continue Journey</button>
           </div>
-          <div id="hint">Goal: finish 3 quests, earn your own house, rest inside, and survive a realistic first-person valley.</div>
+          <div id="hint">🎯 Goal: Complete quests, shop for gear, build your house, pet the cat, and survive a valley full of sarcastic NPCs and angry gelatin.</div>
         </div>
       </div>
     </div>

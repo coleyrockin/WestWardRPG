@@ -16,6 +16,229 @@
   const AUTOSAVE_INTERVAL = 30;
   const QUEST_STATUSES = new Set(["locked", "active", "complete", "turned_in"]);
 
+  /* ─── Sound Effects System (Web Audio API) ─── */
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  let audioCtx = null;
+  let soundEnabled = true;
+
+  function ensureAudio() {
+    if (!audioCtx && AudioCtx) {
+      try { audioCtx = new AudioCtx(); } catch { audioCtx = null; }
+    }
+    if (audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => {});
+    }
+    return audioCtx;
+  }
+
+  function playTone(freq, duration, type, volume, detune) {
+    const ctx = ensureAudio();
+    if (!ctx || !soundEnabled) return;
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type || "square";
+      osc.frequency.value = freq;
+      if (detune) osc.detune.value = detune;
+      gain.gain.setValueAtTime(Math.min(volume || 0.08, 0.15), ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
+    } catch { /* audio not critical */ }
+  }
+
+  function playNoise(duration, volume) {
+    const ctx = ensureAudio();
+    if (!ctx || !soundEnabled) return;
+    try {
+      const bufSize = Math.floor(ctx.sampleRate * duration);
+      const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
+      const src = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      src.buffer = buf;
+      gain.gain.setValueAtTime(Math.min(volume || 0.04, 0.1), ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      src.connect(gain);
+      gain.connect(ctx.destination);
+      src.start();
+    } catch { /* audio not critical */ }
+  }
+
+  const sfx = {
+    footstep()   { playTone(80 + Math.random() * 40, 0.06, "triangle", 0.04); },
+    swordSwing() { playNoise(0.12, 0.07); playTone(220 + Math.random() * 60, 0.1, "sawtooth", 0.05); },
+    swordHit()   { playTone(160, 0.08, "square", 0.09); playNoise(0.06, 0.08); },
+    playerHurt() { playTone(110, 0.15, "sawtooth", 0.08, -200); },
+    enemyDie()   { playTone(300, 0.06, "square", 0.06); playTone(200, 0.1, "square", 0.05); playTone(100, 0.18, "square", 0.04); },
+    pickup()     { playTone(523, 0.06, "sine", 0.07); playTone(659, 0.08, "sine", 0.06); },
+    questDone()  { playTone(392, 0.1, "sine", 0.07); playTone(523, 0.12, "sine", 0.07); playTone(659, 0.14, "sine", 0.07); },
+    shopBuy()    { playTone(440, 0.05, "triangle", 0.06); playTone(554, 0.08, "triangle", 0.06); },
+    doorOpen()   { playTone(130, 0.15, "triangle", 0.05); playTone(165, 0.12, "triangle", 0.04); },
+    potionUse()  { playTone(350, 0.08, "sine", 0.06); playTone(440, 0.12, "sine", 0.05); playTone(523, 0.15, "sine", 0.04); },
+    levelUp()    { playTone(523, 0.1, "sine", 0.08); playTone(659, 0.1, "sine", 0.08); playTone(784, 0.15, "sine", 0.08); playTone(1047, 0.2, "sine", 0.07); },
+    thunder()    { playNoise(0.6, 0.09); playTone(40, 0.5, "sawtooth", 0.06); },
+    miss()       { playNoise(0.08, 0.03); },
+    blockHit()   { playTone(200, 0.06, "square", 0.06); playTone(90, 0.08, "triangle", 0.05); },
+    rain()       { playNoise(0.3, 0.02); },
+    npcChat()    { playTone(280 + Math.random() * 80, 0.04, "triangle", 0.03); },
+    death()      { playTone(180, 0.2, "sawtooth", 0.08); playTone(120, 0.3, "sawtooth", 0.06); playTone(60, 0.5, "sawtooth", 0.04); },
+  };
+
+  let footstepTimer = 0;
+  let ambientTimer = 0;
+
+  /* ─── Comical NPC Dialogue Lines ─── */
+  const npcDialogue = {
+    elder: {
+      idle: [
+        "Elder Nira: Back in my day, slimes were polite. They'd knock first.",
+        "Elder Nira: I've read every scroll in this valley. Most were grocery lists.",
+        "Elder Nira: Don't tell anyone, but I once got lost in my own settlement.",
+        "Elder Nira: Wisdom comes with age. So do backaches.",
+      ],
+      questActive: [
+        "Elder Nira: Those crystals won't collect themselves. I tried asking nicely.",
+        "Elder Nira: Crystal Shards ${p}/${n}. I'm counting. Very slowly.",
+      ],
+    },
+    warden: {
+      idle: [
+        "Warden Sol: I guard these lands! ...mostly from boredom.",
+        "Warden Sol: Have you seen my pet slime? Wait, they all look the same.",
+        "Warden Sol: My sword is sharp. My wit? Debatable.",
+        "Warden Sol: I once chased a slime for three hours. Turns out it was a bush.",
+      ],
+      questActive: [
+        "Warden Sol: Slimes defeated ${p}/${n}. They're not happy about it.",
+        "Warden Sol: Keep smacking those blobs! It's therapeutic.",
+      ],
+    },
+    smith: {
+      idle: [
+        "Smith Varo: I make things. Then I fix the things I made. Circle of life.",
+        "Smith Varo: This anvil has seen things. Terrible, terrible things.",
+        "Smith Varo: Your sword looks fine. My professional opinion? Hit harder.",
+        "Smith Varo: I once forged a spoon so perfect, the Elder cried.",
+      ],
+      questActive: [
+        "Smith Varo: Wood ${wp}/${wn}, Stone ${sp}/${sn}. My back hurts just thinking about it.",
+        "Smith Varo: Bring materials! Your house won't build itself. Trust me, I asked.",
+      ],
+    },
+    merchant: {
+      idle: [
+        "Trader Nyx: Everything's for sale! My morals? Also for sale.",
+        "Trader Nyx: Special deal today - same price as yesterday!",
+        "Trader Nyx: I've got potions, rocks, and a mysterious jar. Don't open the jar.",
+        "Trader Nyx: Trade secrets? My biggest one is a 300% markup.",
+      ],
+    },
+    innkeeper: {
+      idle: [
+        "Innkeeper Mora: You look terrible. That'll be 8 gold.",
+        "Innkeeper Mora: Our beds have only slightly fewer bugs than the marsh.",
+        "Innkeeper Mora: Hot meal? Best I can do is lukewarm and questionable.",
+        "Innkeeper Mora: The secret ingredient in my stew is... ambition. And salt.",
+      ],
+    },
+    bard: {
+      idle: [
+        "Bard Jingles: 🎵 Oh the slimes go splat, and the hero goes WHACK! 🎵",
+        "Bard Jingles: I wrote a ballad about you. It's mostly about falling.",
+        "Bard Jingles: My lute is out of tune. So is my sense of danger.",
+        "Bard Jingles: Want to hear my new song? No? I'll play it anyway.",
+      ],
+    },
+    cat: {
+      idle: [
+        "Whiskers the Cat: *stares at you judgmentally*",
+        "Whiskers the Cat: *knocks a potion off the shelf* Meow.",
+        "Whiskers the Cat: *purrs... menacingly*",
+        "Whiskers the Cat: *pretends you don't exist*",
+      ],
+    },
+  };
+
+  /* ─── Comical Death Messages ─── */
+  const deathMessages = [
+    "You got absolutely slimed. Embarrassing.",
+    "A slime sent you to the shadow realm. A SLIME.",
+    "You fell in battle. The slimes will write songs about this.",
+    "Game over. The slimes are throwing a party.",
+    "You were defeated. Even the Elder is shaking her head.",
+    "Wasted. Trader Nyx is already selling your stuff.",
+    "You got bodied by gelatin. Let that sink in.",
+    "K.O.! The slime didn't even break a sweat. Do slimes sweat?",
+  ];
+
+  /* ─── Shop System ─── */
+  let shopOpen = false;
+  const shopItems = [
+    { name: "Health Potion",    cost: 18, desc: "Restores 38 HP. Tastes like feet.",
+      action() { state.inventory.Potion += 1; } },
+    { name: "Mega Potion",      cost: 40, desc: "Restores 80 HP. Tastes like expensive feet.",
+      action() { state.inventory.Potion += 3; } },
+    { name: "Crystal Shard",    cost: 30, desc: "Shiny rock. The Elder loves these.",
+      action() { state.inventory["Crystal Shard"] += 1; updateQuestProgressFromInventory(); } },
+    { name: "Mystery Box",      cost: 25, desc: "Could be anything! (It's usually rocks.)",
+      action() {
+        const roll = Math.random();
+        if (roll < 0.3) { state.inventory.Potion += 2; logMsg("Mystery Box: 2 Potions! Lucky you!"); }
+        else if (roll < 0.5) { state.player.gold += 50; logMsg("Mystery Box: 50 gold! The house always wins... except now."); }
+        else if (roll < 0.7) { state.inventory["Slime Core"] += 3; logMsg("Mystery Box: 3 Slime Cores! Eww but useful."); }
+        else { state.inventory.Stone += 2; logMsg("Mystery Box: 2 Stones. Called it."); }
+      } },
+    { name: "Sell Slime Cores",  cost: -15, desc: "Sell 1 core for 15 gold. Gross but profitable.",
+      action() {
+        if (state.inventory["Slime Core"] <= 0) { logMsg("No Slime Cores to sell!"); return false; }
+        state.inventory["Slime Core"] -= 1;
+        state.player.gold += 15;
+        return true;
+      } },
+  ];
+  let shopSelection = 0;
+
+  /* ─── Particle System ─── */
+  const particles = [];
+
+  function spawnParticles(x, y, count, color, speed, life) {
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x, y,
+        vx: (Math.random() - 0.5) * (speed || 2),
+        vy: (Math.random() - 0.5) * (speed || 2),
+        life: (life || 1) * (0.5 + Math.random() * 0.5),
+        maxLife: life || 1,
+        color: color || "#fff",
+        size: 2 + Math.random() * 3,
+      });
+    }
+  }
+
+  function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * dt * 60;
+      p.y += p.vy * dt * 60;
+      p.life -= dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      const alpha = clamp(p.life / p.maxLife, 0, 1);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = alpha * 0.8;
+      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
   }
@@ -410,6 +633,30 @@
         wanderAngle: Math.random() * TAU,
         wanderTimer: 0,
       },
+      {
+        id: "bard",
+        name: "Bard Jingles",
+        x: 8.5,
+        y: 10.5,
+        homeX: 8.5,
+        homeY: 10.5,
+        color: "#e8c44a",
+        wanderRadius: 1.2,
+        wanderAngle: Math.random() * TAU,
+        wanderTimer: 0,
+      },
+      {
+        id: "cat",
+        name: "Whiskers the Cat",
+        x: 12.5,
+        y: 7.5,
+        homeX: 12.5,
+        homeY: 7.5,
+        color: "#d4a574",
+        wanderRadius: 1.5,
+        wanderAngle: Math.random() * TAU,
+        wanderTimer: 0,
+      },
     ],
     enemies: [],
     resources: [],
@@ -704,7 +951,8 @@
     menu.style.display = "none";
     autoSaveTimer = 0;
     if (!fromLoad) {
-      logMsg("Welcome to Dustward. Take the 3 quests and claim your house.");
+      logMsg("Welcome to Dustward! Talk to NPCs, dodge slimes, and try not to die. Good luck!");
+      ensureAudio();
     }
     canvas.focus();
   }
@@ -730,7 +978,9 @@
       state.player.maxHp += 14;
       state.player.hp = Math.min(state.player.maxHp, state.player.hp + 28);
       state.player.stamina = 100;
-      logMsg(`Level up! You reached level ${state.player.level}.`);
+      logMsg(`Level up! You reached level ${state.player.level}. The valley trembles!`);
+      sfx.levelUp();
+      spawnParticles(canvas.width / 2, canvas.height / 2, 20, "#ffd700", 4, 1.5);
     }
   }
 
@@ -878,7 +1128,8 @@
     state.player.y = 14.2;
     state.player.angle = -Math.PI / 2;
     state.house.visits += 1;
-    logMsg("You enter your house.");
+    logMsg("You enter your house. Home sweet questionable home.");
+    sfx.doorOpen();
   }
 
   function exitHouse() {
@@ -890,7 +1141,8 @@
     state.player.angle = ret.angle;
     state.player.blocking = false;
     state.mouseButtons.right = false;
-    logMsg("You step back into the valley.");
+    logMsg("You step back into the valley. Nature awaits... and so do the slimes.");
+    sfx.doorOpen();
   }
 
   function interact() {
@@ -906,7 +1158,8 @@
         state.player.hp = state.player.maxHp;
         state.player.stamina = 100;
         state.player.hurtCooldown = 0;
-        logMsg("You rest and recover to full strength.");
+        logMsg(choice(["You rest and recover fully. Ah, the sweet embrace of a mediocre mattress.", "Full health restored! The bed was slightly lumpy but did the job.", "You nap like a champion. All HP restored."]));
+        sfx.potionUse();
         return;
       }
 
@@ -914,12 +1167,14 @@
         if (state.inventory["Slime Core"] > 0) {
           state.inventory["Slime Core"] -= 1;
           state.player.gold += 18;
-          logMsg("Sold one Slime Core from your stash. +18 gold.");
+          logMsg("Sold one Slime Core from your stash. +18 gold. It was grosser than expected.");
+          sfx.shopBuy();
         } else if (state.inventory.Wood >= 2 && state.inventory.Stone >= 1) {
           state.inventory.Wood -= 2;
           state.inventory.Stone -= 1;
           state.inventory.Potion += 1;
-          logMsg("Crafted one Potion at your workbench.");
+          logMsg("Crafted one Potion at your workbench. It bubbles ominously. That's normal... right?");
+          sfx.pickup();
         } else {
           logMsg("Workbench: deposit Slime Cores or 2 Wood + 1 Stone.");
         }
@@ -943,11 +1198,13 @@
         if (q.status === "locked") {
           q.status = "active";
           q.progress = 0;
-          logMsg("Elder Nira: Bring me 4 Crystal Shards to map these lands.");
+          logMsg("Elder Nira: Bring me 4 Crystal Shards to map these lands. I'd get them myself but... my knees.");
+          sfx.npcChat();
           return;
         }
         if (q.status === "active") {
-          logMsg(`Elder Nira: Crystal Shards ${q.progress}/${q.need}.`);
+          logMsg(`Elder Nira: Crystal Shards ${q.progress}/${q.need}. I'm counting. Very slowly.`);
+          sfx.npcChat();
           return;
         }
         if (q.status === "complete") {
@@ -955,14 +1212,17 @@
           state.inventory["Crystal Shard"] = Math.max(0, state.inventory["Crystal Shard"] - q.need);
           grantXp(q.reward.xp);
           state.player.gold += q.reward.gold;
-          logMsg(`Quest done: ${q.title}. +${q.reward.xp} XP, +${q.reward.gold} gold.`);
+          logMsg(`Quest done: ${q.title}. +${q.reward.xp} XP, +${q.reward.gold} gold. Elder Nira nods approvingly.`);
+          sfx.questDone();
+          spawnParticles(canvas.width / 2, canvas.height / 2, 15, "#8fd0ff", 3, 1.2);
           if (state.quests.slime.status === "locked") {
             state.quests.slime.status = "active";
             logMsg("Elder Nira: Warden Sol needs the marsh cleared.");
           }
           return;
         }
-        logMsg("Elder Nira: Keep forging your legacy.");
+        logMsg(choice(npcDialogue.elder.idle));
+        sfx.npcChat();
         return;
       }
 
@@ -975,11 +1235,13 @@
           }
           q.status = "active";
           q.progress = 0;
-          logMsg("Warden Sol: Defeat 3 slimes near the marsh.");
+          logMsg("Warden Sol: Defeat 3 slimes near the marsh. Don't worry, they jiggle when scared.");
+          sfx.npcChat();
           return;
         }
         if (q.status === "active") {
-          logMsg(`Warden Sol: Slimes defeated ${q.progress}/${q.need}.`);
+          logMsg(`Warden Sol: Slimes defeated ${q.progress}/${q.need}. They're not happy about it.`);
+          sfx.npcChat();
           return;
         }
         if (q.status === "complete") {
@@ -987,14 +1249,17 @@
           grantXp(q.reward.xp);
           state.player.gold += q.reward.gold;
           state.inventory.Potion += q.reward.potion;
-          logMsg(`Quest done: ${q.title}. +${q.reward.xp} XP, +${q.reward.gold} gold, +1 Potion.`);
+          logMsg(`Quest done: ${q.title}. +${q.reward.xp} XP, +${q.reward.gold} gold, +1 Potion. The marsh smells slightly better.`);
+          sfx.questDone();
+          spawnParticles(canvas.width / 2, canvas.height / 2, 15, "#6be873", 3, 1.2);
           if (state.quests.wood.status === "locked") {
             state.quests.wood.status = "active";
             logMsg("Warden Sol: Smith Varo can now build your house.");
           }
           return;
         }
-        logMsg("Warden Sol: The roads are safer with you around.");
+        logMsg(choice(npcDialogue.warden.idle));
+        sfx.npcChat();
         return;
       }
 
@@ -1008,7 +1273,8 @@
           q.status = "active";
           q.progress = 0;
           state.house.built = true;
-          logMsg("Smith Varo: Bring 6 Wood and 4 Stone. We'll raise your house.");
+          logMsg("Smith Varo: Bring 6 Wood and 4 Stone. We'll raise your house. No refunds.");
+          sfx.npcChat();
           return;
         }
         if (q.status === "active") {
@@ -1026,20 +1292,24 @@
           state.house.unlocked = true;
           state.player.maxHp += 10;
           state.player.hp = Math.min(state.player.maxHp, state.player.hp + 24);
-          logMsg(`Quest done: ${q.title}. You now own the house.`);
+          logMsg(`Quest done: ${q.title}. You now own the house! It even has a roof. Probably.`);
+          sfx.questDone();
+          spawnParticles(canvas.width / 2, canvas.height / 2, 25, "#d8bc6a", 4, 1.5);
           return;
         }
-        logMsg("Smith Varo: Your home stands strong. Keep it supplied.");
+        logMsg(choice(npcDialogue.smith.idle));
+        sfx.npcChat();
         return;
       }
 
       if (npc.id === "merchant") {
-        if (state.player.gold >= 18) {
-          state.player.gold -= 18;
-          state.inventory.Potion += 1;
-          logMsg("Trader Nyx sold you a Potion for 18 gold.");
+        shopOpen = !shopOpen;
+        shopSelection = 0;
+        if (shopOpen) {
+          sfx.npcChat();
+          logMsg(choice(npcDialogue.merchant.idle));
         } else {
-          logMsg("Trader Nyx: Bring 18 gold for a Potion.");
+          logMsg("Trader Nyx: Come back when you have more gold... or desperation.");
         }
         return;
       }
@@ -1048,9 +1318,35 @@
         if (state.player.hp < state.player.maxHp && state.player.gold >= 8) {
           state.player.gold -= 8;
           state.player.hp = Math.min(state.player.maxHp, state.player.hp + 28);
-          logMsg("Innkeeper Mora patched your wounds for 8 gold.");
+          sfx.potionUse();
+          logMsg("Innkeeper Mora patched your wounds for 8 gold. 'You owe me a tip.'");
+        } else if (state.player.hp >= state.player.maxHp) {
+          logMsg(choice(npcDialogue.innkeeper.idle));
+          sfx.npcChat();
         } else {
-          logMsg("Innkeeper Mora: Sleep in your house to recover fully.");
+          logMsg("Innkeeper Mora: 8 gold for healing. I don't do charity... or quality.");
+          sfx.npcChat();
+        }
+        return;
+      }
+
+      if (npc.id === "bard") {
+        sfx.npcChat();
+        logMsg(choice(npcDialogue.bard.idle));
+        if (Math.random() < 0.3) {
+          grantXp(3);
+          logMsg("The song was oddly inspiring. +3 XP.");
+        }
+        return;
+      }
+
+      if (npc.id === "cat") {
+        sfx.npcChat();
+        logMsg(choice(npcDialogue.cat.idle));
+        if (Math.random() < 0.15) {
+          state.inventory.Potion += 1;
+          logMsg("Whiskers coughed up... a potion? +1 Potion. Gross.");
+          sfx.pickup();
         }
         return;
       }
@@ -1063,17 +1359,20 @@
         resource.respawn = 26;
         state.inventory["Crystal Shard"] += 1;
         grantXp(6);
-        logMsg("Collected Crystal Shard.");
+        logMsg(choice(["Collected Crystal Shard. Ooh, shiny!", "Crystal Shard acquired. It's warm to the touch.", "Got a Crystal Shard! The Elder will be thrilled."]));
+        sfx.pickup();
       } else if (resource.type === "tree") {
         resource.respawn = 20;
         state.inventory.Wood += 1;
         grantXp(4);
-        logMsg("Collected Wood.");
+        logMsg(choice(["Collected Wood. Timber!", "Wood acquired. Bob the Builder approves.", "Got Wood! ...phrasing."]));
+        sfx.pickup();
       } else {
         resource.respawn = 22;
         state.inventory.Stone += 1;
         grantXp(4);
-        logMsg("Collected Stone.");
+        logMsg(choice(["Collected Stone. Rock solid choice.", "Stone acquired. This one has personality.", "Got Stone! It's not just any rock. It's YOUR rock."]));
+        sfx.pickup();
       }
       updateQuestProgressFromInventory();
       return;
@@ -1082,26 +1381,28 @@
     if (!state.chest.opened && dist(state.player, state.chest) < 1.75) {
       state.chest.opened = true;
       state.chest.respawn = 38;
+      sfx.pickup();
+      spawnParticles(canvas.width / 2, canvas.height * 0.4, 12, "#d8bc6a", 3, 1);
       const loot = choice(["Potion", "Gold", "Gold", "Stone", "Crystal"]);
       if (loot === "Potion") {
         state.inventory.Potion += 1;
-        logMsg("Supply cache: found 1 Potion.");
+        logMsg("Supply cache: found 1 Potion! Someone left this here. Score!");
       } else if (loot === "Stone") {
         state.inventory.Stone += 1;
-        logMsg("Supply cache: found 1 Stone.");
+        logMsg("Supply cache: found 1 Stone. Not gold, but we'll take it.");
       } else if (loot === "Crystal") {
         state.inventory["Crystal Shard"] += 1;
-        logMsg("Supply cache: found 1 Crystal Shard.");
+        logMsg("Supply cache: found 1 Crystal Shard! Jackpot!");
       } else {
         const coins = 10 + Math.floor(Math.random() * 14);
         state.player.gold += coins;
-        logMsg(`Supply cache: found ${coins} gold.`);
+        logMsg(`Supply cache: found ${coins} gold. Ka-ching!`);
       }
       updateQuestProgressFromInventory();
       return;
     }
 
-    logMsg("Nothing useful to interact with.");
+    logMsg(choice(["Nothing useful here. Keep looking!", "You interact with the air. It's not impressed.", "Nothing to do here. The void stares back."]));
   }
 
   function attack() {
@@ -1132,13 +1433,15 @@
     state.mouseButtons.right = false;
     state.player.stamina = Math.max(0, state.player.stamina - swing.stamina);
     state.player.cameraKick = clamp(state.player.cameraKick + 0.14 + state.player.comboStep * 0.04, 0, 0.7);
+    sfx.swordSwing();
 
     if (!state.player.inHouse) {
       moveWithCollision(Math.cos(state.player.angle) * swing.lunge, Math.sin(state.player.angle) * swing.lunge);
     }
 
     if (state.player.inHouse) {
-      logMsg("Your blade whistles through the room.");
+      logMsg("Your blade whistles through the room. The furniture is unimpressed.");
+      sfx.swordSwing();
       return;
     }
 
@@ -1178,7 +1481,14 @@
         state.inventory["Slime Core"] += 1;
         state.player.gold += 10;
         grantXp(22);
-        logMsg("Slime slain. +10 gold, +22 XP, +1 Slime Core.");
+        logMsg(choice([
+          "Slime obliterated! +10 gold, +22 XP, +1 Slime Core.",
+          "Splat! One less blob. +10 gold, +22 XP, +1 Core.",
+          "Slime defeated! It died as it lived: jiggly. +10g, +22 XP.",
+          "Another slime bites the dust(ward). +10g, +22 XP, +1 Core.",
+        ]));
+        sfx.enemyDie();
+        spawnParticles(canvas.width / 2, canvas.height * 0.4, 10, "#6be873", 3, 0.8);
 
         const quest = state.quests.slime;
         if (quest.status === "active") {
@@ -1190,12 +1500,14 @@
           }
         }
       } else {
-        logMsg(`Sword hit for ${damage}.`);
+        logMsg(`Sword hit for ${damage}. ${choice(["Ouch!", "That'll leave a mark!", "Jelly everywhere!", "Take that, blob!"])}`);
+        sfx.swordHit();
       }
     }
 
     if (hitCount === 0) {
-      logMsg("Your strike misses.");
+      logMsg(choice(["Your strike misses. The air is very dead though.", "Swing and a miss! Elegant, yet useless.", "You hit nothing. The wind is offended."]));
+      sfx.miss();
     } else {
       state.player.hitPulse = 0.24;
       state.player.cameraKick = clamp(state.player.cameraKick + hitCount * 0.12, 0, 1);
@@ -1216,7 +1528,9 @@
 
     state.inventory.Potion -= 1;
     state.player.hp = Math.min(state.player.maxHp, state.player.hp + 38);
-    logMsg("Potion used. Health restored.");
+    logMsg(choice(["Potion used. Tastes like victory... and feet.", "Glug glug. Health restored. Dignity pending.", "Potion consumed. Your taste buds will never forgive you."]));
+    sfx.potionUse();
+    spawnParticles(canvas.width / 2, canvas.height * 0.8, 8, "#5fe0b5", 2, 0.6);
   }
 
   function toggleFullscreen() {
@@ -1252,7 +1566,7 @@
 
     state.chest.opened = false;
     state.chest.respawn = 0;
-    if (!silent) logMsg("You recover at camp. The valley reshapes itself.");
+    if (!silent) logMsg("You recover at camp. The valley reshapes itself. The slimes reset. It's like nothing happened... except your pride.");
   }
 
   function weatherLabel(kind) {
@@ -1388,6 +1702,28 @@
     const moving = Math.abs(forward) + Math.abs(strafe) > 0;
     player.walkBob += dt * (moving ? 9.8 * speedFactor : 1.8);
 
+    /* Footstep sounds */
+    if (moving) {
+      footstepTimer -= dt;
+      if (footstepTimer <= 0) {
+        sfx.footstep();
+        footstepTimer = sprinting ? 0.25 : 0.38;
+      }
+    } else {
+      footstepTimer = 0;
+    }
+
+    /* Ambient weather sounds */
+    ambientTimer -= dt;
+    if (ambientTimer <= 0 && !player.inHouse) {
+      if (state.weather.rain > 0.3) sfx.rain();
+      if (state.weather.lightning > 0.5) sfx.thunder();
+      ambientTimer = 1.5 + Math.random();
+    }
+
+    /* Particles */
+    updateParticles(dt);
+
     updateNPCs(dt);
 
     if (player.inHouse) {
@@ -1442,7 +1778,8 @@
               if (facingDiff < 1.12 && player.stamina > 10) {
                 damage = Math.max(1, Math.floor(damage * 0.35));
                 player.stamina = Math.max(0, player.stamina - 11);
-                logMsg("Block absorbed most of the hit.");
+                logMsg("Block absorbed most of the hit. Your shield arm disagrees.");
+                sfx.blockHit();
               } else {
                 damage = Math.max(1, Math.floor(damage * 0.85));
               }
@@ -1451,12 +1788,14 @@
             player.hp -= damage;
             player.hitPulse = Math.max(player.hitPulse, 0.16);
             player.cameraKick = clamp(player.cameraKick + 0.18, 0, 1);
-            logMsg(`A slime strikes for ${damage}.`);
+            logMsg(`A slime strikes for ${damage}. ${choice(["Ow!", "That stings!", "Gross AND painful!", "It's so slimy!"])}`);
+            sfx.playerHurt();
 
             if (player.hp <= 0) {
               player.hp = 0;
               state.mode = "gameover";
-              logMsg("You fell in battle. Press R to recover.");
+              logMsg(choice(deathMessages) + " Press R to recover.");
+              sfx.death();
             }
           }
         }
@@ -1482,6 +1821,14 @@
         const pos = findEmptyCell(worldMap, 8, 6, 20, 15, (x, y) => !isInHouseLot(x, y));
         state.chest.x = pos.x;
         state.chest.y = pos.y;
+      }
+    }
+
+    /* Auto-close shop if player walks away from merchant */
+    if (shopOpen) {
+      const merchant = state.npcs.find(n => n.id === "merchant");
+      if (!merchant || dist(state.player, merchant) > 2.5) {
+        shopOpen = false;
       }
     }
 
@@ -2226,17 +2573,69 @@
       ctx.fillText("You Were Defeated", canvas.width * 0.34, canvas.height * 0.43);
       ctx.font = "20px Georgia";
       ctx.fillText("Press R to recover at camp.", canvas.width * 0.38, canvas.height * 0.49);
+      ctx.font = "italic 16px Georgia";
+      ctx.fillStyle = "#ffa0a0";
+      ctx.fillText(`Deaths: ${state.player.deaths + 1}. The slimes send their regards.`, canvas.width * 0.36, canvas.height * 0.54);
+    }
+
+    /* Shop overlay */
+    if (shopOpen && state.mode === "playing") {
+      const sw = 380;
+      const sh = shopItems.length * 52 + 80;
+      const sx = Math.floor((canvas.width - sw) / 2);
+      const sy = Math.floor((canvas.height - sh) / 2);
+
+      ctx.fillStyle = "rgba(10, 18, 22, 0.88)";
+      ctx.fillRect(sx, sy, sw, sh);
+      ctx.strokeStyle = "#d8bc6a";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(sx, sy, sw, sh);
+
+      ctx.fillStyle = "#ffd77b";
+      ctx.font = "bold 20px Georgia";
+      ctx.fillText("🏪 Trader Nyx's Emporium", sx + 16, sy + 30);
+      ctx.font = "12px Georgia";
+      ctx.fillStyle = "#c9b889";
+      ctx.fillText(`Your Gold: ${state.player.gold}   [↑/↓ to browse, Enter/E to buy, Esc to close]`, sx + 16, sy + 50);
+
+      for (let i = 0; i < shopItems.length; i++) {
+        const item = shopItems[i];
+        const iy = sy + 62 + i * 52;
+        const selected = i === shopSelection;
+
+        ctx.fillStyle = selected ? "rgba(216, 188, 106, 0.2)" : "rgba(255, 255, 255, 0.05)";
+        ctx.fillRect(sx + 8, iy, sw - 16, 46);
+
+        if (selected) {
+          ctx.strokeStyle = "#ffd77b";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(sx + 8, iy, sw - 16, 46);
+        }
+
+        ctx.fillStyle = selected ? "#ffd77b" : "#f3ecd8";
+        ctx.font = "bold 14px Georgia";
+        ctx.fillText(item.name, sx + 20, iy + 18);
+
+        ctx.fillStyle = item.cost < 0 ? "#5fe0b5" : (state.player.gold >= item.cost ? "#ffd77b" : "#ff6b6b");
+        ctx.font = "14px Georgia";
+        ctx.fillText(item.cost < 0 ? `+${Math.abs(item.cost)}g` : `${item.cost}g`, sx + sw - 60, iy + 18);
+
+        ctx.fillStyle = "#a09880";
+        ctx.font = "italic 12px Georgia";
+        ctx.fillText(item.desc, sx + 20, iy + 36);
+      }
     }
 
     ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
     ctx.font = "12px Georgia";
-    ctx.fillText("LMB/Space: Swing  RMB: Block  E: Interact  Q: Potion  K: Save  L: Load  M: Map  F: Fullscreen", 20, canvas.height - 8);
+    ctx.fillText("LMB/Space: Swing  RMB/C: Block  E: Interact  Q: Potion  K: Save  L: Load  M: Map  F: Fullscreen  N: Sound", 20, canvas.height - 8);
   }
 
   function render() {
     render3D();
     drawWeaponOverlay();
     drawWeatherOverlay();
+    drawParticles();
     drawMiniMap();
     drawHud();
   }
@@ -2255,9 +2654,11 @@
   syncSaveStateFromStorage();
 
   startBtn.addEventListener("click", () => {
+    ensureAudio();
     beginSession();
   });
   continueBtn?.addEventListener("click", () => {
+    ensureAudio();
     if (!loadGame({ fromMenu: true })) {
       beginSession();
     }
@@ -2265,6 +2666,42 @@
 
   document.addEventListener("keydown", (event) => {
     state.keys[event.code] = true;
+
+    /* Shop controls */
+    if (shopOpen) {
+      if (event.code === "ArrowUp" || event.code === "KeyW") {
+        shopSelection = (shopSelection - 1 + shopItems.length) % shopItems.length;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "ArrowDown" || event.code === "KeyS") {
+        shopSelection = (shopSelection + 1) % shopItems.length;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
+        const item = shopItems[shopSelection];
+        if (item.cost < 0) {
+          const result = item.action();
+          if (result !== false) sfx.shopBuy();
+        } else if (state.player.gold >= item.cost) {
+          state.player.gold -= item.cost;
+          item.action();
+          sfx.shopBuy();
+          logMsg(`Bought ${item.name}! ${choice(["Money well spent!", "Trader Nyx grins.", "Ka-ching!", "Nyx winks."])}`);
+        } else {
+          logMsg("Trader Nyx: No gold, no goods. That's business, baby.");
+        }
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "Escape") {
+        shopOpen = false;
+        logMsg("Trader Nyx: Come back anytime! I'm always here. Literally. I live here.");
+        event.preventDefault();
+        return;
+      }
+    }
 
     if (event.code === "KeyE" || event.code === "Enter") {
       interact();
@@ -2297,9 +2734,19 @@
       toggleFullscreen();
     }
 
+    if (event.code === "KeyN") {
+      soundEnabled = !soundEnabled;
+      logMsg(soundEnabled ? "Sound ON. Your ears will thank you. Maybe." : "Sound OFF. Blissful silence.");
+    }
+
+    if (event.code === "Escape" && shopOpen) {
+      shopOpen = false;
+    }
+
     if (event.code === "KeyR" && state.mode === "gameover") {
       resetWorld();
       state.mode = "playing";
+      logMsg(choice(["You're back! The slimes look disappointed.", "Respawned. Let's try not dying this time.", "Back from the dead. Again. The valley has a generous return policy."]));
     }
   });
 
