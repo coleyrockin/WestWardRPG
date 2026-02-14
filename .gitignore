@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Build/test artifacts
+output/
+
+# OS/editor noise
+.DS_Store
+.vscode/
+.idea/
+
+# Optional local notes
+*.log
