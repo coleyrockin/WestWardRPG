@@ -2184,7 +2184,6 @@
 
     if (state.player.inHouse) {
       logMsg("Your blade whistles through the room. The furniture is unimpressed.");
-      sfx.swordSwing();
       return;
     }
 
@@ -3356,7 +3355,8 @@
       const left = Math.floor(sprite.sx - spriteWidth / 2);
       const top = Math.floor(horizon - spriteHeight * 0.67);
 
-      if (sprite.sx >= 0 && sprite.sx < width && sprite.distToPlayer > depth[Math.floor(sprite.sx)] + 0.08) continue;
+      const depthIdx = Math.min(Math.floor(sprite.sx), width - 1);
+      if (sprite.sx >= 0 && sprite.sx < width && sprite.distToPlayer > depth[depthIdx] + 0.08) continue;
 
       const light = clamp(1 - sprite.distToPlayer / MAX_RAY_DIST, 0.25, 1);
       drawBillboardSprite(sprite, left, top, spriteWidth, spriteHeight, light);
@@ -3734,10 +3734,6 @@
     if (event.code === "KeyN") {
       soundEnabled = !soundEnabled;
       logMsg(soundEnabled ? "Sound ON. Your ears will thank you. Maybe." : "Sound OFF. Blissful silence.");
-    }
-
-    if (event.code === "Escape" && shopOpen) {
-      shopOpen = false;
     }
 
     if (event.code === "KeyR" && state.mode === "gameover") {
