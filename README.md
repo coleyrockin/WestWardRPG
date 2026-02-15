@@ -2,15 +2,25 @@
 
 ![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-F7DF1E?logo=javascript&logoColor=000)
 ![HTML5](https://img.shields.io/badge/HTML5-Canvas-E34F26?logo=html5&logoColor=fff)
+![TypeScript](https://img.shields.io/badge/TypeScript-Utility-3178C6?logo=typescript&logoColor=fff)
+![Python](https://img.shields.io/badge/Python-Tooling-3776AB?logo=python&logoColor=fff)
 ![Playwright](https://img.shields.io/badge/Tested%20With-Playwright-2EAD33?logo=playwright&logoColor=fff)
 
-Single-player first-person sandbox RPG built with plain HTML + JavaScript.
+WestWardRPG is a browser-first RPG sandbox with raycast combat, quest progression, dynamic weather, and intentionally goofy pig chaos.
+Built with plain web tech so the game logic stays transparent, hackable, and fast to iterate.
+
+> Repo bio: "A first-person browser RPG where steel clashes, quests chain together, and pigs occasionally steal the spotlight."
 
 ## Code Language Variety
 
 - **JavaScript**: core game loop, rendering, combat, AI, and save/load.
 - **TypeScript**: typed atmosphere math module (`atmosphere.ts`) used by the renderer.
 - **Python**: utility tooling for scenario snapshot reports (`scripts/state_report.py`).
+- **HTML5**: canvas shell, HUD structure, and menu wiring (`index.html`).
+- **CSS**: in-page UI/HUD styling for responsive overlays (`index.html` styles).
+- **JSON**: deterministic test-action scripts for automation (`test-actions/*.json`).
+- **Markdown**: repository docs and contributor guidance (`README.md`, `CONTRIBUTING.md`).
+- **Shell/CLI**: command-driven dev workflow (`npm`, `node`, `python3`, `git`).
 
 ## Why This Repo Shines
 

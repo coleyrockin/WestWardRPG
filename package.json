@@ -1,7 +1,7 @@
 {
   "name": "westward-rpg",
   "version": "1.0.0",
-  "description": "Single-player first-person sandbox RPG prototype built with vanilla HTML and JavaScript.",
+  "description": "First-person browser RPG with raycast combat, dynamic weather, quest progression, and playful pig chaos.",
   "main": "game.js",
   "scripts": {
     "start": "python3 -m http.server 5173",
@@ -16,7 +16,12 @@
     "first-person",
     "raycasting",
     "javascript",
-    "html5"
+    "html5",
+    "typescript",
+    "python",
+    "playwright",
+    "i18n",
+    "indie-game"
   ],
   "author": "coleyrockin <coleyrockin@aol.com>",
   "license": "ISC",

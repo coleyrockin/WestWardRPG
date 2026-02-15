@@ -21,6 +21,16 @@
   const LOCALE_KEY = "dustward-locale-v1";
   const AUTOSAVE_INTERVAL = 30;
   const QUEST_STATUSES = new Set(["locked", "active", "complete", "turned_in"]);
+  const WESTERN_PIG_ROLES = [
+    { role: "Marshal", hat: "#4f3a23", bandana: "#8f2c2c", temper: 0.42 },
+    { role: "Outlaw", hat: "#2a2f3a", bandana: "#9e1919", temper: 0.88 },
+    { role: "Deputy", hat: "#694b2d", bandana: "#3f6f9a", temper: 0.56 },
+    { role: "Prospector", hat: "#70542e", bandana: "#987d3e", temper: 0.34 },
+    { role: "Gambler", hat: "#3d334f", bandana: "#ab3f79", temper: 0.68 },
+    { role: "Bandit", hat: "#353333", bandana: "#8a3b1c", temper: 0.92 },
+    { role: "Rodeo", hat: "#6f3f24", bandana: "#2d6e63", temper: 0.74 },
+    { role: "Sheriff", hat: "#5c4227", bandana: "#b89a3e", temper: 0.48 },
+  ];
 
   const LANGUAGE_OPTIONS = {
     en: "English",
@@ -37,7 +47,7 @@
     en: {
       menu: {
         title: "🏜️ DUSTWARD",
-        subtitle: "A comically realistic 3D sandbox RPG. Swords, slimes, and questionable life choices.",
+        subtitle: "A dusty western sandbox RPG. Revolver vibes, sword fights, and lawless pig stampedes.",
         controls: [
           "🎮 Move: WASD or Arrow keys",
           "👀 Look: Mouse (click to lock pointer) or Arrow Left/Right",
@@ -50,7 +60,7 @@
         ],
         start: "⚔️ Enter The Wilds",
         continue: "📜 Continue Journey",
-        goal: "🎯 Goal: Complete quests, shop for gear, build your house, pet the cat, and survive a valley full of sarcastic NPCs and angry gelatin.",
+        goal: "🎯 Goal: Become the weirdest hero in Dustward: finish quests, survive slime duels, and outrun outlaw pigs.",
       },
       labels: {
         language: "Language",
@@ -758,8 +768,8 @@
   const npcDialogue = {
     elder: {
       idle: [
-        "Elder Nira: Back in my day, slimes were polite. They'd knock first.",
-        "Elder Nira: I've read every scroll in this valley. Most were grocery lists.",
+        "Elder Nira: Back in my day, slimes tipped their hats before attacking.",
+        "Elder Nira: I've read every scroll in this valley. Half were saloon tabs.",
         "Elder Nira: Don't tell anyone, but I once got lost in my own settlement.",
         "Elder Nira: Wisdom comes with age. So do backaches.",
       ],
@@ -770,10 +780,10 @@
     },
     warden: {
       idle: [
-        "Warden Sol: I guard these lands! ...mostly from boredom.",
+        "Warden Sol: I guard this frontier. Mostly from boredom and pigs.",
         "Warden Sol: Have you seen my pet slime? Wait, they all look the same.",
         "Warden Sol: My sword is sharp. My wit? Debatable.",
-        "Warden Sol: I once chased a slime for three hours. Turns out it was a bush.",
+        "Warden Sol: I once chased a slime for three hours. Turned out to be tumbleweed.",
       ],
       questActive: [
         "Warden Sol: Slimes defeated ${p}/${n}. They're not happy about it.",
@@ -794,7 +804,7 @@
     },
     merchant: {
       idle: [
-        "Trader Nyx: Everything's for sale! My morals? Also for sale.",
+        "Trader Nyx: Welcome to my frontier emporium. Prices are wanted-dead-or-alive.",
         "Trader Nyx: Special deal today - same price as yesterday!",
         "Trader Nyx: I've got potions, rocks, and a mysterious jar. Don't open the jar.",
         "Trader Nyx: Trade secrets? My biggest one is a 300% markup.",
@@ -810,7 +820,7 @@
     },
     bard: {
       idle: [
-        "Bard Jingles: 🎵 Oh the slimes go splat, and the hero goes WHACK! 🎵",
+        "Bard Jingles: 🎵 In Dustward town the pigs wear crowns, and slimes get smacked around! 🎵",
         "Bard Jingles: I wrote a ballad about you. It's mostly about falling.",
         "Bard Jingles: My lute is out of tune. So is my sense of danger.",
         "Bard Jingles: Want to hear my new song? No? I'll play it anyway.",
@@ -936,6 +946,22 @@
     const dx = a.x - b.x;
     const dy = a.y - b.y;
     return Math.hypot(dx, dy);
+  }
+
+  function vecLength(x, y) {
+    return Math.hypot(x, y);
+  }
+
+  function normalizeVec(x, y) {
+    const mag = Math.hypot(x, y) || 1;
+    return { x: x / mag, y: y / mag };
+  }
+
+  function clampVec(x, y, maxLen) {
+    const mag = Math.hypot(x, y);
+    if (mag <= maxLen || mag <= 0.0001) return { x, y };
+    const scale = maxLen / mag;
+    return { x: x * scale, y: y * scale };
   }
 
   function choice(list) {
@@ -1359,6 +1385,7 @@
     enemies: [],
     resources: [],
     pigJokeCooldown: 0,
+    pigStampedeTimer: 0,
     chest: { x: 13.4, y: 7.2, opened: false, respawn: 0 },
     house: {
       unlocked: false,
@@ -1428,7 +1455,16 @@
 
   function spawnPigs() {
     state.pigs = [];
-    const names = ["Sir Oinks", "Porkchop", "Hamlet", "Lady Snort", "Baconius", "Mud Muffin", "Captain Truffle", "Boaris"];
+    const names = [
+      "Sheriff Snout",
+      "Porkchop Cassidy",
+      "Ham Solo",
+      "Deputy Wiggles",
+      "Saddleback Sue",
+      "Mud Maverick",
+      "Bandana Bacon",
+      "Sir Oinks-a-Lot",
+    ];
     const presetPens = [
       { x: 8.2, y: 7.6 },
       { x: 10.7, y: 7.9 },
@@ -1437,12 +1473,17 @@
       { x: 9.3, y: 10.1 },
     ];
     for (let i = 0; i < 8; i++) {
+      const style = WESTERN_PIG_ROLES[i % WESTERN_PIG_ROLES.length];
       const candidate = presetPens[i] || findEmptyCell(worldMap, 5, 5, 24, 15, (x, y) => !isInHouseLot(x, y));
       const fallback = findEmptyCell(worldMap, 6, 6, 15, 12, (x, y) => !isInHouseLot(x, y));
       const pos = !isBlocking(candidate.x, candidate.y) ? candidate : fallback;
       state.pigs.push({
         id: `pig-${i}`,
         name: names[i % names.length],
+        role: style.role,
+        hatColor: style.hat,
+        bandanaColor: style.bandana,
+        temper: style.temper,
         x: pos.x,
         y: pos.y,
         homeX: pos.x,
@@ -1451,6 +1492,12 @@
         wanderAngle: Math.random() * TAU,
         wanderTimer: 0.25 + Math.random() * 1.8,
         zoomTimer: 0,
+        vx: (Math.random() - 0.5) * 0.2,
+        vy: (Math.random() - 0.5) * 0.2,
+        heading: Math.random() * TAU,
+        gaitPhase: Math.random() * TAU,
+        emoteTimer: Math.random() * 4,
+        pickpocketCooldown: 3 + Math.random() * 2,
       });
     }
   }
@@ -1683,7 +1730,7 @@
     menu.style.display = "none";
     autoSaveTimer = 0;
     if (!fromLoad) {
-      logMsg("Welcome to Dustward! Talk to NPCs, dodge slimes, and try not to die. Good luck!");
+      logMsg("Welcome to Dustward, drifter. Talk to townsfolk, duel slimes, and avoid being trampled by outlaw pigs.");
       ensureAudio();
     }
     canvas.focus();
@@ -1925,11 +1972,15 @@
 
     const pig = nearestEntity(state.pigs, () => true, 1.7);
     if (pig) {
-      if (Math.random() < 0.17) {
+      if (Math.random() < 0.2) {
         state.player.gold += 1;
-        logMsg(`${pig.name} drops a shiny coin. +1 gold. Oink.`);
+        logMsg(`${pig.name} (${pig.role}) tips you one coin for "frontier services." +1 gold.`);
       } else {
-        logMsg(choice([`${pig.name}: OINK!`, `${pig.name} lets out a very confident snort.`, `You pet ${pig.name}. The pig approves.`]));
+        logMsg(choice([
+          `${pig.name} (${pig.role}): OINK, partner.`,
+          `${pig.name} adjusts its tiny hat and snorts with authority.`,
+          `You pet ${pig.name}. The pig accepts your alliance.`,
+        ]));
       }
       return;
     }
@@ -1941,7 +1992,7 @@
         if (q.status === "locked") {
           q.status = "active";
           q.progress = 0;
-          logMsg("Elder Nira: Bring me 4 Crystal Shards to map these lands. I'd get them myself but... my knees.");
+          logMsg("Elder Nira: Bring me 4 Crystal Shards to map this frontier. I'd ride out myself, but my knees retired.");
           sfx.npcChat();
           return;
         }
@@ -1978,7 +2029,7 @@
           }
           q.status = "active";
           q.progress = 0;
-          logMsg("Warden Sol: Defeat 3 slimes near the marsh. Don't worry, they jiggle when scared.");
+          logMsg("Warden Sol: Clear 3 slimes near the marsh. Frontier law says no jiggly bandits after sundown.");
           sfx.npcChat();
           return;
         }
@@ -2016,7 +2067,7 @@
           q.status = "active";
           q.progress = 0;
           state.house.built = true;
-          logMsg("Smith Varo: Bring 6 Wood and 4 Stone. We'll raise your house. No refunds.");
+          logMsg("Smith Varo: Bring 6 Wood and 4 Stone. We'll raise your ranch shack by sunset. No refunds.");
           sfx.npcChat();
           return;
         }
@@ -2406,46 +2457,174 @@
   function updatePigs(dt) {
     if (state.player.inHouse) return;
 
+    if (state.pigs.length === 0) return;
+
+    let nearestEnemyDist = Infinity;
+    for (const enemy of state.enemies) {
+      if (!enemy.alive) continue;
+      const d = dist(enemy, state.player);
+      if (d < nearestEnemyDist) nearestEnemyDist = d;
+    }
+    if (nearestEnemyDist < 2.8 || (state.weather.kind === "storm" && Math.random() < dt * 0.22)) {
+      state.pigStampedeTimer = Math.max(state.pigStampedeTimer, 1.1 + Math.random() * 1.1);
+    }
+    state.pigStampedeTimer = Math.max(0, state.pigStampedeTimer - dt);
+
+    const herdCenter = { x: 0, y: 0 };
     for (const pig of state.pigs) {
+      herdCenter.x += pig.x;
+      herdCenter.y += pig.y;
+    }
+    herdCenter.x /= state.pigs.length;
+    herdCenter.y /= state.pigs.length;
+
+    for (let i = 0; i < state.pigs.length; i++) {
+      const pig = state.pigs[i];
       pig.wanderTimer -= dt;
       pig.zoomTimer = Math.max(0, pig.zoomTimer - dt);
+      pig.emoteTimer = Math.max(0, pig.emoteTimer - dt);
+      pig.pickpocketCooldown = Math.max(0, pig.pickpocketCooldown - dt);
 
-      const pigToPlayer = dist(pig, state.player);
-      if (pigToPlayer < 2.2) {
-        pig.wanderAngle = Math.atan2(pig.y - state.player.y, pig.x - state.player.x) + (Math.random() - 0.5) * 0.5;
-        pig.zoomTimer = Math.max(pig.zoomTimer, 1.05);
-        pig.wanderTimer = 0.4;
-      } else if (pig.wanderTimer <= 0) {
-        pig.wanderAngle = Math.random() * TAU;
-        pig.wanderTimer = 0.8 + Math.random() * 2.1;
-        if (Math.random() < 0.28) {
-          pig.zoomTimer = 0.45 + Math.random() * 0.65;
+      let separationX = 0;
+      let separationY = 0;
+      let alignmentX = 0;
+      let alignmentY = 0;
+      let cohesionX = 0;
+      let cohesionY = 0;
+      let neighbors = 0;
+
+      for (let j = 0; j < state.pigs.length; j++) {
+        if (i === j) continue;
+        const other = state.pigs[j];
+        const dx = pig.x - other.x;
+        const dy = pig.y - other.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > 3.6 * 3.6) continue;
+        const d = Math.sqrt(d2) || 0.001;
+        neighbors += 1;
+        if (d < 1.35) {
+          const push = (1.35 - d) / 1.35;
+          separationX += (dx / d) * push;
+          separationY += (dy / d) * push;
         }
+        alignmentX += other.vx;
+        alignmentY += other.vy;
+        cohesionX += other.x;
+        cohesionY += other.y;
       }
 
-      const tx = pig.homeX + Math.cos(pig.wanderAngle) * pig.wanderRadius;
-      const ty = pig.homeY + Math.sin(pig.wanderAngle) * pig.wanderRadius;
-      const dx = tx - pig.x;
-      const dy = ty - pig.y;
-      const d = Math.hypot(dx, dy);
-      if (d > 0.02) {
-        const speed = pig.zoomTimer > 0 ? 1.95 : 0.7;
-        const nx = pig.x + (dx / d) * speed * dt;
-        const ny = pig.y + (dy / d) * speed * dt;
+      if (neighbors > 0) {
+        alignmentX /= neighbors;
+        alignmentY /= neighbors;
+        cohesionX = cohesionX / neighbors - pig.x;
+        cohesionY = cohesionY / neighbors - pig.y;
+      }
 
-        if (!isBlocking(nx, pig.y) && dist({ x: nx, y: pig.y }, state.player) > 0.72) {
-          pig.x = nx;
-        }
-        if (!isBlocking(pig.x, ny) && dist({ x: pig.x, y: ny }, state.player) > 0.72) {
-          pig.y = ny;
-        }
+      const toHomeX = pig.homeX - pig.x;
+      const toHomeY = pig.homeY - pig.y;
+      const toHerdX = herdCenter.x - pig.x;
+      const toHerdY = herdCenter.y - pig.y;
+      const playerDx = state.player.x - pig.x;
+      const playerDy = state.player.y - pig.y;
+      const playerDist = Math.hypot(playerDx, playerDy) || 0.001;
+      const playerAwayX = -playerDx / playerDist;
+      const playerAwayY = -playerDy / playerDist;
+
+      const noiseA = state.time * (1.2 + pig.temper * 1.8) + pig.gaitPhase + i * 0.77;
+      const noiseB = state.time * (1.8 + pig.temper * 1.5) + pig.gaitPhase * 1.7 + i * 0.43;
+      const wanderX = Math.cos(noiseA) * 0.75 + Math.sin(noiseB) * 0.25;
+      const wanderY = Math.sin(noiseA) * 0.75 + Math.cos(noiseB) * 0.25;
+
+      let intentX =
+        separationX * 1.6 +
+        alignmentX * 0.52 +
+        cohesionX * 0.36 +
+        toHomeX * 0.24 +
+        toHerdX * 0.16 +
+        wanderX * (0.33 + pig.temper * 0.16);
+      let intentY =
+        separationY * 1.6 +
+        alignmentY * 0.52 +
+        cohesionY * 0.36 +
+        toHomeY * 0.24 +
+        toHerdY * 0.16 +
+        wanderY * (0.33 + pig.temper * 0.16);
+
+      if (playerDist < 2.5) {
+        const panicWeight = 1.2 + (2.5 - playerDist) * 0.55;
+        intentX += playerAwayX * panicWeight;
+        intentY += playerAwayY * panicWeight;
+        pig.zoomTimer = Math.max(pig.zoomTimer, 0.65 + pig.temper * 0.4);
+      } else if (playerDist < 6.5 && pig.role === "Sheriff") {
+        const tangent = normalizeVec(-playerDy, playerDx);
+        intentX += tangent.x * 0.5;
+        intentY += tangent.y * 0.5;
+      } else if (playerDist < 5.2 && (pig.role === "Gambler" || pig.role === "Bandit")) {
+        intentX += (playerDx / playerDist) * 0.32;
+        intentY += (playerDy / playerDist) * 0.32;
+      }
+
+      if (state.pigStampedeTimer > 0) {
+        const stampedeHeading = normalizeVec(playerAwayX + Math.cos(pig.gaitPhase), playerAwayY + Math.sin(pig.gaitPhase));
+        intentX += stampedeHeading.x * (1.6 + pig.temper * 0.8);
+        intentY += stampedeHeading.y * (1.6 + pig.temper * 0.8);
+      }
+
+      const intentNorm = normalizeVec(intentX, intentY);
+      const calmSpeed = 0.58 + pig.temper * 0.58;
+      const burst = pig.zoomTimer > 0 ? 1.02 + pig.temper * 0.58 : 0;
+      const stampedeBoost = state.pigStampedeTimer > 0 ? 1.15 : 0;
+      const targetSpeed = calmSpeed + burst + stampedeBoost;
+      const targetVelX = intentNorm.x * targetSpeed;
+      const targetVelY = intentNorm.y * targetSpeed;
+
+      pig.vx = lerp(pig.vx, targetVelX, clamp(dt * 4.2, 0, 1));
+      pig.vy = lerp(pig.vy, targetVelY, clamp(dt * 4.2, 0, 1));
+      const clampedVel = clampVec(pig.vx, pig.vy, 2.95);
+      pig.vx = clampedVel.x;
+      pig.vy = clampedVel.y;
+
+      const stepX = pig.vx * dt;
+      const stepY = pig.vy * dt;
+      const nx = pig.x + stepX;
+      const ny = pig.y + stepY;
+      const shoulderRoom = 0.66;
+
+      if (!isBlocking(nx, pig.y) && dist({ x: nx, y: pig.y }, state.player) > shoulderRoom) {
+        pig.x = nx;
+      } else {
+        pig.vx *= -0.42;
+      }
+      if (!isBlocking(pig.x, ny) && dist({ x: pig.x, y: ny }, state.player) > shoulderRoom) {
+        pig.y = ny;
+      } else {
+        pig.vy *= -0.42;
+      }
+
+      if (vecLength(pig.vx, pig.vy) > 0.06) {
+        pig.heading = Math.atan2(pig.vy, pig.vx);
+      }
+      pig.gaitPhase += dt * (5 + vecLength(pig.vx, pig.vy) * 4.5);
+
+      if (playerDist < 1.2 && pig.role === "Bandit" && pig.pickpocketCooldown <= 0 && state.player.gold > 0) {
+        const stolen = Math.min(2, state.player.gold);
+        state.player.gold -= stolen;
+        logMsg(`${pig.name} (${pig.role}) steals ${stolen} gold and vanishes in a cloud of dignity.`);
+        pig.pickpocketCooldown = 9 + Math.random() * 7;
+        pig.zoomTimer = 1.3;
+        state.pigStampedeTimer = Math.max(state.pigStampedeTimer, 0.9);
       }
     }
 
-    const nearestPig = nearestEntity(state.pigs, () => true, 6.5);
-    if (nearestPig && state.pigJokeCooldown <= 0 && Math.random() < dt * 0.45) {
-      logMsg(choice(["A pig sprints past yelling OINK OINK.", "A pig does a tactical barrel roll. Somehow.", "You hear dramatic oinking nearby."]));
-      state.pigJokeCooldown = 8 + Math.random() * 6;
+    const nearestPig = nearestEntity(state.pigs, () => true, 7);
+    if (nearestPig && state.pigJokeCooldown <= 0 && Math.random() < dt * 0.42) {
+      logMsg(choice([
+        "A posse of pigs stampedes across the trail like tiny furry outlaws.",
+        `${nearestPig.name} yells OINK-HAW and kicks up dust.`,
+        "You hear spurs jingling. It's the pig herd again.",
+        "The western wind carries dramatic pig snorts across Dustward.",
+      ]));
+      state.pigJokeCooldown = 7 + Math.random() * 7;
     }
   }
 
@@ -2944,6 +3123,9 @@
       ctx.fillRect(spriteWidth * 0.34, spriteHeight * 0.43, spriteWidth * 0.08, spriteHeight * 0.06);
       ctx.fillRect(spriteWidth * 0.58, spriteHeight * 0.43, spriteWidth * 0.08, spriteHeight * 0.06);
     } else if (sprite.kind === "pig") {
+      const hatColor = sprite.hatColor || "#5b4129";
+      const bandanaColor = sprite.bandanaColor || "#8e4040";
+      const trot = Math.sin((sprite.gaitPhase || 0) + state.time * 1.4) * 0.5 + 0.5;
       const body = ctx.createLinearGradient(0, spriteHeight * 0.26, 0, spriteHeight * 0.9);
       body.addColorStop(0, "#efb8b2");
       body.addColorStop(1, "#d58f8a");
@@ -2954,6 +3136,8 @@
       ctx.beginPath();
       ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.38, spriteWidth * 0.24, spriteHeight * 0.18, 0, 0, TAU);
       ctx.fill();
+      ctx.fillStyle = bandanaColor;
+      ctx.fillRect(spriteWidth * 0.38, spriteHeight * 0.5, spriteWidth * 0.24, spriteHeight * 0.05);
       ctx.fillStyle = "#f3cbc6";
       ctx.beginPath();
       ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.45, spriteWidth * 0.16, spriteHeight * 0.1, 0, 0, TAU);
@@ -2982,6 +3166,31 @@
       ctx.beginPath();
       ctx.arc(spriteWidth * 0.75, spriteHeight * 0.62, spriteWidth * 0.08, 0, TAU * 0.8);
       ctx.stroke();
+      ctx.fillStyle = hatColor;
+      ctx.fillRect(spriteWidth * 0.28, spriteHeight * 0.23, spriteWidth * 0.44, spriteHeight * 0.04);
+      ctx.fillRect(spriteWidth * 0.36, spriteHeight * 0.14, spriteWidth * 0.28, spriteHeight * 0.09);
+      if (sprite.role === "Sheriff") {
+        ctx.fillStyle = "#d8b754";
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.5, spriteHeight * 0.18);
+        ctx.lineTo(spriteWidth * 0.53, spriteHeight * 0.24);
+        ctx.lineTo(spriteWidth * 0.6, spriteHeight * 0.24);
+        ctx.lineTo(spriteWidth * 0.54, spriteHeight * 0.28);
+        ctx.lineTo(spriteWidth * 0.56, spriteHeight * 0.35);
+        ctx.lineTo(spriteWidth * 0.5, spriteHeight * 0.3);
+        ctx.lineTo(spriteWidth * 0.44, spriteHeight * 0.35);
+        ctx.lineTo(spriteWidth * 0.46, spriteHeight * 0.28);
+        ctx.lineTo(spriteWidth * 0.4, spriteHeight * 0.24);
+        ctx.lineTo(spriteWidth * 0.47, spriteHeight * 0.24);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.fillStyle = "#8f6663";
+      const legLift = trot * spriteHeight * 0.025;
+      ctx.fillRect(spriteWidth * 0.34, spriteHeight * 0.78 - legLift, spriteWidth * 0.06, spriteHeight * 0.12 + legLift);
+      ctx.fillRect(spriteWidth * 0.43, spriteHeight * 0.8 + legLift * 0.3, spriteWidth * 0.06, spriteHeight * 0.1 - legLift * 0.3);
+      ctx.fillRect(spriteWidth * 0.54, spriteHeight * 0.78 + legLift * 0.2, spriteWidth * 0.06, spriteHeight * 0.12 - legLift * 0.2);
+      ctx.fillRect(spriteWidth * 0.63, spriteHeight * 0.8 - legLift * 0.4, spriteWidth * 0.06, spriteHeight * 0.1 + legLift * 0.4);
     } else if (sprite.kind === "resource" && sprite.label === "Tree") {
       ctx.fillStyle = "#63472f";
       ctx.fillRect(spriteWidth * 0.44, spriteHeight * 0.36, spriteWidth * 0.14, spriteHeight * 0.58);
@@ -3298,7 +3507,19 @@
       }
 
       for (const pig of state.pigs) {
-        sprites.push({ x: pig.x, y: pig.y, color: "#e29da0", label: pig.name, size: 0.92, kind: "pig" });
+        sprites.push({
+          x: pig.x,
+          y: pig.y,
+          color: "#e29da0",
+          label: pig.name,
+          size: 0.92,
+          kind: "pig",
+          role: pig.role,
+          hatColor: pig.hatColor,
+          bandanaColor: pig.bandanaColor,
+          gaitPhase: pig.gaitPhase,
+          heading: pig.heading,
+        });
       }
 
       for (const enemy of state.enemies) {
@@ -3350,8 +3571,14 @@
 
     for (const sprite of projected) {
       const widthScale = sprite.kind === "resource" && sprite.label === "Tree" ? 0.82 : sprite.kind === "pig" ? 0.72 : 0.62;
-      const spriteWidth = clamp(sprite.scale * widthScale, 6, width * 0.42);
-      const spriteHeight = clamp(sprite.scale, 8, height * 0.82);
+      const nearDampen = clamp((sprite.distToPlayer - 0.35) / 1.7, 0.52, 1);
+      const visualScale = sprite.scale * nearDampen;
+      const maxHeight =
+        sprite.kind === "npc" ? height * 0.56 :
+          sprite.kind === "pig" ? height * 0.42 :
+            sprite.kind === "enemy" ? height * 0.5 : height * 0.7;
+      const spriteWidth = clamp(visualScale * widthScale, 6, width * 0.34);
+      const spriteHeight = clamp(visualScale, 8, maxHeight);
       const left = Math.floor(sprite.sx - spriteWidth / 2);
       const top = Math.floor(horizon - spriteHeight * 0.67);
 
@@ -3509,20 +3736,20 @@
   }
 
   function drawHud() {
-    const hudW = 468;
+    const hudW = 432;
     const hudX = 12;
-    const hudY = canvas.height - 118;
-    ctx.fillStyle = "rgba(16, 29, 33, 0.75)";
-    ctx.fillRect(hudX, hudY, hudW, 104);
+    const hudY = canvas.height - 100;
+    ctx.fillStyle = "rgba(16, 29, 33, 0.72)";
+    ctx.fillRect(hudX, hudY, hudW, 88);
 
-    drawBar(22, hudY + 14, 174, 14, state.player.hp / state.player.maxHp, "#3a1f1e", "#e76b58", `${t("labels.hp")} ${Math.ceil(state.player.hp)}/${state.player.maxHp}`);
-    drawBar(22, hudY + 34, 174, 12, state.player.stamina / 100, "#1f2f2c", "#5fe0b5", `${t("labels.stamina")} ${Math.ceil(state.player.stamina)}`);
-    drawBar(22, hudY + 52, 174, 10, state.player.xp / state.player.nextXp, "#233145", "#79a5ff", `${t("labels.xp")} ${state.player.xp}/${state.player.nextXp}`);
+    drawBar(22, hudY + 10, 168, 13, state.player.hp / state.player.maxHp, "#3a1f1e", "#e76b58", `${t("labels.hp")} ${Math.ceil(state.player.hp)}/${state.player.maxHp}`);
+    drawBar(22, hudY + 28, 168, 11, state.player.stamina / 100, "#1f2f2c", "#5fe0b5", `${t("labels.stamina")} ${Math.ceil(state.player.stamina)}`);
+    drawBar(22, hudY + 44, 168, 9, state.player.xp / state.player.nextXp, "#233145", "#79a5ff", `${t("labels.xp")} ${state.player.xp}/${state.player.nextXp}`);
 
     ctx.fillStyle = "#f8f0dc";
-    ctx.font = "12px Georgia";
-    ctx.fillText(`${t("labels.lvl")} ${state.player.level}   ${t("labels.gold")} ${state.player.gold}   ${t("labels.potions")} ${state.inventory.Potion}`, 212, hudY + 22);
-    ctx.fillText(`${t("labels.crystals")} ${state.inventory["Crystal Shard"]}   ${t("labels.wood")} ${state.inventory.Wood}   ${t("labels.stone")} ${state.inventory.Stone}   ${t("labels.cores")} ${state.inventory["Slime Core"]}`, 212, hudY + 40);
+    ctx.font = "11px Georgia";
+    ctx.fillText(`${t("labels.lvl")} ${state.player.level}   ${t("labels.gold")} ${state.player.gold}   ${t("labels.potions")} ${state.inventory.Potion}`, 202, hudY + 20);
+    ctx.fillText(`${t("labels.crystals")} ${state.inventory["Crystal Shard"]}   ${t("labels.wood")} ${state.inventory.Wood}   ${t("labels.stone")} ${state.inventory.Stone}   ${t("labels.cores")} ${state.inventory["Slime Core"]}`, 202, hudY + 37);
 
     const q1 = state.quests.crystal;
     const q2 = state.quests.slime;
@@ -3535,31 +3762,31 @@
     ];
 
     ctx.fillStyle = "#f3ecd8";
-    ctx.font = "12px Georgia";
-    let qy = hudY + 58;
+    ctx.font = "11px Georgia";
+    let qy = hudY + 52;
     for (const line of questLines) {
-      ctx.fillText(line, 212, qy);
-      qy += 13;
+      ctx.fillText(line, 202, qy);
+      qy += 11;
     }
 
-    ctx.fillStyle = "rgba(16, 29, 33, 0.68)";
-    ctx.fillRect(12, 12, 432, 88);
+    ctx.fillStyle = "rgba(16, 29, 33, 0.64)";
+    ctx.fillRect(12, 12, 392, 70);
     ctx.fillStyle = "#f9f1dd";
-    ctx.font = "12px Georgia";
+    ctx.font = "11px Georgia";
 
     const location = state.player.inHouse ? t("labels.playerHouse") : t("labels.valley");
     const houseStatus = state.house.unlocked ? t("labels.owned") : t("labels.locked");
     const weatherText = state.player.inHouse ? t("labels.sheltered") : weatherLabel(state.weather.kind);
-    ctx.fillText(`${t("labels.location")}: ${location}   ${t("labels.house")}: ${houseStatus}   ${t("labels.weather")}: ${weatherText}`, 20, 30);
+    ctx.fillText(`${t("labels.location")}: ${location}   ${t("labels.house")}: ${houseStatus}   ${t("labels.weather")}: ${weatherText}`, 20, 28);
 
-    let msgY = 46;
-    const shown = state.msg.slice(0, 3);
+    let msgY = 42;
+    const shown = state.msg.slice(0, 2);
     if (shown.length === 0) {
       ctx.fillText(t("labels.explore"), 20, msgY);
     }
     for (const m of shown) {
       ctx.fillText(m.text, 20, msgY);
-      msgY += 14;
+      msgY += 12;
     }
 
     if (state.mode === "gameover") {
@@ -3916,8 +4143,11 @@
           .map((p) => ({
             id: p.id,
             name: p.name,
+            role: p.role,
             x: Number(p.x.toFixed(2)),
             y: Number(p.y.toFixed(2)),
+            speed: Number(vecLength(p.vx || 0, p.vy || 0).toFixed(2)),
+            stampeding: state.pigStampedeTimer > 0,
             distance: Number(dist(state.player, p).toFixed(2)),
           }))
           .filter((p) => p.distance < 10)
