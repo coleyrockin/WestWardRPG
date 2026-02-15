@@ -6,6 +6,12 @@
 
 Single-player first-person sandbox RPG built with plain HTML + JavaScript.
 
+## Code Language Variety
+
+- **JavaScript**: core game loop, rendering, combat, AI, and save/load.
+- **TypeScript**: typed atmosphere math module (`atmosphere.ts`) used by the renderer.
+- **Python**: utility tooling for scenario snapshot reports (`scripts/state_report.py`).
+
 ## Why This Repo Shines
 
 - Fast, framework-free raycast 3D renderer.
@@ -13,7 +19,7 @@ Single-player first-person sandbox RPG built with plain HTML + JavaScript.
 - Full quest loop: gather, fight, craft, build your house.
 - Dynamic atmosphere: day/night cycle + weather states.
 - Save/load + autosave for longer play sessions.
-- Built-in **multi-language support**: English, Español, Português.
+- Built-in **multi-language support**: English, Español, Português, Français, Deutsch.
 - Automation hooks for deterministic testing and Playwright action runs.
 
 ## Gameplay Features
@@ -31,6 +37,8 @@ Use the language selector in the main menu.
 - `English` (`en`)
 - `Español` (`es`)
 - `Português` (`pt`)
+- `Français` (`fr`)
+- `Deutsch` (`de`)
 
 Language preference is persisted in localStorage.
 
@@ -74,6 +82,18 @@ Open: [http://127.0.0.1:5173/index.html](http://127.0.0.1:5173/index.html)
 
 ```bash
 npm test
+```
+
+### TypeScript Check
+
+```bash
+npm run typecheck:ts
+```
+
+### Scenario State Report (Python)
+
+```bash
+npm run report:states
 ```
 
 ### Example Playwright Scenario

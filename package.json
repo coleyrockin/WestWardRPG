@@ -6,7 +6,9 @@
   "scripts": {
     "start": "python3 -m http.server 5173",
     "dev": "python3 -m http.server 5173",
-    "test": "node --check game.js && node --check web_game_playwright_client.mjs"
+    "test": "node --check game.js && node --check web_game_playwright_client.mjs",
+    "report:states": "python3 scripts/state_report.py output",
+    "typecheck:ts": "tsc --noEmit"
   },
   "keywords": [
     "rpg",
@@ -28,5 +30,8 @@
   "homepage": "https://github.com/coleyrockin/WestWardRPG#readme",
   "dependencies": {
     "playwright": "^1.58.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

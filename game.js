@@ -6,6 +6,9 @@
   const continueBtn = document.getElementById("continue-btn");
   const langSelect = document.getElementById("lang-select");
   const langLabel = document.getElementById("lang-label");
+  const tsAtmosphere = window.DustwardTS && typeof window.DustwardTS.computeAtmosphere === "function"
+    ? window.DustwardTS
+    : null;
 
   const TAU = Math.PI * 2;
   const FOV = Math.PI / 2.75;
@@ -18,6 +21,17 @@
   const LOCALE_KEY = "dustward-locale-v1";
   const AUTOSAVE_INTERVAL = 30;
   const QUEST_STATUSES = new Set(["locked", "active", "complete", "turned_in"]);
+
+  const LANGUAGE_OPTIONS = {
+    en: "English",
+    es: "Español",
+    pt: "Português",
+    fr: "Français",
+    de: "Deutsch",
+    it: "Italiano",
+    ja: "日本語",
+    tr: "Türkçe",
+  };
 
   const LANGUAGE_PACKS = {
     en: {
@@ -230,6 +244,356 @@
         sellCoresDesc: "Venda 1 núcleo por 15 de ouro.",
       },
     },
+    fr: {
+      menu: {
+        title: "🏜️ DUSTWARD",
+        subtitle: "Un RPG sandbox 3D au réalisme comique. Épées, slimes et choix discutables.",
+        controls: [
+          "🎮 Déplacement : WASD ou flèches",
+          "👀 Regard : Souris (clic pour verrouiller le pointeur) ou Flèche Gauche/Droite",
+          "⚔️ Attaque : Clic gauche ou Espace (combo de 3 coups)",
+          "🛡️ Parade : Clic droit ou C",
+          "💬 Interaction / Boutique : E (parler aux PNJ, acheter)",
+          "🧪 Utiliser une potion : Q",
+          "🗺️ Carte : M, 🔇 Son : N, 📺 Plein écran : F",
+          "💾 Sauvegarde rapide : K, Chargement rapide : L",
+        ],
+        start: "⚔️ Entrer dans les Terres",
+        continue: "📜 Reprendre l'aventure",
+        goal: "🎯 Objectif : terminez des quêtes, achetez de l'équipement, construisez votre maison, caressez le chat et survivez à la vallée.",
+      },
+      labels: {
+        language: "Langue",
+        hp: "PV",
+        stamina: "Endurance",
+        xp: "XP",
+        lvl: "Niv",
+        gold: "Or",
+        potions: "Potions",
+        crystals: "Cristaux",
+        wood: "Bois",
+        stone: "Pierre",
+        cores: "Noyaux",
+        locked: "Bloquée",
+        done: "Terminée",
+        turnIn: "(Rendre)",
+        location: "Lieu",
+        house: "Maison",
+        weather: "Météo",
+        playerHouse: "Maison du joueur",
+        valley: "Vallée",
+        owned: "À vous",
+        sheltered: "Abrité",
+        explore: "Explorez la vallée et tracez votre route.",
+        defeatedTitle: "Vous avez été vaincu",
+        recover: "Appuyez sur R pour revenir au camp.",
+        deathsLine: "Morts : {deaths}. Les slimes vous saluent.",
+        shopTitle: "🏪 Emporium de Nyx",
+        shopHeader: "Votre or : {gold}   [↑/↓ naviguer, Entrée/E acheter, Échap fermer]",
+        controlsHint: "Frappe : LMB/Espace  Parade : RMB/C  Utiliser : E  Potion : Q  Sauver/Charger : K/L  Carte : M  Son : N",
+        clear: "Clair",
+        mist: "Brume",
+        rain: "Pluie",
+        storm: "Tempête",
+      },
+      quests: {
+        crystal: "1) Repérage de la Vallée",
+        slime: "2) Nettoyage du Marais",
+        wood: "3) Construisez votre Maison",
+      },
+      shop: {
+        healthPotionName: "Potion de soin",
+        healthPotionDesc: "Rend 38 PV. Goût de chaussette.",
+        megaPotionName: "Méga potion",
+        megaPotionDesc: "Rend 80 PV. Goût de chaussette premium.",
+        crystalShardName: "Éclat de cristal",
+        crystalShardDesc: "Pierre brillante. L'Ancienne adore.",
+        mysteryBoxName: "Boîte mystère",
+        mysteryBoxDesc: "Ça peut être n'importe quoi ! (Souvent des pierres.)",
+        sellCoresName: "Vendre des noyaux de slime",
+        sellCoresDesc: "Vendez 1 noyau pour 15 or.",
+      },
+    },
+    de: {
+      menu: {
+        title: "🏜️ DUSTWARD",
+        subtitle: "Ein komisch-realistisches 3D-Sandbox-RPG. Schwerter, Slimes und fragwürdige Entscheidungen.",
+        controls: [
+          "🎮 Bewegen: WASD oder Pfeiltasten",
+          "👀 Blick: Maus (Klick für Pointer-Lock) oder Pfeil Links/Rechts",
+          "⚔️ Angriff: Linksklick oder Leertaste (3er-Kombo)",
+          "🛡️ Blocken: Rechtsklick oder C",
+          "💬 Interagieren / Shop: E (mit NPCs reden, kaufen)",
+          "🧪 Trank benutzen: Q",
+          "🗺️ Karte: M, 🔇 Sound: N, 📺 Vollbild: F",
+          "💾 Schnell speichern: K, Schnell laden: L",
+        ],
+        start: "⚔️ In die Wildnis",
+        continue: "📜 Reise fortsetzen",
+        goal: "🎯 Ziel: Quests abschließen, Ausrüstung kaufen, dein Haus bauen, die Katze streicheln und im Tal überleben.",
+      },
+      labels: {
+        language: "Sprache",
+        hp: "LP",
+        stamina: "Ausdauer",
+        xp: "XP",
+        lvl: "Lvl",
+        gold: "Gold",
+        potions: "Tränke",
+        crystals: "Kristalle",
+        wood: "Holz",
+        stone: "Stein",
+        cores: "Kerne",
+        locked: "Gesperrt",
+        done: "Erledigt",
+        turnIn: "(Abgeben)",
+        location: "Ort",
+        house: "Haus",
+        weather: "Wetter",
+        playerHouse: "Spielerhaus",
+        valley: "Tal",
+        owned: "Eigen",
+        sheltered: "Geschützt",
+        explore: "Erkunde das Tal und bestimme deinen Weg.",
+        defeatedTitle: "Du wurdest besiegt",
+        recover: "Drücke R, um am Lager zu respawnen.",
+        deathsLine: "Tode: {deaths}. Die Slimes grüßen freundlich.",
+        shopTitle: "🏪 Nyx' Emporium",
+        shopHeader: "Dein Gold: {gold}   [↑/↓ wählen, Enter/E kaufen, Esc schließen]",
+        controlsHint: "Schlag: LMB/Leertaste  Block: RMB/C  Nutzen: E  Trank: Q  Speichern/Laden: K/L  Karte: M  Sound: N",
+        clear: "Klar",
+        mist: "Nebel",
+        rain: "Regen",
+        storm: "Sturm",
+      },
+      quests: {
+        crystal: "1) Talerkundung",
+        slime: "2) Sumpfreinigung",
+        wood: "3) Baue dein Haus",
+      },
+      shop: {
+        healthPotionName: "Heiltrank",
+        healthPotionDesc: "Stellt 38 LP wieder her. Schmeckt nach Füßen.",
+        megaPotionName: "Mega-Trank",
+        megaPotionDesc: "Stellt 80 LP wieder her. Schmeckt nach teuren Füßen.",
+        crystalShardName: "Kristallsplitter",
+        crystalShardDesc: "Glänzender Stein. Die Älteste liebt die Dinger.",
+        mysteryBoxName: "Mysteriöse Kiste",
+        mysteryBoxDesc: "Kann alles sein! (Meistens Steine.)",
+        sellCoresName: "Slime-Kerne verkaufen",
+        sellCoresDesc: "Verkaufe 1 Kern für 15 Gold.",
+      },
+    },
+    it: {
+      menu: {
+        title: "🏜️ DUSTWARD",
+        subtitle: "Un RPG sandbox 3D dal realismo comico. Spade, slime e scelte discutibili.",
+        controls: [
+          "🎮 Muovi: WASD o frecce",
+          "👀 Visuale: Mouse (clic per bloccare il puntatore) o Freccia Sinistra/Destra",
+          "⚔️ Attacco: Clic sinistro o Spazio (combo da 3 colpi)",
+          "🛡️ Parata: Clic destro o C",
+          "💬 Interagisci / Negozio: E (parla con gli NPC, compra)",
+          "🧪 Usa pozione: Q",
+          "🗺️ Mappa: M, 🔇 Audio: N, 📺 Schermo intero: F",
+          "💾 Salvataggio rapido: K, Caricamento rapido: L",
+        ],
+        start: "⚔️ Entra nelle Terre",
+        continue: "📜 Continua il viaggio",
+        goal: "🎯 Obiettivo: completa missioni, compra equipaggiamento, costruisci la tua casa, accarezza il gatto e sopravvivi nella valle.",
+      },
+      labels: {
+        language: "Lingua",
+        hp: "PS",
+        stamina: "Stamina",
+        xp: "XP",
+        lvl: "Liv",
+        gold: "Oro",
+        potions: "Pozioni",
+        crystals: "Cristalli",
+        wood: "Legno",
+        stone: "Pietra",
+        cores: "Nuclei",
+        locked: "Bloccata",
+        done: "Completata",
+        turnIn: "(Consegna)",
+        location: "Luogo",
+        house: "Casa",
+        weather: "Meteo",
+        playerHouse: "Casa del giocatore",
+        valley: "Valle",
+        owned: "Di proprietà",
+        sheltered: "Al riparo",
+        explore: "Esplora la valle e scegli il tuo percorso.",
+        defeatedTitle: "Sei stato sconfitto",
+        recover: "Premi R per recuperare al campo.",
+        deathsLine: "Morti: {deaths}. Gli slime ti salutano.",
+        shopTitle: "🏪 Emporio di Nyx",
+        shopHeader: "Il tuo oro: {gold}   [↑/↓ naviga, Invio/E compra, Esc chiudi]",
+        controlsHint: "Colpo: LMB/Spazio  Parata: RMB/C  Usa: E  Pozione: Q  Salva/Carica: K/L  Mappa: M  Audio: N",
+        clear: "Sereno",
+        mist: "Nebbia",
+        rain: "Pioggia",
+        storm: "Tempesta",
+      },
+      quests: {
+        crystal: "1) Ricognizione della Valle",
+        slime: "2) Bonifica della Palude",
+        wood: "3) Costruisci la tua Casa",
+      },
+      shop: {
+        healthPotionName: "Pozione curativa",
+        healthPotionDesc: "Ripristina 38 PS. Sa di piedi.",
+        megaPotionName: "Mega pozione",
+        megaPotionDesc: "Ripristina 80 PS. Sa di piedi costosi.",
+        crystalShardName: "Scheggia di cristallo",
+        crystalShardDesc: "Roccia brillante. All'Anziana piace molto.",
+        mysteryBoxName: "Scatola misteriosa",
+        mysteryBoxDesc: "Può essere qualsiasi cosa! (Di solito pietre.)",
+        sellCoresName: "Vendi nuclei slime",
+        sellCoresDesc: "Vendi 1 nucleo per 15 oro.",
+      },
+    },
+    ja: {
+      menu: {
+        title: "🏜️ DUSTWARD",
+        subtitle: "コミカルでリアル寄りな3DサンドボックスRPG。剣、スライム、そして微妙な人生選択。",
+        controls: [
+          "🎮 移動: WASD または 矢印キー",
+          "👀 視点: マウス（クリックでポインタ固定）または 左右矢印",
+          "⚔️ 攻撃: 左クリック または Space（3連コンボ）",
+          "🛡️ ガード: 右クリック または C",
+          "💬 会話 / ショップ: E（NPCと会話、買い物）",
+          "🧪 ポーション使用: Q",
+          "🗺️ マップ: M、🔇 音: N、📺 全画面: F",
+          "💾 クイックセーブ: K、クイックロード: L",
+        ],
+        start: "⚔️ 荒野へ出発",
+        continue: "📜 冒険を再開",
+        goal: "🎯 目標: クエスト達成、装備購入、家づくり、猫をなでて、皮肉なNPCと怒れるゼリーだらけの谷を生き延びよう。",
+      },
+      labels: {
+        language: "言語",
+        hp: "HP",
+        stamina: "スタミナ",
+        xp: "XP",
+        lvl: "Lv",
+        gold: "ゴールド",
+        potions: "ポーション",
+        crystals: "クリスタル",
+        wood: "木材",
+        stone: "石材",
+        cores: "コア",
+        locked: "未解放",
+        done: "完了",
+        turnIn: "（報告）",
+        location: "場所",
+        house: "家",
+        weather: "天気",
+        playerHouse: "プレイヤーの家",
+        valley: "谷",
+        owned: "所有",
+        sheltered: "屋内",
+        explore: "谷を探索し、自分の道を切り開こう。",
+        defeatedTitle: "あなたは倒された",
+        recover: "Rでキャンプに戻る。",
+        deathsLine: "死亡回数: {deaths}。スライムたちが手を振っている。",
+        shopTitle: "🏪 ニクス商会",
+        shopHeader: "所持金: {gold}   [↑/↓ 選択, Enter/E 購入, Esc 閉じる]",
+        controlsHint: "攻撃: LMB/Space  ガード: RMB/C  使用: E  ポーション: Q  セーブ/ロード: K/L  マップ: M  音: N",
+        clear: "晴れ",
+        mist: "霧",
+        rain: "雨",
+        storm: "嵐",
+      },
+      quests: {
+        crystal: "1) 谷の調査",
+        slime: "2) 沼地の浄化",
+        wood: "3) 自分の家を建てる",
+      },
+      shop: {
+        healthPotionName: "回復ポーション",
+        healthPotionDesc: "HPを38回復。味は足っぽい。",
+        megaPotionName: "メガポーション",
+        megaPotionDesc: "HPを80回復。高級な足の味。",
+        crystalShardName: "クリスタルの欠片",
+        crystalShardDesc: "キラキラした石。長老が大好き。",
+        mysteryBoxName: "ミステリーボックス",
+        mysteryBoxDesc: "何が出るかな！（だいたい石）",
+        sellCoresName: "スライムコアを売る",
+        sellCoresDesc: "コア1個を15ゴールドで売却。",
+      },
+    },
+    tr: {
+      menu: {
+        title: "🏜️ DUSTWARD",
+        subtitle: "Komik gerçekçiliğe sahip bir 3D sandbox RPG. Kılıçlar, slime'lar ve şüpheli hayat kararları.",
+        controls: [
+          "🎮 Hareket: WASD veya ok tuşları",
+          "👀 Bakış: Fare (işaretçiyi kilitlemek için tıkla) veya Sol/Sağ ok",
+          "⚔️ Saldırı: Sol tık veya Boşluk (3 vuruşluk kombo)",
+          "🛡️ Blok: Sağ tık veya C",
+          "💬 Etkileşim / Dükkan: E (NPC'lerle konuş, alışveriş yap)",
+          "🧪 İksir kullan: Q",
+          "🗺️ Harita: M, 🔇 Ses: N, 📺 Tam ekran: F",
+          "💾 Hızlı kayıt: K, Hızlı yükleme: L",
+        ],
+        start: "⚔️ Vahşi Topraklara Gir",
+        continue: "📜 Yolculuğa devam et",
+        goal: "🎯 Hedef: görevleri tamamla, ekipman al, evini inşa et, kediyi sev ve alaycı NPC'ler ile öfkeli jellerle dolu vadide hayatta kal.",
+      },
+      labels: {
+        language: "Dil",
+        hp: "CP",
+        stamina: "Dayanıklılık",
+        xp: "XP",
+        lvl: "Sv",
+        gold: "Altın",
+        potions: "İksirler",
+        crystals: "Kristaller",
+        wood: "Odun",
+        stone: "Taş",
+        cores: "Çekirdek",
+        locked: "Kilitli",
+        done: "Tamam",
+        turnIn: "(Teslim et)",
+        location: "Konum",
+        house: "Ev",
+        weather: "Hava",
+        playerHouse: "Oyuncu Evi",
+        valley: "Vadi",
+        owned: "Sahip",
+        sheltered: "Korunaklı",
+        explore: "Vadiyi keşfet ve kendi yolunu çiz.",
+        defeatedTitle: "Yenildin",
+        recover: "Kampa dönmek için R'ye bas.",
+        deathsLine: "Ölümler: {deaths}. Slime'lar selam söylüyor.",
+        shopTitle: "🏪 Nyx'in Dükkanı",
+        shopHeader: "Altının: {gold}   [↑/↓ gezin, Enter/E satın al, Esc kapat]",
+        controlsHint: "Vuruş: LMB/Boşluk  Blok: RMB/C  Kullan: E  İksir: Q  Kaydet/Yükle: K/L  Harita: M  Ses: N",
+        clear: "Açık",
+        mist: "Sis",
+        rain: "Yağmur",
+        storm: "Fırtına",
+      },
+      quests: {
+        crystal: "1) Vadi Keşfi",
+        slime: "2) Bataklık Temizliği",
+        wood: "3) Evini Kur",
+      },
+      shop: {
+        healthPotionName: "Can iksiri",
+        healthPotionDesc: "38 CP yeniler. Tadı ayak gibi.",
+        megaPotionName: "Mega iksir",
+        megaPotionDesc: "80 CP yeniler. Tadı pahalı ayak gibi.",
+        crystalShardName: "Kristal parçası",
+        crystalShardDesc: "Parlak taş. Yaşlı bunun hastası.",
+        mysteryBoxName: "Gizem kutusu",
+        mysteryBoxDesc: "Her şey çıkabilir! (Genelde taş çıkar.)",
+        sellCoresName: "Slime çekirdeği sat",
+        sellCoresDesc: "1 çekirdeği 15 altına sat.",
+      },
+    },
   };
 
   let currentLang = "en";
@@ -274,6 +638,18 @@
     state.quests.wood.title = t("quests.wood");
   }
 
+  function buildLanguageOptions() {
+    if (!langSelect) return;
+    langSelect.textContent = "";
+    for (const [code, label] of Object.entries(LANGUAGE_OPTIONS)) {
+      if (!LANGUAGE_PACKS[code]) continue;
+      const option = document.createElement("option");
+      option.value = code;
+      option.textContent = label;
+      langSelect.appendChild(option);
+    }
+  }
+
   function setLanguage(langCode) {
     currentLang = LANGUAGE_PACKS[langCode] ? langCode : "en";
     try {
@@ -294,6 +670,7 @@
     }
     currentLang = LANGUAGE_PACKS[stored] ? stored : "en";
     if (langSelect) {
+      buildLanguageOptions();
       langSelect.value = currentLang;
       langSelect.addEventListener("change", (event) => {
         setLanguage(event.target.value);
@@ -2126,7 +2503,7 @@
     const sinAngle = Math.sin(player.angle);
     const cos90 = -sinAngle; // cos(angle + PI/2) = -sin(angle)
     const sin90 = cosAngle;  // sin(angle + PI/2) = cos(angle)
-    
+
     const vx = (cosAngle * forward + cos90 * strafe) * PLAYER_SPEED * speedFactor * dt;
     const vy = (sinAngle * forward + sin90 * strafe) * PLAYER_SPEED * speedFactor * dt;
     moveWithCollision(vx, vy);
@@ -2312,21 +2689,28 @@
     const weather = state.weather;
     const day = 0.5 + Math.sin(state.time * 0.014) * 0.45;
     const horizon = Math.floor(height * 0.5);
-    const stormShade = weather.rain * 0.28 + weather.fog * 0.24;
+    const atmosphere = tsAtmosphere
+      ? tsAtmosphere.computeAtmosphere(day, weather.rain, weather.fog)
+      : null;
+    const stormShade = atmosphere ? atmosphere.stormShade : weather.rain * 0.28 + weather.fog * 0.24;
+    const skyTop = atmosphere
+      ? atmosphere.skyTop
+      : {
+        r: Math.floor(lerp(9, 109, day) * (1 - stormShade)),
+        g: Math.floor(lerp(16, 164, day) * (1 - stormShade * 0.9)),
+        b: Math.floor(lerp(32, 220, day) * (1 - stormShade * 0.7)),
+      };
+    const skyBottom = atmosphere
+      ? atmosphere.skyBottom
+      : {
+        r: Math.floor(lerp(40, 182, day) * (1 - stormShade * 0.9)),
+        g: Math.floor(lerp(62, 204, day) * (1 - stormShade * 0.82)),
+        b: Math.floor(lerp(94, 235, day) * (1 - stormShade * 0.65)),
+      };
 
     const skyGrad = ctx.createLinearGradient(0, 0, 0, horizon);
-    skyGrad.addColorStop(
-      0,
-      `rgb(${Math.floor(lerp(9, 109, day) * (1 - stormShade))}, ${Math.floor(lerp(16, 164, day) * (1 - stormShade * 0.9))}, ${Math.floor(
-        lerp(32, 220, day) * (1 - stormShade * 0.7),
-      )})`,
-    );
-    skyGrad.addColorStop(
-      1,
-      `rgb(${Math.floor(lerp(40, 182, day) * (1 - stormShade * 0.9))}, ${Math.floor(lerp(62, 204, day) * (1 - stormShade * 0.82))}, ${Math.floor(
-        lerp(94, 235, day) * (1 - stormShade * 0.65),
-      )})`,
-    );
+    skyGrad.addColorStop(0, `rgb(${skyTop.r}, ${skyTop.g}, ${skyTop.b})`);
+    skyGrad.addColorStop(1, `rgb(${skyBottom.r}, ${skyBottom.g}, ${skyBottom.b})`);
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, width, horizon);
 
@@ -2363,7 +2747,7 @@
 
     const cloudCount = 7 + Math.floor(weather.fog * 10);
     const cloudOpacity = 0.12 + day * 0.14 + weather.fog * 0.22;
-    
+
     // Cache cloud gradient if opacity hasn't changed significantly
     if (!cachedCloudGradient || Math.abs(lastCloudOpacity - cloudOpacity) > 0.01) {
       cachedCloudGradient = ctx.createRadialGradient(0, 0, 4, 0, 0, 72);
@@ -2371,11 +2755,11 @@
       cachedCloudGradient.addColorStop(1, "rgba(255,255,255,0)");
       lastCloudOpacity = cloudOpacity;
     }
-    
+
     for (let i = 0; i < cloudCount; i++) {
       const cx = ((i * 260 + state.time * (6 + i) + state.weather.wind * 230) % (width + 320)) - 140;
       const cy = 58 + (i % 3) * 34 + Math.sin(state.time * 0.1 + i) * 8;
-      
+
       // Use cached gradient with translation
       ctx.save();
       ctx.translate(cx, cy);
@@ -2944,18 +3328,18 @@
     const projected = [];
     const MAX_RAY_DIST_SQ = MAX_RAY_DIST * MAX_RAY_DIST;
     const MIN_DIST_SQ = 0.12 * 0.12;
-    
+
     for (const sprite of sprites) {
       const dx = sprite.x - state.player.x;
       const dy = sprite.y - state.player.y;
-      
+
       // Quick distance check using squared distance (avoids sqrt)
       const distSq = dx * dx + dy * dy;
       if (distSq < MIN_DIST_SQ || distSq > MAX_RAY_DIST_SQ) continue;
-      
+
       const ang = normalizeAngle(Math.atan2(dy, dx) - state.player.angle);
       if (Math.abs(ang) > FOV * 0.72) continue;
-      
+
       // Only compute actual distance when needed
       const d = Math.sqrt(distSq);
       const sx = ((ang + FOV / 2) / FOV) * width;
@@ -3449,6 +3833,7 @@
   window.render_game_to_text = () => {
     const activeEnemies = state.enemies.filter((e) => e.alive);
     const activeResources = state.resources.filter((r) => !r.harvested);
+    const activeNpcs = state.npcs;
     const activePigs = state.pigs;
     const quests = {
       crystal: {
@@ -3519,7 +3904,7 @@
       quests,
       nearby_npcs: state.player.inHouse
         ? []
-        : state.npcs
+        : activeNpcs
           .map((n) => ({
             id: n.id,
             name: n.name,
