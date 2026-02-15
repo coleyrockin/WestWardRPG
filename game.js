@@ -3519,6 +3519,7 @@
       quests,
       nearby_npcs: state.player.inHouse
         ? []
+        : state.npcs
           .map((n) => ({
             id: n.id,
             name: n.name,
