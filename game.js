@@ -4,6 +4,8 @@
   const menu = document.getElementById("menu");
   const startBtn = document.getElementById("start-btn");
   const continueBtn = document.getElementById("continue-btn");
+  const langSelect = document.getElementById("lang-select");
+  const langLabel = document.getElementById("lang-label");
 
   const TAU = Math.PI * 2;
   const FOV = Math.PI / 2.75;
@@ -13,8 +15,292 @@
   const PLAYER_ROT_SPEED = 2.75;
   const PLAYER_MAX_HP = 120;
   const SAVE_KEY = "dustward-save-v1";
+  const LOCALE_KEY = "dustward-locale-v1";
   const AUTOSAVE_INTERVAL = 30;
   const QUEST_STATUSES = new Set(["locked", "active", "complete", "turned_in"]);
+
+  const LANGUAGE_PACKS = {
+    en: {
+      menu: {
+        title: "🏜️ DUSTWARD",
+        subtitle: "A comically realistic 3D sandbox RPG. Swords, slimes, and questionable life choices.",
+        controls: [
+          "🎮 Move: WASD or Arrow keys",
+          "👀 Look: Mouse (click to lock pointer) or Arrow Left/Right",
+          "⚔️ Attack: Left Mouse or Space (3-hit combo!)",
+          "🛡️ Block: Right Mouse or C",
+          "💬 Interact / Shop: E (talk to NPCs, browse shops)",
+          "🧪 Use potion: Q",
+          "🗺️ Toggle map: M, 🔇 Sound: N, 📺 Fullscreen: F",
+          "💾 Quick save: K, Quick load: L",
+        ],
+        start: "⚔️ Enter The Wilds",
+        continue: "📜 Continue Journey",
+        goal: "🎯 Goal: Complete quests, shop for gear, build your house, pet the cat, and survive a valley full of sarcastic NPCs and angry gelatin.",
+      },
+      labels: {
+        language: "Language",
+        hp: "HP",
+        stamina: "Stamina",
+        xp: "XP",
+        lvl: "Lvl",
+        gold: "Gold",
+        potions: "Potions",
+        crystals: "Crystals",
+        wood: "Wood",
+        stone: "Stone",
+        cores: "Cores",
+        locked: "Locked",
+        done: "Done",
+        turnIn: "(Turn in)",
+        location: "Location",
+        house: "House",
+        weather: "Weather",
+        playerHouse: "Player House",
+        valley: "Valley",
+        owned: "Owned",
+        sheltered: "Sheltered",
+        explore: "Explore the valley and shape your path.",
+        defeatedTitle: "You Were Defeated",
+        recover: "Press R to recover at camp.",
+        deathsLine: "Deaths: {deaths}. The slimes send their regards.",
+        shopTitle: "🏪 Trader Nyx's Emporium",
+        shopHeader: "Your Gold: {gold}   [↑/↓ to browse, Enter/E to buy, Esc to close]",
+        controlsHint: "Swing: LMB/Space  Block: RMB/C  Use: E  Potion: Q  Save/Load: K/L  Map: M  Sound: N",
+        clear: "Clear",
+        mist: "Mist",
+        rain: "Rain",
+        storm: "Storm",
+      },
+      quests: {
+        crystal: "1) Valley Survey",
+        slime: "2) Marsh Cleansing",
+        wood: "3) Raise Your House",
+      },
+      shop: {
+        healthPotionName: "Health Potion",
+        healthPotionDesc: "Restores 38 HP. Tastes like feet.",
+        megaPotionName: "Mega Potion",
+        megaPotionDesc: "Restores 80 HP. Tastes like expensive feet.",
+        crystalShardName: "Crystal Shard",
+        crystalShardDesc: "Shiny rock. The Elder loves these.",
+        mysteryBoxName: "Mystery Box",
+        mysteryBoxDesc: "Could be anything! (It's usually rocks.)",
+        sellCoresName: "Sell Slime Cores",
+        sellCoresDesc: "Sell 1 core for 15 gold. Gross but profitable.",
+      },
+    },
+    es: {
+      menu: {
+        title: "🏜️ DUSTWARD",
+        subtitle: "Un RPG sandbox 3D cómicamente realista. Espadas, slimes y decisiones dudosas.",
+        controls: [
+          "🎮 Moverse: WASD o flechas",
+          "👀 Mirar: Mouse (clic para bloquear puntero) o Flecha Izq/Der",
+          "⚔️ Ataque: Clic izquierdo o Espacio (combo de 3 golpes)",
+          "🛡️ Bloquear: Clic derecho o C",
+          "💬 Interactuar / Tienda: E (habla con NPCs, compra)",
+          "🧪 Usar poción: Q",
+          "🗺️ Mapa: M, 🔇 Sonido: N, 📺 Pantalla completa: F",
+          "💾 Guardado rápido: K, Carga rápida: L",
+        ],
+        start: "⚔️ Entrar a las Tierras",
+        continue: "📜 Continuar aventura",
+        goal: "🎯 Meta: Completa misiones, compra equipo, construye tu casa, acaricia al gato y sobrevive al valle.",
+      },
+      labels: {
+        language: "Idioma",
+        hp: "HP",
+        stamina: "Energía",
+        xp: "XP",
+        lvl: "Nv",
+        gold: "Oro",
+        potions: "Pociones",
+        crystals: "Cristales",
+        wood: "Madera",
+        stone: "Piedra",
+        cores: "Núcleos",
+        locked: "Bloqueada",
+        done: "Hecha",
+        turnIn: "(Entregar)",
+        location: "Lugar",
+        house: "Casa",
+        weather: "Clima",
+        playerHouse: "Casa del jugador",
+        valley: "Valle",
+        owned: "Propia",
+        sheltered: "Resguardado",
+        explore: "Explora el valle y forja tu camino.",
+        defeatedTitle: "Has sido derrotado",
+        recover: "Presiona R para volver al campamento.",
+        deathsLine: "Muertes: {deaths}. Los slimes te mandan saludos.",
+        shopTitle: "🏪 Emporio de Nyx",
+        shopHeader: "Tu oro: {gold}   [↑/↓ navegar, Enter/E comprar, Esc cerrar]",
+        controlsHint: "Golpe: LMB/Espacio  Bloqueo: RMB/C  Usar: E  Poción: Q  Guardar/Cargar: K/L  Mapa: M  Sonido: N",
+        clear: "Despejado",
+        mist: "Niebla",
+        rain: "Lluvia",
+        storm: "Tormenta",
+      },
+      quests: {
+        crystal: "1) Reconocimiento del Valle",
+        slime: "2) Limpieza del Pantano",
+        wood: "3) Levanta tu Casa",
+      },
+      shop: {
+        healthPotionName: "Poción de salud",
+        healthPotionDesc: "Restaura 38 HP. Sabe a pies.",
+        megaPotionName: "Mega poción",
+        megaPotionDesc: "Restaura 80 HP. Sabe a pies caros.",
+        crystalShardName: "Fragmento de cristal",
+        crystalShardDesc: "Roca brillante. A la Anciana le encanta.",
+        mysteryBoxName: "Caja misteriosa",
+        mysteryBoxDesc: "¡Puede ser cualquier cosa! (Casi siempre son rocas.)",
+        sellCoresName: "Vender núcleos slime",
+        sellCoresDesc: "Vende 1 núcleo por 15 de oro.",
+      },
+    },
+    pt: {
+      menu: {
+        title: "🏜️ DUSTWARD",
+        subtitle: "Um RPG sandbox 3D com realismo cômico. Espadas, slimes e escolhas duvidosas.",
+        controls: [
+          "🎮 Mover: WASD ou setas",
+          "👀 Olhar: Mouse (clique para travar ponteiro) ou Seta Esq/Dir",
+          "⚔️ Ataque: Botão esquerdo ou Espaço (combo de 3 golpes)",
+          "🛡️ Defesa: Botão direito ou C",
+          "💬 Interagir / Loja: E (fale com NPCs, compre)",
+          "🧪 Usar poção: Q",
+          "🗺️ Mapa: M, 🔇 Som: N, 📺 Tela cheia: F",
+          "💾 Salvar rápido: K, Carregar rápido: L",
+        ],
+        start: "⚔️ Entrar nas Terras",
+        continue: "📜 Continuar jornada",
+        goal: "🎯 Objetivo: complete missões, compre equipamentos, construa sua casa, faça carinho no gato e sobreviva no vale.",
+      },
+      labels: {
+        language: "Idioma",
+        hp: "HP",
+        stamina: "Fôlego",
+        xp: "XP",
+        lvl: "Nv",
+        gold: "Ouro",
+        potions: "Poções",
+        crystals: "Cristais",
+        wood: "Madeira",
+        stone: "Pedra",
+        cores: "Núcleos",
+        locked: "Bloqueada",
+        done: "Concluída",
+        turnIn: "(Entregar)",
+        location: "Local",
+        house: "Casa",
+        weather: "Clima",
+        playerHouse: "Casa do jogador",
+        valley: "Vale",
+        owned: "Sua",
+        sheltered: "Abrigado",
+        explore: "Explore o vale e siga seu caminho.",
+        defeatedTitle: "Você foi derrotado",
+        recover: "Pressione R para voltar ao acampamento.",
+        deathsLine: "Mortes: {deaths}. Os slimes mandam lembranças.",
+        shopTitle: "🏪 Empório da Nyx",
+        shopHeader: "Seu ouro: {gold}   [↑/↓ navegar, Enter/E comprar, Esc fechar]",
+        controlsHint: "Golpe: LMB/Espaço  Defesa: RMB/C  Usar: E  Poção: Q  Salvar/Carregar: K/L  Mapa: M  Som: N",
+        clear: "Limpo",
+        mist: "Névoa",
+        rain: "Chuva",
+        storm: "Tempestade",
+      },
+      quests: {
+        crystal: "1) Levantamento do Vale",
+        slime: "2) Limpeza do Pântano",
+        wood: "3) Erga sua Casa",
+      },
+      shop: {
+        healthPotionName: "Poção de vida",
+        healthPotionDesc: "Restaura 38 HP. Gosto de pé.",
+        megaPotionName: "Mega poção",
+        megaPotionDesc: "Restaura 80 HP. Gosto de pé premium.",
+        crystalShardName: "Fragmento de cristal",
+        crystalShardDesc: "Pedra brilhante. A Anciã adora.",
+        mysteryBoxName: "Caixa misteriosa",
+        mysteryBoxDesc: "Pode ser qualquer coisa! (Normalmente pedras.)",
+        sellCoresName: "Vender núcleos slime",
+        sellCoresDesc: "Venda 1 núcleo por 15 de ouro.",
+      },
+    },
+  };
+
+  let currentLang = "en";
+
+  function deepGet(obj, path) {
+    return path.split(".").reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj);
+  }
+
+  function fmt(template, vars = {}) {
+    return template.replace(/\{(\w+)\}/g, (_, token) => (vars[token] !== undefined ? String(vars[token]) : `{${token}}`));
+  }
+
+  function t(key, vars) {
+    const active = LANGUAGE_PACKS[currentLang] || LANGUAGE_PACKS.en;
+    const value = deepGet(active, key) ?? deepGet(LANGUAGE_PACKS.en, key) ?? key;
+    return typeof value === "string" ? fmt(value, vars) : value;
+  }
+
+  function localizeMenu() {
+    const title = document.getElementById("menu-title");
+    const subtitle = document.getElementById("menu-subtitle");
+    const hint = document.getElementById("hint");
+    const controls = document.querySelectorAll("[data-control-index]");
+    if (title) title.textContent = t("menu.title");
+    if (subtitle) subtitle.textContent = t("menu.subtitle");
+    if (hint) hint.textContent = t("menu.goal");
+    if (startBtn) startBtn.textContent = t("menu.start");
+    if (continueBtn) continueBtn.textContent = t("menu.continue");
+    if (langLabel) langLabel.textContent = t("labels.language");
+    controls.forEach((node) => {
+      const index = Number(node.getAttribute("data-control-index"));
+      const list = t("menu.controls");
+      if (Array.isArray(list) && Number.isInteger(index) && list[index]) {
+        node.textContent = list[index];
+      }
+    });
+  }
+
+  function refreshLocalizedStateText() {
+    state.quests.crystal.title = t("quests.crystal");
+    state.quests.slime.title = t("quests.slime");
+    state.quests.wood.title = t("quests.wood");
+  }
+
+  function setLanguage(langCode) {
+    currentLang = LANGUAGE_PACKS[langCode] ? langCode : "en";
+    try {
+      window.localStorage.setItem(LOCALE_KEY, currentLang);
+    } catch {
+      // storage unavailable is non-fatal
+    }
+    localizeMenu();
+    refreshLocalizedStateText();
+  }
+
+  function initLanguage() {
+    let stored = "en";
+    try {
+      stored = window.localStorage.getItem(LOCALE_KEY) || "en";
+    } catch {
+      stored = "en";
+    }
+    currentLang = LANGUAGE_PACKS[stored] ? stored : "en";
+    if (langSelect) {
+      langSelect.value = currentLang;
+      langSelect.addEventListener("change", (event) => {
+        setLanguage(event.target.value);
+      });
+    }
+    localizeMenu();
+  }
 
   /* ─── Sound Effects System (Web Audio API) ─── */
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -26,7 +312,7 @@
       try { audioCtx = new AudioCtx(); } catch { audioCtx = null; }
     }
     if (audioCtx && audioCtx.state === "suspended") {
-      audioCtx.resume().catch(() => {});
+      audioCtx.resume().catch(() => { });
     }
     return audioCtx;
   }
@@ -69,23 +355,23 @@
   }
 
   const sfx = {
-    footstep()   { playTone(80 + Math.random() * 40, 0.06, "triangle", 0.04); },
+    footstep() { playTone(80 + Math.random() * 40, 0.06, "triangle", 0.04); },
     swordSwing() { playNoise(0.12, 0.07); playTone(220 + Math.random() * 60, 0.1, "sawtooth", 0.05); },
-    swordHit()   { playTone(160, 0.08, "square", 0.09); playNoise(0.06, 0.08); },
+    swordHit() { playTone(160, 0.08, "square", 0.09); playNoise(0.06, 0.08); },
     playerHurt() { playTone(110, 0.15, "sawtooth", 0.08, -200); },
-    enemyDie()   { playTone(300, 0.06, "square", 0.06); playTone(200, 0.1, "square", 0.05); playTone(100, 0.18, "square", 0.04); },
-    pickup()     { playTone(523, 0.06, "sine", 0.07); playTone(659, 0.08, "sine", 0.06); },
-    questDone()  { playTone(392, 0.1, "sine", 0.07); playTone(523, 0.12, "sine", 0.07); playTone(659, 0.14, "sine", 0.07); },
-    shopBuy()    { playTone(440, 0.05, "triangle", 0.06); playTone(554, 0.08, "triangle", 0.06); },
-    doorOpen()   { playTone(130, 0.15, "triangle", 0.05); playTone(165, 0.12, "triangle", 0.04); },
-    potionUse()  { playTone(350, 0.08, "sine", 0.06); playTone(440, 0.12, "sine", 0.05); playTone(523, 0.15, "sine", 0.04); },
-    levelUp()    { playTone(523, 0.1, "sine", 0.08); playTone(659, 0.1, "sine", 0.08); playTone(784, 0.15, "sine", 0.08); playTone(1047, 0.2, "sine", 0.07); },
-    thunder()    { playNoise(0.6, 0.09); playTone(40, 0.5, "sawtooth", 0.06); },
-    miss()       { playNoise(0.08, 0.03); },
-    blockHit()   { playTone(200, 0.06, "square", 0.06); playTone(90, 0.08, "triangle", 0.05); },
-    rain()       { playNoise(0.3, 0.02); },
-    npcChat()    { playTone(280 + Math.random() * 80, 0.04, "triangle", 0.03); },
-    death()      { playTone(180, 0.2, "sawtooth", 0.08); playTone(120, 0.3, "sawtooth", 0.06); playTone(60, 0.5, "sawtooth", 0.04); },
+    enemyDie() { playTone(300, 0.06, "square", 0.06); playTone(200, 0.1, "square", 0.05); playTone(100, 0.18, "square", 0.04); },
+    pickup() { playTone(523, 0.06, "sine", 0.07); playTone(659, 0.08, "sine", 0.06); },
+    questDone() { playTone(392, 0.1, "sine", 0.07); playTone(523, 0.12, "sine", 0.07); playTone(659, 0.14, "sine", 0.07); },
+    shopBuy() { playTone(440, 0.05, "triangle", 0.06); playTone(554, 0.08, "triangle", 0.06); },
+    doorOpen() { playTone(130, 0.15, "triangle", 0.05); playTone(165, 0.12, "triangle", 0.04); },
+    potionUse() { playTone(350, 0.08, "sine", 0.06); playTone(440, 0.12, "sine", 0.05); playTone(523, 0.15, "sine", 0.04); },
+    levelUp() { playTone(523, 0.1, "sine", 0.08); playTone(659, 0.1, "sine", 0.08); playTone(784, 0.15, "sine", 0.08); playTone(1047, 0.2, "sine", 0.07); },
+    thunder() { playNoise(0.6, 0.09); playTone(40, 0.5, "sawtooth", 0.06); },
+    miss() { playNoise(0.08, 0.03); },
+    blockHit() { playTone(200, 0.06, "square", 0.06); playTone(90, 0.08, "triangle", 0.05); },
+    rain() { playNoise(0.3, 0.02); },
+    npcChat() { playTone(280 + Math.random() * 80, 0.04, "triangle", 0.03); },
+    death() { playTone(180, 0.2, "sawtooth", 0.08); playTone(120, 0.3, "sawtooth", 0.06); playTone(60, 0.5, "sawtooth", 0.04); },
   };
 
   let footstepTimer = 0;
@@ -178,27 +464,37 @@
   /* ─── Shop System ─── */
   let shopOpen = false;
   const shopItems = [
-    { name: "Health Potion",    cost: 18, desc: "Restores 38 HP. Tastes like feet.",
-      action() { state.inventory.Potion += 1; } },
-    { name: "Mega Potion",      cost: 40, desc: "Restores 80 HP. Tastes like expensive feet.",
-      action() { state.inventory.Potion += 3; } },
-    { name: "Crystal Shard",    cost: 30, desc: "Shiny rock. The Elder loves these.",
-      action() { state.inventory["Crystal Shard"] += 1; updateQuestProgressFromInventory(); } },
-    { name: "Mystery Box",      cost: 25, desc: "Could be anything! (It's usually rocks.)",
+    {
+      nameKey: "shop.healthPotionName", cost: 18, descKey: "shop.healthPotionDesc",
+      action() { state.inventory.Potion += 1; }
+    },
+    {
+      nameKey: "shop.megaPotionName", cost: 40, descKey: "shop.megaPotionDesc",
+      action() { state.inventory.Potion += 3; }
+    },
+    {
+      nameKey: "shop.crystalShardName", cost: 30, descKey: "shop.crystalShardDesc",
+      action() { state.inventory["Crystal Shard"] += 1; updateQuestProgressFromInventory(); }
+    },
+    {
+      nameKey: "shop.mysteryBoxName", cost: 25, descKey: "shop.mysteryBoxDesc",
       action() {
         const roll = Math.random();
         if (roll < 0.3) { state.inventory.Potion += 2; logMsg("Mystery Box: 2 Potions! Lucky you!"); }
         else if (roll < 0.5) { state.player.gold += 50; logMsg("Mystery Box: 50 gold! The house always wins... except now."); }
         else if (roll < 0.7) { state.inventory["Slime Core"] += 3; logMsg("Mystery Box: 3 Slime Cores! Eww but useful."); }
         else { state.inventory.Stone += 2; logMsg("Mystery Box: 2 Stones. Called it."); }
-      } },
-    { name: "Sell Slime Cores",  cost: -15, desc: "Sell 1 core for 15 gold. Gross but profitable.",
+      }
+    },
+    {
+      nameKey: "shop.sellCoresName", cost: -15, descKey: "shop.sellCoresDesc",
       action() {
         if (state.inventory["Slime Core"] <= 0) { logMsg("No Slime Cores to sell!"); return false; }
         state.inventory["Slime Core"] -= 1;
         state.player.gold += 15;
         return true;
-      } },
+      }
+    },
   ];
   let shopSelection = 0;
 
@@ -699,6 +995,9 @@
       visits: 0,
     },
   };
+
+  initLanguage();
+  refreshLocalizedStateText();
 
   let hasSaveData = false;
   let lastSaveAt = null;
@@ -1645,10 +1944,10 @@
   }
 
   function weatherLabel(kind) {
-    if (kind === "mist") return "Mist";
-    if (kind === "rain") return "Rain";
-    if (kind === "storm") return "Storm";
-    return "Clear";
+    if (kind === "mist") return t("labels.mist");
+    if (kind === "rain") return t("labels.rain");
+    if (kind === "storm") return t("labels.storm");
+    return t("labels.clear");
   }
 
   function updateWeather(dt) {
@@ -2832,23 +3131,23 @@
     ctx.fillStyle = "rgba(16, 29, 33, 0.75)";
     ctx.fillRect(hudX, hudY, hudW, 104);
 
-    drawBar(22, hudY + 14, 174, 14, state.player.hp / state.player.maxHp, "#3a1f1e", "#e76b58", `HP ${Math.ceil(state.player.hp)}/${state.player.maxHp}`);
-    drawBar(22, hudY + 34, 174, 12, state.player.stamina / 100, "#1f2f2c", "#5fe0b5", `Stamina ${Math.ceil(state.player.stamina)}`);
-    drawBar(22, hudY + 52, 174, 10, state.player.xp / state.player.nextXp, "#233145", "#79a5ff", `XP ${state.player.xp}/${state.player.nextXp}`);
+    drawBar(22, hudY + 14, 174, 14, state.player.hp / state.player.maxHp, "#3a1f1e", "#e76b58", `${t("labels.hp")} ${Math.ceil(state.player.hp)}/${state.player.maxHp}`);
+    drawBar(22, hudY + 34, 174, 12, state.player.stamina / 100, "#1f2f2c", "#5fe0b5", `${t("labels.stamina")} ${Math.ceil(state.player.stamina)}`);
+    drawBar(22, hudY + 52, 174, 10, state.player.xp / state.player.nextXp, "#233145", "#79a5ff", `${t("labels.xp")} ${state.player.xp}/${state.player.nextXp}`);
 
     ctx.fillStyle = "#f8f0dc";
     ctx.font = "12px Georgia";
-    ctx.fillText(`Lvl ${state.player.level}   Gold ${state.player.gold}   Potions ${state.inventory.Potion}`, 212, hudY + 22);
-    ctx.fillText(`Crystals ${state.inventory["Crystal Shard"]}   Wood ${state.inventory.Wood}   Stone ${state.inventory.Stone}   Cores ${state.inventory["Slime Core"]}`, 212, hudY + 40);
+    ctx.fillText(`${t("labels.lvl")} ${state.player.level}   ${t("labels.gold")} ${state.player.gold}   ${t("labels.potions")} ${state.inventory.Potion}`, 212, hudY + 22);
+    ctx.fillText(`${t("labels.crystals")} ${state.inventory["Crystal Shard"]}   ${t("labels.wood")} ${state.inventory.Wood}   ${t("labels.stone")} ${state.inventory.Stone}   ${t("labels.cores")} ${state.inventory["Slime Core"]}`, 212, hudY + 40);
 
     const q1 = state.quests.crystal;
     const q2 = state.quests.slime;
     const q3 = state.quests.wood;
 
     const questLines = [
-      `${q1.title}: ${q1.status === "locked" ? "Locked" : q1.status === "turned_in" ? "Done" : `${q1.progress}/${q1.need}${q1.status === "complete" ? " (Turn in)" : ""}`}`,
-      `${q2.title}: ${q2.status === "locked" ? "Locked" : q2.status === "turned_in" ? "Done" : `${q2.progress}/${q2.need}${q2.status === "complete" ? " (Turn in)" : ""}`}`,
-      `${q3.title}: ${q3.status === "locked" ? "Locked" : q3.status === "turned_in" ? "Done" : `${Math.min(q3.needWood, state.inventory.Wood)}/${q3.needWood}W ${Math.min(q3.needStone, state.inventory.Stone)}/${q3.needStone}S${q3.status === "complete" ? " (Turn in)" : ""}`}`,
+      `${q1.title}: ${q1.status === "locked" ? t("labels.locked") : q1.status === "turned_in" ? t("labels.done") : `${q1.progress}/${q1.need}${q1.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
+      `${q2.title}: ${q2.status === "locked" ? t("labels.locked") : q2.status === "turned_in" ? t("labels.done") : `${q2.progress}/${q2.need}${q2.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
+      `${q3.title}: ${q3.status === "locked" ? t("labels.locked") : q3.status === "turned_in" ? t("labels.done") : `${Math.min(q3.needWood, state.inventory.Wood)}/${q3.needWood}W ${Math.min(q3.needStone, state.inventory.Stone)}/${q3.needStone}S${q3.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
     ];
 
     ctx.fillStyle = "#f3ecd8";
@@ -2864,15 +3163,15 @@
     ctx.fillStyle = "#f9f1dd";
     ctx.font = "12px Georgia";
 
-    const location = state.player.inHouse ? "Player House" : "Valley";
-    const houseStatus = state.house.unlocked ? "Owned" : "Locked";
-    const weatherText = state.player.inHouse ? "Sheltered" : weatherLabel(state.weather.kind);
-    ctx.fillText(`Location: ${location}   House: ${houseStatus}   Weather: ${weatherText}`, 20, 30);
+    const location = state.player.inHouse ? t("labels.playerHouse") : t("labels.valley");
+    const houseStatus = state.house.unlocked ? t("labels.owned") : t("labels.locked");
+    const weatherText = state.player.inHouse ? t("labels.sheltered") : weatherLabel(state.weather.kind);
+    ctx.fillText(`${t("labels.location")}: ${location}   ${t("labels.house")}: ${houseStatus}   ${t("labels.weather")}: ${weatherText}`, 20, 30);
 
     let msgY = 46;
     const shown = state.msg.slice(0, 3);
     if (shown.length === 0) {
-      ctx.fillText("Explore the valley and shape your path.", 20, msgY);
+      ctx.fillText(t("labels.explore"), 20, msgY);
     }
     for (const m of shown) {
       ctx.fillText(m.text, 20, msgY);
@@ -2884,12 +3183,12 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#ffe3d8";
       ctx.font = "bold 42px Georgia";
-      ctx.fillText("You Were Defeated", canvas.width * 0.34, canvas.height * 0.43);
+      ctx.fillText(t("labels.defeatedTitle"), canvas.width * 0.34, canvas.height * 0.43);
       ctx.font = "20px Georgia";
-      ctx.fillText("Press R to recover at camp.", canvas.width * 0.38, canvas.height * 0.49);
+      ctx.fillText(t("labels.recover"), canvas.width * 0.38, canvas.height * 0.49);
       ctx.font = "italic 16px Georgia";
       ctx.fillStyle = "#ffa0a0";
-      ctx.fillText(`Deaths: ${state.player.deaths + 1}. The slimes send their regards.`, canvas.width * 0.36, canvas.height * 0.54);
+      ctx.fillText(t("labels.deathsLine", { deaths: state.player.deaths + 1 }), canvas.width * 0.36, canvas.height * 0.54);
     }
 
     /* Shop overlay */
@@ -2907,10 +3206,10 @@
 
       ctx.fillStyle = "#ffd77b";
       ctx.font = "bold 20px Georgia";
-      ctx.fillText("🏪 Trader Nyx's Emporium", sx + 16, sy + 30);
+      ctx.fillText(t("labels.shopTitle"), sx + 16, sy + 30);
       ctx.font = "12px Georgia";
       ctx.fillStyle = "#c9b889";
-      ctx.fillText(`Your Gold: ${state.player.gold}   [↑/↓ to browse, Enter/E to buy, Esc to close]`, sx + 16, sy + 50);
+      ctx.fillText(t("labels.shopHeader", { gold: state.player.gold }), sx + 16, sy + 50);
 
       for (let i = 0; i < shopItems.length; i++) {
         const item = shopItems[i];
@@ -2928,7 +3227,7 @@
 
         ctx.fillStyle = selected ? "#ffd77b" : "#f3ecd8";
         ctx.font = "bold 14px Georgia";
-        ctx.fillText(item.name, sx + 20, iy + 18);
+        ctx.fillText(t(item.nameKey), sx + 20, iy + 18);
 
         ctx.fillStyle = item.cost < 0 ? "#5fe0b5" : (state.player.gold >= item.cost ? "#ffd77b" : "#ff6b6b");
         ctx.font = "14px Georgia";
@@ -2936,13 +3235,13 @@
 
         ctx.fillStyle = "#a09880";
         ctx.font = "italic 12px Georgia";
-        ctx.fillText(item.desc, sx + 20, iy + 36);
+        ctx.fillText(t(item.descKey), sx + 20, iy + 36);
       }
     }
 
     ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
     ctx.font = "10px Georgia";
-    ctx.fillText("Swing: LMB/Space  Block: RMB/C  Use: E  Potion: Q  Save/Load: K/L  Map: M  Sound: N", 16, canvas.height - 6);
+    ctx.fillText(t("labels.controlsHint"), 16, canvas.height - 6);
   }
 
   function render() {
@@ -3002,7 +3301,7 @@
           state.player.gold -= item.cost;
           item.action();
           sfx.shopBuy();
-          logMsg(`Bought ${item.name}! ${choice(["Money well spent!", "Trader Nyx grins.", "Ka-ching!", "Nyx winks."])}`);
+          logMsg(`Bought ${t(item.nameKey)}! ${choice(["Money well spent!", "Trader Nyx grins.", "Ka-ching!", "Nyx winks."])}`);
         } else {
           logMsg("Trader Nyx: No gold, no goods. That's business, baby.");
         }
@@ -3080,7 +3379,7 @@
       try {
         const maybePromise = canvas.requestPointerLock?.();
         if (maybePromise && typeof maybePromise.catch === "function") {
-          maybePromise.catch(() => {});
+          maybePromise.catch(() => { });
         }
       } catch {
         // Pointer lock is optional in automation/headless contexts.
@@ -3220,74 +3519,58 @@
       quests,
       nearby_npcs: state.player.inHouse
         ? []
-        : state.npcs
-            .reduce((acc, n) => {
-              const distance = dist(state.player, n);
-              if (distance < 8) {
-                acc.push({
-                  id: n.id,
-                  name: n.name,
-                  x: Math.round(n.x * 100) / 100,
-                  y: Math.round(n.y * 100) / 100,
-                  distance: Math.round(distance * 100) / 100,
-                });
-              }
-              return acc;
-            }, [])
-            .sort((a, b) => a.distance - b.distance),
+          .map((n) => ({
+            id: n.id,
+            name: n.name,
+            x: Number(n.x.toFixed(2)),
+            y: Number(n.y.toFixed(2)),
+            distance: Number(dist(state.player, n).toFixed(2)),
+          }))
+          .filter((n) => n.distance < 8)
+          .sort((a, b) => a.distance - b.distance),
       nearby_pigs: state.player.inHouse
         ? []
         : activePigs
-            .map((p) => ({
-              id: p.id,
-              name: p.name,
-              x: Number(p.x.toFixed(2)),
-              y: Number(p.y.toFixed(2)),
-              distance: Number(dist(state.player, p).toFixed(2)),
-            }))
-            .filter((p) => p.distance < 10)
-            .sort((a, b) => a.distance - b.distance)
-            .slice(0, 10),
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            x: Number(p.x.toFixed(2)),
+            y: Number(p.y.toFixed(2)),
+            distance: Number(dist(state.player, p).toFixed(2)),
+          }))
+          .filter((p) => p.distance < 10)
+          .sort((a, b) => a.distance - b.distance)
+          .slice(0, 10),
       nearby_enemies: state.player.inHouse
         ? []
         : activeEnemies
-            .reduce((acc, e) => {
-              const distance = dist(state.player, e);
-              if (distance < 10) {
-                acc.push({
-                  id: e.id,
-                  x: Math.round(e.x * 100) / 100,
-                  y: Math.round(e.y * 100) / 100,
-                  hp: e.hp,
-                  distance: Math.round(distance * 100) / 100,
-                });
-              }
-              return acc;
-            }, [])
-            .sort((a, b) => a.distance - b.distance)
-            .slice(0, 8),
+          .map((e) => ({
+            id: e.id,
+            x: Number(e.x.toFixed(2)),
+            y: Number(e.y.toFixed(2)),
+            hp: e.hp,
+            distance: Number(dist(state.player, e).toFixed(2)),
+          }))
+          .filter((e) => e.distance < 10)
+          .sort((a, b) => a.distance - b.distance)
+          .slice(0, 8),
       nearby_resources: state.player.inHouse
         ? [
-            { id: "bed", type: "bed", x: state.house.bed.x, y: state.house.bed.y, distance: Math.round(dist(state.player, state.house.bed) * 100) / 100 },
-            { id: "stash", type: "stash", x: state.house.stash.x, y: state.house.stash.y, distance: Math.round(dist(state.player, state.house.stash) * 100) / 100 },
-            { id: "exit", type: "exit-door", x: state.house.interiorDoor.x, y: state.house.interiorDoor.y, distance: Math.round(dist(state.player, state.house.interiorDoor) * 100) / 100 },
-          ]
+          { id: "bed", type: "bed", x: state.house.bed.x, y: state.house.bed.y, distance: Number(dist(state.player, state.house.bed).toFixed(2)) },
+          { id: "stash", type: "stash", x: state.house.stash.x, y: state.house.stash.y, distance: Number(dist(state.player, state.house.stash).toFixed(2)) },
+          { id: "exit", type: "exit-door", x: state.house.interiorDoor.x, y: state.house.interiorDoor.y, distance: Number(dist(state.player, state.house.interiorDoor).toFixed(2)) },
+        ]
         : activeResources
-            .reduce((acc, r) => {
-              const distance = dist(state.player, r);
-              if (distance < 9) {
-                acc.push({
-                  id: r.id,
-                  type: r.type,
-                  x: Math.round(r.x * 100) / 100,
-                  y: Math.round(r.y * 100) / 100,
-                  distance: Math.round(distance * 100) / 100,
-                });
-              }
-              return acc;
-            }, [])
-            .sort((a, b) => a.distance - b.distance)
-            .slice(0, 12),
+          .map((r) => ({
+            id: r.id,
+            type: r.type,
+            x: Number(r.x.toFixed(2)),
+            y: Number(r.y.toFixed(2)),
+            distance: Number(dist(state.player, r).toFixed(2)),
+          }))
+          .filter((r) => r.distance < 9)
+          .sort((a, b) => a.distance - b.distance)
+          .slice(0, 12),
       messages: state.msg.slice(0, 4).map((m) => m.text),
     };
 

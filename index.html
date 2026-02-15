@@ -1,148 +1,185 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dustward - Single Player 3D Sandbox RPG</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23253c40'/%3E%3Ccircle cx='8' cy='8' r='5' fill='%23e38655'/%3E%3C/svg%3E" />
-    <style>
-      :root {
-        --bg-a: #d6e8ff;
-        --bg-b: #8dc2a3;
-        --ui: #f4efe0;
-        --accent: #ce6a3f;
-        --ink: #1e2a2f;
-      }
 
-      * {
-        box-sizing: border-box;
-      }
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dustward - Single Player 3D Sandbox RPG</title>
+  <link rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23253c40'/%3E%3Ccircle cx='8' cy='8' r='5' fill='%23e38655'/%3E%3C/svg%3E" />
+  <style>
+    :root {
+      --bg-a: #d6e8ff;
+      --bg-b: #8dc2a3;
+      --ui: #f4efe0;
+      --accent: #ce6a3f;
+      --ink: #1e2a2f;
+    }
 
-      body {
-        margin: 0;
-        min-height: 100vh;
-        font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
-        background: radial-gradient(circle at 15% 10%, #ffffff 0%, var(--bg-a) 38%, var(--bg-b) 100%);
-        color: var(--ink);
-        overflow: hidden;
-      }
+    * {
+      box-sizing: border-box;
+    }
 
-      #app {
-        position: relative;
-        width: 100vw;
-        height: 100vh;
-      }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+      background: radial-gradient(circle at 15% 10%, #ffffff 0%, var(--bg-a) 38%, var(--bg-b) 100%);
+      color: var(--ink);
+      overflow: hidden;
+    }
 
-      #game {
-        display: block;
-        width: 100%;
-        height: 100%;
-      }
+    #app {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
 
-      #menu {
-        position: absolute;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        background: linear-gradient(140deg, rgba(255, 247, 230, 0.95), rgba(188, 222, 210, 0.78));
-        z-index: 10;
-      }
+    #game {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
 
-      .menu-card {
-        width: min(640px, 92vw);
-        border: 3px solid #334f54;
-        background: rgba(255, 254, 249, 0.95);
-        box-shadow: 0 18px 0 rgba(35, 57, 61, 0.2);
-        padding: 1.5rem;
-      }
+    #menu {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(140deg, rgba(255, 247, 230, 0.95), rgba(188, 222, 210, 0.78));
+      z-index: 10;
+    }
 
-      h1 {
-        margin: 0 0 0.6rem;
-        font-size: clamp(2rem, 5.4vw, 3.2rem);
-        letter-spacing: 0.05em;
-      }
+    .menu-card {
+      width: min(640px, 92vw);
+      border: 3px solid #334f54;
+      background: rgba(255, 254, 249, 0.95);
+      box-shadow: 0 18px 0 rgba(35, 57, 61, 0.2);
+      padding: 1.5rem;
+    }
 
-      .subtitle {
-        margin: 0 0 1rem;
-      }
+    h1 {
+      margin: 0 0 0.6rem;
+      font-size: clamp(2rem, 5.4vw, 3.2rem);
+      letter-spacing: 0.05em;
+    }
 
-      ul {
-        margin: 0.5rem 0 1.1rem;
-        padding-left: 1.2rem;
-      }
+    .subtitle {
+      margin: 0 0 1rem;
+    }
 
-      #start-btn {
-        border: 0;
-        cursor: pointer;
-        font-size: 1.05rem;
-        font-weight: 700;
-        letter-spacing: 0.03em;
-        padding: 0.75rem 1.2rem;
-        color: #fff;
-        background: linear-gradient(180deg, #e38655, var(--accent));
-        transition: transform 0.1s;
-      }
+    ul {
+      margin: 0.5rem 0 1.1rem;
+      padding-left: 1.2rem;
+    }
 
-      #continue-btn {
-        border: 0;
-        cursor: pointer;
-        font-size: 1.05rem;
-        font-weight: 700;
-        letter-spacing: 0.03em;
-        padding: 0.75rem 1.2rem;
-        color: #fff;
-        background: linear-gradient(180deg, #5e8b9b, #3f6070);
-        display: none;
-        transition: transform 0.1s;
-      }
+    #start-btn {
+      border: 0;
+      cursor: pointer;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      padding: 0.75rem 1.2rem;
+      color: #fff;
+      background: linear-gradient(180deg, #e38655, var(--accent));
+      transition: transform 0.1s;
+    }
 
-      .menu-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.7rem;
-      }
+    #continue-btn {
+      border: 0;
+      cursor: pointer;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      padding: 0.75rem 1.2rem;
+      color: #fff;
+      background: linear-gradient(180deg, #5e8b9b, #3f6070);
+      display: none;
+      transition: transform 0.1s;
+    }
 
-      #start-btn:hover {
-        filter: brightness(1.08);
-        transform: scale(1.04);
-      }
+    .menu-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+    }
 
-      #continue-btn:hover {
-        filter: brightness(1.08);
-        transform: scale(1.04);
-      }
+    .menu-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.8rem;
+    }
 
-      #hint {
-        font-size: 0.95rem;
-        margin-top: 0.8rem;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="app">
-      <canvas id="game" width="1280" height="720" aria-label="3D sandbox RPG canvas"></canvas>
-      <div id="menu">
-        <div class="menu-card">
-          <h1>🏜️ DUSTWARD</h1>
-          <p class="subtitle">A comically realistic 3D sandbox RPG. Swords, slimes, and questionable life choices.</p>
-          <ul>
-            <li>🎮 Move: WASD or Arrow keys</li>
-            <li>👀 Look: Mouse (click to lock pointer) or Arrow Left/Right</li>
-            <li>⚔️ Attack: Left Mouse or Space (3-hit combo!)</li>
-            <li>🛡️ Block: Right Mouse or C</li>
-            <li>💬 Interact / Shop: E (talk to NPCs, browse shops)</li>
-            <li>🧪 Use potion: Q</li>
-            <li>🗺️ Toggle map: M, 🔇 Sound: N, 📺 Fullscreen: F</li>
-            <li>💾 Quick save: K, Quick load: L</li>
-          </ul>
-          <div class="menu-actions">
-            <button id="start-btn">⚔️ Enter The Wilds</button>
-            <button id="continue-btn">📜 Continue Journey</button>
-          </div>
-          <div id="hint">🎯 Goal: Complete quests, shop for gear, build your house, pet the cat, and survive a valley full of sarcastic NPCs and angry gelatin.</div>
+    .lang-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.92rem;
+    }
+
+    #lang-select {
+      border: 1px solid #334f54;
+      background: #fff;
+      color: #1e2a2f;
+      padding: 0.25rem 0.35rem;
+    }
+
+    #start-btn:hover {
+      filter: brightness(1.08);
+      transform: scale(1.04);
+    }
+
+    #continue-btn:hover {
+      filter: brightness(1.08);
+      transform: scale(1.04);
+    }
+
+    #hint {
+      font-size: 0.95rem;
+      margin-top: 0.8rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <canvas id="game" width="1280" height="720" aria-label="3D sandbox RPG canvas"></canvas>
+    <div id="menu">
+      <div class="menu-card">
+        <div class="menu-top">
+          <h1 id="menu-title">🏜️ DUSTWARD</h1>
+          <label class="lang-wrap" for="lang-select">
+            <span id="lang-label">Language</span>
+            <select id="lang-select" aria-label="Language selector">
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="pt">Português</option>
+            </select>
+          </label>
         </div>
+        <p class="subtitle" id="menu-subtitle">A comically realistic 3D sandbox RPG. Swords, slimes, and questionable
+          life choices.</p>
+        <ul>
+          <li data-control-index="0">🎮 Move: WASD or Arrow keys</li>
+          <li data-control-index="1">👀 Look: Mouse (click to lock pointer) or Arrow Left/Right</li>
+          <li data-control-index="2">⚔️ Attack: Left Mouse or Space (3-hit combo!)</li>
+          <li data-control-index="3">🛡️ Block: Right Mouse or C</li>
+          <li data-control-index="4">💬 Interact / Shop: E (talk to NPCs, browse shops)</li>
+          <li data-control-index="5">🧪 Use potion: Q</li>
+          <li data-control-index="6">🗺️ Toggle map: M, 🔇 Sound: N, 📺 Fullscreen: F</li>
+          <li data-control-index="7">💾 Quick save: K, Quick load: L</li>
+        </ul>
+        <div class="menu-actions">
+          <button id="start-btn">⚔️ Enter The Wilds</button>
+          <button id="continue-btn">📜 Continue Journey</button>
+        </div>
+        <div id="hint">🎯 Goal: Complete quests, shop for gear, build your house, pet the cat, and survive a valley full
+          of sarcastic NPCs and angry gelatin.</div>
       </div>
     </div>
-    <script src="game.js"></script>
-  </body>
+  </div>
+  <script src="game.js"></script>
+</body>
+
 </html>

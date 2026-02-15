@@ -1,60 +1,82 @@
 # WestWardRPG
 
-Single-player first-person sandbox RPG prototype built in plain HTML + JavaScript.
+![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-F7DF1E?logo=javascript&logoColor=000)
+![HTML5](https://img.shields.io/badge/HTML5-Canvas-E34F26?logo=html5&logoColor=fff)
+![Playwright](https://img.shields.io/badge/Tested%20With-Playwright-2EAD33?logo=playwright&logoColor=fff)
 
-## What It Includes
+Single-player first-person sandbox RPG built with plain HTML + JavaScript.
 
-- First-person raycast renderer with dynamic weather and day/night lighting
-- Sword combat with combo swings, block, stamina, and enemy AI
-- Quest progression with NPC interactions, harvesting, and rewards
-- House unlock flow with interior interactions (rest, stash/workbench)
-- Save/load support via localStorage
-- Deterministic test hooks: `window.advanceTime(ms)` and `window.render_game_to_text()`
+## Why This Repo Shines
+
+- Fast, framework-free raycast 3D renderer.
+- Crunchy melee combat: combo swings, block timing, stamina pressure.
+- Full quest loop: gather, fight, craft, build your house.
+- Dynamic atmosphere: day/night cycle + weather states.
+- Save/load + autosave for longer play sessions.
+- Built-in **multi-language support**: English, Español, Português.
+- Automation hooks for deterministic testing and Playwright action runs.
+
+## Gameplay Features
+
+- **World & Rendering**: textured raycast walls, fog, weather overlays, minimap.
+- **Combat**: attack chains, enemy pursuit, hit reactions, death/recovery flow.
+- **Progression**: XP/level curve, gold economy, potions, resource harvesting.
+- **Quest Arc**: 3-step progression from survey → cleanse marsh → build house.
+- **Settlement Life**: NPC interactions, shop, inn vibes, bard lines, pig chaos.
+
+## Language Support
+
+Use the language selector in the main menu.
+
+- `English` (`en`)
+- `Español` (`es`)
+- `Português` (`pt`)
+
+Language preference is persisted in localStorage.
 
 ## Controls
 
 - Move: `WASD` or Arrow keys
-- Look: Mouse (after click/pointer lock) or Arrow Left/Right
+- Look: Mouse (pointer lock) or Arrow Left/Right
 - Attack: Left Mouse or `Space`
 - Block: Right Mouse or `C`
 - Interact: `E` or `Enter`
-- Potion: `Q`
+- Use Potion: `Q`
 - Quick Save / Load: `K` / `L`
-- Toggle Minimap: `M`
+- Toggle Map: `M`
+- Toggle Sound: `N`
 - Fullscreen: `F`
 
 ## Quick Start
 
-Requirements:
+### Requirements
 
-- Node.js 16+ (project uses Playwright dependency)
-- Python 3 (for local static server)
+- Node.js 16+
+- Python 3
 
-Install dependencies:
+### Install
 
 ```bash
 npm install
 ```
 
-Run locally:
+### Run
 
 ```bash
 npm run start
 ```
 
-Open:
+Open: [http://127.0.0.1:5173/index.html](http://127.0.0.1:5173/index.html)
 
-- [http://127.0.0.1:5173/index.html](http://127.0.0.1:5173/index.html)
+## Testing & Validation
 
-## Validation
-
-Syntax check:
+### Syntax Check
 
 ```bash
 npm test
 ```
 
-Playwright automation client (example):
+### Example Playwright Scenario
 
 ```bash
 node ./web_game_playwright_client.mjs \
@@ -66,16 +88,16 @@ node ./web_game_playwright_client.mjs \
   --screenshot-dir output/web-game-quest
 ```
 
-## Repo Info
+## Project Layout
 
-- Repository: [https://github.com/coleyrockin/WestWardRPG](https://github.com/coleyrockin/WestWardRPG)
+- `index.html` - game shell, menu UI, language selector
+- `game.js` - core systems (rendering, combat, AI, quests, saves)
+- `web_game_playwright_client.mjs` - automation runner for scenarios/screenshots
+- `test-actions/` - scripted gameplay action sets
+- `output/` - captured screenshots + JSON snapshots from runs
+- `progress.md` - development log and iteration notes
+
+## Repository Links
+
+- Repo: [https://github.com/coleyrockin/WestWardRPG](https://github.com/coleyrockin/WestWardRPG)
 - Issues: [https://github.com/coleyrockin/WestWardRPG/issues](https://github.com/coleyrockin/WestWardRPG/issues)
-
-## Project Structure
-
-- `/index.html` UI shell and menu
-- `/game.js` main game logic, rendering, AI, quests, and state hooks
-- `/web_game_playwright_client.mjs` automation driver for game actions/screenshots
-- `/test-actions/` canned action payloads used by automation runs
-- `/output/` generated screenshots and state captures
-- `/progress.md` development log and handoff notes
