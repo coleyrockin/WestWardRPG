@@ -118,3 +118,28 @@ Original prompt: Build a 3D role playing game, sandbox, thats single player
   - `output/web-game-quest/state-0.json`
   - `output/web-game-quest/state-1.json`
 - No fresh quest-run `errors-*.json` files were produced.
+
+## Western Refactor + Pig AI Pass (Current)
+- Refactored pig simulation into a richer steering model with weighted behaviors:
+  - flock separation/alignment/cohesion,
+  - role/temperament-driven motion,
+  - stampede mode triggered by nearby danger/weather,
+  - velocity blending + collision bounce for stable movement.
+- Added western pig role system (`Marshal`, `Outlaw`, `Deputy`, `Prospector`, `Gambler`, `Bandit`, `Rodeo`, `Sheriff`) with per-role hat/bandana styling and behavior hints.
+- Added pig interaction flavor updates and bandit pickpocket behavior with cooldowns.
+- Extended sprite payload + rendering for pigs (hat, bandana, gait animation, sheriff badge).
+- Reduced HUD footprint and top message panel footprint to declutter gameplay view.
+- Added westernized intro/menu text and updated key quest/NPC flavor lines.
+- Refined billboard projection scaling so close NPCs no longer dominate the viewport.
+- Extended `render_game_to_text` pig telemetry to include `role`, `speed`, and `stampeding`.
+
+## Validation (Western Refactor)
+- `npm test` passed after each major edit (`node --check` for `game.js` and `web_game_playwright_client.mjs`).
+- Automated Playwright runs completed:
+  - `output/web-game-western-pigs/` (3 iterations, realism smoke actions)
+  - `output/web-game-western-pigs-quest/` (2 iterations, quest flow)
+  - `output/web-game-western-pigs-show/` (targeted camera-turn run)
+- Visual/manual screenshot review completed for:
+  - `output/web-game-western-pigs/shot-2.png`
+  - `output/web-game-western-pigs-show/shot-0.png`
+- Dev server was stopped after validation.
