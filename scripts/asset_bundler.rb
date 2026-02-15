@@ -17,6 +17,7 @@ class AssetBundler
 
   def scan_assets
     assets = []
+    # Core source and config files (excludes binary assets like images)
     patterns = ['*.js', '*.html', '*.css', '*.json', '*.ts']
     
     patterns.each do |pattern|

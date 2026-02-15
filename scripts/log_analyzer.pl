@@ -15,6 +15,7 @@ sub analyze_state_files {
     my %scenarios;
     
     find(sub {
+        # Match state files with numeric IDs (e.g., state-123.json)
         return unless -f && /^state-\d+\.json$/;
         push @state_files, $File::Find::name;
         

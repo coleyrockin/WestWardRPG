@@ -91,7 +91,12 @@ build_assets() {
     # Compile TypeScript to JavaScript
     if [ -f "atmosphere.ts" ]; then
         if command -v tsc &> /dev/null; then
-            tsc atmosphere.ts --outDir . --target ES2015 --module ES2015
+            # Use project's tsconfig.json if available, otherwise use inline options
+            if [ -f "tsconfig.json" ]; then
+                tsc
+            else
+                tsc atmosphere.ts --outDir . --target ES2015 --module ES2015
+            fi
             log_success "TypeScript compiled successfully"
         else
             log_warning "TypeScript compiler not found, skipping compilation"
