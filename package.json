@@ -8,7 +8,15 @@
     "dev": "python3 -m http.server 5173",
     "test": "node --check game.js && node --check web_game_playwright_client.mjs",
     "report:states": "python3 scripts/state_report.py output",
-    "typecheck:ts": "tsc --noEmit"
+    "typecheck:ts": "tsc --noEmit",
+    "bundle:assets": "ruby scripts/asset_bundler.rb generate",
+    "verify:assets": "ruby scripts/asset_bundler.rb verify",
+    "analyze:logs": "perl scripts/log_analyzer.pl output",
+    "config:nginx": "php scripts/config_generator.php -t nginx",
+    "config:apache": "php scripts/config_generator.php -t apache",
+    "dev:check": "bash scripts/dev_tools.sh check",
+    "dev:lint": "bash scripts/dev_tools.sh lint",
+    "dev:full": "bash scripts/dev_tools.sh full"
   },
   "keywords": [
     "rpg",
