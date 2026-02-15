@@ -11,6 +11,12 @@ Single-player first-person sandbox RPG built with plain HTML + JavaScript.
 - **JavaScript**: core game loop, rendering, combat, AI, and save/load.
 - **TypeScript**: typed atmosphere math module (`atmosphere.ts`) used by the renderer.
 - **Python**: utility tooling for scenario snapshot reports (`scripts/state_report.py`).
+- **Go**: high-performance map data validation (`scripts/map_validator.go`).
+- **Rust**: efficient texture analysis and processing (`scripts/texture_analyzer.rs`).
+- **Ruby**: asset bundling and manifest generation (`scripts/asset_bundler.rb`).
+- **Shell**: development automation and build tooling (`scripts/dev_tools.sh`).
+- **Perl**: log analysis and statistics (`scripts/log_analyzer.pl`).
+- **PHP**: web server configuration generator (`scripts/config_generator.php`).
 
 ## Why This Repo Shines
 
@@ -94,6 +100,67 @@ npm run typecheck:ts
 
 ```bash
 npm run report:states
+```
+
+### Development Tools (Shell)
+
+```bash
+# Check dependencies
+npm run dev:check
+
+# Run all linters
+npm run dev:lint
+
+# Full pipeline (check, lint, build, test)
+npm run dev:full
+```
+
+### Asset Management (Ruby)
+
+```bash
+# Generate asset manifest with checksums
+npm run bundle:assets
+
+# Verify asset integrity
+npm run verify:assets
+```
+
+### Log Analysis (Perl)
+
+```bash
+# Analyze output logs and generate statistics
+npm run analyze:logs
+
+# Output as JSON
+perl scripts/log_analyzer.pl output json
+```
+
+### Server Configuration (PHP)
+
+```bash
+# Generate nginx configuration
+npm run config:nginx
+
+# Generate Apache configuration
+npm run config:apache
+
+# Generate Caddy configuration
+php scripts/config_generator.php -t caddy
+```
+
+### Map Validation (Go)
+
+```bash
+# Validate map JSON structure (requires Go)
+go run scripts/map_validator.go <map-file.json>
+```
+
+### Texture Analysis (Rust)
+
+```bash
+# Analyze texture data (requires Rust)
+rustc scripts/texture_analyzer.rs -o texture_analyzer
+./texture_analyzer <texture-data-file>
 ```
 
 ### Example Playwright Scenario

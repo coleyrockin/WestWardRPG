@@ -7,6 +7,13 @@ coverage/
 dist/
 build/
 
+# Compiled binaries
+texture_analyzer
+map_validator
+
+# Generated files
+asset_manifest.json
+
 # OS/editor noise
 .DS_Store
 .vscode/
