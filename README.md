@@ -35,7 +35,7 @@ Built with plain web tech so the game logic stays transparent, hackable, and fas
 - Full quest loop: gather, fight, craft, build your house.
 - Dynamic atmosphere: day/night cycle + weather states.
 - Save/load + autosave for longer play sessions.
-- Built-in **multi-language support**: English, Español, Português, Français, Deutsch.
+- Built-in **multi-language support**: English, Español, Português, Français, Deutsch, Italiano, 日本語, Türkçe.
 - Automation hooks for deterministic testing and Playwright action runs.
 
 ## Gameplay Features
@@ -55,6 +55,9 @@ Use the language selector in the main menu.
 - `Português` (`pt`)
 - `Français` (`fr`)
 - `Deutsch` (`de`)
+- `Italiano` (`it`)
+- `日本語` (`ja`)
+- `Türkçe` (`tr`)
 
 Language preference is persisted in localStorage.
 
