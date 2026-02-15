@@ -14,6 +14,11 @@ map_validator
 # Generated files
 asset_manifest.json
 
+# Cache directories
+__pycache__/
+*.pyc
+root/
+
 # OS/editor noise
 .DS_Store
 .vscode/
