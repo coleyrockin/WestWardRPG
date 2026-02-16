@@ -33,7 +33,8 @@
     return { stormShade, skyTop, skyBottom };
   }
 
-  window.DustwardTS = {
+  window.WestWardTS = {
     computeAtmosphere,
   };
+  window.DustwardTS = window.WestWardTS;
 })();

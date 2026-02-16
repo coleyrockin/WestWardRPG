@@ -143,3 +143,27 @@ Original prompt: Build a 3D role playing game, sandbox, thats single player
   - `output/web-game-western-pigs/shot-2.png`
   - `output/web-game-western-pigs-show/shot-0.png`
 - Dev server was stopped after validation.
+
+## Codebase Polish Pass (Current)
+- Standardized storage/namespace branding while preserving backward compatibility:
+  - Save key now uses `westward-save-v1` with legacy fallback/migration from `dustward-save-v1`.
+  - Locale key now uses `westward-locale-v1` with legacy fallback/migration from `dustward-locale-v1`.
+  - Added shared storage helpers (`readStorageWithFallback`, `migrateStorageValue`) to remove duplicated localStorage handling paths.
+- Atmosphere TypeScript/JavaScript bridge now publishes `window.WestWardTS` and keeps `window.DustwardTS` as a compatibility alias.
+- Game bootstrap now prefers `window.WestWardTS` and falls back to `window.DustwardTS`.
+
+## Validation (Polish Storage/Namespace Pass)
+- Local checks passed:
+  - `npm test`
+  - `npm run dev:lint`
+- Playwright skill client run passed against local project server:
+  - `output/web-game-polish-storage-rpg/shot-0.png`
+  - `output/web-game-polish-storage-rpg/shot-1.png`
+  - `output/web-game-polish-storage-rpg/shot-2.png`
+  - `output/web-game-polish-storage-rpg/state-0.json`
+  - `output/web-game-polish-storage-rpg/state-1.json`
+  - `output/web-game-polish-storage-rpg/state-2.json`
+- Manual screenshot inspection completed for:
+  - `output/web-game-polish-storage-rpg/shot-0.png`
+  - `output/web-game-polish-storage-rpg/shot-2.png`
+- No `errors-*.json` artifact was emitted for this run.

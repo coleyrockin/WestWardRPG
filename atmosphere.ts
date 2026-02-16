@@ -42,14 +42,18 @@ function computeAtmosphere(day: number, rain: number, fog: number): AtmosphereRe
 
 declare global {
   interface Window {
+    WestWardTS?: {
+      computeAtmosphere: (day: number, rain: number, fog: number) => AtmosphereResult;
+    };
     DustwardTS?: {
       computeAtmosphere: (day: number, rain: number, fog: number) => AtmosphereResult;
     };
   }
 }
 
-window.DustwardTS = {
+window.WestWardTS = {
   computeAtmosphere,
 };
+window.DustwardTS = window.WestWardTS;
 
 export { };

@@ -6,9 +6,11 @@
   const continueBtn = document.getElementById("continue-btn");
   const langSelect = document.getElementById("lang-select");
   const langLabel = document.getElementById("lang-label");
-  const tsAtmosphere = window.DustwardTS && typeof window.DustwardTS.computeAtmosphere === "function"
-    ? window.DustwardTS
-    : null;
+  const tsAtmosphere = window.WestWardTS && typeof window.WestWardTS.computeAtmosphere === "function"
+    ? window.WestWardTS
+    : (window.DustwardTS && typeof window.DustwardTS.computeAtmosphere === "function"
+      ? window.DustwardTS
+      : null);
 
   const TAU = Math.PI * 2;
   const FOV = Math.PI / 2.75;
@@ -17,8 +19,10 @@
   const PLAYER_SPEED = 3.95;
   const PLAYER_ROT_SPEED = 2.75;
   const PLAYER_MAX_HP = 120;
-  const SAVE_KEY = "dustward-save-v1";
-  const LOCALE_KEY = "dustward-locale-v1";
+  const SAVE_KEY = "westward-save-v1";
+  const LEGACY_SAVE_KEYS = ["dustward-save-v1"];
+  const LOCALE_KEY = "westward-locale-v1";
+  const LEGACY_LOCALE_KEYS = ["dustward-locale-v1"];
   const AUTOSAVE_INTERVAL = 30;
   const QUEST_STATUSES = new Set(["locked", "active", "complete", "turned_in"]);
   const WESTERN_PIG_ROLES = [
@@ -648,6 +652,29 @@
     state.quests.wood.title = t("quests.wood");
   }
 
+  function readStorageWithFallback(primaryKey, legacyKeys) {
+    try {
+      const primaryValue = window.localStorage.getItem(primaryKey);
+      if (primaryValue !== null) return { value: primaryValue, key: primaryKey };
+      for (const key of legacyKeys) {
+        const legacyValue = window.localStorage.getItem(key);
+        if (legacyValue !== null) return { value: legacyValue, key };
+      }
+    } catch {
+      // storage unavailable
+    }
+    return null;
+  }
+
+  function migrateStorageValue(nextKey, currentKey, rawValue) {
+    if (!rawValue || currentKey === nextKey) return;
+    try {
+      window.localStorage.setItem(nextKey, rawValue);
+    } catch {
+      // migration is best-effort
+    }
+  }
+
   function buildLanguageOptions() {
     if (!langSelect) return;
     langSelect.textContent = "";
@@ -672,11 +699,11 @@
   }
 
   function initLanguage() {
-    let stored = "en";
-    try {
-      stored = window.localStorage.getItem(LOCALE_KEY) || "en";
-    } catch {
-      stored = "en";
+    let stored = null;
+    const localeEntry = readStorageWithFallback(LOCALE_KEY, LEGACY_LOCALE_KEYS);
+    if (localeEntry) {
+      stored = localeEntry.value;
+      migrateStorageValue(LOCALE_KEY, localeEntry.key, localeEntry.value);
     }
     currentLang = LANGUAGE_PACKS[stored] ? stored : "en";
     if (langSelect) {
@@ -1512,11 +1539,12 @@
   }
 
   function readSaveData() {
+    const saveEntry = readStorageWithFallback(SAVE_KEY, LEGACY_SAVE_KEYS);
+    if (!saveEntry) return null;
     try {
-      const raw = window.localStorage.getItem(SAVE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(saveEntry.value);
       if (!parsed || parsed.version !== 1) return null;
+      migrateStorageValue(SAVE_KEY, saveEntry.key, saveEntry.value);
       return parsed;
     } catch {
       return null;
