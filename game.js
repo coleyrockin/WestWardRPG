@@ -802,7 +802,7 @@
       ],
       questActive: [
         "Elder Nira: Those crystals won't collect themselves. I tried asking nicely.",
-        "Elder Nira: Crystal Shards ${p}/${n}. I'm counting. Very slowly.",
+        "Elder Nira: Crystal Shards {p}/{n}. I'm counting. Very slowly.",
       ],
     },
     warden: {
@@ -813,7 +813,7 @@
         "Warden Sol: I once chased a slime for three hours. Turned out to be tumbleweed.",
       ],
       questActive: [
-        "Warden Sol: Slimes defeated ${p}/${n}. They're not happy about it.",
+        "Warden Sol: Slimes defeated {p}/{n}. They're not happy about it.",
         "Warden Sol: Keep smacking those blobs! It's therapeutic.",
       ],
     },
@@ -825,7 +825,7 @@
         "Smith Varo: I once forged a spoon so perfect, the Elder cried.",
       ],
       questActive: [
-        "Smith Varo: Wood ${wp}/${wn}, Stone ${sp}/${sn}. My back hurts just thinking about it.",
+        "Smith Varo: Wood {wp}/{wn}, Stone {sp}/{sn}. My back hurts just thinking about it.",
         "Smith Varo: Bring materials! Your house won't build itself. Trust me, I asked.",
       ],
     },
@@ -2028,7 +2028,7 @@
           return;
         }
         if (q.status === "active") {
-          logMsg(`Elder Nira: Crystal Shards ${q.progress}/${q.need}. I'm counting. Very slowly.`);
+          logMsg(fmt(choice(npcDialogue.elder.questActive), { p: q.progress, n: q.need }));
           sfx.npcChat();
           return;
         }
@@ -2065,7 +2065,7 @@
           return;
         }
         if (q.status === "active") {
-          logMsg(`Warden Sol: Slimes defeated ${q.progress}/${q.need}. They're not happy about it.`);
+          logMsg(fmt(choice(npcDialogue.warden.questActive), { p: q.progress, n: q.need }));
           sfx.npcChat();
           return;
         }
@@ -2105,7 +2105,7 @@
         if (q.status === "active") {
           const woodPart = Math.min(q.needWood, state.inventory.Wood);
           const stonePart = Math.min(q.needStone, state.inventory.Stone);
-          logMsg(`Smith Varo: Wood ${woodPart}/${q.needWood}, Stone ${stonePart}/${q.needStone}.`);
+          logMsg(fmt(choice(npcDialogue.smith.questActive), { wp: woodPart, wn: q.needWood, sp: stonePart, sn: q.needStone }));
           return;
         }
         if (q.status === "complete") {
