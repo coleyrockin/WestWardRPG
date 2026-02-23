@@ -11,6 +11,8 @@ Built with plain web tech so the game logic stays transparent, hackable, and fas
 
 > Repo bio: "A first-person browser RPG where steel clashes, quests chain together, and pigs occasionally steal the spotlight."
 
+![WestWardRPG gameplay preview](docs/images/gameplay-preview.png)
+
 ## Code Language Variety
 
 - **JavaScript**: core game loop, rendering, combat, AI, and save/load.
