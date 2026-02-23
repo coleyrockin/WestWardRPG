@@ -1498,6 +1498,9 @@
       { x: 7.1, y: 8.9 },
       { x: 11.9, y: 9.2 },
       { x: 9.3, y: 10.1 },
+      { x: 7.9, y: 10.7 },
+      { x: 10.9, y: 10.7 },
+      { x: 9.5, y: 11.3 },
     ];
     for (let i = 0; i < 8; i++) {
       const style = WESTERN_PIG_ROLES[i % WESTERN_PIG_ROLES.length];
@@ -1515,7 +1518,7 @@
         y: pos.y,
         homeX: pos.x,
         homeY: pos.y,
-        wanderRadius: 0.9 + Math.random() * 2.1,
+        wanderRadius: 0.75 + Math.random() * 1.25,
         wanderAngle: Math.random() * TAU,
         wanderTimer: 0.25 + Math.random() * 1.8,
         zoomTimer: 0,
@@ -2567,22 +2570,30 @@
         separationX * 1.6 +
         alignmentX * 0.52 +
         cohesionX * 0.36 +
-        toHomeX * 0.24 +
-        toHerdX * 0.16 +
+        toHomeX * 0.36 +
+        toHerdX * 0.24 +
         wanderX * (0.33 + pig.temper * 0.16);
       let intentY =
         separationY * 1.6 +
         alignmentY * 0.52 +
         cohesionY * 0.36 +
-        toHomeY * 0.24 +
-        toHerdY * 0.16 +
+        toHomeY * 0.36 +
+        toHerdY * 0.24 +
         wanderY * (0.33 + pig.temper * 0.16);
 
+      // Keep pigs in a readable town herd so players can find all characters.
+      const homeDist = Math.hypot(toHomeX, toHomeY);
+      if (homeDist > pig.wanderRadius) {
+        const leash = Math.min(2, (homeDist - pig.wanderRadius) * 1.4);
+        intentX += (toHomeX / homeDist) * leash;
+        intentY += (toHomeY / homeDist) * leash;
+      }
+
       if (playerDist < 2.5) {
-        const panicWeight = 1.2 + (2.5 - playerDist) * 0.55;
+        const panicWeight = 0.8 + (2.5 - playerDist) * 0.4;
         intentX += playerAwayX * panicWeight;
         intentY += playerAwayY * panicWeight;
-        pig.zoomTimer = Math.max(pig.zoomTimer, 0.65 + pig.temper * 0.4);
+        pig.zoomTimer = Math.max(pig.zoomTimer, 0.45 + pig.temper * 0.25);
       } else if (playerDist < 6.5 && pig.role === "Sheriff") {
         const tangent = normalizeVec(-playerDy, playerDx);
         intentX += tangent.x * 0.5;

@@ -167,3 +167,44 @@ Original prompt: Build a 3D role playing game, sandbox, thats single player
   - `output/web-game-polish-storage-rpg/shot-0.png`
   - `output/web-game-polish-storage-rpg/shot-2.png`
 - No `errors-*.json` artifact was emitted for this run.
+
+## Reliability + Docs Polish Pass (Current)
+- Added an end-to-end smoke suite runner: `scripts/smoke_suite.sh`.
+  - Runs three gameplay scenarios (`realism_smoke`, `quest_flow`, `combat_block_flow`).
+  - Detects/uses a running local server or starts one automatically when needed.
+  - Validates that each scenario emits state snapshots and no `errors-*.json` artifacts.
+  - Writes timestamped artifacts to `output/qa-smoke-<timestamp>/` for auditability.
+- Improved browser-launch resilience in `web_game_playwright_client.mjs`:
+  - Added retry-based launcher that prioritizes Chrome channel and falls back to bundled Chromium.
+- Added npm quality gates:
+  - `npm run test:smoke`
+  - `npm run qa` (lint + smoke suite).
+- Upgraded README quality/testing guidance:
+  - Added one-command QA section.
+  - Documented local URL fallbacks (`127.0.0.1`, `localhost`, `[::1]`).
+  - Updated Playwright example URL path to `/index.html`.
+
+## Validation (Reliability + Docs Polish Pass)
+- `npm test` passed.
+- `npm run dev:lint` passed.
+- `npm run test:smoke` passed (multi-scenario functional suite):
+  - `output/qa-smoke-20260222-202319/smoke/*`
+  - `output/qa-smoke-20260222-202319/quest/*`
+  - `output/qa-smoke-20260222-202319/combat/*`
+- Manual screenshot review completed for:
+  - `output/qa-smoke-20260222-202319/smoke/shot-2.png`
+
+## Pig Visibility Tuning Pass (Current)
+- Updated pig spawn behavior to keep the entire "funny pig" cast easy to find near town:
+  - Expanded fixed near-town pig spawn points from 5 to 8 (all pig roles now start in the same local area).
+  - Reduced pig wander radius spread so pigs roam less aggressively away from their home positions.
+  - Increased home/herd steering weights and added an explicit leash force when pigs drift beyond their wander radius.
+  - Reduced close-range panic burst intensity so pigs do not scatter as far during normal interaction.
+
+## Validation (Pig Visibility Tuning Pass)
+- `npm test` passed.
+- `npm run dev:lint` passed.
+- Start-state Playwright check passed:
+  - `output/web-game-pigs-visible-check/shot-0.png`
+  - `output/web-game-pigs-visible-check/state-0.json`
+- Verified `nearby_pigs` includes all 8 pigs at start in `state-0.json`.

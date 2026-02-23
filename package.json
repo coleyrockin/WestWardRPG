@@ -7,6 +7,8 @@
     "start": "python3 -m http.server 5173",
     "dev": "python3 -m http.server 5173",
     "test": "node --check game.js && node --check web_game_playwright_client.mjs",
+    "test:smoke": "bash scripts/smoke_suite.sh",
+    "qa": "npm run dev:lint && npm run test:smoke",
     "report:states": "python3 scripts/state_report.py output",
     "typecheck:ts": "tsc --noEmit",
     "bundle:assets": "ruby scripts/asset_bundler.rb generate",

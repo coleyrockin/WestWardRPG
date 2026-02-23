@@ -19,6 +19,16 @@ Built with plain web tech so the game logic stays transparent, hackable, and fas
 
 In-game valley scene with HUD, minimap, and sword combat view.
 
+## Quick Navigation
+
+- [Why This Repo Shines](#why-this-repo-shines)
+- [Gameplay Features](#gameplay-features)
+- [Language Support](#language-support)
+- [Controls](#controls)
+- [Quick Start](#quick-start)
+- [Testing & Validation](#testing--validation)
+- [Project Layout](#project-layout)
+
 ## Code Language Variety
 
 - **JavaScript**: core game loop, rendering, combat, AI, and save/load.
@@ -103,7 +113,17 @@ npm run start
 
 Open: [http://127.0.0.1:5173/index.html](http://127.0.0.1:5173/index.html)
 
+If `127.0.0.1` is unavailable in your environment, use [http://localhost:5173/index.html](http://localhost:5173/index.html) or [http://[::1]:5173/index.html](http://[::1]:5173/index.html).
+
 ## Testing & Validation
+
+### One-Command QA Gate
+
+```bash
+npm run qa
+```
+
+This runs lint/type/syntax checks plus a multi-scenario functional smoke suite (movement, quest pathing, and combat/block flow) and saves artifacts under `output/qa-smoke-<timestamp>/`.
 
 ### Syntax Check
 
@@ -188,7 +208,7 @@ rustc scripts/texture_analyzer.rs -o texture_analyzer
 
 ```bash
 node ./web_game_playwright_client.mjs \
-  --url http://localhost:5173 \
+  --url http://localhost:5173/index.html \
   --actions-file ./test-actions/quest_flow.json \
   --click-selector "#start-btn" \
   --iterations 2 \

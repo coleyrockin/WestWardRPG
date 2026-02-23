@@ -259,23 +259,39 @@ async function doChoreography(page, canvas, steps) {
   }
 }
 
+async function launchBrowserWithFallback(headless) {
+  const common = {
+    headless,
+    args: ["--use-gl=angle", "--use-angle=swiftshader"],
+  };
+  const plans = [
+    { label: "chrome-channel", options: { ...common, channel: "chrome" }, tries: 3 },
+    { label: "bundled-chromium", options: common, tries: 2 },
+  ];
+
+  let lastError = null;
+  for (const plan of plans) {
+    for (let attempt = 1; attempt <= plan.tries; attempt++) {
+      try {
+        return await chromium.launch(plan.options);
+      } catch (error) {
+        lastError = error;
+        if (attempt < plan.tries) {
+          console.warn(`[WARN] Browser launch retry (${plan.label} ${attempt}/${plan.tries})`);
+          await sleep(500);
+        }
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   ensureDir(args.screenshotDir);
 
-  let browser = null;
-  try {
-    browser = await chromium.launch({
-      headless: args.headless,
-      channel: "chrome",
-      args: ["--use-gl=angle", "--use-angle=swiftshader"],
-    });
-  } catch {
-    browser = await chromium.launch({
-      headless: args.headless,
-      args: ["--use-gl=angle", "--use-angle=swiftshader"],
-    });
-  }
+  const browser = await launchBrowserWithFallback(args.headless);
   const page = await browser.newPage();
   const consoleErrors = new ConsoleErrorTracker();
 
