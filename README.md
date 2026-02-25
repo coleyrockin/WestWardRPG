@@ -14,7 +14,7 @@ Built with plain web tech so the game logic stays transparent, hackable, and fas
 ## Gameplay Preview
 
 <p align="center">
-  <img src="docs/images/gameplay-preview.jpg" alt="WestWardRPG gameplay preview in first-person mode" width="960">
+  <img src="docs/images/gameplay-preview.png" alt="WestWardRPG gameplay preview in first-person mode" width="960">
 </p>
 
 In-game valley scene with HUD, minimap, and sword combat view.
