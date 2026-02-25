@@ -24,14 +24,39 @@ cleanup() {
 trap cleanup EXIT
 
 if ! lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  (
-    cd "$PROJECT_ROOT"
-    python3 -m http.server "$PORT" >/tmp/westward-smoke-server.log 2>&1 &
-    echo $! > /tmp/westward-smoke-server.pid
-  )
-  SERVER_PID="$(cat /tmp/westward-smoke-server.pid)"
-  sleep 1
+  cd "$PROJECT_ROOT"
+  python3 -m http.server "$PORT" >/tmp/westward-smoke-server.log 2>&1 &
+  SERVER_PID="$!"
+
+  started=0
+  for _ in $(seq 1 10); do
+    if curl -g -sSf "http://localhost:${PORT}/index.html" >/dev/null 2>&1; then
+      started=1
+      break
+    fi
+    if ! kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.5
+  done
+
+  if [ "$started" -ne 1 ]; then
+    echo "[WARN] Auto-started server did not become reachable on localhost:${PORT}."
+    echo "[WARN] Continuing URL detection against existing listeners."
+    SERVER_PID=""
+  fi
 fi
+
+is_expected_app_url() {
+  local candidate="$1"
+  local html
+  if ! html="$(curl -g -sSf "$candidate" 2>/dev/null)"; then
+    return 1
+  fi
+  echo "$html" | grep -q 'id="game"' || return 1
+  echo "$html" | grep -Eqi 'Dustward|WestWard' || return 1
+  return 0
+}
 
 detect_url() {
   local candidates=()
@@ -45,17 +70,15 @@ detect_url() {
   )
 
   for candidate in "${candidates[@]}"; do
-    if curl -g -sSf "$candidate" >/dev/null 2>&1; then
+    if is_expected_app_url "$candidate"; then
       echo "$candidate"
       return 0
     fi
   done
 
-  if [ -n "$URL_OVERRIDE" ]; then
-    echo "$URL_OVERRIDE"
-  else
-    echo "http://localhost:${PORT}/index.html"
-  fi
+  echo "[ERROR] Could not locate a reachable WestWard game URL on port ${PORT}." >&2
+  echo "[ERROR] Start the game server first (npm run start) or set WESTWARD_URL explicitly." >&2
+  exit 1
 }
 
 BASE_URL="$(detect_url)"

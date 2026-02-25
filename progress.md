@@ -208,3 +208,25 @@ Original prompt: Build a 3D role playing game, sandbox, thats single player
   - `output/web-game-pigs-visible-check/shot-0.png`
   - `output/web-game-pigs-visible-check/state-0.json`
 - Verified `nearby_pigs` includes all 8 pigs at start in `state-0.json`.
+
+## Wall Projection Stability Pass (Current)
+- Addressed near-wall rendering instability that produced giant striped wall bands in first-person view.
+- Added safer player-vs-wall movement collision sampling (`PLAYER_COLLISION_RADIUS`) so camera centers cannot clip directly into wall cells.
+- Added rendering guards for extreme-near rays:
+  - wall projection near clip (`WALL_RENDER_NEAR_CLIP`),
+  - texture-coordinate safety clamp (`WALL_TEXTURE_NEAR_CLIP` + finite/clamped `texX`),
+  - environment-aware wall height cap for readability (`0.62` outdoor, `0.74` indoor).
+- Disabled image smoothing for wall-column sampling and restored it for sprite/UI passes to reduce blurry horizontal wall banding.
+
+## Validation (Wall Projection Stability Pass)
+- Local checks passed:
+  - `npm test`
+  - `npm run dev:lint`
+- Full QA suite passed with updated renderer:
+  - `output/qa-smoke-20260224-182410/smoke/*`
+  - `output/qa-smoke-20260224-182410/quest/*`
+  - `output/qa-smoke-20260224-182410/combat/*`
+- Verified quest screenshot no longer shows the prior half-screen close-wall strip:
+  - `output/qa-smoke-20260224-182410/quest/shot-1.png`
+- Captured targeted close-wall probe artifacts for edge-case verification:
+  - `output/web-game-wall-probe-cap4/shot-0.png`

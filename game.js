@@ -16,6 +16,9 @@
   const FOV = Math.PI / 2.75;
   const MAX_RAY_DIST = 26;
   const TEXTURE_SIZE = 96;
+  const PLAYER_COLLISION_RADIUS = 0.18;
+  const WALL_RENDER_NEAR_CLIP = 0.24;
+  const WALL_TEXTURE_NEAR_CLIP = 0.34;
   const PLAYER_SPEED = 3.95;
   const PLAYER_ROT_SPEED = 2.75;
   const PLAYER_MAX_HP = 120;
@@ -1802,14 +1805,29 @@
     return map[ty][tx] !== 0;
   }
 
+  function canOccupy(x, y, radius = PLAYER_COLLISION_RADIUS) {
+    const diag = radius * 0.7;
+    return (
+      !isBlocking(x, y) &&
+      !isBlocking(x + radius, y) &&
+      !isBlocking(x - radius, y) &&
+      !isBlocking(x, y + radius) &&
+      !isBlocking(x, y - radius) &&
+      !isBlocking(x + diag, y + diag) &&
+      !isBlocking(x - diag, y + diag) &&
+      !isBlocking(x + diag, y - diag) &&
+      !isBlocking(x - diag, y - diag)
+    );
+  }
+
   function moveWithCollision(dx, dy) {
     const px = state.player.x;
     const py = state.player.y;
     const nx = px + dx;
     const ny = py + dy;
 
-    if (!isBlocking(nx, py)) state.player.x = nx;
-    if (!isBlocking(state.player.x, ny)) state.player.y = ny;
+    if (canOccupy(nx, py)) state.player.x = nx;
+    if (canOccupy(state.player.x, ny)) state.player.y = ny;
   }
 
   function castRay(angle) {
@@ -1877,8 +1895,10 @@
     }
     distToWall = clamp(distToWall, 0.0001, MAX_RAY_DIST);
 
-    let wallX = side === 0 ? state.player.y + distToWall * rayDirY : state.player.x + distToWall * rayDirX;
+    const wallSampleDist = Math.max(distToWall, WALL_TEXTURE_NEAR_CLIP);
+    let wallX = side === 0 ? state.player.y + wallSampleDist * rayDirY : state.player.x + wallSampleDist * rayDirX;
     wallX -= Math.floor(wallX);
+    if (!Number.isFinite(wallX)) wallX = 0;
 
     return { dist: distToWall, tileType: tileType || 1, side, wallX };
   }
@@ -3489,15 +3509,18 @@
     drawGroundDetails(horizon, width, height);
 
     const depth = new Float32Array(width);
+    ctx.imageSmoothingEnabled = false;
 
     for (let x = 0; x < width; x++) {
       const rayAngle = state.player.angle - FOV / 2 + (x / width) * FOV;
       const hit = castRay(rayAngle);
       const correctedDist = Math.max(0.0001, hit.dist * Math.cos(rayAngle - state.player.angle));
       depth[x] = correctedDist;
+      const projectedDist = Math.max(correctedDist, WALL_RENDER_NEAR_CLIP);
 
       const wallScale = state.player.inHouse ? 1.07 : 0.94;
-      const wallHeight = Math.min(height * 0.95, (height * wallScale) / correctedDist);
+      const wallHeightCap = height * (state.player.inHouse ? 0.74 : 0.62);
+      const wallHeight = Math.min(wallHeightCap, (height * wallScale) / projectedDist);
       const y = Math.floor(horizon - wallHeight * 0.64);
 
       let tex = textures.stone;
@@ -3506,16 +3529,18 @@
       if (hit.tileType === 4) tex = textures.plaster;
 
       let texX = Math.floor(hit.wallX * (TEXTURE_SIZE - 1));
+      if (!Number.isFinite(texX)) texX = 0;
       if ((hit.side === 0 && Math.cos(rayAngle) > 0) || (hit.side === 1 && Math.sin(rayAngle) < 0)) {
         texX = TEXTURE_SIZE - 1 - texX;
       }
+      texX = clamp(texX, 0, TEXTURE_SIZE - 1);
 
       ctx.drawImage(tex, texX, 0, 1, TEXTURE_SIZE, x, y, 1, wallHeight);
 
-      const shade = clamp(1.2 - correctedDist / (MAX_RAY_DIST * 0.85) - (hit.side === 1 ? 0.12 : 0), 0.2, 1);
+      const shade = clamp(1.2 - projectedDist / (MAX_RAY_DIST * 0.85) - (hit.side === 1 ? 0.12 : 0), 0.2, 1);
       ctx.fillStyle = `rgba(10, 14, 20, ${(1 - shade) * (state.player.inHouse ? 0.7 : 0.9)})`;
       ctx.fillRect(x, y, 1, wallHeight);
-      const baseShadow = clamp((correctedDist / MAX_RAY_DIST) * 0.45 + 0.08, 0.08, 0.5);
+      const baseShadow = clamp((projectedDist / MAX_RAY_DIST) * 0.45 + 0.08, 0.08, 0.5);
       ctx.fillStyle = `rgba(9, 14, 18, ${baseShadow})`;
       ctx.fillRect(x, y + wallHeight * 0.82, 1, wallHeight * 0.18);
 
@@ -3526,13 +3551,14 @@
       }
 
       if (!state.player.inHouse) {
-        const fog = clamp((correctedDist - 5) / (MAX_RAY_DIST - 5), 0, 1);
+        const fog = clamp((projectedDist - 5) / (MAX_RAY_DIST - 5), 0, 1);
         if (fog > 0) {
           ctx.fillStyle = `rgba(132, 150, 164, ${fog * (0.38 + state.weather.fog * 0.5)})`;
           ctx.fillRect(x, y, 1, wallHeight);
         }
       }
     }
+    ctx.imageSmoothingEnabled = true;
 
     const sprites = [];
 
