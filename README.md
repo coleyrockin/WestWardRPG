@@ -14,10 +14,10 @@ Built with plain web tech so the game logic stays transparent, hackable, and fas
 ## Gameplay Preview
 
 <p align="center">
-  <img src="docs/images/gameplay-preview.png" alt="WestWardRPG gameplay preview in first-person mode" width="960">
+  <img src="docs/images/gameplay-preview.jpg" alt="WestWardRPG action scene with sword combat HUD, minimap, NPCs, and roaming outlaw pigs" width="960">
 </p>
 
-In-game valley scene with HUD, minimap, and sword combat view.
+Action-heavy valley encounter with active combat log, sword view, NPCs, and pig chaos.
 
 ## Quick Navigation
 
@@ -63,18 +63,6 @@ In-game valley scene with HUD, minimap, and sword combat view.
 - **Progression**: XP/level curve, gold economy, potions, resource harvesting.
 - **Quest Arc**: 3-step progression from survey → cleanse marsh → build house.
 - **Settlement Life**: NPC interactions, shop, inn vibes, bard lines, pig chaos.
-
-### Pig Chaos
-
-Eight western-themed pigs roam the valley — each with a name, role, hat, and bandana. They wander, stampede, pickpocket your gold, and react when you get close.
-
-<p align="center">
-  <img src="docs/images/pig-chaos.png" alt="Western pigs roaming the valley in WestWardRPG" width="960">
-</p>
-
-<p align="center">
-  <img src="docs/images/pig-herd.png" alt="Pig herd with hats and bandanas in WestWardRPG" width="960">
-</p>
 
 ## Language Support
 
