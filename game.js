@@ -1928,13 +1928,18 @@
     }
 
     const houseQuest = state.quests.wood;
-    if (houseQuest.status === "active") {
+    if (houseQuest.status === "active" || houseQuest.status === "complete") {
       const woodPart = Math.min(houseQuest.needWood, state.inventory.Wood);
       const stonePart = Math.min(houseQuest.needStone, state.inventory.Stone);
+      const hasAll = woodPart >= houseQuest.needWood && stonePart >= houseQuest.needStone;
+      const wasComplete = houseQuest.status === "complete";
       houseQuest.progress = woodPart + stonePart;
-      if (houseQuest.progress >= houseQuest.need) {
+      if (hasAll && houseQuest.status === "active") {
         houseQuest.status = "complete";
         logMsg("Quest complete objective: Raise Your House ready to turn in.");
+      } else if (!hasAll && wasComplete) {
+        houseQuest.status = "active";
+        logMsg("House materials were used elsewhere. Gather more to finish construction.");
       }
     }
   }
