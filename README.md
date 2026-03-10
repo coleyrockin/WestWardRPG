@@ -1,121 +1,169 @@
 # WestWardRPG
 
-![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-F7DF1E?logo=javascript&logoColor=000)
-![HTML5](https://img.shields.io/badge/HTML5-Canvas-E34F26?logo=html5&logoColor=fff)
-![TypeScript](https://img.shields.io/badge/TypeScript-Utility-3178C6?logo=typescript&logoColor=fff)
-![Python](https://img.shields.io/badge/Python-Tooling-3776AB?logo=python&logoColor=fff)
-![Playwright](https://img.shields.io/badge/Tested%20With-Playwright-2EAD33?logo=playwright&logoColor=fff)
+[![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-F7DF1E?logo=javascript&logoColor=000)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![HTML5](https://img.shields.io/badge/HTML5-Canvas-E34F26?logo=html5&logoColor=fff)](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Atmosphere-3178C6?logo=typescript&logoColor=fff)](https://www.typescriptlang.org/)
+[![Playwright](https://img.shields.io/badge/Tested%20With-Playwright-2EAD33?logo=playwright&logoColor=fff)](https://playwright.dev/)
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 
-WestWardRPG is a browser-first RPG sandbox with raycast combat, quest progression, dynamic weather, and intentionally goofy pig chaos.
-Built with plain web tech so the game logic stays transparent, hackable, and fast to iterate.
+> **A first-person browser RPG where steel clashes, quests chain together, and pigs occasionally steal the spotlight.**
 
-> Repo bio: "A first-person browser RPG where steel clashes, quests chain together, and pigs occasionally steal the spotlight."
+WestWardRPG (in-game title: *Dustward*) is a fully browser-native, framework-free, first-person RPG sandbox. Built on raw HTML5 Canvas and vanilla JavaScript, it features a custom DDA raycast renderer, stamina-driven sword combat, a three-quest progression arc, dynamic weather, and an ensemble cast of western-themed NPC pigs — all playable at `http://localhost:5173` with a single `npm start`.
+
+---
 
 ## Gameplay Preview
 
 <p align="center">
-  <img src="docs/images/gameplay-preview.jpg" alt="WestWardRPG action scene with sword combat HUD, minimap, NPCs, and roaming outlaw pigs" width="960">
+  <img src="docs/images/gameplay-preview.jpg" alt="WestWardRPG action scene: sword combat HUD, minimap, NPCs, and roaming outlaw pigs" width="960">
 </p>
 
-Action-heavy valley encounter with active combat log, sword view, NPCs, and pig chaos.
+<p align="center">
+  <img src="docs/images/pig-herd.png" alt="Western pig herd near town" width="460">
+  <img src="docs/images/pig-chaos.png" alt="Pig stampede in the valley" width="460">
+</p>
 
-## Quick Navigation
+---
 
-- [Why This Repo Shines](#why-this-repo-shines)
-- [Gameplay Features](#gameplay-features)
-- [Language Support](#language-support)
-- [Controls](#controls)
+## Table of Contents
+
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [How It Works](#how-it-works)
 - [Quick Start](#quick-start)
-- [Testing & Validation](#testing--validation)
-- [Project Layout](#project-layout)
+- [Controls](#controls)
+- [Language Support](#language-support)
+- [Testing & QA](#testing--qa)
+- [Project Structure](#project-structure)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
 
-## Code Language Variety
+---
 
-- **JavaScript**: core game loop, rendering, combat, AI, and save/load.
-- **TypeScript**: typed atmosphere math module (`atmosphere.ts`) used by the renderer.
-- **Python**: utility tooling for scenario snapshot reports (`scripts/state_report.py`).
-- **Go**: high-performance map data validation (`scripts/map_validator.go`).
-- **Rust**: efficient texture analysis and processing (`scripts/texture_analyzer.rs`).
-- **Ruby**: asset bundling and manifest generation (`scripts/asset_bundler.rb`).
-- **Shell**: development automation and build tooling (`scripts/dev_tools.sh`).
-- **Perl**: log analysis and statistics (`scripts/log_analyzer.pl`).
-- **PHP**: web server configuration generator (`scripts/config_generator.php`).
-- **HTML5**: canvas shell, HUD structure, and menu wiring (`index.html`).
-- **CSS**: in-page UI/HUD styling for responsive overlays (`index.html` styles).
-- **JSON**: deterministic test-action scripts for automation (`test-actions/*.json`).
-- **Markdown**: repository docs and contributor guidance (`README.md`, `CONTRIBUTING.md`).
-- **Shell/CLI**: command-driven dev workflow (`npm`, `node`, `python3`, `git`).
+## Features
 
-## Why This Repo Shines
+| Area | Details |
+|---|---|
+| **Rendering** | DDA raycast 3D renderer with procedural stone/water textures, fog, distance haze, and weather overlays |
+| **Combat** | 3-hit sword combo, stamina pressure, timed blocking, hit stagger, knockback, and death/recovery flow |
+| **Progression** | XP/level curve, gold economy, health potions, resource harvesting, loot chests |
+| **Quests** | 3-step arc: *Valley Survey* → *Marsh Cleansing* → *Raise Your House* |
+| **World** | Outdoor valley + enterable player house interior, day/night cycle, dynamic weather (clear/mist/rain/storm) |
+| **NPCs & Pigs** | Interactive NPCs (elder, merchant, innkeeper, bard); 8 western pig roles with flocking AI and stampede behavior |
+| **Save System** | Quick save/load (K/L), 30-second autosave, versioned localStorage with legacy migration |
+| **Localization** | 8 languages with in-game selector; preference persisted in localStorage |
+| **Automation** | Playwright-based scenario runner with deterministic hooks for CI/screenshot capture |
 
-- Fast, framework-free raycast 3D renderer.
-- Crunchy melee combat: combo swings, block timing, stamina pressure.
-- Full quest loop: gather, fight, craft, build your house.
-- Dynamic atmosphere: day/night cycle + weather states.
-- Save/load + autosave for longer play sessions.
-- Built-in **multi-language support**: English, Español, Português, Français, Deutsch, Italiano, 日本語, Türkçe.
-- Automation hooks for deterministic testing and Playwright action runs.
+---
 
-## Gameplay Features
+## Tech Stack
 
-- **World & Rendering**: textured raycast walls, fog, weather overlays, minimap.
-- **Combat**: attack chains, enemy pursuit, hit reactions, death/recovery flow.
-- **Progression**: XP/level curve, gold economy, potions, resource harvesting.
-- **Quest Arc**: 3-step progression from survey → cleanse marsh → build house.
-- **Settlement Life**: NPC interactions, shop, inn vibes, bard lines, pig chaos.
+### Core Game
+| Technology | Role |
+|---|---|
+| **JavaScript (ES2020)** | Game loop, raycast renderer, combat, AI, quest engine, save/load |
+| **HTML5 Canvas** | Full-screen render target; all drawing done via the 2D context API |
+| **CSS3** | Menu card, HUD overlays, responsive layout |
+| **TypeScript** | Typed atmosphere math module (`atmosphere.ts`) compiled to `atmosphere.js` |
 
-## Language Support
+### Development Tooling
+| Technology | Role |
+|---|---|
+| **Python 3** | Dev server (`http.server`), scenario state analysis (`scripts/state_report.py`) |
+| **Go** | High-performance map data validation (`scripts/map_validator.go`) |
+| **Rust** | Texture data processing and color analysis (`scripts/texture_analyzer.rs`) |
+| **Ruby** | Asset manifest generation and integrity verification (`scripts/asset_bundler.rb`) |
+| **Perl** | Log analysis and run statistics (`scripts/log_analyzer.pl`) |
+| **PHP** | Web server config generation — nginx, Apache, Caddy (`scripts/config_generator.php`) |
+| **Shell (Bash)** | Build pipeline, dependency checks, end-to-end smoke suite (`scripts/dev_tools.sh`, `scripts/smoke_suite.sh`) |
+| **Playwright** | Automated gameplay scenario execution, screenshot capture, and state validation |
 
-Use the language selector in the main menu.
+---
 
-- `English` (`en`)
-- `Español` (`es`)
-- `Português` (`pt`)
-- `Français` (`fr`)
-- `Deutsch` (`de`)
-- `Italiano` (`it`)
-- `日本語` (`ja`)
-- `Türkçe` (`tr`)
+## How It Works
 
-Language preference is persisted in localStorage.
+```
+index.html          ← game shell, menu UI, language selector, canvas mount
+  └── atmosphere.js ← compiled TypeScript: sky color math (day/night + storm blending)
+  └── game.js       ← everything else (≈ 4 000 lines of vanilla JS)
+        ├── Raycast Renderer   DDA wall casting, texture sampling, fog, sprite projection
+        ├── World Maps         Indoor/outdoor tile maps; player collision; chest/door logic
+        ├── Weather System     State machine (clear → mist → rain → storm); sky/fog/rain visuals
+        ├── Combat Engine      Attack chains, stamina drain, block window, enemy pursuit AI
+        ├── Quest Engine       Locked/active/complete/turned-in state per quest
+        ├── NPC System         Roaming idle + dialogue, shop, inn, bard flavor
+        ├── Pig AI             Flocking (separation/alignment/cohesion), stampede trigger, role behaviors
+        ├── Save/Load          Versioned localStorage with validation, autosave, legacy migration
+        └── i18n               Language pack lookup; locale persisted across sessions
+```
 
-## Controls
+The renderer runs inside a `requestAnimationFrame` loop. Each frame: advance time → simulate weather → move entities → cast rays → draw environment → project billboards → render HUD. The deterministic hooks (`window.advanceTime(ms)`, `window.render_game_to_text()`) expose game state as JSON for automated testing without a real browser frame clock.
 
-- Move: `WASD` or Arrow keys
-- Look: Mouse (pointer lock) or Arrow Left/Right
-- Attack: Left Mouse or `Space`
-- Block: Right Mouse or `C`
-- Interact: `E` or `Enter`
-- Use Potion: `Q`
-- Quick Save / Load: `K` / `L`
-- Toggle Map: `M`
-- Toggle Sound: `N`
-- Fullscreen: `F`
+---
 
 ## Quick Start
 
-### Requirements
+### Prerequisites
 
-- Node.js 16+
-- Python 3
+- [Node.js](https://nodejs.org/) 16+ (for `npm` and syntax checks)
+- [Python 3](https://www.python.org/) (for the dev HTTP server)
 
-### Install
+### Install & Run
 
 ```bash
+git clone https://github.com/coleyrockin/WestWardRPG.git
+cd WestWardRPG
 npm install
+npm start
 ```
 
-### Run
+Open in your browser:
 
-```bash
-npm run start
-```
+- **Primary:** [http://127.0.0.1:5173/index.html](http://127.0.0.1:5173/index.html)
+- **Fallback:** [http://localhost:5173/index.html](http://localhost:5173/index.html)
+- **IPv6:** [http://[::1]:5173/index.html](http://[::1]:5173/index.html)
 
-Open: [http://127.0.0.1:5173/index.html](http://127.0.0.1:5173/index.html)
+No build step required. The game runs directly from source.
 
-If `127.0.0.1` is unavailable in your environment, use [http://localhost:5173/index.html](http://localhost:5173/index.html) or [http://[::1]:5173/index.html](http://[::1]:5173/index.html).
+---
 
-## Testing & Validation
+## Controls
+
+| Action | Keys |
+|---|---|
+| Move | `W` `A` `S` `D` or Arrow keys |
+| Look | Mouse (pointer lock) or `←` `→` |
+| Attack | Left Mouse or `Space` |
+| Block | Right Mouse or `C` |
+| Interact / Shop | `E` or `Enter` |
+| Use Potion | `Q` |
+| Quick Save | `K` |
+| Quick Load | `L` |
+| Toggle Map | `M` |
+| Toggle Sound | `N` |
+| Fullscreen | `F` |
+| Recover (after death) | `R` |
+
+---
+
+## Language Support
+
+Select a language in the main menu. The choice is saved between sessions.
+
+| Code | Language |
+|---|---|
+| `en` | English |
+| `es` | Español |
+| `pt` | Português |
+| `fr` | Français |
+| `de` | Deutsch |
+| `it` | Italiano |
+| `ja` | 日本語 |
+| `tr` | Türkçe |
+
+---
+
+## Testing & QA
 
 ### One-Command QA Gate
 
@@ -123,88 +171,28 @@ If `127.0.0.1` is unavailable in your environment, use [http://localhost:5173/in
 npm run qa
 ```
 
-This runs lint/type/syntax checks plus a multi-scenario functional smoke suite (movement, quest pathing, and combat/block flow) and saves artifacts under `output/qa-smoke-<timestamp>/`.
+Runs lint/type/syntax checks, then a multi-scenario functional smoke suite (movement, quest pathing, combat/block flow). Artifacts are saved to `output/qa-smoke-<timestamp>/`.
 
-### Syntax Check
+### Individual Commands
 
 ```bash
+# Syntax check
 npm test
-```
 
-### TypeScript Check
-
-```bash
+# TypeScript type check
 npm run typecheck:ts
-```
 
-### Scenario State Report (Python)
+# Scenario smoke suite only
+npm run test:smoke
 
-```bash
+# Python state report from output snapshots
 npm run report:states
-```
 
-### Development Tools (Shell)
-
-```bash
-# Check dependencies
-npm run dev:check
-
-# Run all linters
-npm run dev:lint
-
-# Full pipeline (check, lint, build, test)
+# Full dev pipeline (check → lint → build → test)
 npm run dev:full
 ```
 
-### Asset Management (Ruby)
-
-```bash
-# Generate asset manifest with checksums
-npm run bundle:assets
-
-# Verify asset integrity
-npm run verify:assets
-```
-
-### Log Analysis (Perl)
-
-```bash
-# Analyze output logs and generate statistics
-npm run analyze:logs
-
-# Output as JSON
-perl scripts/log_analyzer.pl output json
-```
-
-### Server Configuration (PHP)
-
-```bash
-# Generate nginx configuration
-npm run config:nginx
-
-# Generate Apache configuration
-npm run config:apache
-
-# Generate Caddy configuration
-php scripts/config_generator.php -t caddy
-```
-
-### Map Validation (Go)
-
-```bash
-# Validate map JSON structure (requires Go)
-go run scripts/map_validator.go <map-file.json>
-```
-
-### Texture Analysis (Rust)
-
-```bash
-# Analyze texture data (requires Rust)
-rustc scripts/texture_analyzer.rs -o texture_analyzer
-./texture_analyzer <texture-data-file>
-```
-
-### Example Playwright Scenario
+### Playwright Scenario Example
 
 ```bash
 node ./web_game_playwright_client.mjs \
@@ -216,16 +204,68 @@ node ./web_game_playwright_client.mjs \
   --screenshot-dir output/web-game-quest
 ```
 
-## Project Layout
+Scenario files live in `test-actions/`. Each file is a JSON array of `{ type, key/x/y, duration }` action objects that the Playwright client replays deterministically.
 
-- `index.html` - game shell, menu UI, language selector
-- `game.js` - core systems (rendering, combat, AI, quests, saves)
-- `web_game_playwright_client.mjs` - automation runner for scenarios/screenshots
-- `test-actions/` - scripted gameplay action sets
-- `output/` - captured screenshots + JSON snapshots from runs
-- `progress.md` - development log and iteration notes
+---
 
-## Repository Links
+## Project Structure
 
-- Repo: [https://github.com/coleyrockin/WestWardRPG](https://github.com/coleyrockin/WestWardRPG)
-- Issues: [https://github.com/coleyrockin/WestWardRPG/issues](https://github.com/coleyrockin/WestWardRPG/issues)
+```
+WestWardRPG/
+├── index.html                    # Game shell: canvas, menu, language selector
+├── game.js                       # Core engine (~4 000 lines): render, combat, AI, quests, saves
+├── atmosphere.ts                 # TypeScript source: sky/atmosphere math module
+├── atmosphere.js                 # Compiled output of atmosphere.ts (loaded by index.html)
+├── web_game_playwright_client.mjs# Playwright automation runner
+│
+├── test-actions/                 # JSON action scripts for automated gameplay scenarios
+│   ├── quest_flow.json
+│   ├── combat_block_flow.json
+│   ├── realism_smoke.json
+│   └── ...
+│
+├── scripts/                      # Dev & deployment tooling (multi-language)
+│   ├── dev_tools.sh              # Build pipeline and linting automation
+│   ├── smoke_suite.sh            # End-to-end QA smoke runner
+│   ├── state_report.py           # Python: analyze scenario snapshot output
+│   ├── map_validator.go          # Go: validate map JSON structure
+│   ├── texture_analyzer.rs       # Rust: texture data processing
+│   ├── asset_bundler.rb          # Ruby: asset manifest generation
+│   ├── log_analyzer.pl           # Perl: log statistics
+│   ├── config_generator.php      # PHP: web server config generation
+│   └── README.md                 # Detailed per-script usage docs
+│
+├── test-data/                    # Sample input files for Go/Rust scripts
+├── docs/images/                  # Screenshots used in this README
+│
+├── CHANGELOG.md                  # Development history and milestone notes
+├── ROADMAP.md                    # Planned features and future direction
+├── CONTRIBUTING.md               # How to contribute
+└── package.json                  # npm scripts and metadata
+```
+
+---
+
+## Roadmap
+
+See **[ROADMAP.md](ROADMAP.md)** for the full list of planned features, including:
+
+- Sprite art pass for NPCs and enemies
+- Expanded quest arc beyond house construction
+- GitHub Pages live demo deployment
+- Mobile / touch control support
+- TypeScript migration of `game.js`
+
+---
+
+## Contributing
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup instructions, coding guidelines, and how to run scenarios before opening a pull request.
+
+Bug reports and feature suggestions are welcome via [GitHub Issues](https://github.com/coleyrockin/WestWardRPG/issues).
+
+---
+
+## Why This Project
+
+WestWardRPG demonstrates that a compelling, fully featured game experience can be built using nothing but platform-native web APIs — no game engine, no UI framework, no build step required. Every system (renderer, physics, AI, weather, localization) is written from scratch and visible in a single `game.js` file, making the codebase unusually readable and educational for anyone wanting to understand how 3D browser games work under the hood.
