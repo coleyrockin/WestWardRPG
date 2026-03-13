@@ -19,6 +19,15 @@ Built with plain web tech so the game logic stays transparent, hackable, and fas
 
 Action-heavy valley encounter with active combat log, sword view, NPCs, and pig chaos.
 
+### Pig Chaos
+
+<p align="center">
+  <img src="docs/images/pig-chaos.png" alt="Outlaw pig stampede through the valley settlement" width="480">
+  <img src="docs/images/pig-herd.png" alt="Western pig herd roaming the town" width="480">
+</p>
+
+Eight named outlaw pigs roam the settlement with boid-flocking AI, stampede triggers, and the occasional pickpocket.
+
 ## Quick Navigation
 
 - [Why This Repo Shines](#why-this-repo-shines)
@@ -220,9 +229,13 @@ node ./web_game_playwright_client.mjs \
 
 - `index.html` - game shell, menu UI, language selector
 - `game.js` - core systems (rendering, combat, AI, quests, saves)
+- `atmosphere.ts` / `atmosphere.js` - typed weather/sky math module
 - `web_game_playwright_client.mjs` - automation runner for scenarios/screenshots
-- `test-actions/` - scripted gameplay action sets
-- `output/` - captured screenshots + JSON snapshots from runs
+- `test-actions/` - scripted gameplay action sets (smoke, quest, combat)
+- `scripts/` - dev tooling in multiple languages (Shell, Python, Go, Rust, Ruby, Perl, PHP)
+- `docs/images/` - gameplay and pig-chaos screenshots
+- `output/` - captured screenshots + JSON snapshots from test runs
+- `test-data/` - sample map JSON for validation scripts
 - `progress.md` - development log and iteration notes
 
 ## Repository Links
