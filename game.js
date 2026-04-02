@@ -3714,23 +3714,43 @@
     if (!state.showMap) return;
 
     const map = currentMap();
-    const radius = state.player.inHouse ? 5 : 6;
-    const cells = radius * 2;
-    const mapSize = 150;
-    const cell = mapSize / cells;
-    const startX = canvas.width - mapSize - 12;
-    const startY = 12;
+    const tileRadius = state.player.inHouse ? 5 : 6;
+    const cells = tileRadius * 2;
+    const mapDiameter = 164;
+    const mapRadius = mapDiameter / 2;
+    const cell = mapDiameter / cells;
+    const cx = canvas.width - mapRadius - 16;
+    const cy = mapRadius + 16;
 
-    ctx.fillStyle = "rgba(8, 18, 20, 0.64)";
-    ctx.fillRect(startX - 6, startY - 6, mapSize + 12, mapSize + 12);
+    ctx.save();
+
+    // Outer shadow disc
+    ctx.fillStyle = "rgba(4, 10, 14, 0.5)";
+    ctx.beginPath();
+    ctx.arc(cx + 2, cy + 2, mapRadius + 6, 0, TAU);
+    ctx.fill();
+
+    // Dark background disc
+    ctx.fillStyle = "rgba(8, 18, 20, 0.72)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, mapRadius + 4, 0, TAU);
+    ctx.fill();
+
+    // Clip to circle for terrain
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, mapRadius, 0, TAU);
+    ctx.clip();
 
     const px = Math.floor(state.player.x);
     const py = Math.floor(state.player.y);
+    const originX = cx - mapRadius;
+    const originY = cy - mapRadius;
 
     for (let my = 0; my < cells; my++) {
       for (let mx = 0; mx < cells; mx++) {
-        const wx = px - radius + mx;
-        const wy = py - radius + my;
+        const wx = px - tileRadius + mx;
+        const wy = py - tileRadius + my;
         const tile = map[wy]?.[wx] ?? 1;
 
         let color = state.player.inHouse ? "#6f6253" : "#5a915c";
@@ -3740,69 +3760,138 @@
         if (tile === 4) color = "#ada08e";
 
         ctx.fillStyle = color;
-        ctx.fillRect(startX + mx * cell, startY + my * cell, cell - 1, cell - 1);
+        ctx.fillRect(originX + mx * cell, originY + my * cell, cell + 0.5, cell + 0.5);
       }
+    }
+
+    // Radial fog at edges
+    const edgeFog = ctx.createRadialGradient(cx, cy, mapRadius * 0.55, cx, cy, mapRadius);
+    edgeFog.addColorStop(0, "rgba(8, 18, 20, 0)");
+    edgeFog.addColorStop(1, "rgba(8, 18, 20, 0.6)");
+    ctx.fillStyle = edgeFog;
+    ctx.fillRect(originX, originY, mapDiameter, mapDiameter);
+
+    // Entity dot helper (draws a small glowing circle)
+    function drawDot(wx, wy, color, size) {
+      const dx = wx - (px - tileRadius);
+      const dy = wy - (py - tileRadius);
+      const dotX = originX + dx * cell;
+      const dotY = originY + dy * cell;
+      const distFromCenter = Math.sqrt((dotX - cx) ** 2 + (dotY - cy) ** 2);
+      if (distFromCenter > mapRadius - 2) return;
+      // Glow
+      ctx.fillStyle = color.replace(")", ", 0.35)").replace("rgb", "rgba");
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, size + 2, 0, TAU);
+      ctx.fill();
+      // Core
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, size, 0, TAU);
+      ctx.fill();
     }
 
     if (!state.player.inHouse) {
       for (const enemy of state.enemies) {
         if (!enemy.alive) continue;
-        const ex = enemy.x - (px - radius);
-        const ey = enemy.y - (py - radius);
-        if (ex < 0 || ex >= cells || ey < 0 || ey >= cells) continue;
-        ctx.fillStyle = "#98f39b";
-        ctx.fillRect(startX + ex * cell + 2, startY + ey * cell + 2, 3, 3);
+        drawDot(enemy.x, enemy.y, "#98f39b", 2.5);
       }
-
       for (const npc of state.npcs) {
-        const nx = npc.x - (px - radius);
-        const ny = npc.y - (py - radius);
-        if (nx < 0 || nx >= cells || ny < 0 || ny >= cells) continue;
-        ctx.fillStyle = "#ffd77b";
-        ctx.fillRect(startX + nx * cell + 2, startY + ny * cell + 2, 3, 3);
+        drawDot(npc.x, npc.y, "#ffd77b", 2.5);
       }
-
       for (const pig of state.pigs) {
-        const pxMap = pig.x - (px - radius);
-        const pyMap = pig.y - (py - radius);
-        if (pxMap < 0 || pxMap >= cells || pyMap < 0 || pyMap >= cells) continue;
-        ctx.fillStyle = "#f0adb4";
-        ctx.fillRect(startX + pxMap * cell + 2, startY + pyMap * cell + 2, 3, 3);
+        drawDot(pig.x, pig.y, "#f0adb4", 2.5);
       }
-
-      const hx = state.house.outsideDoor.x - (px - radius);
-      const hy = state.house.outsideDoor.y - (py - radius);
-      if (hx >= 0 && hx < cells && hy >= 0 && hy < cells) {
-        ctx.fillStyle = state.house.unlocked ? "#d8bc6a" : "#9b7b56";
-        ctx.fillRect(startX + hx * cell + 2, startY + hy * cell + 2, 4, 4);
-      }
+      drawDot(state.house.outsideDoor.x, state.house.outsideDoor.y,
+        state.house.unlocked ? "#d8bc6a" : "#9b7b56", 3.5);
     } else {
-      const homePoints = [
-        { ...state.house.bed, color: "#d8a7a7" },
-        { ...state.house.stash, color: "#c9b372" },
-        { ...state.house.interiorDoor, color: "#d3c4a0" },
-      ];
-      for (const point of homePoints) {
-        const ex = point.x - (px - radius);
-        const ey = point.y - (py - radius);
-        if (ex < 0 || ex >= cells || ey < 0 || ey >= cells) continue;
-        ctx.fillStyle = point.color;
-        ctx.fillRect(startX + ex * cell + 2, startY + ey * cell + 2, 4, 4);
-      }
+      drawDot(state.house.bed.x, state.house.bed.y, "#d8a7a7", 3);
+      drawDot(state.house.stash.x, state.house.stash.y, "#c9b372", 3);
+      drawDot(state.house.interiorDoor.x, state.house.interiorDoor.y, "#d3c4a0", 3);
     }
 
-    const playerX = startX + radius * cell + cell * (state.player.x - px);
-    const playerY = startY + radius * cell + cell * (state.player.y - py);
-    ctx.fillStyle = "#fffcf0";
+    // Player dot + direction
+    const playerX = cx + (state.player.x - px) * cell;
+    const playerY = cy + (state.player.y - py) * cell;
+
+    // Player glow
+    const playerGlow = ctx.createRadialGradient(playerX, playerY, 0, playerX, playerY, 10);
+    playerGlow.addColorStop(0, "rgba(255, 252, 240, 0.4)");
+    playerGlow.addColorStop(1, "rgba(255, 252, 240, 0)");
+    ctx.fillStyle = playerGlow;
     ctx.beginPath();
-    ctx.arc(playerX, playerY, 3, 0, TAU);
+    ctx.arc(playerX, playerY, 10, 0, TAU);
     ctx.fill();
 
-    ctx.strokeStyle = "#fffcf0";
+    // Direction cone (field of view wedge)
+    ctx.fillStyle = "rgba(255, 252, 240, 0.1)";
     ctx.beginPath();
     ctx.moveTo(playerX, playerY);
-    ctx.lineTo(playerX + Math.cos(state.player.angle) * 8, playerY + Math.sin(state.player.angle) * 8);
+    ctx.arc(playerX, playerY, 18, state.player.angle - FOV / 2, state.player.angle + FOV / 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Player dot
+    ctx.fillStyle = "#fffcf0";
+    ctx.beginPath();
+    ctx.arc(playerX, playerY, 3.5, 0, TAU);
+    ctx.fill();
+
+    // Direction line
+    ctx.strokeStyle = "#fffcf0";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(playerX, playerY);
+    ctx.lineTo(playerX + Math.cos(state.player.angle) * 10, playerY + Math.sin(state.player.angle) * 10);
     ctx.stroke();
+
+    ctx.restore(); // end clip
+
+    // Gradient ring border
+    ctx.lineWidth = 2.5;
+    const ringGrad = ctx.createLinearGradient(cx - mapRadius, cy - mapRadius, cx + mapRadius, cy + mapRadius);
+    ringGrad.addColorStop(0, "#d8bc6a");
+    ringGrad.addColorStop(0.5, "#8a7448");
+    ringGrad.addColorStop(1, "#d8bc6a");
+    ctx.strokeStyle = ringGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, mapRadius + 1, 0, TAU);
+    ctx.stroke();
+
+    // Compass cardinal directions (N/S/E/W rotated with player)
+    ctx.font = "bold 10px Georgia";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const compassDist = mapRadius + 12;
+    const cardinals = [
+      { label: "N", angle: -Math.PI / 2 },
+      { label: "E", angle: 0 },
+      { label: "S", angle: Math.PI / 2 },
+      { label: "W", angle: Math.PI },
+    ];
+    for (const c of cardinals) {
+      const a = c.angle;
+      const lx = cx + Math.cos(a) * compassDist;
+      const ly = cy + Math.sin(a) * compassDist;
+      ctx.fillStyle = c.label === "N" ? "#e8c86a" : "rgba(248, 240, 220, 0.6)";
+      ctx.fillText(c.label, lx, ly);
+    }
+
+    // Tick marks around the ring
+    ctx.strokeStyle = "rgba(216, 188, 106, 0.3)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * TAU;
+      const inner = mapRadius - 1;
+      const outer = mapRadius + 3;
+      if (i % 4 === 0) continue; // skip where cardinals are
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner);
+      ctx.lineTo(cx + Math.cos(a) * outer, cy + Math.sin(a) * outer);
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 
   function drawHud() {
