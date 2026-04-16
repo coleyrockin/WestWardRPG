@@ -1,5 +1,38 @@
-(() => {
-  const canvas = document.getElementById("game");
+import {
+  TAU,
+  FOV,
+  MAX_RAY_DIST,
+  TEXTURE_SIZE,
+  PLAYER_COLLISION_RADIUS,
+  WALL_RENDER_NEAR_CLIP,
+  WALL_TEXTURE_NEAR_CLIP,
+  PLAYER_SPEED,
+  PLAYER_ROT_SPEED,
+  PLAYER_MAX_HP,
+  SAVE_KEY,
+  LEGACY_SAVE_KEYS,
+  LOCALE_KEY,
+  LEGACY_LOCALE_KEYS,
+  AUTOSAVE_INTERVAL,
+  QUEST_STATUSES,
+  WESTERN_PIG_ROLES,
+} from "./constants.js";
+import {
+  clamp,
+  lerp,
+  easeOutCubic,
+  normalizeAngle,
+  dist,
+  vecLength,
+  normalizeVec,
+  clampVec,
+  choice,
+  numberOr,
+  noise2D,
+  shadeHex,
+} from "./math.js";
+
+const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
   const menu = document.getElementById("menu");
   const startBtn = document.getElementById("start-btn");
@@ -11,33 +44,6 @@
     : (window.DustwardTS && typeof window.DustwardTS.computeAtmosphere === "function"
       ? window.DustwardTS
       : null);
-
-  const TAU = Math.PI * 2;
-  const FOV = Math.PI / 2.75;
-  const MAX_RAY_DIST = 26;
-  const TEXTURE_SIZE = 96;
-  const PLAYER_COLLISION_RADIUS = 0.18;
-  const WALL_RENDER_NEAR_CLIP = 0.24;
-  const WALL_TEXTURE_NEAR_CLIP = 0.34;
-  const PLAYER_SPEED = 3.95;
-  const PLAYER_ROT_SPEED = 2.75;
-  const PLAYER_MAX_HP = 120;
-  const SAVE_KEY = "westward-save-v1";
-  const LEGACY_SAVE_KEYS = ["dustward-save-v1"];
-  const LOCALE_KEY = "westward-locale-v1";
-  const LEGACY_LOCALE_KEYS = ["dustward-locale-v1"];
-  const AUTOSAVE_INTERVAL = 30;
-  const QUEST_STATUSES = new Set(["locked", "active", "complete", "turned_in"]);
-  const WESTERN_PIG_ROLES = [
-    { role: "Marshal", hat: "#4f3a23", bandana: "#8f2c2c", temper: 0.42 },
-    { role: "Outlaw", hat: "#2a2f3a", bandana: "#9e1919", temper: 0.88 },
-    { role: "Deputy", hat: "#694b2d", bandana: "#3f6f9a", temper: 0.56 },
-    { role: "Prospector", hat: "#70542e", bandana: "#987d3e", temper: 0.34 },
-    { role: "Gambler", hat: "#3d334f", bandana: "#ab3f79", temper: 0.68 },
-    { role: "Bandit", hat: "#353333", bandana: "#8a3b1c", temper: 0.92 },
-    { role: "Rodeo", hat: "#6f3f24", bandana: "#2d6e63", temper: 0.74 },
-    { role: "Sheriff", hat: "#5c4227", bandana: "#b89a3e", temper: 0.48 },
-  ];
 
   const LANGUAGE_OPTIONS = {
     en: "English",
@@ -952,68 +958,7 @@
     ctx.globalAlpha = 1;
   }
 
-  function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-  }
-
-  function lerp(a, b, t) {
-    return a + (b - a) * t;
-  }
-
-  function easeOutCubic(t) {
-    const x = clamp(t, 0, 1);
-    return 1 - Math.pow(1 - x, 3);
-  }
-
-  function normalizeAngle(angle) {
-    let a = angle % TAU;
-    if (a < -Math.PI) a += TAU;
-    if (a > Math.PI) a -= TAU;
-    return a;
-  }
-
-  function dist(a, b) {
-    const dx = a.x - b.x;
-    const dy = a.y - b.y;
-    return Math.hypot(dx, dy);
-  }
-
-  function vecLength(x, y) {
-    return Math.hypot(x, y);
-  }
-
-  function normalizeVec(x, y) {
-    const mag = Math.hypot(x, y) || 1;
-    return { x: x / mag, y: y / mag };
-  }
-
-  function clampVec(x, y, maxLen) {
-    const mag = Math.hypot(x, y);
-    if (mag <= maxLen || mag <= 0.0001) return { x, y };
-    const scale = maxLen / mag;
-    return { x: x * scale, y: y * scale };
-  }
-
-  function choice(list) {
-    return list[Math.floor(Math.random() * list.length)];
-  }
-
-  function numberOr(value, fallback) {
-    return Number.isFinite(value) ? value : fallback;
-  }
-
-  function noise2D(x, y, seed) {
-    const n = Math.sin(x * 127.1 + y * 311.7 + seed * 73.97) * 43758.5453;
-    return n - Math.floor(n);
-  }
-
-  function shadeHex(hex, mult) {
-    const m = clamp(mult, 0, 2.5);
-    const r = clamp(Math.floor(parseInt(hex.slice(1, 3), 16) * m), 0, 255);
-    const g = clamp(Math.floor(parseInt(hex.slice(3, 5), 16) * m), 0, 255);
-    const b = clamp(Math.floor(parseInt(hex.slice(5, 7), 16) * m), 0, 255);
-    return `rgb(${r}, ${g}, ${b})`;
-  }
+  // Math utilities moved to ./math.js
 
   function makeTexture(kind) {
     const tex = document.createElement("canvas");
@@ -4345,6 +4290,5 @@
       messages: state.msg.slice(0, 4).map((m) => m.text),
     };
 
-    return JSON.stringify(payload);
-  };
-})();
+  return JSON.stringify(payload);
+};
