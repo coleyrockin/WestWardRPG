@@ -4,6 +4,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-Atmosphere-3178C6?style=flat&logo=typescript&logoColor=white)
 ![HTML5](https://img.shields.io/badge/HTML5-Canvas-E34F26?style=flat&logo=html5&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-Tools-3776AB?style=flat&logo=python&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-Tests-6E9F18?style=flat&logo=vitest&logoColor=white)
 ![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33?style=flat&logo=playwright&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat)
 
@@ -13,7 +14,11 @@ A first-person western RPG that runs in a single HTML file — raycast 3D render
 
 ## Demo
 
-Clone and run locally (see [Getting Started](#getting-started)) — the game is a static `index.html` and works offline. A hosted demo isn't currently deployed; any static host (GitHub Pages, Vercel, Netlify) will serve it as-is.
+Clone and run locally (see [Getting Started](#getting-started)) — the game is a static `index.html` and works offline.
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/coleyrockin/WestWardRPG)
+
+One-click deploy to Vercel (zero configuration required thanks to `vercel.json`), or use any static host (GitHub Pages, Netlify, Cloudflare Pages).
 
 ---
 
@@ -36,7 +41,7 @@ Clone and run locally (see [Getting Started](#getting-started)) — the game is 
 | **Typed Modules** | TypeScript (atmosphere math) |
 | **Scripting** | Python (balance tuning, test harness) |
 | **Build Tools** | Shell, Ruby (bundler), Perl (log analysis), PHP (config generator) |
-| **Testing** | Playwright E2E, JSON action scripts, shell smoke suite |
+| **Testing** | Vitest unit tests, Playwright E2E, JSON action scripts, shell smoke suite |
 | **Deployment** | Static HTML — no server required |
 
 ## Getting Started
@@ -56,6 +61,14 @@ npm run dev
 ```
 
 Open the printed local URL to play. No build step required for the base game — just open `index.html` in a browser.
+
+### Running the test suite
+
+```bash
+npm test            # Vitest unit tests
+npm run test:smoke  # Playwright end-to-end smoke scenarios
+npm run typecheck:ts
+```
 
 ## Controls
 

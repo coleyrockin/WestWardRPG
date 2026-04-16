@@ -1,24 +1,24 @@
-type RGB = { r: number; g: number; b: number };
+export type RGB = { r: number; g: number; b: number };
 
-type AtmosphereResult = {
+export type AtmosphereResult = {
   stormShade: number;
   skyTop: RGB;
   skyBottom: RGB;
 };
 
-function clamp(value: number, min: number, max: number): number {
+export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function lerp(a: number, b: number, t: number): number {
+export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-function toChannel(value: number): number {
+export function toChannel(value: number): number {
   return Math.floor(clamp(value, 0, 255));
 }
 
-function computeAtmosphere(day: number, rain: number, fog: number): AtmosphereResult {
+export function computeAtmosphere(day: number, rain: number, fog: number): AtmosphereResult {
   const safeDay = clamp(day, 0, 1);
   const safeRain = clamp(rain, 0, 1);
   const safeFog = clamp(fog, 0, 1);
@@ -51,9 +51,7 @@ declare global {
   }
 }
 
-window.WestWardTS = {
-  computeAtmosphere,
-};
-window.DustwardTS = window.WestWardTS;
-
-export { };
+if (typeof window !== "undefined") {
+  window.WestWardTS = { computeAtmosphere };
+  window.DustwardTS = window.WestWardTS;
+}

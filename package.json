@@ -6,7 +6,10 @@
   "scripts": {
     "start": "python3 -m http.server 5173",
     "dev": "python3 -m http.server 5173",
-    "test": "node --check game.js && node --check web_game_playwright_client.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:syntax": "node --check game.js && node --check web_game_playwright_client.mjs",
     "test:smoke": "bash scripts/smoke_suite.sh",
     "qa": "npm run dev:lint && npm run test:smoke",
     "report:states": "python3 scripts/state_report.py output",
@@ -44,7 +47,9 @@
   },
   "homepage": "https://github.com/coleyrockin/WestWardRPG#readme",
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.4",
     "playwright": "^1.58.2",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.4"
   }
 }
