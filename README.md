@@ -89,10 +89,14 @@ npm run typecheck:ts
 ```
 WestWardRPG/
 ├── index.html                     # Game entry point and HUD
-├── game.js                        # Core game loop, rendering, combat, AI, quests
+├── src/
+│   ├── main.js                    # Core game loop, rendering, combat, AI, quests
+│   ├── constants.js               # Tuning constants, save keys, pig-role data
+│   └── math.js                    # Pure math utilities (clamp, lerp, dist, noise2D…)
 ├── atmosphere.ts / atmosphere.js  # Typed atmosphere math (TS source + compiled JS)
 ├── web_game_playwright_client.mjs # Playwright action-script runner
 ├── scripts/                       # Dev tools (Shell, Python, Ruby, Perl, PHP, Rust, Go)
+├── tests/                         # Vitest unit tests
 ├── test-actions/                  # Deterministic JSON test scripts
 ├── test-data/                     # Fixtures for map and texture validators
 ├── docs/                          # Screenshots and technical documentation
