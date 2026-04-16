@@ -4,11 +4,16 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-Atmosphere-3178C6?style=flat&logo=typescript&logoColor=white)
 ![HTML5](https://img.shields.io/badge/HTML5-Canvas-E34F26?style=flat&logo=html5&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-Tools-3776AB?style=flat&logo=python&logoColor=white)
-![Vitest](https://img.shields.io/badge/Vitest-Tests-6E9F18?style=flat&logo=vitest&logoColor=white)
 ![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33?style=flat&logo=playwright&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat)
 
-A chaotic first-person western RPG in the browser with raycast rendering, sword duels, quest progression, dynamic weather, and a pig outlaw posse running the town. Built with plain web tech — no frameworks, no engine, just transparent game logic.
+A first-person western RPG that runs in a single HTML file — raycast 3D renderer, melee combat, quest progression, dynamic weather, boid-flocked pig outlaws, and save/load. No frameworks, no engine, no build step: the rendering, physics, AI, and UI are all transparent in one readable codebase.
+
+![Gameplay preview](docs/images/gameplay-preview.png)
+
+## Demo
+
+Clone and run locally (see [Getting Started](#getting-started)) — the game is a static `index.html` and works offline. A hosted demo isn't currently deployed; any static host (GitHub Pages, Vercel, Netlify) will serve it as-is.
 
 ---
 
@@ -31,7 +36,7 @@ A chaotic first-person western RPG in the browser with raycast rendering, sword 
 | **Typed Modules** | TypeScript (atmosphere math) |
 | **Scripting** | Python (balance tuning, test harness) |
 | **Build Tools** | Shell, Ruby (bundler), Perl (log analysis), PHP (config generator) |
-| **Testing** | Vitest, Playwright E2E, JSON action scripts |
+| **Testing** | Playwright E2E, JSON action scripts, shell smoke suite |
 | **Deployment** | Static HTML — no server required |
 
 ## Getting Started
@@ -70,14 +75,15 @@ Open the printed local URL to play. No build step required for the base game —
 
 ```
 WestWardRPG/
-├── src/               # Core game modules (rendering, combat, AI, quests)
-├── scripts/           # Dev tools (Shell, Python, Perl, PHP, Ruby)
-├── test-actions/      # Deterministic JSON test scripts
-├── tests/             # Vitest and Playwright test suites
-├── docs/              # Technical documentation
-├── index.html         # Game entry point and HUD
-├── atmosphere.ts      # Typed atmosphere math module
-└── package.json       # Dependencies and scripts
+├── index.html                     # Game entry point and HUD
+├── game.js                        # Core game loop, rendering, combat, AI, quests
+├── atmosphere.ts / atmosphere.js  # Typed atmosphere math (TS source + compiled JS)
+├── web_game_playwright_client.mjs # Playwright action-script runner
+├── scripts/                       # Dev tools (Shell, Python, Ruby, Perl, PHP, Rust, Go)
+├── test-actions/                  # Deterministic JSON test scripts
+├── test-data/                     # Fixtures for map and texture validators
+├── docs/                          # Screenshots and technical documentation
+└── package.json                   # Dependencies and scripts
 ```
 
 ## Code Language Variety
@@ -93,6 +99,13 @@ WestWardRPG/
 | **Perl** | Log analysis and statistics |
 | **PHP** | Web server config generator |
 | **JSON** | Deterministic test-action scripts |
+
+## What This Demonstrates
+
+- **Graphics from first principles** — a working raycast renderer (walls, sprites, depth, lighting) without a game engine or 3D library.
+- **Systems thinking** — combat, AI, quests, inventory, save/load, i18n, and atmosphere all composed in a single readable JS module.
+- **Test discipline on a toy codebase** — deterministic JSON action scripts driven by a Playwright client produce reproducible state snapshots for CI.
+- **Polyglot tooling** — the game is vanilla JS/HTML, while supporting dev utilities span Python, Shell, Ruby, Perl, PHP, Rust, and Go to exercise the full script-and-build toolbelt.
 
 ## Contributing
 

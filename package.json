@@ -34,7 +34,7 @@
     "indie-game"
   ],
   "author": "coleyrockin <coleyrockin@aol.com>",
-  "license": "ISC",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/coleyrockin/WestWardRPG.git"
