@@ -10,7 +10,7 @@
 
 A first-person western RPG that runs in a single HTML file — raycast 3D renderer, melee combat, quest progression, dynamic weather, boid-flocked pig outlaws, and save/load. No frameworks, no engine, no build step: the rendering, physics, AI, and UI are all transparent in one readable codebase.
 
-![Gameplay preview](docs/images/gameplay-preview.png)
+![Gameplay preview](docs/screenshot.jpg)
 
 ## Demo
 
