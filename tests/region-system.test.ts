@@ -56,4 +56,22 @@ describe("regionSystem", () => {
     expect(mods.priceMult).toBe(1);
     expect(mods.banner).toBeNull();
   });
+
+  it("tracks mini-boss defeat flags in default state", () => {
+    const state = createInitialRegionState();
+    expect(state.miniBosses.ashfall_scrap_tyrant.defeated).toBe(false);
+    expect(state.miniBosses.ashfall_scorch_engine.defeated).toBe(false);
+    expect(state.miniBosses.lantern_overseer.defeated).toBe(false);
+    expect(state.miniBosses.lantern_iron_chanter.defeated).toBe(false);
+  });
+
+  it("preserves mini-boss defeat flags across serialization shape", () => {
+    const state = createInitialRegionState();
+    state.miniBosses.ashfall_scrap_tyrant.defeated = true;
+    state.miniBosses.lantern_overseer.defeated = true;
+    const roundTrip = JSON.parse(JSON.stringify(state));
+    expect(roundTrip.miniBosses.ashfall_scrap_tyrant.defeated).toBe(true);
+    expect(roundTrip.miniBosses.lantern_overseer.defeated).toBe(true);
+    expect(roundTrip.miniBosses.ashfall_scorch_engine.defeated).toBe(false);
+  });
 });

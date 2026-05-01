@@ -873,12 +873,21 @@ const canvas = document.getElementById("game");
   }
 
   let skillScreenOpen = false;
+  let settingsOpen = false;
+  let settingsSelection = 0;
   let skillSelection = 0;
   const SKILL_BRANCH_LABELS = [
     { id: "survival", label: "Survival", desc: "Stamina pool, harvest yield, weather grit." },
     { id: "combat", label: "Combat", desc: "Damage, block window, crit chance." },
     { id: "influence", label: "Influence", desc: "Faction sway, shop barter, ideology threshold." },
   ];
+  const SETTINGS_OPTIONS = [
+    { id: "motionReduction", label: "Motion Reduction", type: "toggle" },
+    { id: "colorblindMode", label: "Colorblind Mode", type: "cycle" },
+    { id: "fontScale", label: "Font Scale", type: "range" },
+    { id: "gradientCache", label: "Gradient Cache", type: "toggle" },
+  ];
+  const COLORBLIND_ORDER = ["none", "deuteranopia", "protanopia", "tritanopia"];
 
   let shopOpen = false;
   const shopItems = [
@@ -5285,6 +5294,74 @@ const canvas = document.getElementById("game");
       drawClippedText("↑/↓ select   Enter unlock   Esc close", sx + 16, sy + sh - 14, sw - 32, "#9088b0");
     }
 
+    /* Settings overlay */
+    if (settingsOpen && state.mode === "playing") {
+      const settingsItems = [
+        {
+          id: "highContrast",
+          label: "High Contrast",
+          value: state.graphics.accessibility.highContrast ? "ON" : "OFF",
+        },
+        {
+          id: "hitMarkerStrength",
+          label: "Hit Marker Strength",
+          value: `${(state.graphics.accessibility.hitMarkerStrength || 1).toFixed(2)}x`,
+        },
+        {
+          id: "cameraShake",
+          label: "Camera Shake",
+          value: `${(state.graphics.accessibility.cameraShake || 1).toFixed(2)}x`,
+        },
+        {
+          id: "motionReduction",
+          label: "Motion Reduction",
+          value: state.graphics.accessibility.motionReduction ? "ON" : "OFF",
+        },
+        {
+          id: "fontScale",
+          label: "Font Scale",
+          value: `${(state.graphics.accessibility.fontScale || 1).toFixed(2)}x`,
+        },
+        {
+          id: "colorblindMode",
+          label: "Colorblind Mode",
+          value: state.graphics.accessibility.colorblindMode || "none",
+        },
+        {
+          id: "gradientCache",
+          label: "Gradient Cache",
+          value: state.graphics.performance?.gradientCache ? "ON" : "OFF",
+        },
+      ];
+      const sw = Math.min(460, canvas.width - margin * 2);
+      const sh = settingsItems.length * 46 + 100;
+      const sx = Math.floor((canvas.width - sw) / 2);
+      const sy = Math.floor((canvas.height - sh) / 2);
+      drawSoftPanel(sx, sy, sw, sh, {
+        top: "rgba(18, 22, 34, 0.95)",
+        bottom: "rgba(8, 12, 20, 0.93)",
+        border: "rgba(134, 184, 255, 0.55)",
+      });
+      ctx.font = "bold 20px Georgia";
+      drawClippedText("Accessibility & Settings", sx + 16, sy + 30, sw - 32, "#8ec4ff");
+      ctx.font = "12px Georgia";
+      drawClippedText("↑/↓ select   ←/→ adjust   Enter toggle/apply   O/Esc close", sx + 16, sy + 50, sw - 32, "#adc3e2");
+      for (let i = 0; i < settingsItems.length; i++) {
+        const item = settingsItems[i];
+        const iy = sy + 64 + i * 46;
+        const selected = i === settingsSelection;
+        fillRoundedRect(sx + 10, iy, sw - 20, 40, 7, selected ? "rgba(132, 182, 255, 0.24)" : "rgba(255,255,255,0.05)");
+        if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 39, 7, "#8ec4ff", 1);
+        ctx.font = "bold 13px Georgia";
+        drawClippedText(item.label, sx + 20, iy + 16, sw - 140, selected ? "#bde1ff" : "#f3ecd8");
+        ctx.font = "12px Georgia";
+        ctx.textAlign = "right";
+        ctx.fillStyle = selected ? "#8ec4ff" : "#d5dce8";
+        ctx.fillText(item.value, sx + sw - 24, iy + 28);
+        ctx.textAlign = "left";
+      }
+    }
+
     /* Shop overlay */
     if (shopOpen && state.mode === "playing") {
       const sw = Math.min(420, canvas.width - margin * 2);
@@ -5519,9 +5596,17 @@ const canvas = document.getElementById("game");
       cycleRegion();
     }
 
-    if (event.code === "KeyT" && state.mode === "playing" && !shopOpen) {
+    if (event.code === "KeyT" && state.mode === "playing" && !shopOpen && !settingsOpen) {
       skillScreenOpen = !skillScreenOpen;
       if (skillScreenOpen) logMsg("Skill tree opened.");
+    }
+
+    if (event.code === "KeyO" && state.mode === "playing" && !shopOpen && !skillScreenOpen) {
+      settingsOpen = !settingsOpen;
+      if (settingsOpen) {
+        settingsSelection = 0;
+        logMsg("Settings opened.");
+      }
     }
 
     if (event.code === "KeyJ" && state.mode === "playing") {

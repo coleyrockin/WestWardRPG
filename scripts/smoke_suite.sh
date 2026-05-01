@@ -134,8 +134,10 @@ run_scenario "smoke" "test-actions/realism_smoke.json" 3
 run_scenario "quest" "test-actions/quest_flow.json" 2
 run_scenario "combat" "test-actions/combat_block_flow.json" 2
 run_scenario "boss-fight" "test-actions/boss_fight_flow.json" 2
+run_scenario "mini-boss" "test-actions/mini_boss_flow.json" 2
 run_scenario "weather-heavy" "test-actions/weather_heavy_scene.json" 2
 run_scenario "upgrade-equip" "test-actions/upgrade_purchase_equip_flow.json" 2
+run_scenario "accessibility" "test-actions/accessibility_toggles_flow.json" 2
 
 echo "[SUCCESS] Functional smoke suite completed."
 echo "[SUCCESS] Artifacts: $OUT_ROOT"

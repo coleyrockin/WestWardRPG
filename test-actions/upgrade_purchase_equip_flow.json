@@ -6,6 +6,18 @@
     { "buttons": ["w"], "frames": 26 },
     { "buttons": ["e"], "frames": 3 },
     { "buttons": ["1"], "frames": 2 },
-    { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 640, "mouse_y": 360 }
+    { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 640, "mouse_y": 360 },
+    { "buttons": ["o"], "frames": 2 },
+    { "buttons": ["down"], "frames": 2 },
+    { "buttons": ["enter"], "frames": 2 },
+    { "buttons": ["down"], "frames": 2 },
+    { "buttons": ["enter"], "frames": 2 },
+    { "buttons": ["down"], "frames": 2 },
+    { "buttons": ["right"], "frames": 2 },
+    { "buttons": ["down"], "frames": 2 },
+    { "buttons": ["right"], "frames": 2 },
+    { "buttons": ["down"], "frames": 2 },
+    { "buttons": ["right"], "frames": 2 },
+    { "buttons": ["escape"], "frames": 2 }
   ]
 }
