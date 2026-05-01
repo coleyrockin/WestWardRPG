@@ -4196,11 +4196,12 @@ const canvas = document.getElementById("game");
       biome: state.regions.activeRegion,
     });
     const visualMood = applyGraphicsAccessibility(visualMoodBase, state.graphics.accessibility);
+    const cameraShakeStrength = clamp(visualMood.cameraShake ?? 1, 0, 1.5);
 
     const baseHorizon = drawSkyAndGround(width, height, dayForMood, visualMood);
     const bobOffset = Math.sin(state.player.walkBob * 2.2) * (state.player.inHouse ? 1.2 : 2.2);
     const hitJitter = Math.sin(state.time * 120) * state.player.hitPulse * 5;
-    const shakeAmt = state.player.screenShake;
+    const shakeAmt = state.player.screenShake * cameraShakeStrength;
     const shakeX = shakeAmt > 0 ? Math.sin(state.time * 89 + 1.2) * shakeAmt * 14 : 0;
     const shakeY = shakeAmt > 0 ? Math.cos(state.time * 73) * shakeAmt * 9 : 0;
     const horizon = clamp(baseHorizon + bobOffset + hitJitter + shakeY, height * 0.38, height * 0.66);
@@ -4237,7 +4238,7 @@ const canvas = document.getElementById("game");
       ctx.drawImage(tex, texX, 0, 1, TEXTURE_SIZE, x, y, 1, wallHeight);
 
       const shade = clamp(1.24 - projectedDist / (MAX_RAY_DIST * 0.86) - (hit.side === 1 ? 0.14 : 0), 0.2, 1);
-      const contrastPass = state.player.inHouse ? 0.74 : 0.94;
+      const contrastPass = (state.player.inHouse ? 0.74 : 0.94) * clamp(visualMood.contrastBoost || 1, 0.9, 1.4);
       ctx.fillStyle = `rgba(8, 12, 18, ${(1 - shade) * contrastPass * (1 + visualMood.gradeStrength * 0.22)})`;
       ctx.fillRect(x, y, 1, wallHeight);
       const baseShadow = clamp((projectedDist / MAX_RAY_DIST) * 0.5 + 0.06, 0.08, 0.56);
@@ -4363,10 +4364,15 @@ const canvas = document.getElementById("game");
       const depthIdx = Math.min(Math.floor(sprite.sx), width - 1);
       if (sprite.sx >= 0 && sprite.sx < width && sprite.distToPlayer > depth[depthIdx] + 0.08) continue;
 
-      const light = clamp(1 - sprite.distToPlayer / MAX_RAY_DIST, 0.25, 1);
+      const light = clamp(1 - sprite.distToPlayer / MAX_RAY_DIST + visualMood.dynamicLightStrength * 0.08, 0.25, 1.1);
       drawBillboardSprite(sprite, left, top, spriteWidth, spriteHeight, light);
 
       if (sprite.kind === "enemy") {
+        if (visualMood.silhouetteStrength > 0.05) {
+          ctx.strokeStyle = `rgba(255, 238, 192, ${0.18 + visualMood.silhouetteStrength * 0.35})`;
+          ctx.lineWidth = 1.2;
+          ctx.strokeRect(left - 1, top - 1, spriteWidth + 2, spriteHeight + 2);
+        }
         const hpRatio = clamp(sprite.hp / sprite.maxHp, 0, 1);
         const barW = spriteWidth;
         const barY = top - 6;
@@ -4415,14 +4421,17 @@ const canvas = document.getElementById("game");
 
     if (state.mode !== "menu") {
       const crossSize = state.player.blocking ? 6 : 4;
-      const crossColor = state.player.hitPulse > 0 ? "rgba(255, 186, 159, 0.96)" : "rgba(255, 244, 218, 0.92)";
+      const hitMarkerStrength = clamp(visualMood.hitMarkerStrength ?? 1, 0.4, 2);
+      const crossColor = state.player.hitPulse > 0
+        ? `rgba(255, 186, 159, ${clamp(0.56 + hitMarkerStrength * 0.22, 0.55, 1)})`
+        : "rgba(255, 244, 218, 0.92)";
       const cx = width / 2;
       const cy = height / 2;
       ctx.save();
       ctx.shadowColor = "rgba(255, 219, 156, 0.32)";
       ctx.shadowBlur = 8;
       ctx.strokeStyle = crossColor;
-      ctx.lineWidth = 1.6;
+      ctx.lineWidth = 1.2 + hitMarkerStrength * 0.55;
       ctx.beginPath();
       ctx.moveTo(cx - crossSize - 7, cy);
       ctx.lineTo(cx - crossSize, cy);
@@ -4462,7 +4471,7 @@ const canvas = document.getElementById("game");
 
       if (state.player.hitPulse > 0) {
         const flash = ctx.createRadialGradient(width / 2, height / 2, 8, width / 2, height / 2, 120);
-        flash.addColorStop(0, `rgba(255, 132, 132, ${state.player.hitPulse * 0.28})`);
+        flash.addColorStop(0, `rgba(255, 132, 132, ${state.player.hitPulse * (0.18 + hitMarkerStrength * 0.16)})`);
         flash.addColorStop(1, "rgba(255,132,132,0)");
         ctx.fillStyle = flash;
         ctx.fillRect(0, 0, width, height);
@@ -4488,6 +4497,13 @@ const canvas = document.getElementById("game");
     const grade = visualMood.skyTint;
     ctx.fillStyle = `rgba(${grade.r + 28}, ${grade.g + 16}, ${grade.b + 30}, ${visualMood.gradeStrength * 0.2})`;
     ctx.fillRect(0, 0, width, height);
+
+    if (visualMood.factionCueStrength > 0.12 && !state.player.inHouse) {
+      ctx.fillStyle = `rgba(122, 188, 255, ${Math.min(0.18, visualMood.factionCueStrength * 0.28)})`;
+      ctx.fillRect(width * 0.18, height * 0.1, width * 0.12, height * 0.008);
+      ctx.fillStyle = `rgba(255, 158, 122, ${Math.min(0.18, visualMood.factionCueStrength * 0.28)})`;
+      ctx.fillRect(width * 0.7, height * 0.12, width * 0.12, height * 0.008);
+    }
 
     const vignette = ctx.createRadialGradient(width * 0.5, height * 0.5, width * 0.12, width * 0.5, height * 0.5, width * 0.68);
     vignette.addColorStop(0, "rgba(0,0,0,0)");
