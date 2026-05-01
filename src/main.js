@@ -45,6 +45,7 @@ import {
   chooseEnemyType,
   createEnemyStats,
   createEnemyCombatProfile,
+  resolveBehaviorMove,
 } from "./enemyArchetypes.js";
 import {
   resolveCombatProgression,
@@ -62,12 +63,15 @@ import { migrateSaveToV3 } from "./saveMigration.js";
 import {
   createInitialProgressionState,
   unlockSkill,
+  canUnlockSkill,
   upgradeWeaponTier,
   addArmorModifier,
   resolveIdeologyTraits,
   buildProgressionModifiers,
+  ARMOR_MODIFIERS,
+  WEAPON_TIERS,
 } from "./progressionSystem.js";
-import { createInitialRegionState, unlockRegion, rollRegionEvent } from "./regionSystem.js";
+import { REGIONS, createInitialRegionState, unlockRegion, rollRegionEvent, resolveRegionEventModifiers } from "./regionSystem.js";
 import {
   GRAPHICS_PRESETS,
   createInitialGraphicsState,
@@ -168,6 +172,16 @@ const canvas = document.getElementById("game");
         mysteryBoxDesc: "Could be anything! (It's usually rocks.)",
         sellCoresName: "Sell Slime Cores",
         sellCoresDesc: "Sell 1 core for 15 gold. Gross but profitable.",
+        refineWeaponName: "Refine Weapon (Common→Refined)",
+        refineWeaponDesc: "60g + 4 Ashglass. +8% damage.",
+        relicWeaponName: "Relic Weapon (Refined→Relic)",
+        relicWeaponDesc: "180g + 4 Cipher Lens. +16% damage total.",
+        armorStaminaName: "Armor: Stamina Regen",
+        armorStaminaDesc: "40g + 2 Heat Resin. +25% stamina recovery.",
+        armorBlockName: "Armor: Block Efficiency",
+        armorBlockDesc: "50g + 2 Scrap Coil. Better block window.",
+        armorWeatherName: "Armor: Weather Resistance",
+        armorWeatherDesc: "45g + 2 Pressurized Ink. Reduced weather penalty.",
       },
     },
     es: {
@@ -851,6 +865,21 @@ const canvas = document.getElementById("game");
   const deathMessages = DEATH_MESSAGES;
 
   /* ─── Shop System ─── */
+  let regionEventsEnabled = true;
+
+  function getActiveRegionEventModifiers() {
+    if (!regionEventsEnabled) return { priceMult: 1, spawnDensityMult: 1, banner: null };
+    return resolveRegionEventModifiers(state.regions?.events);
+  }
+
+  let skillScreenOpen = false;
+  let skillSelection = 0;
+  const SKILL_BRANCH_LABELS = [
+    { id: "survival", label: "Survival", desc: "Stamina pool, harvest yield, weather grit." },
+    { id: "combat", label: "Combat", desc: "Damage, block window, crit chance." },
+    { id: "influence", label: "Influence", desc: "Faction sway, shop barter, ideology threshold." },
+  ];
+
   let shopOpen = false;
   const shopItems = [
     {
@@ -881,6 +910,61 @@ const canvas = document.getElementById("game");
         if (state.inventory["Slime Core"] <= 0) { logMsg("No Slime Cores to sell!"); return false; }
         state.inventory["Slime Core"] -= 1;
         state.player.gold += 15;
+        return true;
+      }
+    },
+    {
+      nameKey: "shop.refineWeaponName", cost: 60, descKey: "shop.refineWeaponDesc",
+      action() {
+        if (state.progression.equipment.weaponTier !== "Common") { logMsg("Weapon already past Common."); return false; }
+        if ((state.inventory.Ashglass || 0) < 4) { logMsg("Need 4 Ashglass to refine."); return false; }
+        state.inventory.Ashglass -= 4;
+        upgradeWeaponTier(state.progression);
+        logMsg(`Weapon refined to ${state.progression.equipment.weaponTier}.`);
+        return true;
+      }
+    },
+    {
+      nameKey: "shop.relicWeaponName", cost: 180, descKey: "shop.relicWeaponDesc",
+      action() {
+        if (state.progression.equipment.weaponTier !== "Refined") { logMsg("Refine the weapon first."); return false; }
+        if ((state.inventory["Cipher Lens"] || 0) < 4) { logMsg("Need 4 Cipher Lens for relic upgrade."); return false; }
+        state.inventory["Cipher Lens"] -= 4;
+        upgradeWeaponTier(state.progression);
+        logMsg(`Weapon ascended to ${state.progression.equipment.weaponTier}.`);
+        return true;
+      }
+    },
+    {
+      nameKey: "shop.armorStaminaName", cost: 40, descKey: "shop.armorStaminaDesc",
+      action() {
+        if (state.progression.equipment.armorMods.includes("stamina_regen")) { logMsg("Stamina mod already fitted."); return false; }
+        if ((state.inventory["Heat Resin"] || 0) < 2) { logMsg("Need 2 Heat Resin."); return false; }
+        state.inventory["Heat Resin"] -= 2;
+        addArmorModifier(state.progression, "stamina_regen");
+        logMsg("Armor modifier installed: stamina regen.");
+        return true;
+      }
+    },
+    {
+      nameKey: "shop.armorBlockName", cost: 50, descKey: "shop.armorBlockDesc",
+      action() {
+        if (state.progression.equipment.armorMods.includes("block_efficiency")) { logMsg("Block mod already fitted."); return false; }
+        if ((state.inventory["Scrap Coil"] || 0) < 2) { logMsg("Need 2 Scrap Coil."); return false; }
+        state.inventory["Scrap Coil"] -= 2;
+        addArmorModifier(state.progression, "block_efficiency");
+        logMsg("Armor modifier installed: block efficiency.");
+        return true;
+      }
+    },
+    {
+      nameKey: "shop.armorWeatherName", cost: 45, descKey: "shop.armorWeatherDesc",
+      action() {
+        if (state.progression.equipment.armorMods.includes("weather_resistance")) { logMsg("Weather mod already fitted."); return false; }
+        if ((state.inventory["Pressurized Ink"] || 0) < 2) { logMsg("Need 2 Pressurized Ink."); return false; }
+        state.inventory["Pressurized Ink"] -= 2;
+        addArmorModifier(state.progression, "weather_resistance");
+        logMsg("Armor modifier installed: weather resistance.");
         return true;
       }
     },
@@ -1276,6 +1360,12 @@ const canvas = document.getElementById("game");
       Stone: 0,
       Potion: 2,
       "Slime Core": 0,
+      Ashglass: 0,
+      "Scrap Coil": 0,
+      "Heat Resin": 0,
+      "Lantern Filament": 0,
+      "Cipher Lens": 0,
+      "Pressurized Ink": 0,
     },
     quests: createInitialQuestState(),
     narrative: createInitialNarrativeState(),
@@ -1463,7 +1553,22 @@ const canvas = document.getElementById("game");
       maxY: 48,
       extraCheck: (x, y) => tileTypeAtCurrentMap(x + 0.5, y + 0.5) === 5,
     });
+    addResource("ashglass", 4, { minX: 26, minY: 32, maxX: 50, maxY: 50 });
+    addResource("scrap-coil", 3, { minX: 26, minY: 32, maxX: 50, maxY: 50 });
+    addResource("heat-resin", 3, { minX: 26, minY: 32, maxX: 50, maxY: 50 });
+    addResource("lantern-filament", 4, { minX: 4, minY: 32, maxX: 26, maxY: 50 });
+    addResource("cipher-lens", 3, { minX: 4, minY: 32, maxX: 26, maxY: 50 });
+    addResource("pressurized-ink", 3, { minX: 4, minY: 32, maxX: 26, maxY: 50 });
   }
+
+  const REGION_RESOURCE_MAP = {
+    ashglass: { region: "ashfall", item: "Ashglass", respawn: 36, xp: 8, label: "Ashglass" },
+    "scrap-coil": { region: "ashfall", item: "Scrap Coil", respawn: 36, xp: 9, label: "Scrap Coil" },
+    "heat-resin": { region: "ashfall", item: "Heat Resin", respawn: 40, xp: 9, label: "Heat Resin" },
+    "lantern-filament": { region: "ironlantern", item: "Lantern Filament", respawn: 36, xp: 8, label: "Lantern Filament" },
+    "cipher-lens": { region: "ironlantern", item: "Cipher Lens", respawn: 40, xp: 10, label: "Cipher Lens" },
+    "pressurized-ink": { region: "ironlantern", item: "Pressurized Ink", respawn: 40, xp: 10, label: "Pressurized Ink" },
+  };
 
   function spawnPigs() {
     state.pigs = [];
@@ -1578,6 +1683,12 @@ const canvas = document.getElementById("game");
         Stone: state.inventory.Stone,
         Potion: state.inventory.Potion,
         "Slime Core": state.inventory["Slime Core"],
+        Ashglass: state.inventory.Ashglass || 0,
+        "Scrap Coil": state.inventory["Scrap Coil"] || 0,
+        "Heat Resin": state.inventory["Heat Resin"] || 0,
+        "Lantern Filament": state.inventory["Lantern Filament"] || 0,
+        "Cipher Lens": state.inventory["Cipher Lens"] || 0,
+        "Pressurized Ink": state.inventory["Pressurized Ink"] || 0,
       },
       quests: {
         crystal: { status: state.quests.crystal.status, progress: state.quests.crystal.progress },
@@ -1661,6 +1772,9 @@ const canvas = document.getElementById("game");
     state.inventory.Stone = Math.max(0, Math.floor(numberOr(inventory.Stone, 0)));
     state.inventory.Potion = Math.max(0, Math.floor(numberOr(inventory.Potion, 0)));
     state.inventory["Slime Core"] = Math.max(0, Math.floor(numberOr(inventory["Slime Core"], 0)));
+    for (const key of ["Ashglass", "Scrap Coil", "Heat Resin", "Lantern Filament", "Cipher Lens", "Pressurized Ink"]) {
+      state.inventory[key] = Math.max(0, Math.floor(numberOr(inventory[key], 0)));
+    }
 
     applyQuestState("crystal", save.quests?.crystal);
     applyQuestState("slime", save.quests?.slime);
@@ -1682,6 +1796,9 @@ const canvas = document.getElementById("game");
     state.graphics = save.graphics || createInitialGraphicsState();
     state.player.quickUtility = save.player?.quickUtility || state.player.quickUtility;
     syncCombatProfileState();
+    for (const regionId of state.regions.discovered) {
+      ensureRegionMiniBosses(regionId);
+    }
 
     const harvested = new Set(Array.isArray(save.world?.harvestedResourceIds) ? save.world.harvestedResourceIds : []);
     for (const resource of state.resources) {
@@ -1894,27 +2011,115 @@ const canvas = document.getElementById("game");
     }
   }
 
+  const MINI_BOSS_DEFS = {
+    ashfall_scrap_tyrant: { region: "ashfall", label: "Scrap Tyrant", behavior: "tank", baseType: "brute", spawnArea: { minX: 36, minY: 38, maxX: 50, maxY: 50 }, hpMult: 3.2, damageMult: 1.4, rewardGold: 80, rewardResource: { item: "Heat Resin", count: 2 } },
+    ashfall_scorch_engine: { region: "ashfall", label: "Scorch Engine", behavior: "charge", baseType: "charger", spawnArea: { minX: 28, minY: 32, maxX: 42, maxY: 46 }, hpMult: 2.8, damageMult: 1.3, rewardGold: 90, rewardResource: { item: "Scrap Coil", count: 2 } },
+    lantern_overseer: { region: "ironlantern", label: "Lantern Overseer", behavior: "shield", baseType: "shield_brute", spawnArea: { minX: 6, minY: 38, maxX: 22, maxY: 50 }, hpMult: 3.5, damageMult: 1.4, rewardGold: 120, rewardResource: { item: "Cipher Lens", count: 2 } },
+    lantern_iron_chanter: { region: "ironlantern", label: "Iron Chanter", behavior: "control", baseType: "suppressor", spawnArea: { minX: 10, minY: 32, maxX: 24, maxY: 44 }, hpMult: 2.6, damageMult: 1.2, rewardGold: 110, rewardResource: { item: "Pressurized Ink", count: 2 } },
+  };
+
+  function spawnMiniBossById(bossId) {
+    const def = MINI_BOSS_DEFS[bossId];
+    if (!def) return;
+    if (state.regions.miniBosses[bossId]?.defeated) return;
+    if (state.enemies.some((e) => e.miniBossId === bossId && e.alive)) return;
+    const pos = findEmptyCell(worldMap, def.spawnArea.minX, def.spawnArea.minY, def.spawnArea.maxX, def.spawnArea.maxY, (x, y) => !isInHouseLot(x, y));
+    const stats = createEnemyStats(def.baseType, state.player.level);
+    state.enemies.push({
+      id: `miniboss-${bossId}`,
+      miniBossId: bossId,
+      type: stats.type,
+      label: def.label,
+      color: stats.color,
+      behavior: def.behavior,
+      x: pos.x,
+      y: pos.y,
+      hp: Math.round(stats.maxHp * def.hpMult),
+      maxHp: Math.round(stats.maxHp * def.hpMult),
+      speed: stats.speed * 0.95,
+      attackReach: stats.attackReach + 0.2,
+      baseDamage: Math.round(stats.baseDamage * def.damageMult),
+      damageVariance: stats.damageVariance + 2,
+      attackCooldown: 1.0,
+      alive: true,
+      respawn: 0,
+      stagger: 0,
+      flashTimer: 0,
+    });
+    logMsg(`Mini-boss prowling ${REGIONS[def.region]?.name || def.region}: ${def.label}.`);
+  }
+
+  function ensureRegionMiniBosses(regionId) {
+    for (const [bossId, def] of Object.entries(MINI_BOSS_DEFS)) {
+      if (def.region !== regionId) continue;
+      spawnMiniBossById(bossId);
+    }
+  }
+
   function applyDynamicRegionProgression() {
     if (state.player.level >= 4 && !state.regions.discovered.includes("ashfall")) {
       unlockRegion(state.regions, "ashfall");
-      state.quests.ashfall_intro.status = "active";
+      if (state.quests.ashfall_intro && state.quests.ashfall_intro.status === "locked") {
+        state.quests.ashfall_intro.status = "active";
+      }
       logMsg("Region unlocked: Ashfall Basin. Heat haze now distorts the horizon.");
+      ensureRegionMiniBosses("ashfall");
     }
     if (state.player.level >= 7 && !state.regions.discovered.includes("ironlantern")) {
       unlockRegion(state.regions, "ironlantern");
-      state.quests.lantern_probe.status = "active";
+      if (state.quests.lantern_probe && state.quests.lantern_probe.status === "locked") {
+        state.quests.lantern_probe.status = "active";
+      }
       logMsg("Region unlocked: Iron Lantern District. Surveillance pressure is rising.");
+      ensureRegionMiniBosses("ironlantern");
     }
   }
 
   function cycleRegion() {
     const order = ["frontier", "ashfall", "ironlantern"];
     const unlocked = order.filter((regionId) => state.regions.discovered.includes(regionId));
-    if (unlocked.length <= 1) return;
+    if (unlocked.length <= 1) {
+      logMsg("No other regions are unlocked yet.");
+      return;
+    }
     const idx = unlocked.indexOf(state.regions.activeRegion);
     const next = unlocked[(idx + 1) % unlocked.length];
     unlockRegion(state.regions, next);
-    logMsg(`Travelled to region: ${next}.`);
+    const name = REGIONS[next]?.name || next;
+    logMsg(`Travelled to region: ${name}.`);
+  }
+
+  function applySmokeBlind() {
+    let count = 0;
+    for (const enemy of state.enemies) {
+      if (!enemy.alive) continue;
+      const d = Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y);
+      if (d > 6.5) continue;
+      enemy.searchTimer = 3.0;
+      enemy.attackCooldown = Math.max(enemy.attackCooldown || 0, 1.4);
+      enemy.stagger = Math.max(enemy.stagger || 0, 0.6);
+      count += 1;
+    }
+    return count;
+  }
+
+  function applyFlareSlow() {
+    let count = 0;
+    for (const enemy of state.enemies) {
+      if (!enemy.alive) continue;
+      const d = Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y);
+      if (d > 9) continue;
+      enemy.flareSlowTimer = Math.max(enemy.flareSlowTimer || 0, 4.0);
+      count += 1;
+    }
+    state.player.flareRevealTimer = Math.max(state.player.flareRevealTimer || 0, 6.0);
+    return count;
+  }
+
+  function applyTonicHoT() {
+    state.player.tonicTimer = 5.0;
+    state.player.tonicTickAccum = 0;
+    state.player.stamina = Math.min(100, state.player.stamina + 12);
   }
 
   function useQuickUtility() {
@@ -1928,15 +2133,15 @@ const canvas = document.getElementById("game");
     }
     quick.inventory[current] = available - 1;
     if (current === "smoke") {
-      state.player.screenShake = Math.max(0, state.player.screenShake - 0.08);
-      logMsg("Utility used: smoke canister. Enemy pressure briefly drops.");
+      const blinded = applySmokeBlind();
+      logMsg(`Smoke canister popped. ${blinded ? `${blinded} enemies lose your trail.` : "No enemies in range."}`);
     } else if (current === "flare") {
+      const slowed = applyFlareSlow();
       state.weather.lightning = Math.max(state.weather.lightning, 0.35);
-      logMsg("Utility used: flare. Visibility increased.");
+      logMsg(`Flare deployed. ${slowed ? `${slowed} enemies slowed; map reveal active.` : "Map reveal active."}`);
     } else {
-      state.player.hp = Math.min(state.player.maxHp, state.player.hp + 18);
-      state.player.stamina = Math.min(100, state.player.stamina + 26);
-      logMsg("Utility used: tonic. Recovery boosted.");
+      applyTonicHoT();
+      logMsg("Tonic ingested. Health regenerating.");
     }
   }
 
@@ -1950,7 +2155,6 @@ const canvas = document.getElementById("game");
   function performDodgeStep() {
     if (state.mode !== "playing" || state.player.inHouse) return;
     if (state.player.dodgeCooldown > 0 || state.player.stamina < 12) {
-      logMsg("Dodge unavailable.");
       return;
     }
     const heading = state.player.angle;
@@ -1966,7 +2170,6 @@ const canvas = document.getElementById("game");
   function performChargedAttack() {
     if (state.mode !== "playing") return;
     if (state.player.attackCooldown > 0 || state.player.stamina < 24) {
-      logMsg("Too exhausted for charged attack.");
       return;
     }
     const orderKeeper = state.progression.traits.includes("order_keeper");
@@ -2520,6 +2723,26 @@ const canvas = document.getElementById("game");
           logMsg("Archive objective complete. Bring findings back to the town circle.");
         }
         sfx.pickup();
+      } else if (REGION_RESOURCE_MAP[resource.type]) {
+        const def = REGION_RESOURCE_MAP[resource.type];
+        if (state.regions.activeRegion !== def.region) {
+          resource.harvested = false;
+          logMsg(`${def.label} can only be harvested while in ${REGIONS[def.region]?.name || def.region}.`);
+          return;
+        }
+        resource.respawn = def.respawn;
+        state.inventory[def.item] = (state.inventory[def.item] || 0) + 1;
+        grantXp(def.xp);
+        if (state.quests.ashfall_intro && state.quests.ashfall_intro.status === "active" && resource.type === "ashglass") {
+          const q = state.quests.ashfall_intro;
+          q.progress = Math.min(q.need, q.progress + 1);
+          if (q.progress >= q.need) {
+            q.status = "complete";
+            logMsg("Ashfall salvage objective complete. Bring it to the town circle.");
+          }
+        }
+        logMsg(`Harvested ${def.label}.`);
+        sfx.pickup();
       } else {
         resource.respawn = 22;
         state.inventory.Stone += 1;
@@ -2652,12 +2875,32 @@ const canvas = document.getElementById("game");
 
       if (enemy.hp <= 0) {
         enemy.alive = false;
-        enemy.respawn = 22 + Math.random() * 8;
+        const spawnMods = getActiveRegionEventModifiers();
+        enemy.respawn = (22 + Math.random() * 8) / Math.max(0.4, spawnMods.spawnDensityMult);
         state.inventory["Slime Core"] += 1;
         const civicBounty = state.narrative.globalFlags.curfewNormalized ? 3 : 0;
         const truthBonusXp = state.narrative.globalFlags.ledgerPublished ? 4 : 0;
         state.player.gold += 10 + civicBounty;
         grantXp(22 + truthBonusXp);
+
+        if (enemy.miniBossId) {
+          const def = MINI_BOSS_DEFS[enemy.miniBossId];
+          if (def) {
+            if (state.regions.miniBosses[enemy.miniBossId]) state.regions.miniBosses[enemy.miniBossId].defeated = true;
+            state.player.gold += def.rewardGold;
+            state.inventory[def.rewardResource.item] = (state.inventory[def.rewardResource.item] || 0) + def.rewardResource.count;
+            state.progression.upgradePoints += 1;
+            grantXp(120);
+            enemy.respawn = 1e9;
+            logMsg(`Mini-boss defeated: ${def.label}! +${def.rewardGold}g, +${def.rewardResource.count} ${def.rewardResource.item}, +1 upgrade point.`);
+            if (enemy.miniBossId === "ashfall_scrap_tyrant" && state.quests.ashfall_boss?.status === "active") {
+              state.quests.ashfall_boss.status = "complete";
+              state.quests.ashfall_boss.progress = state.quests.ashfall_boss.need;
+              logMsg("Ashfall boss objective complete.");
+            }
+          }
+        }
+
         logMsg(choice([
           `Slime obliterated! +${10 + civicBounty} gold, +${22 + truthBonusXp} XP, +1 Slime Core.`,
           `Splat! One less blob. +${10 + civicBounty} gold, +${22 + truthBonusXp} XP, +1 Core.`,
@@ -3073,15 +3316,6 @@ const canvas = document.getElementById("game");
   function update(dt) {
     state.time += dt;
     state.player.dodgeCooldown = Math.max(0, numberOr(state.player.dodgeCooldown, 0) - dt);
-    if (state.keys.KeyX && state.mode === "playing") performDodgeStep();
-    if (state.keys.KeyG && state.mode === "playing") {
-      state.player.chargedAttackHold = Math.min(1.4, numberOr(state.player.chargedAttackHold, 0) + dt);
-    } else if (numberOr(state.player.chargedAttackHold, 0) > 0.4 && state.mode === "playing") {
-      performChargedAttack();
-      state.player.chargedAttackHold = 0;
-    } else {
-      state.player.chargedAttackHold = 0;
-    }
     rollRegionEvent(state.regions, dt);
     applyDynamicRegionProgression();
     if (state.graphics.autoRecommended) {
@@ -3195,6 +3429,18 @@ const canvas = document.getElementById("game");
       return;
     }
 
+    if ((state.player.tonicTimer || 0) > 0) {
+      state.player.tonicTimer = Math.max(0, state.player.tonicTimer - dt);
+      state.player.tonicTickAccum = (state.player.tonicTickAccum || 0) + dt;
+      while (state.player.tonicTickAccum >= 0.5) {
+        state.player.tonicTickAccum -= 0.5;
+        state.player.hp = Math.min(state.player.maxHp, state.player.hp + 4);
+      }
+    }
+    if ((state.player.flareRevealTimer || 0) > 0) {
+      state.player.flareRevealTimer = Math.max(0, state.player.flareRevealTimer - dt);
+    }
+
     const weatherPursuitMult = 1 - state.weather.rain * 0.18;
     for (const enemy of state.enemies) {
       if (!enemy.alive) {
@@ -3226,6 +3472,8 @@ const canvas = document.getElementById("game");
       if (enemy.stagger > 0) {
         enemy.stagger -= dt;
       }
+      if (enemy.searchTimer > 0) enemy.searchTimer = Math.max(0, enemy.searchTimer - dt);
+      if (enemy.flareSlowTimer > 0) enemy.flareSlowTimer = Math.max(0, enemy.flareSlowTimer - dt);
 
       const dx = player.x - enemy.x;
       const dy = player.y - enemy.y;
@@ -3237,14 +3485,16 @@ const canvas = document.getElementById("game");
         combatProfile.attackRange += 0.35;
       }
 
-      if (d < combatProfile.pursuitRange && enemy.stagger <= 0) {
+      if (d < combatProfile.pursuitRange && enemy.stagger <= 0 && (enemy.searchTimer || 0) <= 0) {
         // Pre-compute inverse distance to avoid division in both calculations
         const invD = 1 / (d + 1e-6);
         const nx = dx * invD;
         const ny = dy * invD;
-        const move = enemy.speed * weatherPursuitMult * dt;
-        const nextX = enemy.x + nx * move;
-        const nextY = enemy.y + ny * move;
+        const behaviorMove = resolveBehaviorMove(enemy, { nx, ny, distance: d, dt });
+        const flareMult = (enemy.flareSlowTimer || 0) > 0 ? 0.5 : 1;
+        const move = enemy.speed * weatherPursuitMult * dt * behaviorMove.speedMult * flareMult;
+        const nextX = enemy.x + behaviorMove.mx * move;
+        const nextY = enemy.y + behaviorMove.my * move;
 
         if (!isBlocking(nextX, enemy.y)) enemy.x = nextX;
         if (!isBlocking(enemy.x, nextY)) enemy.y = nextY;
@@ -4312,6 +4562,18 @@ const canvas = document.getElementById("game");
           sprites.push({ x: resource.x, y: resource.y, color: "#d96cff", label: "Archive", size: 0.78, kind: "resource" });
         } else if (resource.type === "rock") {
           sprites.push({ x: resource.x, y: resource.y, color: "#8f969f", label: "Stone", size: 0.72, kind: "resource" });
+        } else if (resource.type === "ashglass") {
+          sprites.push({ x: resource.x, y: resource.y, color: "#e2a36b", label: "Ashglass", size: 0.6, kind: "resource" });
+        } else if (resource.type === "scrap-coil") {
+          sprites.push({ x: resource.x, y: resource.y, color: "#b89060", label: "Scrap Coil", size: 0.66, kind: "resource" });
+        } else if (resource.type === "heat-resin") {
+          sprites.push({ x: resource.x, y: resource.y, color: "#ff8a4c", label: "Heat Resin", size: 0.58, kind: "resource" });
+        } else if (resource.type === "lantern-filament") {
+          sprites.push({ x: resource.x, y: resource.y, color: "#9bd3ff", label: "Filament", size: 0.6, kind: "resource" });
+        } else if (resource.type === "cipher-lens") {
+          sprites.push({ x: resource.x, y: resource.y, color: "#c8a8ff", label: "Cipher Lens", size: 0.62, kind: "resource" });
+        } else if (resource.type === "pressurized-ink") {
+          sprites.push({ x: resource.x, y: resource.y, color: "#7e8cff", label: "Pressure Ink", size: 0.62, kind: "resource" });
         } else {
           sprites.push({ x: resource.x, y: resource.y, color: "#2d6138", label: "Tree", size: 1.35, kind: "resource" });
         }
@@ -4842,8 +5104,12 @@ const canvas = document.getElementById("game");
       topW - 20,
       "#d4c4a4",
     );
-
+    const eventMods = getActiveRegionEventModifiers();
     let msgY = topY + 54;
+    if (eventMods.banner) {
+      drawClippedText(`Event: ${eventMods.banner}`, topX + 10, topY + 50, topW - 20, "#ffb46d");
+      msgY = topY + 66;
+    }
     const shown = state.msg.slice(0, 2);
     ctx.font = "11px Georgia";
     if (shown.length === 0) {
@@ -4876,6 +5142,37 @@ const canvas = document.getElementById("game");
       ctx.fillStyle = "#ffa0a0";
       ctx.fillText(fitText(t("labels.deathsLine", { deaths: state.player.deaths + 1 }), panelW - 36), canvas.width * 0.5, py + 112);
       ctx.textAlign = "left";
+    }
+
+    /* Skill screen overlay */
+    if (skillScreenOpen && state.mode === "playing") {
+      const sw = Math.min(440, canvas.width - margin * 2);
+      const sh = SKILL_BRANCH_LABELS.length * 64 + 110;
+      const sx = Math.floor((canvas.width - sw) / 2);
+      const sy = Math.floor((canvas.height - sh) / 2);
+      drawSoftPanel(sx, sy, sw, sh, {
+        top: "rgba(20, 22, 36, 0.94)",
+        bottom: "rgba(8, 10, 18, 0.92)",
+        border: "rgba(186, 168, 255, 0.55)",
+      });
+      ctx.font = "bold 20px Georgia";
+      drawClippedText("Skill Tree", sx + 16, sy + 30, sw - 32, "#cdb8ff");
+      ctx.font = "12px Georgia";
+      drawClippedText(`Upgrade points: ${state.progression.upgradePoints}   (T to close)`, sx + 16, sy + 50, sw - 32, "#b9aedf");
+      for (let i = 0; i < SKILL_BRANCH_LABELS.length; i++) {
+        const branch = SKILL_BRANCH_LABELS[i];
+        const ranks = state.progression.skillTree?.[branch.id] || 0;
+        const iy = sy + 70 + i * 64;
+        const selected = i === skillSelection;
+        fillRoundedRect(sx + 8, iy, sw - 16, 56, 7, selected ? "rgba(186, 168, 255, 0.22)" : "rgba(255, 255, 255, 0.05)");
+        if (selected) strokeRoundedRect(sx + 8.5, iy + 0.5, sw - 17, 55, 7, "#cdb8ff", 1);
+        ctx.font = "bold 14px Georgia";
+        drawClippedText(`${branch.label}  ${ranks}/5`, sx + 20, iy + 18, sw - 40, selected ? "#cdb8ff" : "#f3ecd8");
+        ctx.font = "italic 12px Georgia";
+        drawClippedText(branch.desc, sx + 20, iy + 36, sw - 40, "#a09cba");
+      }
+      ctx.font = "10px Georgia";
+      drawClippedText("↑/↓ select   Enter unlock   Esc close", sx + 16, sy + sh - 14, sw - 32, "#9088b0");
     }
 
     /* Shop overlay */
@@ -4974,6 +5271,37 @@ const canvas = document.getElementById("game");
   document.addEventListener("keydown", (event) => {
     state.keys[event.code] = true;
 
+    /* Skill screen controls */
+    if (skillScreenOpen) {
+      if (event.code === "ArrowUp" || event.code === "KeyW") {
+        skillSelection = (skillSelection - 1 + SKILL_BRANCH_LABELS.length) % SKILL_BRANCH_LABELS.length;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "ArrowDown" || event.code === "KeyS") {
+        skillSelection = (skillSelection + 1) % SKILL_BRANCH_LABELS.length;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
+        const branch = SKILL_BRANCH_LABELS[skillSelection].id;
+        if (canUnlockSkill(state.progression, branch)) {
+          unlockSkill(state.progression, branch);
+          logMsg(`Unlocked ${branch} skill rank ${state.progression.skillTree[branch]}.`);
+          sfx.shopBuy();
+        } else {
+          logMsg("Not enough upgrade points or branch maxed.");
+        }
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "Escape" || event.code === "KeyT") {
+        skillScreenOpen = false;
+        event.preventDefault();
+        return;
+      }
+    }
+
     /* Shop controls */
     if (shopOpen) {
       if (event.code === "ArrowUp" || event.code === "KeyW") {
@@ -4988,14 +5316,20 @@ const canvas = document.getElementById("game");
       }
       if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
         const item = shopItems[shopSelection];
+        const mods = getActiveRegionEventModifiers();
+        const adjustedCost = item.cost < 0 ? item.cost : Math.max(1, Math.round(item.cost * mods.priceMult));
         if (item.cost < 0) {
           const result = item.action();
           if (result !== false) sfx.shopBuy();
-        } else if (state.player.gold >= item.cost) {
-          state.player.gold -= item.cost;
-          item.action();
-          sfx.shopBuy();
-          logMsg(`Bought ${t(item.nameKey)}! ${choice(["Money well spent!", "Trader Nyx grins.", "Ka-ching!", "Nyx winks."])}`);
+        } else if (state.player.gold >= adjustedCost) {
+          state.player.gold -= adjustedCost;
+          const result = item.action();
+          if (result === false) {
+            state.player.gold += adjustedCost;
+          } else {
+            sfx.shopBuy();
+            logMsg(`Bought ${t(item.nameKey)} for ${adjustedCost}g! ${choice(["Money well spent!", "Trader Nyx grins.", "Ka-ching!", "Nyx winks."])}`);
+          }
         } else {
           logMsg("Trader Nyx: No gold, no goods. That's business, baby.");
         }
@@ -5065,6 +5399,23 @@ const canvas = document.getElementById("game");
 
     if (event.code === "KeyG") {
       cycleRegion();
+    }
+
+    if (event.code === "KeyT" && state.mode === "playing" && !shopOpen) {
+      skillScreenOpen = !skillScreenOpen;
+      if (skillScreenOpen) logMsg("Skill tree opened.");
+    }
+
+    if (event.code === "KeyJ" && state.mode === "playing") {
+      state.graphics.accessibility.motionReduction = !state.graphics.accessibility.motionReduction;
+      logMsg(`Motion reduction: ${state.graphics.accessibility.motionReduction ? "ON" : "OFF"}.`);
+    }
+
+    if (event.code === "Equal" || event.code === "Minus") {
+      const dir = event.code === "Equal" ? 0.1 : -0.1;
+      const next = (state.graphics.accessibility.fontScale || 1) + dir;
+      state.graphics.accessibility.fontScale = Math.max(0.8, Math.min(1.6, Number(next.toFixed(2))));
+      logMsg(`Font scale: ${state.graphics.accessibility.fontScale.toFixed(2)}x.`);
     }
 
     if (event.code === "KeyX") {

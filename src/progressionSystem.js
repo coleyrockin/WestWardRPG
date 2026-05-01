@@ -51,7 +51,13 @@ export function createInitialProgressionState() {
   };
 }
 
-export function canUnlockSkill(progression, branch, maxPerBranch = 5) {
+export const MAX_SKILLS_PER_BRANCH = 5;
+
+export function listSkillBranches() {
+  return SKILL_BRANCHES.slice();
+}
+
+export function canUnlockSkill(progression, branch, maxPerBranch = MAX_SKILLS_PER_BRANCH) {
   if (!SKILL_BRANCHES.includes(branch)) return false;
   if ((progression.skillTree[branch] || 0) >= maxPerBranch) return false;
   return progression.upgradePoints > 0;
@@ -82,10 +88,8 @@ export function resolveIdeologyTraits(narrativeState) {
   const traits = [];
   for (const trait of Object.values(IDEOLOGY_TRAITS)) {
     const axisValue = narrativeState?.thematicAxes?.[trait.axis] || 0;
-    if (axisValue >= trait.threshold || axisValue <= trait.threshold) {
-      if (trait.threshold >= 0 && axisValue >= trait.threshold) traits.push(trait.id);
-      if (trait.threshold < 0 && axisValue <= trait.threshold) traits.push(trait.id);
-    }
+    if (trait.threshold >= 0 && axisValue >= trait.threshold) traits.push(trait.id);
+    else if (trait.threshold < 0 && axisValue <= trait.threshold) traits.push(trait.id);
   }
   return traits;
 }

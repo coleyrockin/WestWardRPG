@@ -22,10 +22,12 @@ The flagship update adds chapter-driven narrative consequences, faction/NPC reac
 
 - [Why This Project](#why-this-project)
 - [What's New in Flagship Update](#whats-new-in-flagship-update)
+- [Shattered Frontier v3 Expansion](#shattered-frontier-v3-expansion)
 - [Quick Start](#quick-start)
 - [Controls](#controls)
 - [Architecture](#architecture)
 - [Developer Commands](#developer-commands)
+- [Save Format & Migration](#save-format--migration)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [License](#license)
@@ -50,6 +52,21 @@ The flagship update adds chapter-driven narrative consequences, faction/NPC reac
 - **Visual profile pipeline** (chapter/weather-aware fog, shimmer, vignette) with runtime quality toggle.
 - **Save migration to v2** with backward compatibility for v1 payloads.
 - **Expanded test coverage** for decisions, combat loadouts, archetype behavior, and quest definitions.
+
+## Shattered Frontier v3 Expansion
+
+The v3 expansion layers progression and biome systems on top of the flagship update:
+
+- **Two new regions** with distinct weather pools and hazards:
+  - *Ashfall Basin* — sandstorms, heatwaves, scrap-tier resources (`Ashglass`, `Scrap Coil`, `Heat Resin`).
+  - *Iron Lantern District* — neon rain, surveillance pressure, signal-tier resources (`Lantern Filament`, `Cipher Lens`, `Pressurized Ink`).
+- **Region events** (`patrol_crackdown`, `market_crash`, `civic_unrest`) that ramp severity over time and decay between visits.
+- **Progression system** with three skill branches (`survival`, `combat`, `influence`), tiered weapons (`Common` → `Refined` → `Relic`), and stackable armor modifiers.
+- **Ideology traits** unlocked by extreme thematic-axis values (`freedom_strider`, `order_keeper`, `truthseeker`, `commons_guard`).
+- **Quick utility slot** with three consumables (`smoke`, `flare`, `tonic`) bound to number keys.
+- **Dodge step + charged attack** layered onto existing combat loop with stamina costs and trait-aware modifiers.
+- **Graphics presets** (`low` / `balanced` / `high`) with auto-detection from screen resolution and device memory, plus accessibility toggles for hit-marker strength, camera shake, and high contrast.
+- **Save format v3** — automatic migration from v1/v2, including new progression, region, graphics, and quest fields.
 
 ## Quick Start
 
@@ -84,7 +101,13 @@ Then open [http://localhost:5183](http://localhost:5183).
 - Save / Load: `K` / `L`
 - Recover after defeat: `R`
 - Cycle visual quality: `V`
+- Cycle graphics preset: `[` / `]`
 - Cycle combat stance: `Z`
+- Travel between unlocked regions: `G`
+- Dodge step: `X`
+- Charged attack: `B`
+- Quick utility slot select: `1` (smoke) / `2` (flare) / `3` (tonic)
+- Use quick utility: `U`
 
 ## Architecture
 
@@ -99,7 +122,11 @@ WestWardRPG/
 │   ├── combatLoadout.js     # combat doctrines, perks, stance effects
 │   ├── enemyArchetypes.js   # enemy families and combat profiles
 │   ├── questDefinitions.js  # data-driven quest metadata/state helpers
-│   ├── visualProfile.js     # atmosphere/quality blending
+│   ├── visualProfile.js     # atmosphere/quality + biome grading
+│   ├── progressionSystem.js # skill branches, weapon tiers, armor mods, traits
+│   ├── regionSystem.js      # regions, weather pools, region events
+│   ├── graphicsSettings.js  # presets, auto-detect, accessibility
+│   ├── saveMigration.js     # v1/v2 -> v3 save migration
 │   └── storyContent.js      # flagship dialogue and narrative flavor text
 ├── atmosphere.ts            # typed atmosphere model source
 ├── atmosphere.js            # browser-consumable atmosphere build
@@ -123,6 +150,18 @@ npm run test:coverage
 npm run test:smoke
 npm run qa
 ```
+
+## Save Format & Migration
+
+Saves live in `localStorage` under the `westward.save.v1` key. The on-disk schema version field tracks compatibility:
+
+| Version | Adds                                                                     |
+| ------- | ------------------------------------------------------------------------ |
+| `1`     | Original flagship payload (player, inventory, quests, house, world).     |
+| `2`     | Narrative state (chapters, axes, decisions, NPC reactions).              |
+| `3`     | Progression, regions, graphics, quick utility, four expansion quests.    |
+
+`migrateSaveToV3` upgrades v1/v2 payloads on load — old saves remain playable. Unknown or malformed payloads are rejected silently and fall back to a fresh world.
 
 ## Troubleshooting
 

@@ -3,6 +3,7 @@ import {
   createInitialRegionState,
   unlockRegion,
   rollRegionEvent,
+  resolveRegionEventModifiers,
 } from "../src/regionSystem.js";
 
 describe("regionSystem", () => {
@@ -27,5 +28,32 @@ describe("regionSystem", () => {
     expect(events.patrol_crackdown.severity).toBeGreaterThanOrEqual(1);
     expect(events.market_crash.severity).toBeGreaterThanOrEqual(1);
     expect(events.civic_unrest.severity).toBeGreaterThanOrEqual(1);
+  });
+
+  it("resolves no modifiers when no events are active", () => {
+    const state = createInitialRegionState();
+    const mods = resolveRegionEventModifiers(state.events);
+    expect(mods.priceMult).toBe(1);
+    expect(mods.spawnDensityMult).toBe(1);
+    expect(mods.banner).toBeNull();
+  });
+
+  it("market crash reduces prices, civic unrest raises spawn density", () => {
+    const events = {
+      market_crash: { severity: 2, timer: 5 },
+      civic_unrest: { severity: 1, timer: 5 },
+      patrol_crackdown: { severity: 0, timer: 0 },
+    };
+    const mods = resolveRegionEventModifiers(events);
+    expect(mods.priceMult).toBeLessThan(1);
+    expect(mods.spawnDensityMult).toBeGreaterThan(1);
+    expect(mods.banner).toContain("Market Crash");
+    expect(mods.banner).toContain("Civic Unrest");
+  });
+
+  it("handles missing events object safely", () => {
+    const mods = resolveRegionEventModifiers(undefined);
+    expect(mods.priceMult).toBe(1);
+    expect(mods.banner).toBeNull();
   });
 });

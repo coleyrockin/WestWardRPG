@@ -35,6 +35,8 @@ export function resolveRecommendedPreset(metrics = {}) {
   return "balanced";
 }
 
+export const COLORBLIND_MODES = ["none", "deuteranopia", "protanopia", "tritanopia"];
+
 export function createInitialGraphicsState() {
   return {
     preset: "balanced",
@@ -43,6 +45,9 @@ export function createInitialGraphicsState() {
       highContrast: false,
       hitMarkerStrength: 1,
       cameraShake: 1,
+      fontScale: 1,
+      motionReduction: false,
+      colorblindMode: "none",
     },
   };
 }
@@ -53,6 +58,25 @@ export function applyGraphicsAccessibility(strengths, accessibility) {
     next.contrastBoost = (next.contrastBoost || 0) + 0.2;
   }
   next.hitMarkerStrength = accessibility.hitMarkerStrength ?? 1;
-  next.cameraShake = accessibility.cameraShake ?? 1;
+  next.cameraShake = accessibility.motionReduction ? 0 : (accessibility.cameraShake ?? 1);
+  next.fontScale = clampFontScale(accessibility.fontScale);
+  next.motionReduction = !!accessibility.motionReduction;
+  next.colorblindMode = COLORBLIND_MODES.includes(accessibility.colorblindMode) ? accessibility.colorblindMode : "none";
   return next;
+}
+
+function clampFontScale(value) {
+  const v = typeof value === "number" && isFinite(value) ? value : 1;
+  return Math.max(0.8, Math.min(1.6, v));
+}
+
+const COLORBLIND_PALETTES = {
+  none: null,
+  deuteranopia: { friend: "#6FA8FF", foe: "#FFB347", neutral: "#F5E0A8" },
+  protanopia: { friend: "#79B3FF", foe: "#F2A65A", neutral: "#F0DCA0" },
+  tritanopia: { friend: "#69D3D6", foe: "#F58A8A", neutral: "#F4E1B5" },
+};
+
+export function getColorblindPalette(mode) {
+  return COLORBLIND_PALETTES[mode] || null;
 }

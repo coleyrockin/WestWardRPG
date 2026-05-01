@@ -4,6 +4,8 @@ import {
   createEnemyStats,
   createEnemyCombatProfile,
   listEnemyArchetypes,
+  resolveBehaviorMove,
+  getBehaviorTuning,
 } from "../src/enemyArchetypes.js";
 
 describe("enemyArchetypes", () => {
@@ -35,5 +37,40 @@ describe("enemyArchetypes", () => {
     const profile = createEnemyCombatProfile(brute, 6);
     expect(profile.attackRange).toBeGreaterThan(1);
     expect(profile.cooldownFactor).toBeGreaterThan(1);
+  });
+
+  it("ranged behavior kites away when player is too close", () => {
+    const enemy: any = { behavior: "ranged" };
+    const move = resolveBehaviorMove(enemy, { nx: 1, ny: 0, distance: 1, dt: 0.016 });
+    expect(move.mx).toBeLessThan(0);
+  });
+
+  it("flank behavior produces sideways motion", () => {
+    const enemy: any = { behavior: "flank" };
+    const move = resolveBehaviorMove(enemy, { nx: 1, ny: 0, distance: 4, dt: 0.016 });
+    expect(Math.abs(move.my)).toBeGreaterThan(0.3);
+  });
+
+  it("charge behavior winds up before dashing", () => {
+    const enemy: any = { behavior: "charge" };
+    const ctx = { nx: 1, ny: 0, distance: 4, dt: 0.1 };
+    const first = resolveBehaviorMove(enemy, ctx);
+    expect(first.speedMult).toBeLessThan(1);
+    for (let i = 0; i < 8; i++) resolveBehaviorMove(enemy, ctx);
+    const dashing = resolveBehaviorMove(enemy, ctx);
+    expect(dashing.speedMult).toBeGreaterThan(1.2);
+  });
+
+  it("tank behavior is slower than baseline", () => {
+    expect(getBehaviorTuning("tank").speedMult).toBeLessThan(1);
+    expect(getBehaviorTuning("balanced").speedMult).toBe(1);
+  });
+
+  it("falls back to balanced for unknown behaviors", () => {
+    const enemy: any = { behavior: "unknown_behavior_label" };
+    const move = resolveBehaviorMove(enemy, { nx: 1, ny: 0, distance: 4, dt: 0.016 });
+    expect(move.mx).toBeCloseTo(1);
+    expect(move.my).toBeCloseTo(0);
+    expect(move.speedMult).toBe(1);
   });
 });

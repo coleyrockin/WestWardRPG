@@ -54,6 +54,31 @@ export function unlockRegion(regionState, regionId) {
   return true;
 }
 
+export function resolveRegionEventModifiers(events) {
+  let priceMult = 1;
+  let spawnDensityMult = 1;
+  const active = [];
+  if (!events) return { priceMult, spawnDensityMult, banner: null };
+  if ((events.patrol_crackdown?.severity || 0) > 0) {
+    const s = events.patrol_crackdown.severity;
+    spawnDensityMult *= 1 + s * 0.18;
+    priceMult *= 1 + s * 0.04;
+    active.push(`Patrol Crackdown (sev ${s})`);
+  }
+  if ((events.market_crash?.severity || 0) > 0) {
+    const s = events.market_crash.severity;
+    priceMult *= Math.max(0.55, 1 - s * 0.12);
+    active.push(`Market Crash (sev ${s})`);
+  }
+  if ((events.civic_unrest?.severity || 0) > 0) {
+    const s = events.civic_unrest.severity;
+    spawnDensityMult *= 1 + s * 0.1;
+    priceMult *= 1 + s * 0.07;
+    active.push(`Civic Unrest (sev ${s})`);
+  }
+  return { priceMult, spawnDensityMult, banner: active.length ? active.join(" · ") : null };
+}
+
 export function rollRegionEvent(regionState, dt, rng = Math.random) {
   const events = regionState.events;
   for (const eventState of Object.values(events)) {

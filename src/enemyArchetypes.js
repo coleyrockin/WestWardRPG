@@ -102,6 +102,70 @@ export function createEnemyStats(type, level) {
   };
 }
 
+export const BEHAVIOR_TUNING = {
+  charge:  { kiteDistance: 0,    strafeWeight: 0,    speedMult: 1.0,  windupTime: 0.55, dashTime: 0.4, dashMult: 1.85 },
+  ranged:  { kiteDistance: 3.4,  strafeWeight: 0.25, speedMult: 1.0,  windupTime: 0,    dashTime: 0,   dashMult: 1.0  },
+  control: { kiteDistance: 3.0,  strafeWeight: 0.15, speedMult: 1.0,  windupTime: 0,    dashTime: 0,   dashMult: 1.0  },
+  flank:   { kiteDistance: 1.4,  strafeWeight: 0.7,  speedMult: 1.05, windupTime: 0,    dashTime: 0,   dashMult: 1.0  },
+  tank:    { kiteDistance: 0,    strafeWeight: 0,    speedMult: 0.92, windupTime: 0,    dashTime: 0,   dashMult: 1.0  },
+  shield:  { kiteDistance: 0,    strafeWeight: 0,    speedMult: 0.9,  windupTime: 0,    dashTime: 0,   dashMult: 1.0  },
+  balanced:{ kiteDistance: 0,    strafeWeight: 0,    speedMult: 1.0,  windupTime: 0,    dashTime: 0,   dashMult: 1.0  },
+};
+
+export function getBehaviorTuning(behavior) {
+  return BEHAVIOR_TUNING[behavior] || BEHAVIOR_TUNING.balanced;
+}
+
+export function resolveBehaviorMove(enemy, ctx) {
+  const tuning = getBehaviorTuning(enemy.behavior);
+  const { nx, ny, distance, dt } = ctx;
+  let mx = nx;
+  let my = ny;
+  let speedMult = tuning.speedMult;
+
+  if (tuning.kiteDistance > 0) {
+    const inner = tuning.kiteDistance - 0.6;
+    const outer = tuning.kiteDistance + 0.6;
+    if (distance < inner) {
+      mx = -nx;
+      my = -ny;
+    } else if (distance < outer) {
+      mx = 0;
+      my = 0;
+    }
+  }
+
+  if (tuning.strafeWeight > 0) {
+    const sign = enemy._strafeSign || (enemy._strafeSign = Math.random() < 0.5 ? -1 : 1);
+    if (Math.random() < dt * 0.4) enemy._strafeSign = -sign;
+    const strafeX = -ny * sign;
+    const strafeY = nx * sign;
+    const w = tuning.strafeWeight;
+    mx = mx * (1 - w) + strafeX * w;
+    my = my * (1 - w) + strafeY * w;
+  }
+
+  if (tuning.windupTime > 0) {
+    enemy._chargeCd = Math.max(0, (enemy._chargeCd || 0) - dt);
+    if (!(enemy._dashTimer > 0) && !(enemy._windupTimer > 0) && enemy._chargeCd <= 0 && distance < 5) {
+      enemy._windupTimer = tuning.windupTime;
+      enemy._chargeCd = 2.6;
+    }
+    if (enemy._dashTimer > 0) {
+      enemy._dashTimer -= dt;
+      speedMult *= tuning.dashMult;
+    } else if (enemy._windupTimer > 0) {
+      enemy._windupTimer -= dt;
+      speedMult *= 0.25;
+      if (enemy._windupTimer <= 0) {
+        enemy._dashTimer = tuning.dashTime;
+      }
+    }
+  }
+
+  return { mx, my, speedMult };
+}
+
 export function createEnemyCombatProfile(enemy, playerLevel) {
   const archetype = ENEMY_ARCHETYPES[enemy.type] || ENEMY_ARCHETYPES.slime;
   const aggression =
