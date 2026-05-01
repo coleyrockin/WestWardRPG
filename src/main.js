@@ -1239,6 +1239,8 @@ const canvas = document.getElementById("game");
       swingDuration: 0.3,
       hitPulse: 0,
       cameraKick: 0,
+      screenShake: 0,
+      weaponSway: 0,
       deaths: 0,
       loadout: {
         weapon: "Frontier Saber",
@@ -1348,6 +1350,7 @@ const canvas = document.getElementById("game");
     pigJokeCooldown: 0,
     pigStampedeTimer: 0,
     narrativePulseTimer: 7,
+    floatingTexts: [],
     chest: { x: 13.4, y: 7.2, opened: false, respawn: 0 },
     house: {
       unlocked: false,
@@ -1399,6 +1402,7 @@ const canvas = document.getElementById("game");
         alive: true,
         respawn: 0,
         stagger: 0,
+        flashTimer: 0,
       });
     }
   }
@@ -2467,6 +2471,7 @@ const canvas = document.getElementById("game");
       enemy.hp -= damage;
       enemy.attackCooldown += 0.45;
       enemy.stagger = 0.2 + state.player.comboStep * 0.05;
+      enemy.flashTimer = 0.1;
 
       const nx = dx / (d + 1e-6);
       const ny = dy / (d + 1e-6);
@@ -2476,6 +2481,15 @@ const canvas = document.getElementById("game");
       if (!isBlocking(enemy.x, pushY)) enemy.y = pushY;
 
       hitCount += 1;
+      const isKill = enemy.hp <= 0;
+      state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: isKill ? "SLAIN" : `-${damage}`, life: 0.72, maxLife: 0.72, color: isKill ? "#ff5555" : damage >= 24 ? "#ff9f3a" : "#ffe84e" });
+
+      const eDx = enemy.x - state.player.x;
+      const eDy = enemy.y - state.player.y;
+      const eAng = normalizeAngle(Math.atan2(eDy, eDx) - state.player.angle);
+      const eSx = clamp(((eAng + FOV / 2) / FOV) * canvas.width, 0, canvas.width);
+      const eSy = canvas.height * 0.42;
+      spawnParticles(eSx, eSy, 5, enemy.color || "#6be873", 2.5, 0.4);
 
       if (enemy.hp <= 0) {
         enemy.alive = false;
@@ -2492,7 +2506,7 @@ const canvas = document.getElementById("game");
           `Another slime bites the dust(ward). +${10 + civicBounty}g, +${22 + truthBonusXp} XP, +1 Core.`,
         ]));
         sfx.enemyDie();
-        spawnParticles(canvas.width / 2, canvas.height * 0.4, 10, "#6be873", 3, 0.8);
+        spawnParticles(eSx, eSy, 14, enemy.color || "#6be873", 3.5, 0.85);
 
         const quest = state.quests.slime;
         if (quest.status === "active") {
@@ -2514,6 +2528,7 @@ const canvas = document.getElementById("game");
       sfx.miss();
     } else {
       state.player.hitPulse = 0.24;
+      state.player.screenShake = clamp(state.player.screenShake + 0.1 * hitCount, 0, 0.45);
       state.player.cameraKick = clamp(state.player.cameraKick + hitCount * 0.12, 0, 1);
       if (hitCount > 1) logMsg("Cleave strike landed on multiple targets.");
     }
@@ -2559,6 +2574,9 @@ const canvas = document.getElementById("game");
     state.player.swingTimer = 0;
     state.player.cameraKick = 0;
     state.player.hitPulse = 0;
+    state.player.screenShake = 0;
+    state.player.weaponSway = 0;
+    state.floatingTexts = [];
     state.player.inHouse = false;
     state.player.blocking = false;
     state.player.stamina = 100;
@@ -2887,6 +2905,15 @@ const canvas = document.getElementById("game");
     player.swingTimer = Math.max(0, player.swingTimer - dt);
     player.hitPulse = Math.max(0, player.hitPulse - dt * 2.4);
     player.cameraKick = Math.max(0, player.cameraKick - dt * 1.8);
+    player.screenShake = Math.max(0, player.screenShake - dt * 7);
+    const strafeDir = (state.keys.KeyD ? 1 : 0) - (state.keys.KeyA ? 1 : 0);
+    player.weaponSway = lerp(player.weaponSway, strafeDir * -20, Math.min(1, dt * 9));
+    for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+      const ft = state.floatingTexts[i];
+      ft.life -= dt;
+      ft.wy -= 0.55 * dt;
+      if (ft.life <= 0) state.floatingTexts.splice(i, 1);
+    }
     state.pigJokeCooldown = Math.max(0, state.pigJokeCooldown - dt);
     updateWeather(dt);
 
@@ -2989,6 +3016,7 @@ const canvas = document.getElementById("game");
         continue;
       }
 
+      if (enemy.flashTimer > 0) enemy.flashTimer = Math.max(0, enemy.flashTimer - dt);
       if (enemy.stagger > 0) {
         enemy.stagger -= dt;
       }
@@ -3040,6 +3068,7 @@ const canvas = document.getElementById("game");
             player.hp -= damage;
             player.hitPulse = Math.max(player.hitPulse, 0.16);
             player.cameraKick = clamp(player.cameraKick + 0.18, 0, 1);
+            player.screenShake = clamp(player.screenShake + 0.6, 0, 1);
             logMsg(`A slime strikes for ${damage}. ${choice(["Ow!", "That stings!", "Gross AND painful!", "It's so slimy!"])}`);
             sfx.playerHurt();
 
@@ -3753,6 +3782,10 @@ const canvas = document.getElementById("game");
     ctx.shadowBlur = 0;
     ctx.fillStyle = `rgba(0, 0, 0, ${0.18 * (1 - lightFactor + 0.24)})`;
     ctx.fillRect(0, 0, spriteWidth, spriteHeight);
+    if (sprite.flashTimer > 0) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${clamp(sprite.flashTimer / 0.1, 0, 1) * 0.72})`;
+      ctx.fillRect(0, 0, spriteWidth, spriteHeight);
+    }
     ctx.restore();
   }
 
@@ -3764,7 +3797,7 @@ const canvas = document.getElementById("game");
     const swingT = p.swingTimer > 0 ? 1 - p.swingTimer / p.swingDuration : 0;
     const eased = easeOutCubic(swingT);
 
-    let x = canvas.width * 0.74 + idleBob;
+    let x = canvas.width * 0.74 + idleBob + p.weaponSway;
     let y = canvas.height * 0.86 + Math.abs(idleBob) * 0.45;
     let rot = -0.28;
 
@@ -3941,7 +3974,10 @@ const canvas = document.getElementById("game");
     const baseHorizon = drawSkyAndGround(width, height, dayForMood, visualMood);
     const bobOffset = Math.sin(state.player.walkBob * 2.2) * (state.player.inHouse ? 1.2 : 2.2);
     const hitJitter = Math.sin(state.time * 120) * state.player.hitPulse * 5;
-    const horizon = clamp(baseHorizon + bobOffset + hitJitter, height * 0.38, height * 0.66);
+    const shakeAmt = state.player.screenShake;
+    const shakeX = shakeAmt > 0 ? Math.sin(state.time * 89 + 1.2) * shakeAmt * 14 : 0;
+    const shakeY = shakeAmt > 0 ? Math.cos(state.time * 73) * shakeAmt * 9 : 0;
+    const horizon = clamp(baseHorizon + bobOffset + hitJitter + shakeY, height * 0.38, height * 0.66);
     drawGroundDetails(horizon, width, height, visualMood);
 
     const depth = new Float32Array(width);
@@ -4037,6 +4073,7 @@ const canvas = document.getElementById("game");
           kind: "enemy",
           hp: enemy.hp,
           maxHp: enemy.maxHp,
+          flashTimer: enemy.flashTimer,
         });
       }
 
@@ -4094,7 +4131,7 @@ const canvas = document.getElementById("game");
             sprite.kind === "enemy" ? height * 0.5 : height * 0.7;
       const spriteWidth = clamp(visualScale * widthScale, 6, width * 0.34);
       const spriteHeight = clamp(visualScale, 8, maxHeight);
-      const left = Math.floor(sprite.sx - spriteWidth / 2);
+      const left = Math.floor(sprite.sx - spriteWidth / 2 + shakeX);
       const top = Math.floor(horizon - spriteHeight * 0.67);
 
       const depthIdx = Math.min(Math.floor(sprite.sx), width - 1);
@@ -4116,6 +4153,38 @@ const canvas = document.getElementById("game");
         ctx.font = "bold 11px Georgia";
         drawPillLabel(fitText(sprite.label, 116), left + spriteWidth / 2, top - 10);
       }
+    }
+
+    if (state.floatingTexts.length > 0) {
+      const MAX_RAY_DIST_SQ_FT = MAX_RAY_DIST * MAX_RAY_DIST;
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.shadowColor = "rgba(0,0,0,0.85)";
+      ctx.shadowBlur = 5;
+      for (const ft of state.floatingTexts) {
+        const ftDx = ft.wx - state.player.x;
+        const ftDy = ft.wy - state.player.y;
+        const ftDistSq = ftDx * ftDx + ftDy * ftDy;
+        if (ftDistSq < 0.04 || ftDistSq > MAX_RAY_DIST_SQ_FT) continue;
+        const ftAng = normalizeAngle(Math.atan2(ftDy, ftDx) - state.player.angle);
+        if (Math.abs(ftAng) > FOV * 0.6) continue;
+        const ftD = Math.sqrt(ftDistSq);
+        const ftSx = ((ftAng + FOV / 2) / FOV) * width + shakeX;
+        const rise = (1 - ft.life / ft.maxLife) * 40;
+        const ftSy = horizon - (height / (ftD + 0.01)) * 0.44 - rise;
+        const ftDepthIdx = clamp(Math.floor(ftSx), 0, width - 1);
+        if (ftD > depth[ftDepthIdx] + 0.3) continue;
+        const alpha = Math.min(1, ft.life / ft.maxLife * 2.5);
+        const fontSize = clamp(height / (ftD + 0.01) * 0.2, 11, 26);
+        ctx.font = `bold ${fontSize}px Georgia`;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, ftSx, ftSy);
+      }
+      ctx.globalAlpha = 1;
+      ctx.textAlign = "left";
+      ctx.shadowBlur = 0;
+      ctx.restore();
     }
 
     if (state.mode !== "menu") {
@@ -4143,6 +4212,26 @@ const canvas = document.getElementById("game");
       ctx.arc(cx, cy, state.player.blocking ? 13 : 8, 0, TAU);
       ctx.strokeStyle = state.player.blocking ? "rgba(126, 220, 255, 0.58)" : "rgba(255, 255, 255, 0.26)";
       ctx.stroke();
+
+      if (state.player.comboWindow > 0) {
+        const pipColors = ["#ffe84e", "#ff9f3a", "#ff5555"];
+        const pipR = 4;
+        const pipSpacing = 11;
+        const totalW = 3 * pipSpacing - (pipSpacing - pipR * 2);
+        let px = cx - totalW / 2 + pipR;
+        for (let i = 0; i < 3; i++) {
+          const filled = i < state.player.comboStep;
+          ctx.beginPath();
+          ctx.arc(px, cy + 22, pipR, 0, TAU);
+          ctx.fillStyle = filled ? pipColors[state.player.comboStep - 1] : "rgba(255,255,255,0.18)";
+          ctx.shadowColor = filled ? pipColors[state.player.comboStep - 1] : "transparent";
+          ctx.shadowBlur = filled ? 8 : 0;
+          ctx.fill();
+          px += pipSpacing;
+        }
+        ctx.shadowBlur = 0;
+      }
+
       ctx.restore();
 
       if (state.player.hitPulse > 0) {
@@ -4150,6 +4239,16 @@ const canvas = document.getElementById("game");
         flash.addColorStop(0, `rgba(255, 132, 132, ${state.player.hitPulse * 0.28})`);
         flash.addColorStop(1, "rgba(255,132,132,0)");
         ctx.fillStyle = flash;
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      if (state.player.hurtCooldown > 0) {
+        const hurtT = clamp(state.player.hurtCooldown / 0.33, 0, 1);
+        const hurtVig = ctx.createRadialGradient(width * 0.5, height * 0.5, width * 0.14, width * 0.5, height * 0.5, width * 0.72);
+        hurtVig.addColorStop(0, `rgba(190, 0, 0, ${hurtT * 0.06})`);
+        hurtVig.addColorStop(0.55, `rgba(210, 0, 0, ${hurtT * 0.1})`);
+        hurtVig.addColorStop(1, `rgba(230, 10, 10, ${hurtT * 0.58})`);
+        ctx.fillStyle = hurtVig;
         ctx.fillRect(0, 0, width, height);
       }
     }
