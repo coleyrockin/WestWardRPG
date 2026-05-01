@@ -2,6 +2,7 @@ import { createInitialNarrativeState } from "./decisionEngine.js";
 import { createInitialQuestState } from "./questDefinitions.js";
 import { createInitialProgressionState } from "./progressionSystem.js";
 import { createInitialRegionState } from "./regionSystem.js";
+import { createInitialGraphicsState } from "./graphicsSettings.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -22,6 +23,7 @@ export function migrateSaveToV3(save) {
   if (save.version !== 2 && save.version !== 1) return null;
 
   const questDefaults = createInitialQuestState();
+  const graphicsDefaults = createInitialGraphicsState();
   const base = {
     version: 3,
     savedAt: Number.isFinite(save.savedAt) ? save.savedAt : Date.now(),
@@ -53,16 +55,18 @@ export function migrateSaveToV3(save) {
     showMap: typeof save.showMap === "boolean" ? save.showMap : true,
     progression: clone(save.progression || createInitialProgressionState()),
     regions: clone(save.regions || createInitialRegionState()),
-    graphics: clone(save.graphics || {
-      quality: "balanced",
-      preset: "balanced",
+    graphics: {
+      ...clone(graphicsDefaults),
+      ...(save.graphics || {}),
       accessibility: {
-        highContrast: false,
-        hitMarkerStrength: 1,
-        cameraShake: 1,
+        ...clone(graphicsDefaults.accessibility),
+        ...(save.graphics?.accessibility || {}),
       },
-      autoRecommended: true,
-    }),
+      performance: {
+        ...clone(graphicsDefaults.performance),
+        ...(save.graphics?.performance || {}),
+      },
+    },
   };
 
   if (save.version === 1) {

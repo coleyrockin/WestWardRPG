@@ -15,6 +15,7 @@ describe("saveMigration", () => {
     expect(migrated?.progression?.skillTree?.survival).toBe(0);
     expect(migrated?.regions?.activeRegion).toBe("frontier");
     expect(migrated?.graphics?.preset).toBe("balanced");
+    expect(migrated?.graphics?.performance?.gradientCache).toBe(false);
   });
 
   it("preserves v3 saves untouched", () => {

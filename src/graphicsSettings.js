@@ -41,6 +41,9 @@ export function createInitialGraphicsState() {
   return {
     preset: "balanced",
     autoRecommended: true,
+    performance: {
+      gradientCache: false,
+    },
     accessibility: {
       highContrast: false,
       hitMarkerStrength: 1,
@@ -54,14 +57,15 @@ export function createInitialGraphicsState() {
 
 export function applyGraphicsAccessibility(strengths, accessibility) {
   const next = { ...strengths };
-  if (accessibility.highContrast) {
+  const safeAccessibility = accessibility || {};
+  if (safeAccessibility.highContrast) {
     next.contrastBoost = (next.contrastBoost || 0) + 0.2;
   }
-  next.hitMarkerStrength = accessibility.hitMarkerStrength ?? 1;
-  next.cameraShake = accessibility.motionReduction ? 0 : (accessibility.cameraShake ?? 1);
-  next.fontScale = clampFontScale(accessibility.fontScale);
-  next.motionReduction = !!accessibility.motionReduction;
-  next.colorblindMode = COLORBLIND_MODES.includes(accessibility.colorblindMode) ? accessibility.colorblindMode : "none";
+  next.hitMarkerStrength = safeAccessibility.hitMarkerStrength ?? 1;
+  next.cameraShake = safeAccessibility.motionReduction ? 0 : (safeAccessibility.cameraShake ?? 1);
+  next.fontScale = clampFontScale(safeAccessibility.fontScale);
+  next.motionReduction = !!safeAccessibility.motionReduction;
+  next.colorblindMode = COLORBLIND_MODES.includes(safeAccessibility.colorblindMode) ? safeAccessibility.colorblindMode : "none";
   return next;
 }
 

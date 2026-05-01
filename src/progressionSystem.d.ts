@@ -1,0 +1,12 @@
+export const WEAPON_TIERS: string[];
+export const ARMOR_MODIFIERS: Record<string, any>;
+export const IDEOLOGY_TRAITS: Record<string, any>;
+export const MAX_SKILLS_PER_BRANCH: number;
+export function createInitialProgressionState(): any;
+export function listSkillBranches(): string[];
+export function canUnlockSkill(progression: any, branch: string, maxPerBranch?: number): boolean;
+export function unlockSkill(progression: any, branch: string): boolean;
+export function upgradeWeaponTier(progression: any): boolean;
+export function addArmorModifier(progression: any, modifierId: string): boolean;
+export function resolveIdeologyTraits(narrativeState: any): string[];
+export function buildProgressionModifiers(progression: any): any;

@@ -970,12 +970,40 @@ const canvas = document.getElementById("game");
     },
   ];
   let shopSelection = 0;
+  let latestParticleMultiplier = 1;
+  const gradientCacheStore = new Map();
+
+  function gradientBucket(value, bucketCount = 12) {
+    const clamped = clamp(numberOr(value, 0), 0, 1);
+    return Math.round(clamped * bucketCount) / bucketCount;
+  }
+
+  function isGradientCacheEnabled() {
+    return Boolean(state?.graphics?.performance?.gradientCache);
+  }
+
+  function clearGradientCache() {
+    gradientCacheStore.clear();
+  }
+
+  function getCachedGradient(key, buildFn, enabled) {
+    if (!enabled) return buildFn();
+    const cached = gradientCacheStore.get(key);
+    if (cached) return cached;
+    const created = buildFn();
+    gradientCacheStore.set(key, created);
+    return created;
+  }
 
   /* ─── Particle System ─── */
   const particles = [];
 
-  function spawnParticles(x, y, count, color, speed, life) {
+  function spawnParticles(x, y, count, color, speed, life, options = {}) {
+    const decorative = Boolean(options.decorative);
+    const spawnChance = decorative ? clamp(latestParticleMultiplier, 0, 1) : 1;
+    if (spawnChance <= 0) return;
     for (let i = 0; i < count; i++) {
+      if (spawnChance < 1 && Math.random() > spawnChance) continue;
       particles.push({
         x, y,
         vx: (Math.random() - 0.5) * (speed || 2),
@@ -1793,7 +1821,19 @@ const canvas = document.getElementById("game");
     state.narrative = migrateNarrativeState(save);
     state.progression = save.progression || createInitialProgressionState();
     state.regions = save.regions || createInitialRegionState();
-    state.graphics = save.graphics || createInitialGraphicsState();
+    const graphicsDefaults = createInitialGraphicsState();
+    state.graphics = {
+      ...graphicsDefaults,
+      ...(save.graphics || {}),
+      accessibility: {
+        ...graphicsDefaults.accessibility,
+        ...(save.graphics?.accessibility || {}),
+      },
+      performance: {
+        ...graphicsDefaults.performance,
+        ...(save.graphics?.performance || {}),
+      },
+    };
     state.player.quickUtility = save.player?.quickUtility || state.player.quickUtility;
     syncCombatProfileState();
     for (const regionId of state.regions.discovered) {
@@ -2001,7 +2041,7 @@ const canvas = document.getElementById("game");
       state.player.stamina = 100;
       logMsg(`Level up! You reached level ${state.player.level}. The valley trembles!`);
       sfx.levelUp();
-      spawnParticles(canvas.width / 2, canvas.height / 2, 20, "#ffd700", 4, 1.5);
+      spawnParticles(canvas.width / 2, canvas.height / 2, 20, "#ffd700", 4, 1.5, { decorative: true });
       syncCombatProfileState({ announce: true });
     }
     syncChapterFromProgress(state.narrative, state.player.level);
@@ -2520,7 +2560,7 @@ const canvas = document.getElementById("game");
           state.player.gold += q.reward.gold;
           logMsg(`Quest done: ${q.title}. +${q.reward.xp} XP, +${q.reward.gold} gold. Elder Nira nods approvingly.`);
           sfx.questDone();
-          spawnParticles(canvas.width / 2, canvas.height / 2, 15, "#8fd0ff", 3, 1.2);
+          spawnParticles(canvas.width / 2, canvas.height / 2, 15, "#8fd0ff", 3, 1.2, { decorative: true });
           if (state.quests.slime.status === "locked") {
             state.quests.slime.status = "active";
             logMsg("Elder Nira: Warden Sol needs the marsh cleared.");
@@ -2564,7 +2604,7 @@ const canvas = document.getElementById("game");
           state.inventory.Potion += q.reward.potion;
           logMsg(`Quest done: ${q.title}. +${q.reward.xp} XP, +${q.reward.gold} gold, +1 Potion. The marsh smells slightly better.`);
           sfx.questDone();
-          spawnParticles(canvas.width / 2, canvas.height / 2, 15, "#6be873", 3, 1.2);
+          spawnParticles(canvas.width / 2, canvas.height / 2, 15, "#6be873", 3, 1.2, { decorative: true });
           if (state.quests.wood.status === "locked") {
             state.quests.wood.status = "active";
             logMsg("Warden Sol: Smith Varo can now build your house.");
@@ -2614,7 +2654,7 @@ const canvas = document.getElementById("game");
           state.player.hp = Math.min(state.player.maxHp, state.player.hp + 24);
           logMsg(`Quest done: ${q.title}. You now own the house! It even has a roof. Probably.`);
           sfx.questDone();
-          spawnParticles(canvas.width / 2, canvas.height / 2, 25, "#d8bc6a", 4, 1.5);
+          spawnParticles(canvas.width / 2, canvas.height / 2, 25, "#d8bc6a", 4, 1.5, { decorative: true });
           const decision = applyMajorDecision(state.narrative, "smith");
           if (decision) {
             logMsg(decision.immediateLog);
@@ -2758,7 +2798,7 @@ const canvas = document.getElementById("game");
       state.chest.opened = true;
       state.chest.respawn = 38;
       sfx.pickup();
-      spawnParticles(canvas.width / 2, canvas.height * 0.4, 12, "#d8bc6a", 3, 1);
+      spawnParticles(canvas.width / 2, canvas.height * 0.4, 12, "#d8bc6a", 3, 1, { decorative: true });
       const loot = choice(["Potion", "Gold", "Gold", "Stone", "Crystal"]);
       if (loot === "Potion") {
         state.inventory.Potion += 1;
@@ -2951,7 +2991,7 @@ const canvas = document.getElementById("game");
     state.player.hp = Math.min(state.player.maxHp, state.player.hp + 38);
     logMsg(choice(["Potion used. Tastes like victory... and feet.", "Glug glug. Health restored. Dignity pending.", "Potion consumed. Your taste buds will never forgive you."]));
     sfx.potionUse();
-    spawnParticles(canvas.width / 2, canvas.height * 0.8, 8, "#5fe0b5", 2, 0.6);
+    spawnParticles(canvas.width / 2, canvas.height * 0.8, 8, "#5fe0b5", 2, 0.6, { decorative: true });
   }
 
   function toggleFullscreen() {
@@ -4045,6 +4085,10 @@ const canvas = document.getElementById("game");
   function drawBillboardSprite(sprite, left, top, spriteWidth, spriteHeight, lightFactor) {
     ctx.save();
     ctx.translate(left, top);
+    const gradientCacheEnabled = isGradientCacheEnabled();
+    const sizeKey = `${Math.max(8, Math.round(spriteWidth / 8) * 8)}x${Math.max(8, Math.round(spriteHeight / 8) * 8)}`;
+    const distNorm = clamp(numberOr(sprite.distToPlayer, MAX_RAY_DIST) / MAX_RAY_DIST, 0, 0.999);
+    const distBand = Math.max(0, Math.min(7, Math.floor(distNorm * 8)));
 
     const glowColor =
       sprite.kind === "enemy" ? "rgba(112, 246, 126, 0.38)" :
@@ -4062,9 +4106,16 @@ const canvas = document.getElementById("game");
     ctx.shadowOffsetY = 0;
 
     if (sprite.kind === "npc") {
-      const robe = ctx.createLinearGradient(0, 0, 0, spriteHeight);
-      robe.addColorStop(0, shadeHex(sprite.color, 1.2));
-      robe.addColorStop(1, shadeHex(sprite.color, 0.55));
+      const robe = getCachedGradient(
+        `sprite-npc-robe|${sizeKey}|${sprite.color}`,
+        () => {
+          const g = ctx.createLinearGradient(0, 0, 0, spriteHeight);
+          g.addColorStop(0, shadeHex(sprite.color, 1.2));
+          g.addColorStop(1, shadeHex(sprite.color, 0.55));
+          return g;
+        },
+        gradientCacheEnabled,
+      );
       ctx.fillStyle = robe;
       ctx.strokeStyle = "rgba(21, 18, 16, 0.34)";
       ctx.lineWidth = Math.max(1, spriteWidth * 0.025);
@@ -4084,11 +4135,19 @@ const canvas = document.getElementById("game");
       ctx.fillStyle = "rgba(255,255,255,0.18)";
       ctx.fillRect(spriteWidth * 0.35, spriteHeight * 0.34, spriteWidth * 0.06, spriteHeight * 0.35);
     } else if (sprite.kind === "enemy") {
-      const slime = ctx.createRadialGradient(spriteWidth * 0.45, spriteHeight * 0.34, 2, spriteWidth * 0.45, spriteHeight * 0.52, spriteHeight * 0.5);
       const enemyBase = sprite.color || "#6be873";
-      slime.addColorStop(0, shadeHex(enemyBase, 1.72));
-      slime.addColorStop(0.58, enemyBase);
-      slime.addColorStop(1, shadeHex(enemyBase, 0.5));
+      const enemyTypeKey = sprite.enemyType || "slime";
+      const slime = getCachedGradient(
+        `sprite-enemy-core|${enemyTypeKey}|band${distBand}|${sizeKey}|${enemyBase}`,
+        () => {
+          const g = ctx.createRadialGradient(spriteWidth * 0.45, spriteHeight * 0.34, 2, spriteWidth * 0.45, spriteHeight * 0.52, spriteHeight * 0.5);
+          g.addColorStop(0, shadeHex(enemyBase, 1.72));
+          g.addColorStop(0.58, enemyBase);
+          g.addColorStop(1, shadeHex(enemyBase, 0.5));
+          return g;
+        },
+        gradientCacheEnabled,
+      );
       ctx.fillStyle = slime;
       ctx.beginPath();
       ctx.moveTo(spriteWidth * 0.14, spriteHeight * 0.84);
@@ -4111,9 +4170,16 @@ const canvas = document.getElementById("game");
       const hatColor = sprite.hatColor || "#5b4129";
       const bandanaColor = sprite.bandanaColor || "#8e4040";
       const trot = Math.sin((sprite.gaitPhase || 0) + state.time * 1.4) * 0.5 + 0.5;
-      const body = ctx.createLinearGradient(0, spriteHeight * 0.26, 0, spriteHeight * 0.9);
-      body.addColorStop(0, "#efb8b2");
-      body.addColorStop(1, "#d58f8a");
+      const body = getCachedGradient(
+        `sprite-pig-body|${sizeKey}`,
+        () => {
+          const g = ctx.createLinearGradient(0, spriteHeight * 0.26, 0, spriteHeight * 0.9);
+          g.addColorStop(0, "#efb8b2");
+          g.addColorStop(1, "#d58f8a");
+          return g;
+        },
+        gradientCacheEnabled,
+      );
       ctx.fillStyle = body;
       ctx.beginPath();
       ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.62, spriteWidth * 0.32, spriteHeight * 0.24, 0, 0, TAU);
@@ -4215,9 +4281,16 @@ const canvas = document.getElementById("game");
       ctx.fillStyle = "rgba(255,255,255,0.35)";
       ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.2, spriteWidth * 0.08, spriteHeight * 0.5);
     } else if (sprite.kind === "chest") {
-      const wood = ctx.createLinearGradient(0, 0, 0, spriteHeight);
-      wood.addColorStop(0, "#bc8b55");
-      wood.addColorStop(1, "#6c4b30");
+      const wood = getCachedGradient(
+        `sprite-chest-wood|${sizeKey}`,
+        () => {
+          const g = ctx.createLinearGradient(0, 0, 0, spriteHeight);
+          g.addColorStop(0, "#bc8b55");
+          g.addColorStop(1, "#6c4b30");
+          return g;
+        },
+        gradientCacheEnabled,
+      );
       ctx.fillStyle = wood;
       ctx.fillRect(spriteWidth * 0.18, spriteHeight * 0.45, spriteWidth * 0.64, spriteHeight * 0.45);
       ctx.fillStyle = "#c8ac43";
@@ -4446,6 +4519,8 @@ const canvas = document.getElementById("game");
       biome: state.regions.activeRegion,
     });
     const visualMood = applyGraphicsAccessibility(visualMoodBase, state.graphics.accessibility);
+    latestParticleMultiplier = clamp(numberOr(visualMood.particleMultiplier, 1), 0, 1);
+    const gradientCacheEnabled = isGradientCacheEnabled();
     const cameraShakeStrength = clamp(visualMood.cameraShake ?? 1, 0, 1.5);
 
     const baseHorizon = drawSkyAndGround(width, height, dayForMood, visualMood);
@@ -4546,6 +4621,7 @@ const canvas = document.getElementById("game");
           y: enemy.y,
           color: enemy.color || "#6be873",
           label: enemy.label || "Slime",
+          enemyType: enemy.type,
           size: enemy.type === "brute" ? 1.18 : enemy.type === "spitter" ? 0.86 : 1.0,
           kind: "enemy",
           hp: enemy.hp,
@@ -4741,18 +4817,35 @@ const canvas = document.getElementById("game");
 
       if (state.player.hurtCooldown > 0) {
         const hurtT = clamp(state.player.hurtCooldown / 0.33, 0, 1);
-        const hurtVig = ctx.createRadialGradient(width * 0.5, height * 0.5, width * 0.14, width * 0.5, height * 0.5, width * 0.72);
-        hurtVig.addColorStop(0, `rgba(190, 0, 0, ${hurtT * 0.06})`);
-        hurtVig.addColorStop(0.55, `rgba(210, 0, 0, ${hurtT * 0.1})`);
-        hurtVig.addColorStop(1, `rgba(230, 10, 10, ${hurtT * 0.58})`);
+        const hurtBucket = gradientBucket(hurtT, 12);
+        const hurtVig = getCachedGradient(
+          `hurt-vig|${width}|${height}|${hurtBucket}`,
+          () => {
+            const g = ctx.createRadialGradient(width * 0.5, height * 0.5, width * 0.14, width * 0.5, height * 0.5, width * 0.72);
+            g.addColorStop(0, `rgba(190, 0, 0, ${hurtBucket * 0.06})`);
+            g.addColorStop(0.55, `rgba(210, 0, 0, ${hurtBucket * 0.1})`);
+            g.addColorStop(1, `rgba(230, 10, 10, ${hurtBucket * 0.58})`);
+            return g;
+          },
+          gradientCacheEnabled,
+        );
         ctx.fillStyle = hurtVig;
         ctx.fillRect(0, 0, width, height);
       }
     }
 
-    const bloom = ctx.createRadialGradient(width * 0.5, height * 0.46, width * 0.06, width * 0.5, height * 0.46, width * 0.62);
-    bloom.addColorStop(0, `rgba(255, 240, 218, ${0.12 + visualMood.bloomStrength * 0.22})`);
-    bloom.addColorStop(1, "rgba(255, 240, 218, 0)");
+    const bloomAlpha = clamp(0.12 + visualMood.bloomStrength * 0.22, 0, 1);
+    const bloomBucket = gradientBucket(bloomAlpha, 12);
+    const bloom = getCachedGradient(
+      `bloom|${width}|${height}|${bloomBucket}`,
+      () => {
+        const g = ctx.createRadialGradient(width * 0.5, height * 0.46, width * 0.06, width * 0.5, height * 0.46, width * 0.62);
+        g.addColorStop(0, `rgba(255, 240, 218, ${bloomBucket})`);
+        g.addColorStop(1, "rgba(255, 240, 218, 0)");
+        return g;
+      },
+      gradientCacheEnabled,
+    );
     ctx.fillStyle = bloom;
     ctx.fillRect(0, 0, width, height);
 
@@ -4767,9 +4860,18 @@ const canvas = document.getElementById("game");
       ctx.fillRect(width * 0.7, height * 0.12, width * 0.12, height * 0.008);
     }
 
-    const vignette = ctx.createRadialGradient(width * 0.5, height * 0.5, width * 0.12, width * 0.5, height * 0.5, width * 0.68);
-    vignette.addColorStop(0, "rgba(0,0,0,0)");
-    vignette.addColorStop(1, `rgba(0,0,0,${Math.min(0.62, visualMood.vignetteStrength)})`);
+    const vignetteAlpha = clamp(Math.min(0.62, visualMood.vignetteStrength), 0, 1);
+    const vignetteBucket = gradientBucket(vignetteAlpha, 12);
+    const vignette = getCachedGradient(
+      `vignette|${width}|${height}|${vignetteBucket}`,
+      () => {
+        const g = ctx.createRadialGradient(width * 0.5, height * 0.5, width * 0.12, width * 0.5, height * 0.5, width * 0.68);
+        g.addColorStop(0, "rgba(0,0,0,0)");
+        g.addColorStop(1, `rgba(0,0,0,${vignetteBucket})`);
+        return g;
+      },
+      gradientCacheEnabled,
+    );
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, width, height);
 
@@ -4785,9 +4887,17 @@ const canvas = document.getElementById("game");
 
     if (state.player.hp / state.player.maxHp < 0.32) {
       const danger = 1 - state.player.hp / (state.player.maxHp * 0.32);
-      const hurt = ctx.createRadialGradient(width * 0.5, height * 0.48, width * 0.25, width * 0.5, height * 0.48, width * 0.72);
-      hurt.addColorStop(0, "rgba(90, 0, 0, 0)");
-      hurt.addColorStop(1, `rgba(143, 24, 18, ${0.22 * danger})`);
+      const dangerBucket = gradientBucket(danger, 12);
+      const hurt = getCachedGradient(
+        `lowhp-hurt|${width}|${height}|${dangerBucket}`,
+        () => {
+          const g = ctx.createRadialGradient(width * 0.5, height * 0.48, width * 0.25, width * 0.5, height * 0.48, width * 0.72);
+          g.addColorStop(0, "rgba(90, 0, 0, 0)");
+          g.addColorStop(1, `rgba(143, 24, 18, ${0.22 * dangerBucket})`);
+          return g;
+        },
+        gradientCacheEnabled,
+      );
       ctx.fillStyle = hurt;
       ctx.fillRect(0, 0, width, height);
     }
@@ -5251,6 +5361,7 @@ const canvas = document.getElementById("game");
     canvas.height = h;
     canvas.style.width = `${w}px`;
     canvas.style.height = `${h}px`;
+    clearGradientCache();
   }
 
   window.addEventListener("resize", resize);
@@ -5395,6 +5506,13 @@ const canvas = document.getElementById("game");
       state.graphics.preset = presetOrder[nextIdx];
       state.weather.quality = state.graphics.preset === "high" ? "cinematic" : state.graphics.preset === "low" ? "performance" : "balanced";
       logMsg(`Graphics preset: ${state.graphics.preset}.`);
+    }
+
+    if (event.code === "KeyY") {
+      state.graphics.performance = state.graphics.performance || { gradientCache: false };
+      state.graphics.performance.gradientCache = !state.graphics.performance.gradientCache;
+      clearGradientCache();
+      logMsg(`Gradient cache: ${state.graphics.performance.gradientCache ? "ON" : "OFF"}.`);
     }
 
     if (event.code === "KeyG") {
