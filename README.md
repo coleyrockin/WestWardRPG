@@ -7,43 +7,51 @@
 ![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33?style=flat&logo=playwright&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat)
 
-Story-first western RPG in a single-page Canvas app. The flagship update adds chapter-driven narrative systems, major choice consequences, enemy archetypes, richer atmosphere profiles, and a satirical tone inspired by *Animal Farm* power critique and cyberpunk social pressure.
+Story-first frontier RPG built on a custom Canvas raycasting stack.  
+No engine. No framework lock-in. Just readable systems code and a surprisingly deep game loop.
+
+The flagship update adds chapter-driven narrative consequences, faction/NPC reactivity, enemy archetypes, visual mood profiles, and satirical world design inspired by *Animal Farm* power critique and cyberpunk systemic pressure.
+
+## Preview
 
 ![Flagship Story Overview](docs/flagship-story-overview.svg)
 ![Flagship Systems Overview](docs/flagship-systems-overview.svg)
 ![Flagship NPC Cast](docs/flagship-npc-cast.svg)
 
+## Table of Contents
+
+- [Why This Project](#why-this-project)
+- [What's New in Flagship Update](#whats-new-in-flagship-update)
+- [Quick Start](#quick-start)
+- [Controls](#controls)
+- [Architecture](#architecture)
+- [Developer Commands](#developer-commands)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Why This Project
+
+- Demonstrates a complete game loop from first principles (rendering, combat, AI, quests, persistence).
+- Keeps complexity transparent by using modular plain JavaScript files.
+- Treats narrative as gameplay logic, not only dialogue flavor.
+- Uses automated tests for core systems and progression logic.
+
 ## What's New in Flagship Update
 
-- **Story-first structure**: three-act campaign state (`act1` to `act3`) tracked in runtime and saves.
-- **Decision consequence engine**: major choices modify thematic axes, faction reputation, NPC affinity, and ending resolution.
-- **Expanded NPC framing**: core cast now has layered motivations and reactive alignment shifts.
-- **Combat depth bump**: enemy archetypes (`slime`, `charger`, `spitter`, `brute`) with behavior-specific profiles.
-- **Visual mood tuning**: chapter/weather-aware fog, shimmer, and vignette profiles plus runtime quality cycling (`V`).
-- **Data-driven quest scaffolding**: quest definitions moved into reusable registry with Glass Gulch archive nodes for multi-step branch completion.
-- **Save migration**: save payload upgraded to version `2` with backward-compatible loading for version `1`.
-- **Test expansion**: new Vitest coverage for decision logic, combat doctrine behavior, enemy archetype scaling, and quest registry progression.
+- **Three-act story progression** (`act1` -> `act3`) persisted in runtime and save data.
+- **Decision consequence engine** with thematic axes:
+  - `controlVsFreedom`
+  - `truthVsComfort`
+  - `solidarityVsStatus`
+- **Reactive cast system** where key NPC relationships and faction alignment shift from player actions.
+- **Combat depth expansion** with archetypes (`slime`, `charger`, `spitter`, `brute`) and doctrine-based loadout/perk behavior.
+- **Glass Gulch biome content** plus multi-step archive branch quest progression.
+- **Visual profile pipeline** (chapter/weather-aware fog, shimmer, vignette) with runtime quality toggle.
+- **Save migration to v2** with backward compatibility for v1 payloads.
+- **Expanded test coverage** for decisions, combat loadouts, archetype behavior, and quest definitions.
 
-## Feature Overview
-
-- **Narrative Systems**
-  - chapter progression and chapter HUD visibility
-  - thematic axes (`controlVsFreedom`, `truthVsComfort`, `solidarityVsStatus`)
-  - endings resolved from ideology outcomes, not only combat success
-- **World and Quest Systems**
-  - data-driven quest definitions
-  - branching-style archive quest progression
-  - faction/NPC consequence persistence in save data
-- **Combat and AI Systems**
-  - archetype-based enemy spawning and stats scaling
-  - behavior-aware pursuit/attack profiles
-  - weather-adjusted combat pressure
-- **Visual and Atmosphere Systems**
-  - atmosphere blend from typed weather model + mood profile
-  - quality presets for cinematic vs performance
-  - enhanced weather readability in HUD and overlays
-
-## Getting Started
+## Quick Start
 
 ```bash
 git clone https://github.com/coleyrockin/WestWardRPG.git
@@ -52,19 +60,15 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:5173/> and play.
+Then open [http://localhost:5173](http://localhost:5173).
 
-## Run and Verification Commands
+If port `5173` is already used on your machine:
 
 ```bash
-npm run dev
-npm run test
-npm run test:smoke
-npm run test:coverage
-npm run typecheck:ts
-npm run dev:lint
-npm run qa
+python3 -m http.server 5183
 ```
+
+Then open [http://localhost:5183](http://localhost:5183).
 
 ## Controls
 
@@ -80,34 +84,56 @@ npm run qa
 - Save / Load: `K` / `L`
 - Recover after defeat: `R`
 - Cycle visual quality: `V`
+- Cycle combat stance: `Z`
 
-## Project Structure
+## Architecture
 
 ```text
 WestWardRPG/
 ├── index.html
 ├── src/
-│   ├── main.js
-│   ├── constants.js
-│   ├── math.js
-│   ├── decisionEngine.js
-│   ├── combatLoadout.js
-│   ├── enemyArchetypes.js
-│   ├── questDefinitions.js
-│   ├── visualProfile.js
-│   └── storyContent.js
-├── atmosphere.ts
-├── atmosphere.js
-├── tests/
-├── test-actions/
-├── docs/
+│   ├── main.js              # orchestration loop + rendering + input
+│   ├── constants.js         # tuning constants and static system values
+│   ├── math.js              # shared math utilities
+│   ├── decisionEngine.js    # chapters, axes, choices, ending resolution
+│   ├── combatLoadout.js     # combat doctrines, perks, stance effects
+│   ├── enemyArchetypes.js   # enemy families and combat profiles
+│   ├── questDefinitions.js  # data-driven quest metadata/state helpers
+│   ├── visualProfile.js     # atmosphere/quality blending
+│   └── storyContent.js      # flagship dialogue and narrative flavor text
+├── atmosphere.ts            # typed atmosphere model source
+├── atmosphere.js            # browser-consumable atmosphere build
+├── tests/                   # vitest system tests
+├── test-actions/            # deterministic scripted behavior checks
+├── docs/                    # flagship diagrams/screenshots
 └── package.json
 ```
 
+## Developer Commands
+
+```bash
+# Local run
+npm run dev
+
+# Verification
+npm test
+npm run test:syntax
+npm run typecheck:ts
+npm run test:coverage
+npm run test:smoke
+npm run qa
+```
+
+## Troubleshooting
+
+- **Wrong app appears on localhost**: another process is using `5173`; run on `5183`.
+- **No audio at start**: click canvas first to unlock browser audio context.
+- **`npm run dev:lint` failure mentioning `game.js`**: this script references older repo layout; use `npm test` + `node --check src/main.js` + `npm run typecheck:ts` for current validation.
+
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 
-MIT License — see [LICENSE](LICENSE).
+MIT License — see [`LICENSE`](LICENSE).

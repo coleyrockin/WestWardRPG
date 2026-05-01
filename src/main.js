@@ -897,9 +897,20 @@ const canvas = document.getElementById("game");
   function drawParticles() {
     for (const p of particles) {
       const alpha = clamp(p.life / p.maxLife, 0, 1);
+      const radius = Math.max(1, p.size * 0.56);
+      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius * 1.8);
+      glow.addColorStop(0, p.color);
+      glow.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = glow;
+      ctx.globalAlpha = alpha * 0.7;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius * 1.7, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = alpha * 0.92;
       ctx.fillStyle = p.color;
-      ctx.globalAlpha = alpha * 0.8;
-      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius, 0, TAU);
+      ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
@@ -967,36 +978,50 @@ const canvas = document.getElementById("game");
           }
         } else if (kind === "timber") {
           const beam = x % 12 < 2;
-          const grain = 0.68 + n * 0.35;
-          r = 132 * grain;
-          g = 95 * grain;
-          b = 62 * grain;
+          const grainWave = Math.sin(y * 0.18 + n2 * 3.4) * 0.08;
+          const grain = 0.66 + n * 0.36 + grainWave;
+          r = 136 * grain;
+          g = 96 * grain;
+          b = 58 * grain;
           if (beam) {
             r *= 0.58;
             g *= 0.58;
             b *= 0.58;
+          } else if ((x + y) % 29 < 2) {
+            r *= 1.08;
+            g *= 1.04;
+            b *= 0.96;
           }
         } else if (kind === "plaster") {
           const crack = (x + y) % 17 === 0 || (x * 3 + y * 2) % 31 === 0;
-          const tone = 0.82 + n * 0.2;
-          r = 178 * tone;
-          g = 166 * tone;
+          const grime = noise2D(x * 0.07, y * 0.09, 93.1);
+          const tone = 0.82 + n * 0.2 - grime * 0.08;
+          r = 182 * tone;
+          g = 168 * tone;
           b = 152 * tone;
           if (crack) {
             r *= 0.7;
             g *= 0.7;
             b *= 0.7;
+          } else if (grime > 0.72) {
+            r *= 0.88;
+            g *= 0.9;
+            b *= 0.86;
           }
         } else if (kind === "neon") {
           const stripe = (x + y) % 18 < 4;
-          const pulse = 0.6 + Math.sin((x - y) * 0.14 + n * 5) * 0.2 + n2 * 0.22;
-          r = 58 * pulse;
-          g = 102 * pulse;
-          b = 154 * pulse + 40;
+          const pulse = 0.58 + Math.sin((x - y) * 0.14 + n * 5) * 0.24 + n2 * 0.24;
+          r = 54 * pulse;
+          g = 98 * pulse;
+          b = 150 * pulse + 44;
           if (stripe) {
-            r += 30;
-            g += 26;
-            b += 58;
+            r += 38;
+            g += 30;
+            b += 68;
+          } else if (noise2D(x * 0.26, y * 0.26, 44.1) > 0.86) {
+            r += 24;
+            g += 14;
+            b += 36;
           }
         } else {
           const tone = 0.76 + n * 0.34;
@@ -3095,31 +3120,31 @@ const canvas = document.getElementById("game");
   let cachedCloudGradient = null;
   let lastCloudOpacity = -1;
 
-  function drawSkyAndGround(width, height) {
+  function drawSkyAndGround(width, height, day, visualMood) {
     if (state.player.inHouse) {
       return drawInteriorBackdrop(width, height);
     }
 
     const weather = state.weather;
-    const day = 0.5 + Math.sin(state.time * 0.014) * 0.45;
+    const normalizedDay = clamp(day, 0, 1);
     const horizon = Math.floor(height * 0.5);
     const atmosphere = tsAtmosphere
-      ? tsAtmosphere.computeAtmosphere(day, weather.rain, weather.fog)
+      ? tsAtmosphere.computeAtmosphere(normalizedDay, weather.rain, weather.fog)
       : null;
     const stormShade = atmosphere ? atmosphere.stormShade : weather.rain * 0.28 + weather.fog * 0.24;
     const skyTop = atmosphere
       ? atmosphere.skyTop
       : {
         r: Math.floor(lerp(9, 109, day) * (1 - stormShade)),
-        g: Math.floor(lerp(16, 164, day) * (1 - stormShade * 0.9)),
-        b: Math.floor(lerp(32, 220, day) * (1 - stormShade * 0.7)),
+        g: Math.floor(lerp(16, 164, normalizedDay) * (1 - stormShade * 0.9)),
+        b: Math.floor(lerp(32, 220, normalizedDay) * (1 - stormShade * 0.7)),
       };
     const skyBottom = atmosphere
       ? atmosphere.skyBottom
       : {
-        r: Math.floor(lerp(40, 182, day) * (1 - stormShade * 0.9)),
-        g: Math.floor(lerp(62, 204, day) * (1 - stormShade * 0.82)),
-        b: Math.floor(lerp(94, 235, day) * (1 - stormShade * 0.65)),
+        r: Math.floor(lerp(40, 182, normalizedDay) * (1 - stormShade * 0.9)),
+        g: Math.floor(lerp(62, 204, normalizedDay) * (1 - stormShade * 0.82)),
+        b: Math.floor(lerp(94, 235, normalizedDay) * (1 - stormShade * 0.65)),
       };
 
     const skyGrad = ctx.createLinearGradient(0, 0, 0, horizon);
@@ -3128,8 +3153,8 @@ const canvas = document.getElementById("game");
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, width, horizon);
 
-    if (day < 0.35) {
-      const starAlpha = clamp((0.35 - day) / 0.35, 0, 1) * (1 - weather.rain * 0.75);
+    if (normalizedDay < 0.35) {
+      const starAlpha = clamp((0.35 - normalizedDay) / 0.35, 0, 1) * (1 - weather.rain * 0.75);
       ctx.fillStyle = `rgba(232, 241, 255, ${0.58 * starAlpha})`;
       for (let i = 0; i < 90; i++) {
         const sx = ((i * 137 + 53) % (width + 23)) - 12;
@@ -3144,10 +3169,10 @@ const canvas = document.getElementById("game");
 
     const sunX = width * (0.16 + (Math.sin(state.time * 0.006) * 0.5 + 0.5) * 0.68);
     const sunY = horizon * (0.2 + Math.cos(state.time * 0.006) * 0.08);
-    const sunR = lerp(30, 56, day);
-    if (day > 0.16) {
+    const sunR = lerp(30, 56, normalizedDay);
+    if (normalizedDay > 0.16) {
       const sunGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 2.8);
-      sunGrad.addColorStop(0, `rgba(255, 247, 204, ${0.68 * day * (1 - weather.rain * 0.7)})`);
+      sunGrad.addColorStop(0, `rgba(255, 247, 204, ${0.68 * normalizedDay * (1 - weather.rain * 0.7)})`);
       sunGrad.addColorStop(1, "rgba(255, 247, 204, 0)");
       ctx.fillStyle = sunGrad;
       ctx.fillRect(0, 0, width, horizon);
@@ -3160,7 +3185,7 @@ const canvas = document.getElementById("game");
     }
 
     const cloudCount = 7 + Math.floor(weather.fog * 10);
-    const cloudOpacity = 0.12 + day * 0.14 + weather.fog * 0.22;
+    const cloudOpacity = 0.12 + normalizedDay * 0.14 + weather.fog * 0.22;
 
     // Cache cloud gradient if opacity hasn't changed significantly
     if (!cachedCloudGradient || Math.abs(lastCloudOpacity - cloudOpacity) > 0.01) {
@@ -3196,10 +3221,10 @@ const canvas = document.getElementById("game");
       ctx.fill();
     };
 
-    ridge(13, state.time * 0.03, horizon - 44, `rgba(70, 108, 120, ${0.28 + day * 0.2 + weather.fog * 0.3})`);
-    ridge(18, state.time * 0.04 + 1.4, horizon - 18, `rgba(52, 84, 98, ${0.36 + day * 0.2 + weather.fog * 0.24})`);
+    ridge(13, state.time * 0.03, horizon - 44, `rgba(70, 108, 120, ${0.28 + normalizedDay * 0.2 + weather.fog * 0.3})`);
+    ridge(18, state.time * 0.04 + 1.4, horizon - 18, `rgba(52, 84, 98, ${0.36 + normalizedDay * 0.2 + weather.fog * 0.24})`);
 
-    ctx.fillStyle = `rgba(28, 58, 44, ${0.36 + day * 0.12 + weather.fog * 0.1})`;
+    ctx.fillStyle = `rgba(28, 58, 44, ${0.36 + normalizedDay * 0.12 + weather.fog * 0.1})`;
     ctx.beginPath();
     ctx.moveTo(0, horizon + 24);
     for (let x = 0; x <= width + 14; x += 14) {
@@ -3217,14 +3242,14 @@ const canvas = document.getElementById("game");
     const groundGrad = ctx.createLinearGradient(0, horizon, 0, height);
     groundGrad.addColorStop(
       0,
-      `rgb(${Math.floor(lerp(50, 132, day) * (1 - weather.rain * 0.22))}, ${Math.floor(lerp(68, 178, day) * (1 - weather.rain * 0.28))}, ${Math.floor(
-        lerp(56, 116, day) * (1 - weather.rain * 0.2),
+      `rgb(${Math.floor(lerp(50, 132, normalizedDay) * (1 - weather.rain * 0.22))}, ${Math.floor(lerp(68, 178, normalizedDay) * (1 - weather.rain * 0.28))}, ${Math.floor(
+        lerp(56, 116, normalizedDay) * (1 - weather.rain * 0.2),
       )})`,
     );
     groundGrad.addColorStop(
       1,
-      `rgb(${Math.floor(lerp(34, 90, day) * (1 - weather.rain * 0.18))}, ${Math.floor(lerp(46, 126, day) * (1 - weather.rain * 0.2))}, ${Math.floor(
-        lerp(38, 86, day) * (1 - weather.rain * 0.14),
+      `rgb(${Math.floor(lerp(34, 90, normalizedDay) * (1 - weather.rain * 0.18))}, ${Math.floor(lerp(46, 126, normalizedDay) * (1 - weather.rain * 0.2))}, ${Math.floor(
+        lerp(38, 86, normalizedDay) * (1 - weather.rain * 0.14),
       )})`,
     );
     ctx.fillStyle = groundGrad;
@@ -3249,10 +3274,17 @@ const canvas = document.getElementById("game");
       ctx.fillRect(0, horizon - 20, width, height - horizon + 20);
     }
 
+    // Graphics V2: stronger cinematic grade in sky/ground pass.
+    if (visualMood) {
+      const tint = visualMood.skyTint;
+      ctx.fillStyle = `rgba(${tint.r + 40}, ${tint.g + 20}, ${tint.b + 50}, ${Math.min(0.24, visualMood.gradeStrength * 0.46)})`;
+      ctx.fillRect(0, 0, width, height);
+    }
+
     return horizon;
   }
 
-  function drawGroundDetails(horizon, width, height) {
+  function drawGroundDetails(horizon, width, height, visualMood) {
     if (state.player.inHouse) return;
 
     const weather = state.weather;
@@ -3267,7 +3299,11 @@ const canvas = document.getElementById("game");
       const sway = Math.sin(state.time * (1.7 + weather.wind * 2.4) + i * 0.93) * (1.4 + weather.wind * 7.2) * near;
       const length = 2 + near * 12;
       const tint = 55 + near * 55 - weather.rain * 16;
+      const moodPush = visualMood ? visualMood.gradeStrength * 28 : 0;
       ctx.strokeStyle = `rgba(${24 + near * 20}, ${tint}, ${30 + near * 18}, ${0.12 + near * 0.3})`;
+      if (moodPush > 0) {
+        ctx.strokeStyle = `rgba(${28 + near * 24 + moodPush * 0.2}, ${tint + moodPush * 0.35}, ${34 + near * 16 + moodPush * 0.3}, ${0.14 + near * 0.34})`;
+      }
       ctx.lineWidth = 0.8 + near * 1.05;
       ctx.beginPath();
       ctx.moveTo(x + sway, y + 1);
@@ -3686,11 +3722,11 @@ const canvas = document.getElementById("game");
       qualitySetting: state.weather.quality,
     });
 
-    const baseHorizon = drawSkyAndGround(width, height);
+    const baseHorizon = drawSkyAndGround(width, height, dayForMood, visualMood);
     const bobOffset = Math.sin(state.player.walkBob * 2.2) * (state.player.inHouse ? 1.2 : 2.2);
     const hitJitter = Math.sin(state.time * 120) * state.player.hitPulse * 5;
     const horizon = clamp(baseHorizon + bobOffset + hitJitter, height * 0.38, height * 0.66);
-    drawGroundDetails(horizon, width, height);
+    drawGroundDetails(horizon, width, height, visualMood);
 
     const depth = new Float32Array(width);
     ctx.imageSmoothingEnabled = false;
@@ -3722,10 +3758,11 @@ const canvas = document.getElementById("game");
 
       ctx.drawImage(tex, texX, 0, 1, TEXTURE_SIZE, x, y, 1, wallHeight);
 
-      const shade = clamp(1.2 - projectedDist / (MAX_RAY_DIST * 0.85) - (hit.side === 1 ? 0.12 : 0), 0.2, 1);
-      ctx.fillStyle = `rgba(10, 14, 20, ${(1 - shade) * (state.player.inHouse ? 0.7 : 0.9)})`;
+      const shade = clamp(1.24 - projectedDist / (MAX_RAY_DIST * 0.86) - (hit.side === 1 ? 0.14 : 0), 0.2, 1);
+      const contrastPass = state.player.inHouse ? 0.74 : 0.94;
+      ctx.fillStyle = `rgba(8, 12, 18, ${(1 - shade) * contrastPass * (1 + visualMood.gradeStrength * 0.22)})`;
       ctx.fillRect(x, y, 1, wallHeight);
-      const baseShadow = clamp((projectedDist / MAX_RAY_DIST) * 0.45 + 0.08, 0.08, 0.5);
+      const baseShadow = clamp((projectedDist / MAX_RAY_DIST) * 0.5 + 0.06, 0.08, 0.56);
       ctx.fillStyle = `rgba(9, 14, 18, ${baseShadow})`;
       ctx.fillRect(x, y + wallHeight * 0.82, 1, wallHeight * 0.18);
 
@@ -3738,7 +3775,8 @@ const canvas = document.getElementById("game");
       if (!state.player.inHouse) {
         const fog = clamp((projectedDist - 5) / (MAX_RAY_DIST - 5), 0, 1);
         if (fog > 0) {
-          ctx.fillStyle = `rgba(132, 150, 164, ${fog * (0.3 + visualMood.fogStrength)})`;
+          const tint = visualMood.skyTint;
+          ctx.fillStyle = `rgba(${tint.r + 100}, ${tint.g + 112}, ${tint.b + 120}, ${fog * (0.28 + visualMood.fogStrength)})`;
           ctx.fillRect(x, y, 1, wallHeight);
         }
       }
@@ -3883,6 +3921,16 @@ const canvas = document.getElementById("game");
       ctx.fillStyle = flash;
       ctx.fillRect(0, 0, width, height);
     }
+
+    const bloom = ctx.createRadialGradient(width * 0.5, height * 0.46, width * 0.06, width * 0.5, height * 0.46, width * 0.62);
+    bloom.addColorStop(0, `rgba(255, 240, 218, ${0.12 + visualMood.bloomStrength * 0.22})`);
+    bloom.addColorStop(1, "rgba(255, 240, 218, 0)");
+    ctx.fillStyle = bloom;
+    ctx.fillRect(0, 0, width, height);
+
+    const grade = visualMood.skyTint;
+    ctx.fillStyle = `rgba(${grade.r + 28}, ${grade.g + 16}, ${grade.b + 30}, ${visualMood.gradeStrength * 0.2})`;
+    ctx.fillRect(0, 0, width, height);
 
     const vignette = ctx.createRadialGradient(width * 0.5, height * 0.5, width * 0.12, width * 0.5, height * 0.5, width * 0.68);
     vignette.addColorStop(0, "rgba(0,0,0,0)");
@@ -4090,8 +4138,14 @@ const canvas = document.getElementById("game");
     const hudW = 432;
     const hudX = 12;
     const hudY = canvas.height - 100;
-    ctx.fillStyle = "rgba(16, 29, 33, 0.72)";
+    const hudGrad = ctx.createLinearGradient(hudX, hudY, hudX, hudY + 88);
+    hudGrad.addColorStop(0, "rgba(18, 30, 34, 0.82)");
+    hudGrad.addColorStop(1, "rgba(12, 20, 24, 0.74)");
+    ctx.fillStyle = hudGrad;
     ctx.fillRect(hudX, hudY, hudW, 88);
+    ctx.strokeStyle = "rgba(255, 222, 160, 0.34)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(hudX + 0.5, hudY + 0.5, hudW - 1, 87);
 
     drawBar(22, hudY + 10, 168, 13, state.player.hp / state.player.maxHp, "#3a1f1e", "#e76b58", `${t("labels.hp")} ${Math.ceil(state.player.hp)}/${state.player.maxHp}`);
     drawBar(22, hudY + 28, 168, 11, state.player.stamina / 100, "#1f2f2c", "#5fe0b5", `${t("labels.stamina")} ${Math.ceil(state.player.stamina)}`);
@@ -4125,8 +4179,13 @@ const canvas = document.getElementById("game");
       qy += 11;
     }
 
-    ctx.fillStyle = "rgba(16, 29, 33, 0.64)";
+    const topGrad = ctx.createLinearGradient(12, 12, 12, 98);
+    topGrad.addColorStop(0, "rgba(14, 24, 28, 0.72)");
+    topGrad.addColorStop(1, "rgba(9, 17, 22, 0.62)");
+    ctx.fillStyle = topGrad;
     ctx.fillRect(12, 12, 620, 86);
+    ctx.strokeStyle = "rgba(255, 215, 145, 0.28)";
+    ctx.strokeRect(12.5, 12.5, 619, 85);
     ctx.fillStyle = "#f9f1dd";
     ctx.font = "11px Georgia";
 
@@ -4214,6 +4273,15 @@ const canvas = document.getElementById("game");
     ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
     ctx.font = "10px Georgia";
     ctx.fillText(t("labels.controlsHint"), 16, canvas.height - 6);
+
+    // Graphics pass indicator for quick visual verification.
+    ctx.fillStyle = "rgba(12, 16, 20, 0.7)";
+    ctx.fillRect(canvas.width - 166, 12, 154, 20);
+    ctx.strokeStyle = "rgba(255, 205, 128, 0.5)";
+    ctx.strokeRect(canvas.width - 165.5, 12.5, 153, 19);
+    ctx.fillStyle = "#ffd28a";
+    ctx.font = "bold 11px Georgia";
+    ctx.fillText("GRAPHICS V2 ACTIVE", canvas.width - 158, 26);
   }
 
   function render() {
