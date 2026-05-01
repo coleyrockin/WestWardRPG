@@ -9,7 +9,7 @@ import {
 describe("enemyArchetypes", () => {
   it("lists all flagship archetypes", () => {
     const types = listEnemyArchetypes();
-    expect(types).toEqual(expect.arrayContaining(["slime", "charger", "spitter", "brute"]));
+    expect(types).toEqual(expect.arrayContaining(["slime", "charger", "spitter", "brute", "suppressor", "skirmisher", "shield_brute"]));
   });
 
   it("keeps low-level spawns conservative", () => {
@@ -19,6 +19,8 @@ describe("enemyArchetypes", () => {
   it("escalates archetypes by level and weather", () => {
     expect(chooseEnemyType(6, "storm", 0.2)).toBe("brute");
     expect(chooseEnemyType(6, "mist", 0.2)).toBe("spitter");
+    expect(chooseEnemyType(7, "sandstorm", 0.2)).toBe("skirmisher");
+    expect(chooseEnemyType(7, "neon_rain", 0.2)).toBe("suppressor");
   });
 
   it("generates scaled stats by level", () => {

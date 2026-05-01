@@ -58,6 +58,22 @@ import {
   updateQuestProgressFromInventoryDataDriven,
 } from "./questDefinitions.js";
 import { NPC_DIALOGUE, DEATH_MESSAGES } from "./storyContent.js";
+import { migrateSaveToV3 } from "./saveMigration.js";
+import {
+  createInitialProgressionState,
+  unlockSkill,
+  upgradeWeaponTier,
+  addArmorModifier,
+  resolveIdeologyTraits,
+  buildProgressionModifiers,
+} from "./progressionSystem.js";
+import { createInitialRegionState, unlockRegion, rollRegionEvent } from "./regionSystem.js";
+import {
+  GRAPHICS_PRESETS,
+  createInitialGraphicsState,
+  resolveRecommendedPreset,
+  applyGraphicsAccessibility,
+} from "./graphicsSettings.js";
 
 const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -686,6 +702,10 @@ const canvas = document.getElementById("game");
     state.quests.crystal.title = t("quests.crystal");
     state.quests.slime.title = t("quests.slime");
     state.quests.wood.title = t("quests.wood");
+    if (state.quests.ashfall_intro) state.quests.ashfall_intro.title = "5) Ashfall Salvage Route";
+    if (state.quests.ashfall_boss) state.quests.ashfall_boss.title = "6) Sump Tyrant Shutdown";
+    if (state.quests.lantern_probe) state.quests.lantern_probe.title = "7) Lantern Signal Intercept";
+    if (state.quests.lantern_revolt) state.quests.lantern_revolt.title = "8) District Pressure Valve";
   }
 
   function readStorageWithFallback(primaryKey, legacyKeys) {
@@ -1215,7 +1235,7 @@ const canvas = document.getElementById("game");
       wind: 0.18,
       lightning: 0,
       timer: 22,
-      quality: "cinematic",
+      quality: "balanced",
     },
     player: {
       x: 9.5,
@@ -1246,6 +1266,7 @@ const canvas = document.getElementById("game");
         weapon: "Frontier Saber",
         stance: "balanced",
       },
+      quickUtility: { active: "smoke", inventory: { smoke: 1, flare: 1, tonic: 1 } },
       perks: [],
       combatProfile: resolveCombatProgression(createInitialNarrativeState(), 1),
     },
@@ -1258,6 +1279,9 @@ const canvas = document.getElementById("game");
     },
     quests: createInitialQuestState(),
     narrative: createInitialNarrativeState(),
+    progression: createInitialProgressionState(),
+    regions: createInitialRegionState(),
+    graphics: createInitialGraphicsState(),
     npcs: [
       {
         id: "elder",
@@ -1507,7 +1531,7 @@ const canvas = document.getElementById("game");
     if (!saveEntry) return null;
     try {
       const parsed = JSON.parse(saveEntry.value);
-      if (!parsed || (parsed.version !== 1 && parsed.version !== 2)) return null;
+      if (!parsed || (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== 3)) return null;
       migrateStorageValue(SAVE_KEY, saveEntry.key, saveEntry.value);
       return parsed;
     } catch {
@@ -1525,7 +1549,7 @@ const canvas = document.getElementById("game");
   function captureSaveData() {
     state.narrative.ending = resolveNarrativeEnding(state.narrative);
     return {
-      version: 2,
+      version: 3,
       savedAt: Date.now(),
       time: state.time,
       player: {
@@ -1543,6 +1567,10 @@ const canvas = document.getElementById("game");
         inHouse: state.player.inHouse,
         loadout: state.player.loadout,
         perks: state.player.perks,
+        upgradePoints: state.progression.upgradePoints,
+        equipment: state.progression.equipment,
+        traits: state.progression.traits,
+        quickUtility: state.player.quickUtility,
       },
       inventory: {
         "Crystal Shard": state.inventory["Crystal Shard"],
@@ -1557,6 +1585,18 @@ const canvas = document.getElementById("game");
         wood: { status: state.quests.wood.status, progress: state.quests.wood.progress },
         archive: state.quests.archive
           ? { status: state.quests.archive.status, progress: state.quests.archive.progress }
+          : null,
+        ashfall_intro: state.quests.ashfall_intro
+          ? { status: state.quests.ashfall_intro.status, progress: state.quests.ashfall_intro.progress }
+          : null,
+        ashfall_boss: state.quests.ashfall_boss
+          ? { status: state.quests.ashfall_boss.status, progress: state.quests.ashfall_boss.progress }
+          : null,
+        lantern_probe: state.quests.lantern_probe
+          ? { status: state.quests.lantern_probe.status, progress: state.quests.lantern_probe.progress }
+          : null,
+        lantern_revolt: state.quests.lantern_revolt
+          ? { status: state.quests.lantern_revolt.status, progress: state.quests.lantern_revolt.progress }
           : null,
       },
       house: {
@@ -1576,6 +1616,9 @@ const canvas = document.getElementById("game");
       },
       narrative: state.narrative,
       showMap: state.showMap,
+      progression: state.progression,
+      regions: state.regions,
+      graphics: state.graphics,
     };
   }
 
@@ -1589,7 +1632,10 @@ const canvas = document.getElementById("game");
   }
 
   function applySaveData(save) {
-    if (!save || (save.version !== 1 && save.version !== 2)) return false;
+    if (!save || (save.version !== 1 && save.version !== 2 && save.version !== 3)) return false;
+    const migrated = migrateSaveToV3(save);
+    if (!migrated) return false;
+    save = migrated;
 
     resetWorld({ countDeath: false, silent: true });
     state.time = Math.max(0, numberOr(save.time, state.time));
@@ -1620,6 +1666,10 @@ const canvas = document.getElementById("game");
     applyQuestState("slime", save.quests?.slime);
     applyQuestState("wood", save.quests?.wood);
     applyQuestState("archive", save.quests?.archive);
+    applyQuestState("ashfall_intro", save.quests?.ashfall_intro);
+    applyQuestState("ashfall_boss", save.quests?.ashfall_boss);
+    applyQuestState("lantern_probe", save.quests?.lantern_probe);
+    applyQuestState("lantern_revolt", save.quests?.lantern_revolt);
 
     state.house.unlocked = Boolean(save.house?.unlocked);
     state.house.built = Boolean(save.house?.built || state.house.unlocked);
@@ -1627,6 +1677,10 @@ const canvas = document.getElementById("game");
 
     state.showMap = typeof save.showMap === "boolean" ? save.showMap : state.showMap;
     state.narrative = migrateNarrativeState(save);
+    state.progression = save.progression || createInitialProgressionState();
+    state.regions = save.regions || createInitialRegionState();
+    state.graphics = save.graphics || createInitialGraphicsState();
+    state.player.quickUtility = save.player?.quickUtility || state.player.quickUtility;
     syncCombatProfileState();
 
     const harvested = new Set(Array.isArray(save.world?.harvestedResourceIds) ? save.world.harvestedResourceIds : []);
@@ -1757,6 +1811,25 @@ const canvas = document.getElementById("game");
     if (state.msg.length > 8) state.msg.length = 8;
   }
 
+  function applyProgressionEffects() {
+    const modifiers = buildProgressionModifiers(state.progression);
+    state.player.progressionMods = modifiers;
+    state.player.quickUtility = state.player.quickUtility || {
+      active: "smoke",
+      inventory: { smoke: 1, flare: 1, tonic: 1 },
+    };
+    if (!state.player.quickUtility.inventory) {
+      state.player.quickUtility.inventory = { smoke: 1, flare: 1, tonic: 1 };
+    }
+    const ideologyTraits = resolveIdeologyTraits(state.narrative);
+    state.progression.traits = ideologyTraits;
+    state.player.traits = ideologyTraits;
+    state.progression.upgradePoints = Math.max(
+      state.progression.upgradePoints,
+      Math.max(0, Math.floor(state.player.level / 2) - 1),
+    );
+  }
+
   function syncCombatProfileState(options = {}) {
     const { announce = false } = options;
     const previousPerks = new Set(state.player.perks || []);
@@ -1785,6 +1858,7 @@ const canvas = document.getElementById("game");
         logMsg(`Combat doctrine updated: ${profile.style.label}.`);
       }
     }
+    applyProgressionEffects();
   }
 
   function getStanceModifiers() {
@@ -1818,6 +1892,91 @@ const canvas = document.getElementById("game");
       const chapterInfo = STORY_CHAPTERS[state.narrative.chapterIndex] || STORY_CHAPTERS[0];
       logMsg(`Story chapter advanced: ${chapterInfo.title}.`);
     }
+  }
+
+  function applyDynamicRegionProgression() {
+    if (state.player.level >= 4 && !state.regions.discovered.includes("ashfall")) {
+      unlockRegion(state.regions, "ashfall");
+      state.quests.ashfall_intro.status = "active";
+      logMsg("Region unlocked: Ashfall Basin. Heat haze now distorts the horizon.");
+    }
+    if (state.player.level >= 7 && !state.regions.discovered.includes("ironlantern")) {
+      unlockRegion(state.regions, "ironlantern");
+      state.quests.lantern_probe.status = "active";
+      logMsg("Region unlocked: Iron Lantern District. Surveillance pressure is rising.");
+    }
+  }
+
+  function cycleRegion() {
+    const order = ["frontier", "ashfall", "ironlantern"];
+    const unlocked = order.filter((regionId) => state.regions.discovered.includes(regionId));
+    if (unlocked.length <= 1) return;
+    const idx = unlocked.indexOf(state.regions.activeRegion);
+    const next = unlocked[(idx + 1) % unlocked.length];
+    unlockRegion(state.regions, next);
+    logMsg(`Travelled to region: ${next}.`);
+  }
+
+  function useQuickUtility() {
+    const quick = state.player.quickUtility;
+    if (!quick) return;
+    const current = quick.active || "smoke";
+    const available = Math.max(0, Math.floor(numberOr(quick.inventory?.[current], 0)));
+    if (available <= 0) {
+      logMsg(`No ${current} left in utility slot.`);
+      return;
+    }
+    quick.inventory[current] = available - 1;
+    if (current === "smoke") {
+      state.player.screenShake = Math.max(0, state.player.screenShake - 0.08);
+      logMsg("Utility used: smoke canister. Enemy pressure briefly drops.");
+    } else if (current === "flare") {
+      state.weather.lightning = Math.max(state.weather.lightning, 0.35);
+      logMsg("Utility used: flare. Visibility increased.");
+    } else {
+      state.player.hp = Math.min(state.player.maxHp, state.player.hp + 18);
+      state.player.stamina = Math.min(100, state.player.stamina + 26);
+      logMsg("Utility used: tonic. Recovery boosted.");
+    }
+  }
+
+  function setQuickUtility(slot) {
+    if (!state.player.quickUtility) return;
+    if (!["smoke", "flare", "tonic"].includes(slot)) return;
+    state.player.quickUtility.active = slot;
+    logMsg(`Quick utility set to ${slot}.`);
+  }
+
+  function performDodgeStep() {
+    if (state.mode !== "playing" || state.player.inHouse) return;
+    if (state.player.dodgeCooldown > 0 || state.player.stamina < 12) {
+      logMsg("Dodge unavailable.");
+      return;
+    }
+    const heading = state.player.angle;
+    const dx = Math.cos(heading) * 0.82;
+    const dy = Math.sin(heading) * 0.82;
+    moveWithCollision(dx, dy);
+    state.player.dodgeCooldown = 1.1;
+    const freedomBonus = state.progression.traits.includes("freedom_strider") ? 0.78 : 1;
+    state.player.stamina = Math.max(0, state.player.stamina - 12 * freedomBonus);
+    logMsg("Dodge step executed.");
+  }
+
+  function performChargedAttack() {
+    if (state.mode !== "playing") return;
+    if (state.player.attackCooldown > 0 || state.player.stamina < 24) {
+      logMsg("Too exhausted for charged attack.");
+      return;
+    }
+    const orderKeeper = state.progression.traits.includes("order_keeper");
+    const prevCombo = state.player.comboStep;
+    state.player.comboStep = 3;
+    attack();
+    state.player.comboStep = prevCombo;
+    state.player.attackCooldown += orderKeeper ? 0.05 : 0.14;
+    state.player.stamina = Math.max(0, state.player.stamina - 14);
+    logMsg("Charged attack unleashed.");
   }
 
   function isBlocking(x, y) {
@@ -2598,6 +2757,9 @@ const canvas = document.getElementById("game");
     if (kind === "mist") return t("labels.mist");
     if (kind === "rain") return t("labels.rain");
     if (kind === "storm") return t("labels.storm");
+    if (kind === "sandstorm") return "Sandstorm";
+    if (kind === "heatwave") return "Heatwave";
+    if (kind === "neon_rain") return "Neon Rain";
     return t("labels.clear");
   }
 
@@ -2607,7 +2769,18 @@ const canvas = document.getElementById("game");
 
     if (weather.timer <= 0) {
       const roll = Math.random();
-      if (roll < 0.45) {
+      const region = state.regions.activeRegion;
+      if (region === "ashfall") {
+        if (roll < 0.36) weather.kind = "sandstorm";
+        else if (roll < 0.62) weather.kind = "heatwave";
+        else if (roll < 0.82) weather.kind = "mist";
+        else weather.kind = "clear";
+      } else if (region === "ironlantern") {
+        if (roll < 0.34) weather.kind = "neon_rain";
+        else if (roll < 0.62) weather.kind = "mist";
+        else if (roll < 0.84) weather.kind = "storm";
+        else weather.kind = "clear";
+      } else if (roll < 0.45) {
         weather.kind = "clear";
       } else if (roll < 0.67) {
         weather.kind = "mist";
@@ -2631,6 +2804,18 @@ const canvas = document.getElementById("game");
       targetRain = 0.48;
       targetFog = 0.22;
       targetWind = 0.32;
+    } else if (weather.kind === "neon_rain") {
+      targetRain = 0.58;
+      targetFog = 0.27;
+      targetWind = 0.35;
+    } else if (weather.kind === "sandstorm") {
+      targetRain = 0.1;
+      targetFog = 0.52;
+      targetWind = 0.72;
+    } else if (weather.kind === "heatwave") {
+      targetRain = 0;
+      targetFog = 0.2;
+      targetWind = 0.48;
     } else if (weather.kind === "storm") {
       targetRain = 0.86;
       targetFog = 0.36;
@@ -2887,6 +3072,27 @@ const canvas = document.getElementById("game");
 
   function update(dt) {
     state.time += dt;
+    state.player.dodgeCooldown = Math.max(0, numberOr(state.player.dodgeCooldown, 0) - dt);
+    if (state.keys.KeyX && state.mode === "playing") performDodgeStep();
+    if (state.keys.KeyG && state.mode === "playing") {
+      state.player.chargedAttackHold = Math.min(1.4, numberOr(state.player.chargedAttackHold, 0) + dt);
+    } else if (numberOr(state.player.chargedAttackHold, 0) > 0.4 && state.mode === "playing") {
+      performChargedAttack();
+      state.player.chargedAttackHold = 0;
+    } else {
+      state.player.chargedAttackHold = 0;
+    }
+    rollRegionEvent(state.regions, dt);
+    applyDynamicRegionProgression();
+    if (state.graphics.autoRecommended) {
+      const recommended = resolveRecommendedPreset({
+        width: canvas.width,
+        height: canvas.height,
+        deviceMemory: navigator.deviceMemory || 4,
+      });
+      state.graphics.preset = recommended;
+      state.weather.quality = recommended === "high" ? "cinematic" : recommended === "low" ? "performance" : "balanced";
+    }
 
     for (const m of state.msg) {
       m.ttl -= dt;
@@ -3518,7 +3724,7 @@ const canvas = document.getElementById("game");
     }
   }
 
-  function drawWeatherOverlay() {
+  function drawWeatherOverlay(visualMood) {
     if (state.player.inHouse) return;
 
     const weather = state.weather;
@@ -3537,7 +3743,8 @@ const canvas = document.getElementById("game");
     }
 
     if (weather.rain > 0.03) {
-      const streaks = Math.floor(canvas.width * (0.03 + weather.rain * 0.1));
+      const depthBoost = visualMood?.rainDepthStrength || 0;
+      const streaks = Math.floor(canvas.width * (0.03 + weather.rain * (0.1 + depthBoost * 0.08)));
       ctx.strokeStyle = `rgba(196, 218, 238, ${0.1 + weather.rain * 0.2})`;
       ctx.lineWidth = 1.1;
       for (let i = 0; i < streaks; i++) {
@@ -3549,6 +3756,18 @@ const canvas = document.getElementById("game");
         ctx.moveTo(x, y);
         ctx.lineTo(x + dx, y + len);
         ctx.stroke();
+      }
+    }
+
+    if (weather.kind === "sandstorm") {
+      const bands = Math.floor(canvas.width / 14);
+      for (let i = 0; i < bands; i++) {
+        const x = ((i * 37 + state.time * (120 + weather.wind * 80)) % (canvas.width + 120)) - 60;
+        const y = ((i * 23 + state.time * 20) % canvas.height);
+        const w = 12 + (i % 5) * 4;
+        const h = 1 + (i % 3);
+        ctx.fillStyle = `rgba(219, 171, 114, ${0.12 + weather.wind * 0.12})`;
+        ctx.fillRect(x, y, w, h);
       }
     }
 
@@ -3564,6 +3783,11 @@ const canvas = document.getElementById("game");
     if (weather.lightning > 0.01) {
       const flash = clamp(weather.lightning, 0, 1);
       ctx.fillStyle = `rgba(242, 247, 255, ${flash * 0.28})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    if (visualMood?.weatherHazardTint) {
+      const tint = visualMood.weatherHazardTint;
+      ctx.fillStyle = `rgba(${tint.r}, ${tint.g}, ${tint.b}, ${tint.a})`;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
   }
@@ -3964,17 +4188,20 @@ const canvas = document.getElementById("game");
     const width = canvas.width;
     const height = canvas.height;
     const dayForMood = 0.5 + Math.sin(state.time * 0.014) * 0.45;
-    const visualMood = buildVisualMood({
+    const visualMoodBase = buildVisualMood({
       weather: state.weather,
       chapterIndex: state.narrative.chapterIndex,
       day: dayForMood,
       qualitySetting: state.weather.quality,
+      biome: state.regions.activeRegion,
     });
+    const visualMood = applyGraphicsAccessibility(visualMoodBase, state.graphics.accessibility);
+    const cameraShakeStrength = clamp(visualMood.cameraShake ?? 1, 0, 1.5);
 
     const baseHorizon = drawSkyAndGround(width, height, dayForMood, visualMood);
     const bobOffset = Math.sin(state.player.walkBob * 2.2) * (state.player.inHouse ? 1.2 : 2.2);
     const hitJitter = Math.sin(state.time * 120) * state.player.hitPulse * 5;
-    const shakeAmt = state.player.screenShake;
+    const shakeAmt = state.player.screenShake * cameraShakeStrength;
     const shakeX = shakeAmt > 0 ? Math.sin(state.time * 89 + 1.2) * shakeAmt * 14 : 0;
     const shakeY = shakeAmt > 0 ? Math.cos(state.time * 73) * shakeAmt * 9 : 0;
     const horizon = clamp(baseHorizon + bobOffset + hitJitter + shakeY, height * 0.38, height * 0.66);
@@ -4011,7 +4238,7 @@ const canvas = document.getElementById("game");
       ctx.drawImage(tex, texX, 0, 1, TEXTURE_SIZE, x, y, 1, wallHeight);
 
       const shade = clamp(1.24 - projectedDist / (MAX_RAY_DIST * 0.86) - (hit.side === 1 ? 0.14 : 0), 0.2, 1);
-      const contrastPass = state.player.inHouse ? 0.74 : 0.94;
+      const contrastPass = (state.player.inHouse ? 0.74 : 0.94) * clamp(visualMood.contrastBoost || 1, 0.9, 1.4);
       ctx.fillStyle = `rgba(8, 12, 18, ${(1 - shade) * contrastPass * (1 + visualMood.gradeStrength * 0.22)})`;
       ctx.fillRect(x, y, 1, wallHeight);
       const baseShadow = clamp((projectedDist / MAX_RAY_DIST) * 0.5 + 0.06, 0.08, 0.56);
@@ -4137,10 +4364,15 @@ const canvas = document.getElementById("game");
       const depthIdx = Math.min(Math.floor(sprite.sx), width - 1);
       if (sprite.sx >= 0 && sprite.sx < width && sprite.distToPlayer > depth[depthIdx] + 0.08) continue;
 
-      const light = clamp(1 - sprite.distToPlayer / MAX_RAY_DIST, 0.25, 1);
+      const light = clamp(1 - sprite.distToPlayer / MAX_RAY_DIST + visualMood.dynamicLightStrength * 0.08, 0.25, 1.1);
       drawBillboardSprite(sprite, left, top, spriteWidth, spriteHeight, light);
 
       if (sprite.kind === "enemy") {
+        if (visualMood.silhouetteStrength > 0.05) {
+          ctx.strokeStyle = `rgba(255, 238, 192, ${0.18 + visualMood.silhouetteStrength * 0.35})`;
+          ctx.lineWidth = 1.2;
+          ctx.strokeRect(left - 1, top - 1, spriteWidth + 2, spriteHeight + 2);
+        }
         const hpRatio = clamp(sprite.hp / sprite.maxHp, 0, 1);
         const barW = spriteWidth;
         const barY = top - 6;
@@ -4189,14 +4421,17 @@ const canvas = document.getElementById("game");
 
     if (state.mode !== "menu") {
       const crossSize = state.player.blocking ? 6 : 4;
-      const crossColor = state.player.hitPulse > 0 ? "rgba(255, 186, 159, 0.96)" : "rgba(255, 244, 218, 0.92)";
+      const hitMarkerStrength = clamp(visualMood.hitMarkerStrength ?? 1, 0.4, 2);
+      const crossColor = state.player.hitPulse > 0
+        ? `rgba(255, 186, 159, ${clamp(0.56 + hitMarkerStrength * 0.22, 0.55, 1)})`
+        : "rgba(255, 244, 218, 0.92)";
       const cx = width / 2;
       const cy = height / 2;
       ctx.save();
       ctx.shadowColor = "rgba(255, 219, 156, 0.32)";
       ctx.shadowBlur = 8;
       ctx.strokeStyle = crossColor;
-      ctx.lineWidth = 1.6;
+      ctx.lineWidth = 1.2 + hitMarkerStrength * 0.55;
       ctx.beginPath();
       ctx.moveTo(cx - crossSize - 7, cy);
       ctx.lineTo(cx - crossSize, cy);
@@ -4236,7 +4471,7 @@ const canvas = document.getElementById("game");
 
       if (state.player.hitPulse > 0) {
         const flash = ctx.createRadialGradient(width / 2, height / 2, 8, width / 2, height / 2, 120);
-        flash.addColorStop(0, `rgba(255, 132, 132, ${state.player.hitPulse * 0.28})`);
+        flash.addColorStop(0, `rgba(255, 132, 132, ${state.player.hitPulse * (0.18 + hitMarkerStrength * 0.16)})`);
         flash.addColorStop(1, "rgba(255,132,132,0)");
         ctx.fillStyle = flash;
         ctx.fillRect(0, 0, width, height);
@@ -4262,6 +4497,13 @@ const canvas = document.getElementById("game");
     const grade = visualMood.skyTint;
     ctx.fillStyle = `rgba(${grade.r + 28}, ${grade.g + 16}, ${grade.b + 30}, ${visualMood.gradeStrength * 0.2})`;
     ctx.fillRect(0, 0, width, height);
+
+    if (visualMood.factionCueStrength > 0.12 && !state.player.inHouse) {
+      ctx.fillStyle = `rgba(122, 188, 255, ${Math.min(0.18, visualMood.factionCueStrength * 0.28)})`;
+      ctx.fillRect(width * 0.18, height * 0.1, width * 0.12, height * 0.008);
+      ctx.fillStyle = `rgba(255, 158, 122, ${Math.min(0.18, visualMood.factionCueStrength * 0.28)})`;
+      ctx.fillRect(width * 0.7, height * 0.12, width * 0.12, height * 0.008);
+    }
 
     const vignette = ctx.createRadialGradient(width * 0.5, height * 0.5, width * 0.12, width * 0.5, height * 0.5, width * 0.68);
     vignette.addColorStop(0, "rgba(0,0,0,0)");
@@ -4516,12 +4758,28 @@ const canvas = document.getElementById("game");
     const q2 = state.quests.slime;
     const q3 = state.quests.wood;
     const q4 = state.quests.archive;
+    const q5 = state.quests.ashfall_intro;
+    const q6 = state.quests.ashfall_boss;
+    const q7 = state.quests.lantern_probe;
+    const q8 = state.quests.lantern_revolt;
     const questLines = [
       `${q1.title}: ${q1.status === "locked" ? t("labels.locked") : q1.status === "turned_in" ? t("labels.done") : `${q1.progress}/${q1.need}${q1.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
       `${q2.title}: ${q2.status === "locked" ? t("labels.locked") : q2.status === "turned_in" ? t("labels.done") : `${q2.progress}/${q2.need}${q2.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
       `${q3.title}: ${q3.status === "locked" ? t("labels.locked") : q3.status === "turned_in" ? t("labels.done") : `${Math.min(q3.needWood, state.inventory.Wood)}/${q3.needWood}W ${Math.min(q3.needStone, state.inventory.Stone)}/${q3.needStone}S${q3.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
       q4
         ? `${q4.title}: ${q4.status === "locked" ? t("labels.locked") : q4.status === "turned_in" ? t("labels.done") : `${q4.progress}/${q4.need}${q4.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`
+        : "",
+      q5
+        ? `${q5.title}: ${q5.status === "locked" ? t("labels.locked") : q5.status === "turned_in" ? t("labels.done") : `${q5.progress}/${q5.need}${q5.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`
+        : "",
+      q6
+        ? `${q6.title}: ${q6.status === "locked" ? t("labels.locked") : q6.status === "turned_in" ? t("labels.done") : `${q6.progress}/${q6.need}${q6.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`
+        : "",
+      q7
+        ? `${q7.title}: ${q7.status === "locked" ? t("labels.locked") : q7.status === "turned_in" ? t("labels.done") : `${q7.progress}/${q7.need}${q7.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`
+        : "",
+      q8
+        ? `${q8.title}: ${q8.status === "locked" ? t("labels.locked") : q8.status === "turned_in" ? t("labels.done") : `${q8.progress}/${q8.need}${q8.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`
         : "",
     ];
 
@@ -4544,14 +4802,16 @@ const canvas = document.getElementById("game");
     const statsY = compact ? hudY + 76 : hudY + 24;
     const statsW = hudX + hudW - statsX - 12;
     drawClippedText(`${t("labels.lvl")} ${state.player.level}  ${t("labels.gold")} ${state.player.gold}  ${t("labels.potions")} ${state.inventory.Potion}`, statsX, statsY, statsW, "#fff1d0");
+    const quick = state.player.quickUtility || { active: "smoke", inventory: { smoke: 0, flare: 0, tonic: 0 } };
+    const quickCount = Math.max(0, Math.floor(numberOr(quick.inventory?.[quick.active], 0)));
     if (!compact) {
       ctx.font = "11px Georgia";
       drawClippedText(`${t("labels.crystals")} ${state.inventory["Crystal Shard"]}  ${t("labels.wood")} ${state.inventory.Wood}  ${t("labels.stone")} ${state.inventory.Stone}  ${t("labels.cores")} ${state.inventory["Slime Core"]}`, statsX, hudY + 41, statsW, "#d7c7a7");
-      drawClippedText(`${state.player.loadout.weapon} / ${state.player.loadout.stance} / ${state.player.perks.length} perks`, statsX, hudY + 57, statsW, "#d7c7a7");
+      drawClippedText(`${state.player.loadout.weapon} / ${state.player.loadout.stance} / ${state.player.perks.length} perks / ${quick.active}:${quickCount}`, statsX, hudY + 57, statsW, "#d7c7a7");
 
       ctx.font = "10px Georgia";
       let qy = hudY + 75;
-      for (const line of questLines.filter(Boolean).slice(0, 3)) {
+      for (const line of questLines.filter(Boolean).slice(0, 4)) {
         drawClippedText(line, statsX, qy, statsW, "#f1e5c8");
         qy += 12;
       }
@@ -4576,7 +4836,7 @@ const canvas = document.getElementById("game");
     drawClippedText(`${t("labels.location")}: ${location}   ${t("labels.house")}: ${houseStatus}   ${t("labels.weather")}: ${weatherText}`, topX + 10, topY + 20, topW - 20, "#fff1d0");
     ctx.font = "10px Georgia";
     drawClippedText(
-      `Chapter: ${state.narrative.chapterTitle}  CVF:${state.narrative.thematicAxes.controlVsFreedom}  TVC:${state.narrative.thematicAxes.truthVsComfort}  SVS:${state.narrative.thematicAxes.solidarityVsStatus}`,
+      `Region: ${state.regions.activeRegion}  Chapter: ${state.narrative.chapterTitle}  CVF:${state.narrative.thematicAxes.controlVsFreedom}  TVC:${state.narrative.thematicAxes.truthVsComfort}  SVS:${state.narrative.thematicAxes.solidarityVsStatus}`,
       topX + 10,
       topY + 35,
       topW - 20,
@@ -4791,6 +5051,36 @@ const canvas = document.getElementById("game");
       const idx = order.indexOf(state.weather.quality);
       state.weather.quality = order[(idx + 1) % order.length];
       logMsg(`Visual quality profile: ${state.weather.quality}.`);
+    }
+
+    if (event.code === "BracketLeft" || event.code === "BracketRight") {
+      const presetOrder = ["low", "balanced", "high"];
+      const dir = event.code === "BracketRight" ? 1 : -1;
+      const currentIdx = presetOrder.indexOf(state.graphics.preset);
+      const nextIdx = (currentIdx + dir + presetOrder.length) % presetOrder.length;
+      state.graphics.preset = presetOrder[nextIdx];
+      state.weather.quality = state.graphics.preset === "high" ? "cinematic" : state.graphics.preset === "low" ? "performance" : "balanced";
+      logMsg(`Graphics preset: ${state.graphics.preset}.`);
+    }
+
+    if (event.code === "KeyG") {
+      cycleRegion();
+    }
+
+    if (event.code === "KeyX") {
+      performDodgeStep();
+    }
+
+    if (event.code === "KeyB") {
+      performChargedAttack();
+    }
+
+    if (event.code === "Digit1") setQuickUtility("smoke");
+    if (event.code === "Digit2") setQuickUtility("flare");
+    if (event.code === "Digit3") setQuickUtility("tonic");
+
+    if (event.code === "KeyU") {
+      useQuickUtility();
     }
 
     if (event.code === "KeyZ") {

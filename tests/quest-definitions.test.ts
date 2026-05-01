@@ -34,4 +34,11 @@ describe("questDefinitions", () => {
     expect(quests.wood.progress).toBe(10);
     expect(quests.wood.status).toBe("complete");
   });
+
+  it("includes new region quest definitions for v3", () => {
+    expect(QUEST_DEFINITIONS.ashfall_intro).toBeDefined();
+    expect(QUEST_DEFINITIONS.ashfall_boss).toBeDefined();
+    expect(QUEST_DEFINITIONS.lantern_probe).toBeDefined();
+    expect(QUEST_DEFINITIONS.lantern_revolt).toBeDefined();
+  });
 });

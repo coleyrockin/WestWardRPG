@@ -35,6 +35,40 @@ export const QUEST_DEFINITIONS = {
     reward: { xp: 120, gold: 80 },
     branchTag: "truthVsComfort",
   },
+  ashfall_intro: {
+    id: "ashfall_intro",
+    title: "5) Ashfall Salvage Route",
+    type: "collect",
+    item: "Ashglass",
+    need: 3,
+    reward: { xp: 140, gold: 90 },
+    branchTag: "solidarityVsStatus",
+  },
+  ashfall_boss: {
+    id: "ashfall_boss",
+    title: "6) Sump Tyrant Shutdown",
+    type: "defeat",
+    enemyType: "shield_brute",
+    need: 1,
+    reward: { xp: 220, gold: 150, potion: 1 },
+    branchTag: "controlVsFreedom",
+  },
+  lantern_probe: {
+    id: "lantern_probe",
+    title: "7) Lantern Signal Intercept",
+    type: "story",
+    need: 3,
+    reward: { xp: 160, gold: 105 },
+    branchTag: "truthVsComfort",
+  },
+  lantern_revolt: {
+    id: "lantern_revolt",
+    title: "8) District Pressure Valve",
+    type: "story",
+    need: 4,
+    reward: { xp: 260, gold: 180 },
+    branchTag: "solidarityVsStatus",
+  },
 };
 
 export function createInitialQuestState() {
