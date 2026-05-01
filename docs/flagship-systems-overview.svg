@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc">
+  <title id="title">WestWardRPG Flagship Systems Overview</title>
+  <desc id="desc">Story, combat, world, and visual systems in the flagship update.</desc>
+  <rect width="1200" height="675" fill="#1c2328"/>
+  <text x="56" y="72" fill="#f8e2ad" font-family="Georgia, serif" font-size="42" font-weight="700">Flagship Systems Overview</text>
+  <text x="56" y="106" fill="#bcd0de" font-family="Georgia, serif" font-size="21">Story-first loops now drive combat difficulty, quest branches, and world mood.</text>
+
+  <g font-family="Georgia, serif">
+    <rect x="56" y="150" width="260" height="460" rx="14" fill="#2d3542" stroke="#f2b063"/>
+    <text x="76" y="196" fill="#f2b063" font-size="28">Narrative</text>
+    <text x="76" y="234" fill="#edf3f8" font-size="18">- Chapter progression</text>
+    <text x="76" y="264" fill="#edf3f8" font-size="18">- NPC affinity state</text>
+    <text x="76" y="294" fill="#edf3f8" font-size="18">- Faction reputation</text>
+    <text x="76" y="324" fill="#edf3f8" font-size="18">- Multi-ending ideology</text>
+  </g>
+
+  <g font-family="Georgia, serif">
+    <rect x="336" y="150" width="260" height="460" rx="14" fill="#2f3a2f" stroke="#9de297"/>
+    <text x="356" y="196" fill="#9de297" font-size="28">Combat</text>
+    <text x="356" y="234" fill="#edf3f8" font-size="18">- Enemy archetypes</text>
+    <text x="356" y="264" fill="#edf3f8" font-size="18">- Context pursuit profiles</text>
+    <text x="356" y="294" fill="#edf3f8" font-size="18">- Story-reactive pressure</text>
+    <text x="356" y="324" fill="#edf3f8" font-size="18">- Perk-ready structure</text>
+  </g>
+
+  <g font-family="Georgia, serif">
+    <rect x="616" y="150" width="260" height="460" rx="14" fill="#3a2f2f" stroke="#e6a47f"/>
+    <text x="636" y="196" fill="#e6a47f" font-size="28">World + Quests</text>
+    <text x="636" y="234" fill="#edf3f8" font-size="18">- Data-driven quest state</text>
+    <text x="636" y="264" fill="#edf3f8" font-size="18">- Archive branch quest</text>
+    <text x="636" y="294" fill="#edf3f8" font-size="18">- Branching outcomes</text>
+    <text x="636" y="324" fill="#edf3f8" font-size="18">- Save migration to v2</text>
+  </g>
+
+  <g font-family="Georgia, serif">
+    <rect x="896" y="150" width="248" height="460" rx="14" fill="#2d3040" stroke="#8fc9ff"/>
+    <text x="916" y="196" fill="#8fc9ff" font-size="28">Visuals</text>
+    <text x="916" y="234" fill="#edf3f8" font-size="18">- Mood profile blending</text>
+    <text x="916" y="264" fill="#edf3f8" font-size="18">- Fog and shimmer scaling</text>
+    <text x="916" y="294" fill="#edf3f8" font-size="18">- Chapter-aware atmosphere</text>
+    <text x="916" y="324" fill="#edf3f8" font-size="18">- Runtime quality toggle</text>
+  </g>
+</svg>

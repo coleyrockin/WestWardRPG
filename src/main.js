@@ -31,6 +31,33 @@ import {
   noise2D,
   shadeHex,
 } from "./math.js";
+import {
+  STORY_CHAPTERS,
+  MAJOR_NPCS,
+  createInitialNarrativeState,
+  syncChapterFromProgress,
+  applyMajorDecision,
+  createDecisionRecap,
+  resolveNarrativeEnding,
+  migrateNarrativeState,
+} from "./decisionEngine.js";
+import {
+  chooseEnemyType,
+  createEnemyStats,
+  createEnemyCombatProfile,
+} from "./enemyArchetypes.js";
+import {
+  resolveCombatProgression,
+  applySwingLoadout,
+  resolveIncomingDamage,
+  getSprintModifier,
+} from "./combatLoadout.js";
+import { buildVisualMood } from "./visualProfile.js";
+import {
+  createInitialQuestState,
+  updateQuestProgressFromInventoryDataDriven,
+} from "./questDefinitions.js";
+import { NPC_DIALOGUE, DEATH_MESSAGES } from "./storyContent.js";
 
 const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -800,89 +827,8 @@ const canvas = document.getElementById("game");
   let footstepTimer = 0;
   let ambientTimer = 0;
 
-  /* ─── Comical NPC Dialogue Lines ─── */
-  const npcDialogue = {
-    elder: {
-      idle: [
-        "Elder Nira: Back in my day, slimes tipped their hats before attacking.",
-        "Elder Nira: I've read every scroll in this valley. Half were saloon tabs.",
-        "Elder Nira: Don't tell anyone, but I once got lost in my own settlement.",
-        "Elder Nira: Wisdom comes with age. So do backaches.",
-      ],
-      questActive: [
-        "Elder Nira: Those crystals won't collect themselves. I tried asking nicely.",
-        "Elder Nira: Crystal Shards ${p}/${n}. I'm counting. Very slowly.",
-      ],
-    },
-    warden: {
-      idle: [
-        "Warden Sol: I guard this frontier. Mostly from boredom and pigs.",
-        "Warden Sol: Have you seen my pet slime? Wait, they all look the same.",
-        "Warden Sol: My sword is sharp. My wit? Debatable.",
-        "Warden Sol: I once chased a slime for three hours. Turned out to be tumbleweed.",
-      ],
-      questActive: [
-        "Warden Sol: Slimes defeated ${p}/${n}. They're not happy about it.",
-        "Warden Sol: Keep smacking those blobs! It's therapeutic.",
-      ],
-    },
-    smith: {
-      idle: [
-        "Smith Varo: I make things. Then I fix the things I made. Circle of life.",
-        "Smith Varo: This anvil has seen things. Terrible, terrible things.",
-        "Smith Varo: Your sword looks fine. My professional opinion? Hit harder.",
-        "Smith Varo: I once forged a spoon so perfect, the Elder cried.",
-      ],
-      questActive: [
-        "Smith Varo: Wood ${wp}/${wn}, Stone ${sp}/${sn}. My back hurts just thinking about it.",
-        "Smith Varo: Bring materials! Your house won't build itself. Trust me, I asked.",
-      ],
-    },
-    merchant: {
-      idle: [
-        "Trader Nyx: Welcome to my frontier emporium. Prices are wanted-dead-or-alive.",
-        "Trader Nyx: Special deal today - same price as yesterday!",
-        "Trader Nyx: I've got potions, rocks, and a mysterious jar. Don't open the jar.",
-        "Trader Nyx: Trade secrets? My biggest one is a 300% markup.",
-      ],
-    },
-    innkeeper: {
-      idle: [
-        "Innkeeper Mora: You look terrible. That'll be 8 gold.",
-        "Innkeeper Mora: Our beds have only slightly fewer bugs than the marsh.",
-        "Innkeeper Mora: Hot meal? Best I can do is lukewarm and questionable.",
-        "Innkeeper Mora: The secret ingredient in my stew is... ambition. And salt.",
-      ],
-    },
-    bard: {
-      idle: [
-        "Bard Jingles: 🎵 In Dustward town the pigs wear crowns, and slimes get smacked around! 🎵",
-        "Bard Jingles: I wrote a ballad about you. It's mostly about falling.",
-        "Bard Jingles: My lute is out of tune. So is my sense of danger.",
-        "Bard Jingles: Want to hear my new song? No? I'll play it anyway.",
-      ],
-    },
-    cat: {
-      idle: [
-        "Whiskers the Cat: *stares at you judgmentally*",
-        "Whiskers the Cat: *knocks a potion off the shelf* Meow.",
-        "Whiskers the Cat: *purrs... menacingly*",
-        "Whiskers the Cat: *pretends you don't exist*",
-      ],
-    },
-  };
-
-  /* ─── Comical Death Messages ─── */
-  const deathMessages = [
-    "You got absolutely slimed. Embarrassing.",
-    "A slime sent you to the shadow realm. A SLIME.",
-    "You fell in battle. The slimes will write songs about this.",
-    "Game over. The slimes are throwing a party.",
-    "You were defeated. Even the Elder is shaking her head.",
-    "Wasted. Trader Nyx is already selling your stuff.",
-    "You got bodied by gelatin. Let that sink in.",
-    "K.O.! The slime didn't even break a sweat. Do slimes sweat?",
-  ];
+  const npcDialogue = NPC_DIALOGUE;
+  const deathMessages = DEATH_MESSAGES;
 
   /* ─── Shop System ─── */
   let shopOpen = false;
@@ -1041,6 +987,17 @@ const canvas = document.getElementById("game");
             g *= 0.7;
             b *= 0.7;
           }
+        } else if (kind === "neon") {
+          const stripe = (x + y) % 18 < 4;
+          const pulse = 0.6 + Math.sin((x - y) * 0.14 + n * 5) * 0.2 + n2 * 0.22;
+          r = 58 * pulse;
+          g = 102 * pulse;
+          b = 154 * pulse + 40;
+          if (stripe) {
+            r += 30;
+            g += 26;
+            b += 58;
+          }
         } else {
           const tone = 0.76 + n * 0.34;
           r = 92 * tone;
@@ -1136,6 +1093,25 @@ const canvas = document.getElementById("game");
       }
     }
 
+    // Flagship biome: "Glass Gulch", a foggy industrial fringe where ranged enemies thrive.
+    for (let y = 32; y <= 50; y++) {
+      for (let x = 36; x <= 52; x++) {
+        if (x === 36 || y === 32 || x === 52 || y === 50) {
+          grid[y][x] = 1;
+        } else {
+          grid[y][x] = 5;
+        }
+      }
+    }
+    for (let y = 38; y <= 43; y++) {
+      for (let x = 41; x <= 47; x++) {
+        grid[y][x] = 0;
+      }
+    }
+    grid[32][44] = 0;
+    grid[31][44] = 0;
+    grid[30][44] = 0;
+
     return grid;
   }
 
@@ -1196,6 +1172,7 @@ const canvas = document.getElementById("game");
     water: makeTexture("water"),
     timber: makeTexture("timber"),
     plaster: makeTexture("plaster"),
+    neon: makeTexture("neon"),
   };
 
   const state = {
@@ -1213,6 +1190,7 @@ const canvas = document.getElementById("game");
       wind: 0.18,
       lightning: 0,
       timer: 22,
+      quality: "balanced",
     },
     player: {
       x: 9.5,
@@ -1237,6 +1215,12 @@ const canvas = document.getElementById("game");
       hitPulse: 0,
       cameraKick: 0,
       deaths: 0,
+      loadout: {
+        weapon: "Frontier Saber",
+        stance: "balanced",
+      },
+      perks: [],
+      combatProfile: resolveCombatProgression(createInitialNarrativeState(), 1),
     },
     inventory: {
       "Crystal Shard": 0,
@@ -1245,35 +1229,12 @@ const canvas = document.getElementById("game");
       Potion: 2,
       "Slime Core": 0,
     },
-    quests: {
-      crystal: {
-        title: "1) Valley Survey",
-        status: "locked",
-        need: 4,
-        progress: 0,
-        reward: { xp: 60, gold: 25 },
-      },
-      slime: {
-        title: "2) Marsh Cleansing",
-        status: "locked",
-        need: 3,
-        progress: 0,
-        reward: { xp: 75, gold: 35, potion: 1 },
-      },
-      wood: {
-        title: "3) Raise Your House",
-        status: "locked",
-        need: 10,
-        progress: 0,
-        needWood: 6,
-        needStone: 4,
-        reward: { xp: 95, gold: 60 },
-      },
-    },
+    quests: createInitialQuestState(),
+    narrative: createInitialNarrativeState(),
     npcs: [
       {
         id: "elder",
-        name: "Elder Nira",
+        name: MAJOR_NPCS.elder.name,
         x: 9.0,
         y: 8.2,
         homeX: 9.0,
@@ -1285,7 +1246,7 @@ const canvas = document.getElementById("game");
       },
       {
         id: "warden",
-        name: "Warden Sol",
+        name: MAJOR_NPCS.warden.name,
         x: 11.5,
         y: 8.8,
         homeX: 11.5,
@@ -1297,7 +1258,7 @@ const canvas = document.getElementById("game");
       },
       {
         id: "smith",
-        name: "Smith Varo",
+        name: MAJOR_NPCS.smith.name,
         x: 17.8,
         y: 10.8,
         homeX: 17.8,
@@ -1309,7 +1270,7 @@ const canvas = document.getElementById("game");
       },
       {
         id: "merchant",
-        name: "Trader Nyx",
+        name: MAJOR_NPCS.merchant.name,
         x: 7.3,
         y: 9.6,
         homeX: 7.3,
@@ -1321,7 +1282,7 @@ const canvas = document.getElementById("game");
       },
       {
         id: "innkeeper",
-        name: "Innkeeper Mora",
+        name: MAJOR_NPCS.innkeeper.name,
         x: 6.4,
         y: 7.4,
         homeX: 6.4,
@@ -1361,6 +1322,7 @@ const canvas = document.getElementById("game");
     resources: [],
     pigJokeCooldown: 0,
     pigStampedeTimer: 0,
+    narrativePulseTimer: 7,
     chest: { x: 13.4, y: 7.2, opened: false, respawn: 0 },
     house: {
       unlocked: false,
@@ -1377,6 +1339,8 @@ const canvas = document.getElementById("game");
 
   initLanguage();
   refreshLocalizedStateText();
+  syncChapterFromProgress(state.narrative, state.player.level);
+  syncCombatProfileState();
 
   let hasSaveData = false;
   let lastSaveAt = null;
@@ -1390,14 +1354,22 @@ const canvas = document.getElementById("game");
     state.enemies = [];
     for (let i = 0; i < 16; i++) {
       const pos = findEmptyCell(worldMap, 10, 10, 53, 53, (x, y) => !isInHouseLot(x, y) && Math.hypot(x - 10, y - 8) > 6);
+      const type = chooseEnemyType(state.player.level, state.weather.kind);
+      const stats = createEnemyStats(type, state.player.level);
       state.enemies.push({
         id: `slime-${i}`,
-        type: "slime",
+        type: stats.type,
+        label: stats.label,
+        color: stats.color,
+        behavior: stats.behavior,
         x: pos.x,
         y: pos.y,
-        hp: 48,
-        maxHp: 48,
-        speed: 1.35 + Math.random() * 0.45,
+        hp: stats.hp,
+        maxHp: stats.maxHp,
+        speed: stats.speed + Math.random() * 0.3,
+        attackReach: stats.attackReach,
+        baseDamage: stats.baseDamage,
+        damageVariance: stats.damageVariance,
         attackCooldown: Math.random() * 0.75,
         alive: true,
         respawn: 0,
@@ -1409,9 +1381,14 @@ const canvas = document.getElementById("game");
   function spawnResources() {
     state.resources = [];
 
-    function addResource(type, count) {
+    function addResource(type, count, opts = {}) {
+      const minX = opts.minX ?? 4;
+      const minY = opts.minY ?? 4;
+      const maxX = opts.maxX ?? 53;
+      const maxY = opts.maxY ?? 53;
+      const extraCheck = opts.extraCheck ?? ((x, y) => !isInHouseLot(x, y) && Math.hypot(x - 10, y - 8) > 4);
       for (let i = 0; i < count; i++) {
-        const pos = findEmptyCell(worldMap, 4, 4, 53, 53, (x, y) => !isInHouseLot(x, y) && Math.hypot(x - 10, y - 8) > 4);
+        const pos = findEmptyCell(worldMap, minX, minY, maxX, maxY, extraCheck);
         state.resources.push({
           id: `${type}-${i}`,
           type,
@@ -1426,6 +1403,13 @@ const canvas = document.getElementById("game");
     addResource("crystal", 16);
     addResource("tree", 24);
     addResource("rock", 18);
+    addResource("archive-node", 4, {
+      minX: 38,
+      minY: 34,
+      maxX: 50,
+      maxY: 48,
+      extraCheck: (x, y) => tileTypeAtCurrentMap(x + 0.5, y + 0.5) === 5,
+    });
   }
 
   function spawnPigs() {
@@ -1494,7 +1478,7 @@ const canvas = document.getElementById("game");
     if (!saveEntry) return null;
     try {
       const parsed = JSON.parse(saveEntry.value);
-      if (!parsed || parsed.version !== 1) return null;
+      if (!parsed || (parsed.version !== 1 && parsed.version !== 2)) return null;
       migrateStorageValue(SAVE_KEY, saveEntry.key, saveEntry.value);
       return parsed;
     } catch {
@@ -1510,8 +1494,9 @@ const canvas = document.getElementById("game");
   }
 
   function captureSaveData() {
+    state.narrative.ending = resolveNarrativeEnding(state.narrative);
     return {
-      version: 1,
+      version: 2,
       savedAt: Date.now(),
       time: state.time,
       player: {
@@ -1527,6 +1512,8 @@ const canvas = document.getElementById("game");
         gold: state.player.gold,
         deaths: state.player.deaths,
         inHouse: state.player.inHouse,
+        loadout: state.player.loadout,
+        perks: state.player.perks,
       },
       inventory: {
         "Crystal Shard": state.inventory["Crystal Shard"],
@@ -1539,6 +1526,9 @@ const canvas = document.getElementById("game");
         crystal: { status: state.quests.crystal.status, progress: state.quests.crystal.progress },
         slime: { status: state.quests.slime.status, progress: state.quests.slime.progress },
         wood: { status: state.quests.wood.status, progress: state.quests.wood.progress },
+        archive: state.quests.archive
+          ? { status: state.quests.archive.status, progress: state.quests.archive.progress }
+          : null,
       },
       house: {
         unlocked: state.house.unlocked,
@@ -1555,6 +1545,7 @@ const canvas = document.getElementById("game");
         harvestedResourceIds: state.resources.filter((resource) => resource.harvested).map((resource) => resource.id),
         defeatedEnemyIds: state.enemies.filter((enemy) => !enemy.alive).map((enemy) => enemy.id),
       },
+      narrative: state.narrative,
       showMap: state.showMap,
     };
   }
@@ -1569,7 +1560,7 @@ const canvas = document.getElementById("game");
   }
 
   function applySaveData(save) {
-    if (!save || save.version !== 1) return false;
+    if (!save || (save.version !== 1 && save.version !== 2)) return false;
 
     resetWorld({ countDeath: false, silent: true });
     state.time = Math.max(0, numberOr(save.time, state.time));
@@ -1583,6 +1574,11 @@ const canvas = document.getElementById("game");
     state.player.stamina = clamp(numberOr(player.stamina, 100), 0, 100);
     state.player.gold = Math.max(0, Math.floor(numberOr(player.gold, state.player.gold)));
     state.player.deaths = Math.max(0, Math.floor(numberOr(player.deaths, state.player.deaths)));
+    const allowedStances = new Set(["balanced", "aggressive", "defensive"]);
+    const nextStance = player?.loadout?.stance;
+    state.player.loadout.stance = allowedStances.has(nextStance) ? nextStance : state.player.loadout.stance;
+    state.player.loadout.weapon = typeof player?.loadout?.weapon === "string" ? player.loadout.weapon : state.player.loadout.weapon;
+    state.player.perks = Array.isArray(player?.perks) ? player.perks.filter((perk) => typeof perk === "string").slice(0, 12) : state.player.perks;
 
     const inventory = save.inventory || {};
     state.inventory["Crystal Shard"] = Math.max(0, Math.floor(numberOr(inventory["Crystal Shard"], 0)));
@@ -1594,12 +1590,15 @@ const canvas = document.getElementById("game");
     applyQuestState("crystal", save.quests?.crystal);
     applyQuestState("slime", save.quests?.slime);
     applyQuestState("wood", save.quests?.wood);
+    applyQuestState("archive", save.quests?.archive);
 
     state.house.unlocked = Boolean(save.house?.unlocked);
     state.house.built = Boolean(save.house?.built || state.house.unlocked);
     state.house.visits = Math.max(0, Math.floor(numberOr(save.house?.visits, state.house.visits)));
 
     state.showMap = typeof save.showMap === "boolean" ? save.showMap : state.showMap;
+    state.narrative = migrateNarrativeState(save);
+    syncCombatProfileState();
 
     const harvested = new Set(Array.isArray(save.world?.harvestedResourceIds) ? save.world.harvestedResourceIds : []);
     for (const resource of state.resources) {
@@ -1649,6 +1648,8 @@ const canvas = document.getElementById("game");
     state.player.angle = normalizeAngle(numberOr(player.angle, fallback.angle));
 
     updateQuestProgressFromInventory();
+    syncChapterFromProgress(state.narrative, state.player.level);
+    syncCombatProfileState();
     return true;
   }
 
@@ -1727,8 +1728,50 @@ const canvas = document.getElementById("game");
     if (state.msg.length > 8) state.msg.length = 8;
   }
 
+  function syncCombatProfileState(options = {}) {
+    const { announce = false } = options;
+    const previousPerks = new Set(state.player.perks || []);
+    const profile = resolveCombatProgression(state.narrative, state.player.level);
+    state.player.combatProfile = profile;
+    state.player.perks = [...profile.perks];
+    const stanceMap = {
+      civicBulwark: "defensive",
+      commonsDuelist: "balanced",
+      cartelTrickster: "aggressive",
+    };
+    state.player.loadout.stance = stanceMap[profile.styleId] || "balanced";
+    state.player.loadout.weapon =
+      profile.styleId === "civicBulwark"
+        ? "Marshal Saber"
+        : profile.styleId === "cartelTrickster"
+          ? "Cartel Rapier"
+          : "Commons Blade";
+
+    if (announce) {
+      const unlocked = profile.perkDetails.filter((perk) => !previousPerks.has(perk.id));
+      for (const perk of unlocked) {
+        logMsg(`Perk unlocked: ${perk.label}. ${perk.description}`);
+      }
+      if (unlocked.length > 0) {
+        logMsg(`Combat doctrine updated: ${profile.style.label}.`);
+      }
+    }
+  }
+
+  function getStanceModifiers() {
+    const stance = state.player.loadout.stance;
+    if (stance === "aggressive") {
+      return { damageMult: 1.12, staminaMult: 1.1, cooldownMult: 1.04, blockPenalty: 1.08, sprintMult: 1.02 };
+    }
+    if (stance === "defensive") {
+      return { damageMult: 0.92, staminaMult: 0.9, cooldownMult: 0.94, blockPenalty: 0.8, sprintMult: 0.95 };
+    }
+    return { damageMult: 1, staminaMult: 1, cooldownMult: 1, blockPenalty: 1, sprintMult: 1 };
+  }
+
   function grantXp(amount) {
     state.player.xp += amount;
+    const previousChapter = state.narrative.chapter;
     while (state.player.xp >= state.player.nextXp) {
       state.player.xp -= state.player.nextXp;
       state.player.level += 1;
@@ -1739,6 +1782,12 @@ const canvas = document.getElementById("game");
       logMsg(`Level up! You reached level ${state.player.level}. The valley trembles!`);
       sfx.levelUp();
       spawnParticles(canvas.width / 2, canvas.height / 2, 20, "#ffd700", 4, 1.5);
+      syncCombatProfileState({ announce: true });
+    }
+    syncChapterFromProgress(state.narrative, state.player.level);
+    if (state.narrative.chapter !== previousChapter) {
+      const chapterInfo = STORY_CHAPTERS[state.narrative.chapterIndex] || STORY_CHAPTERS[0];
+      logMsg(`Story chapter advanced: ${chapterInfo.title}.`);
     }
   }
 
@@ -1748,6 +1797,14 @@ const canvas = document.getElementById("game");
     const ty = Math.floor(y);
     if (ty < 0 || tx < 0 || ty >= map.length || tx >= map[0].length) return true;
     return map[ty][tx] !== 0;
+  }
+
+  function tileTypeAtCurrentMap(x, y) {
+    const map = currentMap();
+    const tx = Math.floor(x);
+    const ty = Math.floor(y);
+    if (ty < 0 || tx < 0 || ty >= map.length || tx >= map[0].length) return 1;
+    return map[ty][tx];
   }
 
   function canOccupy(x, y, radius = PLAYER_COLLISION_RADIUS) {
@@ -1863,29 +1920,74 @@ const canvas = document.getElementById("game");
   }
 
   function updateQuestProgressFromInventory() {
-    const crystalQuest = state.quests.crystal;
-    if (crystalQuest.status === "active") {
-      crystalQuest.progress = Math.min(crystalQuest.need, state.inventory["Crystal Shard"]);
-      if (crystalQuest.progress >= crystalQuest.need) {
-        crystalQuest.status = "complete";
-        logMsg("Quest complete objective: Valley Survey ready to turn in.");
-      }
+    const logs = updateQuestProgressFromInventoryDataDriven(state.quests, state.inventory);
+    for (const entry of logs) {
+      logMsg(entry);
+    }
+  }
+
+  function storyReactiveQuip(npcId) {
+    const affinity = state.narrative.npcAffinity[npcId] || 0;
+    const control = state.narrative.thematicAxes.controlVsFreedom;
+    const truth = state.narrative.thematicAxes.truthVsComfort;
+    const solidarity = state.narrative.thematicAxes.solidarityVsStatus;
+
+    if (npcId === "elder" && truth > 12) {
+      return "Mayor Clem: Publishing truth was brave. Also politically catastrophic. Nice work.";
+    }
+    if (npcId === "warden" && control > 15) {
+      return "Marshal Boone: The streets are calm. The people are less so. That's governance.";
+    }
+    if (npcId === "smith" && solidarity > 10) {
+      return "Professor Cogwheel: Shared tools, shared leverage. Funny how equality scares investors.";
+    }
+    if (npcId === "merchant" && truth < -8) {
+      return "Reverend Quill: Information scarcity remains my most charitable product.";
+    }
+    if (affinity >= 18) {
+      return `${state.npcs.find((npc) => npc.id === npcId)?.name || "NPC"}: You keep your word. That's rarer than ammo.`;
+    }
+    if (affinity <= -10) {
+      return `${state.npcs.find((npc) => npc.id === npcId)?.name || "NPC"}: You talk reform, then negotiate like an accountant with a knife.`;
+    }
+    return null;
+  }
+
+  function describeNpcBackground(npcId) {
+    const profile = MAJOR_NPCS[npcId];
+    if (!profile) return;
+    const affinity = state.narrative.npcAffinity[npcId] || 0;
+    const stance =
+      affinity >= 15 ? "allied" : affinity <= -10 ? "hostile" : "uncertain";
+    logMsg(`${profile.name} profile: public "${profile.publicPersona}" | private "${profile.privateTruth}" | relationship ${stance} (${affinity}).`);
+  }
+
+  function tickNarrativeEvents(dt) {
+    state.narrativePulseTimer = Math.max(0, state.narrativePulseTimer - dt);
+    if (state.narrativePulseTimer > 0) return;
+    state.narrativePulseTimer = 9 + Math.random() * 6;
+
+    const flags = state.narrative.globalFlags;
+    if (flags.ledgerPublished && flags.curfewNormalized && !flags.crossroad_civic_backlash) {
+      flags.crossroad_civic_backlash = true;
+      state.narrative.factionRep.civicCouncil = clamp(state.narrative.factionRep.civicCouncil - 6, -100, 100);
+      state.narrative.npcAffinity.elder = clamp((state.narrative.npcAffinity.elder || 0) + 4, -100, 100);
+      state.narrative.npcAffinity.warden = clamp((state.narrative.npcAffinity.warden || 0) - 5, -100, 100);
+      logMsg("Crossroad event: public transparency collides with curfew control. The council splinters.");
+      return;
     }
 
-    const houseQuest = state.quests.wood;
-    if (houseQuest.status === "active" || houseQuest.status === "complete") {
-      const woodPart = Math.min(houseQuest.needWood, state.inventory.Wood);
-      const stonePart = Math.min(houseQuest.needStone, state.inventory.Stone);
-      const hasAll = woodPart >= houseQuest.needWood && stonePart >= houseQuest.needStone;
-      const wasComplete = houseQuest.status === "complete";
-      houseQuest.progress = woodPart + stonePart;
-      if (hasAll && houseQuest.status === "active") {
-        houseQuest.status = "complete";
-        logMsg("Quest complete objective: Raise Your House ready to turn in.");
-      } else if (!hasAll && wasComplete) {
-        houseQuest.status = "active";
-        logMsg("House materials were used elsewhere. Gather more to finish construction.");
-      }
+    if (flags.toolCommonsCreated && flags.curfewNormalized && !flags.crossroad_tools_policed) {
+      flags.crossroad_tools_policed = true;
+      state.narrative.thematicAxes.controlVsFreedom = clamp(state.narrative.thematicAxes.controlVsFreedom + 7, -100, 100);
+      state.narrative.thematicAxes.solidarityVsStatus = clamp(state.narrative.thematicAxes.solidarityVsStatus - 5, -100, 100);
+      logMsg("Crossroad event: open tooling is now permit-locked. Innovation survives, autonomy shrinks.");
+      return;
+    }
+
+    if (state.narrative.decisions.length >= 3 && !state.narrative.globalFlags.midpoint_reflection) {
+      state.narrative.globalFlags.midpoint_reflection = true;
+      logMsg("Midpoint reflection: your choices changed who holds leverage, not just who likes you.");
     }
   }
 
@@ -1990,6 +2092,24 @@ const canvas = document.getElementById("game");
     if (npc) {
       if (npc.id === "elder") {
         const q = state.quests.crystal;
+        const archiveQuest = state.quests.archive;
+        if (archiveQuest && archiveQuest.status === "complete") {
+          archiveQuest.status = "turned_in";
+          grantXp(archiveQuest.reward.xp);
+          state.player.gold += archiveQuest.reward.gold;
+          const truthBias = state.narrative.thematicAxes.truthVsComfort;
+          if (truthBias >= 0) {
+            state.narrative.factionRep.workersGuild = clamp(state.narrative.factionRep.workersGuild + 8, -100, 100);
+            state.narrative.factionRep.marketCartel = clamp(state.narrative.factionRep.marketCartel - 6, -100, 100);
+          } else {
+            state.narrative.factionRep.civicCouncil = clamp(state.narrative.factionRep.civicCouncil + 6, -100, 100);
+          }
+          state.narrative.ending = resolveNarrativeEnding(state.narrative);
+          logMsg(`Quest done: ${archiveQuest.title}. +${archiveQuest.reward.xp} XP, +${archiveQuest.reward.gold} gold.`);
+          logMsg(`Ending trajectory: ${state.narrative.ending.title} - ${state.narrative.ending.summary}`);
+          sfx.questDone();
+          return;
+        }
         if (q.status === "locked") {
           q.status = "active";
           q.progress = 0;
@@ -2014,9 +2134,16 @@ const canvas = document.getElementById("game");
             state.quests.slime.status = "active";
             logMsg("Elder Nira: Warden Sol needs the marsh cleared.");
           }
+          const decision = applyMajorDecision(state.narrative, "elder");
+          if (decision) {
+            logMsg(decision.immediateLog);
+            logMsg(createDecisionRecap(state.narrative));
+            syncCombatProfileState({ announce: true });
+          }
           return;
         }
-        logMsg(choice(npcDialogue.elder.idle));
+        logMsg(storyReactiveQuip("elder") || choice(npcDialogue.elder.idle));
+        if (Math.random() < 0.35) describeNpcBackground("elder");
         sfx.npcChat();
         return;
       }
@@ -2051,9 +2178,16 @@ const canvas = document.getElementById("game");
             state.quests.wood.status = "active";
             logMsg("Warden Sol: Smith Varo can now build your house.");
           }
+          const decision = applyMajorDecision(state.narrative, "warden");
+          if (decision) {
+            logMsg(decision.immediateLog);
+            logMsg(createDecisionRecap(state.narrative));
+            syncCombatProfileState({ announce: true });
+          }
           return;
         }
-        logMsg(choice(npcDialogue.warden.idle));
+        logMsg(storyReactiveQuip("warden") || choice(npcDialogue.warden.idle));
+        if (Math.random() < 0.35) describeNpcBackground("warden");
         sfx.npcChat();
         return;
       }
@@ -2090,9 +2224,20 @@ const canvas = document.getElementById("game");
           logMsg(`Quest done: ${q.title}. You now own the house! It even has a roof. Probably.`);
           sfx.questDone();
           spawnParticles(canvas.width / 2, canvas.height / 2, 25, "#d8bc6a", 4, 1.5);
+          const decision = applyMajorDecision(state.narrative, "smith");
+          if (decision) {
+            logMsg(decision.immediateLog);
+            logMsg(createDecisionRecap(state.narrative));
+            syncCombatProfileState({ announce: true });
+          }
+          if (state.quests.archive && state.quests.archive.status === "locked") {
+            state.quests.archive.status = "active";
+            logMsg("Professor Cogwheel: One final job. Bring me the Redacted Archive from the north watchtower.");
+          }
           return;
         }
-        logMsg(choice(npcDialogue.smith.idle));
+        logMsg(storyReactiveQuip("smith") || choice(npcDialogue.smith.idle));
+        if (Math.random() < 0.35) describeNpcBackground("smith");
         sfx.npcChat();
         return;
       }
@@ -2102,7 +2247,8 @@ const canvas = document.getElementById("game");
         shopSelection = 0;
         if (shopOpen) {
           sfx.npcChat();
-          logMsg(choice(npcDialogue.merchant.idle));
+          logMsg(storyReactiveQuip("merchant") || choice(npcDialogue.merchant.idle));
+          if (Math.random() < 0.35) describeNpcBackground("merchant");
         } else {
           logMsg("Trader Nyx: Come back when you have more gold... or desperation.");
         }
@@ -2117,6 +2263,7 @@ const canvas = document.getElementById("game");
           logMsg("Innkeeper Mora patched your wounds for 8 gold. 'You owe me a tip.'");
         } else if (state.player.hp >= state.player.maxHp) {
           logMsg(choice(npcDialogue.innkeeper.idle));
+          if (Math.random() < 0.35) describeNpcBackground("innkeeper");
           sfx.npcChat();
         } else {
           logMsg("Innkeeper Mora: 8 gold for healing. I don't do charity... or quality.");
@@ -2128,6 +2275,9 @@ const canvas = document.getElementById("game");
       if (npc.id === "bard") {
         sfx.npcChat();
         logMsg(choice(npcDialogue.bard.idle));
+        if (state.quests.archive && state.quests.archive.status === "active") {
+          logMsg("Bard Jingles: The watchtower in Glass Gulch hums with redacted ledgers. Bring all four pages.");
+        }
         if (Math.random() < 0.3) {
           grantXp(3);
           logMsg("The song was oddly inspiring. +3 XP.");
@@ -2161,6 +2311,26 @@ const canvas = document.getElementById("game");
         state.inventory.Wood += 1;
         grantXp(4);
         logMsg(choice(["Collected Wood. Timber!", "Wood acquired. Bob the Builder approves.", "Got Wood! ...phrasing."]));
+        sfx.pickup();
+      } else if (resource.type === "archive-node") {
+        const archiveQuest = state.quests.archive;
+        if (!archiveQuest || archiveQuest.status === "locked") {
+          resource.harvested = false;
+          logMsg("Encrypted watchtower node: locked behind Professor Cogwheel's final brief.");
+          return;
+        }
+        resource.respawn = 45;
+        archiveQuest.progress = Math.min(archiveQuest.need, archiveQuest.progress + 1);
+        grantXp(12);
+        logMsg(choice([
+          "Recovered a redacted archive page. Truth gets heavier.",
+          "Archive fragment decrypted. The supply chain suddenly looks like a power map.",
+          "Watchtower node cracked. Somebody profits every time fear spikes.",
+        ]));
+        if (archiveQuest.progress >= archiveQuest.need && archiveQuest.status === "active") {
+          archiveQuest.status = "complete";
+          logMsg("Archive objective complete. Bring findings back to the town circle.");
+        }
         sfx.pickup();
       } else {
         resource.respawn = 22;
@@ -2208,6 +2378,7 @@ const canvas = document.getElementById("game");
       return;
     }
 
+    const stance = getStanceModifiers();
     const combos = [
       { duration: 0.31, cooldown: 0.24, reach: 1.95, arc: 0.85, damage: 16, stamina: 9, lunge: 0.12, knock: 0.18 },
       { duration: 0.29, cooldown: 0.22, reach: 2.1, arc: 0.92, damage: 19, stamina: 10, lunge: 0.16, knock: 0.24 },
@@ -2219,14 +2390,17 @@ const canvas = document.getElementById("game");
     }
     state.player.comboStep = (state.player.comboStep % combos.length) + 1;
 
-    const swing = combos[state.player.comboStep - 1];
-    state.player.attackCooldown = swing.cooldown;
+    const swing = applySwingLoadout(combos[state.player.comboStep - 1], state.player.combatProfile, {
+      weatherKind: state.weather.kind,
+      solidarityVsStatus: state.narrative.thematicAxes.solidarityVsStatus,
+    });
+    state.player.attackCooldown = swing.cooldown * stance.cooldownMult;
     state.player.comboWindow = 0.55;
     state.player.swingDuration = swing.duration;
     state.player.swingTimer = swing.duration;
     state.player.blocking = false;
     state.mouseButtons.right = false;
-    state.player.stamina = Math.max(0, state.player.stamina - swing.stamina);
+    state.player.stamina = Math.max(0, state.player.stamina - swing.stamina * stance.staminaMult);
     state.player.cameraKick = clamp(state.player.cameraKick + 0.14 + state.player.comboStep * 0.04, 0, 0.7);
     sfx.swordSwing();
 
@@ -2249,9 +2423,10 @@ const canvas = document.getElementById("game");
       return daSq - dbSq;
     });
 
+    const maxTargets = state.narrative.globalFlags.toolCommonsCreated ? 3 : 2;
     let hitCount = 0;
     for (const enemy of targets) {
-      if (hitCount >= 2) break;
+      if (hitCount >= maxTargets) break;
       const dx = enemy.x - state.player.x;
       const dy = enemy.y - state.player.y;
       const d = Math.hypot(dx, dy);
@@ -2261,7 +2436,9 @@ const canvas = document.getElementById("game");
       const facingDiff = Math.abs(normalizeAngle(angleToEnemy - state.player.angle));
       if (facingDiff > swing.arc) continue;
 
-      const damage = swing.damage + Math.floor(state.player.level * 1.8) + Math.floor(Math.random() * 4) - 1;
+      const damage = Math.floor((swing.damage * stance.damageMult))
+        + Math.floor(state.player.level * 1.8)
+        + Math.floor(Math.random() * 4) - 1;
       enemy.hp -= damage;
       enemy.attackCooldown += 0.45;
       enemy.stagger = 0.2 + state.player.comboStep * 0.05;
@@ -2279,13 +2456,15 @@ const canvas = document.getElementById("game");
         enemy.alive = false;
         enemy.respawn = 22 + Math.random() * 8;
         state.inventory["Slime Core"] += 1;
-        state.player.gold += 10;
-        grantXp(22);
+        const civicBounty = state.narrative.globalFlags.curfewNormalized ? 3 : 0;
+        const truthBonusXp = state.narrative.globalFlags.ledgerPublished ? 4 : 0;
+        state.player.gold += 10 + civicBounty;
+        grantXp(22 + truthBonusXp);
         logMsg(choice([
-          "Slime obliterated! +10 gold, +22 XP, +1 Slime Core.",
-          "Splat! One less blob. +10 gold, +22 XP, +1 Core.",
-          "Slime defeated! It died as it lived: jiggly. +10g, +22 XP.",
-          "Another slime bites the dust(ward). +10g, +22 XP, +1 Core.",
+          `Slime obliterated! +${10 + civicBounty} gold, +${22 + truthBonusXp} XP, +1 Slime Core.`,
+          `Splat! One less blob. +${10 + civicBounty} gold, +${22 + truthBonusXp} XP, +1 Core.`,
+          `Slime defeated! It died as it lived: jiggly. +${10 + civicBounty}g, +${22 + truthBonusXp} XP.`,
+          `Another slime bites the dust(ward). +${10 + civicBounty}g, +${22 + truthBonusXp} XP, +1 Core.`,
         ]));
         sfx.enemyDie();
         spawnParticles(canvas.width / 2, canvas.height * 0.4, 10, "#6be873", 3, 0.8);
@@ -2368,6 +2547,7 @@ const canvas = document.getElementById("game");
     state.chest.opened = false;
     state.chest.respawn = 0;
     state.pigJokeCooldown = 0;
+    state.narrativePulseTimer = 7;
     if (!silent) logMsg("You recover at camp. The valley reshapes itself. The slimes reset. It's like nothing happened... except your pride.");
   }
 
@@ -2637,6 +2817,31 @@ const canvas = document.getElementById("game");
     }
   }
 
+  function updateAmbientSatire(dt) {
+    state.narrative.ambientBanterTimer = Math.max(0, numberOr(state.narrative.ambientBanterTimer, 0) - dt);
+    if (state.mode !== "playing" || state.player.inHouse) return;
+    if (state.narrative.ambientBanterTimer > 0) return;
+    if (Math.random() > dt * 0.18) return;
+
+    const lines = [];
+    if (state.weather.kind === "storm") {
+      lines.push("Town notice: Lightning is now considered a motivational speaker.");
+    }
+    if (state.narrative.thematicAxes.controlVsFreedom > 15) {
+      lines.push("Public service reminder: Curfew starts at dusk and ends when someone important feels safe.");
+    }
+    if (state.narrative.thematicAxes.truthVsComfort > 10) {
+      lines.push("Bard bulletin: The truth has entered the chat and everyone is suddenly busy.");
+    }
+    if (state.narrative.thematicAxes.solidarityVsStatus > 10) {
+      lines.push("Workshop update: Shared tools increased productivity and arguments by 40%.");
+    }
+    if (lines.length > 0) {
+      logMsg(choice(lines));
+      state.narrative.ambientBanterTimer = 9 + Math.random() * 7;
+    }
+  }
+
   function update(dt) {
     state.time += dt;
 
@@ -2670,11 +2875,12 @@ const canvas = document.getElementById("game");
 
     const forward = (state.keys.KeyW || state.keys.ArrowUp ? 1 : 0) - (state.keys.KeyS || state.keys.ArrowDown ? 1 : 0);
     const strafe = (state.keys.KeyD ? 1 : 0) - (state.keys.KeyA ? 1 : 0);
+    const stance = getStanceModifiers();
 
     const sprinting = (state.keys.ShiftLeft || state.keys.ShiftRight) && !player.blocking && !player.inHouse;
     let speedFactor = 1;
     if (sprinting && player.stamina > 4) {
-      speedFactor = 1.42;
+      speedFactor = 1.42 * getSprintModifier(state.player.combatProfile) * stance.sprintMult;
       player.stamina = Math.max(0, player.stamina - dt * 24);
     } else {
       player.stamina = Math.min(100, player.stamina + dt * (player.blocking ? 5 : 8.6));
@@ -2722,6 +2928,8 @@ const canvas = document.getElementById("game");
 
     updateNPCs(dt);
     updatePigs(dt);
+    updateAmbientSatire(dt);
+    tickNarrativeEvents(dt);
 
     if (player.inHouse) {
       updateQuestProgressFromInventory();
@@ -2735,9 +2943,20 @@ const canvas = document.getElementById("game");
         enemy.respawn -= dt;
         if (enemy.respawn <= 0) {
           const pos = findEmptyCell(worldMap, 10, 10, 53, 53, (x, y) => !isInHouseLot(x, y));
+          const nextType = chooseEnemyType(state.player.level, state.weather.kind);
+          const stats = createEnemyStats(nextType, state.player.level);
           enemy.x = pos.x;
           enemy.y = pos.y;
-          enemy.hp = enemy.maxHp;
+          enemy.type = stats.type;
+          enemy.label = stats.label;
+          enemy.color = stats.color;
+          enemy.behavior = stats.behavior;
+          enemy.maxHp = stats.maxHp;
+          enemy.hp = stats.maxHp;
+          enemy.speed = stats.speed;
+          enemy.attackReach = stats.attackReach;
+          enemy.baseDamage = stats.baseDamage;
+          enemy.damageVariance = stats.damageVariance;
           enemy.alive = true;
           enemy.attackCooldown = 0.7;
           enemy.stagger = 0;
@@ -2752,8 +2971,14 @@ const canvas = document.getElementById("game");
       const dx = player.x - enemy.x;
       const dy = player.y - enemy.y;
       const d = Math.hypot(dx, dy);
+      const combatProfile = createEnemyCombatProfile(enemy, player.level);
+      const onGlassGulchTile = tileTypeAtCurrentMap(enemy.x, enemy.y) === 5;
+      if (onGlassGulchTile && enemy.type === "spitter") {
+        combatProfile.pursuitRange += 2.4;
+        combatProfile.attackRange += 0.35;
+      }
 
-      if (d < 9.5 && enemy.stagger <= 0) {
+      if (d < combatProfile.pursuitRange && enemy.stagger <= 0) {
         // Pre-compute inverse distance to avoid division in both calculations
         const invD = 1 / (d + 1e-6);
         const nx = dx * invD;
@@ -2766,22 +2991,24 @@ const canvas = document.getElementById("game");
         if (!isBlocking(enemy.x, nextY)) enemy.y = nextY;
 
         enemy.attackCooldown -= dt;
-        if (d < 1.22 && enemy.attackCooldown <= 0) {
-          enemy.attackCooldown = 1 + Math.random() * 0.5;
+        if (d < combatProfile.attackRange && enemy.attackCooldown <= 0) {
+          enemy.attackCooldown = (1 + Math.random() * 0.5) * combatProfile.cooldownFactor;
           if (player.hurtCooldown <= 0) {
             player.hurtCooldown = 0.33;
-            let damage = 7 + Math.floor(Math.random() * 6);
+            let damage = (enemy.baseDamage || 7) + Math.floor(Math.random() * (enemy.damageVariance || 6));
 
             if (player.blocking) {
               const angleToEnemy = Math.atan2(enemy.y - player.y, enemy.x - player.x);
               const facingDiff = Math.abs(normalizeAngle(angleToEnemy - player.angle));
+              const stance = getStanceModifiers();
+              const mitigated = resolveIncomingDamage(damage, state.player.combatProfile, { blocked: true });
               if (facingDiff < 1.12 && player.stamina > 10) {
-                damage = Math.max(1, Math.floor(damage * 0.35));
+                damage = Math.max(1, Math.floor(mitigated.blocked * stance.blockPenalty));
                 player.stamina = Math.max(0, player.stamina - 11);
                 logMsg("Block absorbed most of the hit. Your shield arm disagrees.");
                 sfx.blockHit();
               } else {
-                damage = Math.max(1, Math.floor(damage * 0.85));
+                damage = Math.max(1, Math.floor(mitigated.glancing));
               }
             }
 
@@ -3451,6 +3678,13 @@ const canvas = document.getElementById("game");
   function render3D() {
     const width = canvas.width;
     const height = canvas.height;
+    const dayForMood = 0.5 + Math.sin(state.time * 0.014) * 0.45;
+    const visualMood = buildVisualMood({
+      weather: state.weather,
+      chapterIndex: state.narrative.chapterIndex,
+      day: dayForMood,
+      qualitySetting: state.weather.quality,
+    });
 
     const baseHorizon = drawSkyAndGround(width, height);
     const bobOffset = Math.sin(state.player.walkBob * 2.2) * (state.player.inHouse ? 1.2 : 2.2);
@@ -3477,6 +3711,7 @@ const canvas = document.getElementById("game");
       if (hit.tileType === 2) tex = textures.water;
       if (hit.tileType === 3) tex = textures.timber;
       if (hit.tileType === 4) tex = textures.plaster;
+      if (hit.tileType === 5) tex = textures.neon;
 
       let texX = Math.floor(hit.wallX * (TEXTURE_SIZE - 1));
       if (!Number.isFinite(texX)) texX = 0;
@@ -3495,7 +3730,7 @@ const canvas = document.getElementById("game");
       ctx.fillRect(x, y + wallHeight * 0.82, 1, wallHeight * 0.18);
 
       if (hit.tileType === 2 && !state.player.inHouse) {
-        const shimmer = (Math.sin(state.time * 3.2 + x * 0.07) * 0.5 + 0.5) * 0.2;
+        const shimmer = (Math.sin(state.time * 3.2 + x * 0.07) * 0.5 + 0.5) * 0.2 * (1 + visualMood.shimmerStrength);
         ctx.fillStyle = `rgba(126, 188, 226, ${shimmer * 0.4})`;
         ctx.fillRect(x, y, 1, wallHeight);
       }
@@ -3503,7 +3738,7 @@ const canvas = document.getElementById("game");
       if (!state.player.inHouse) {
         const fog = clamp((projectedDist - 5) / (MAX_RAY_DIST - 5), 0, 1);
         if (fog > 0) {
-          ctx.fillStyle = `rgba(132, 150, 164, ${fog * (0.38 + state.weather.fog * 0.5)})`;
+          ctx.fillStyle = `rgba(132, 150, 164, ${fog * (0.3 + visualMood.fogStrength)})`;
           ctx.fillRect(x, y, 1, wallHeight);
         }
       }
@@ -3539,13 +3774,24 @@ const canvas = document.getElementById("game");
 
       for (const enemy of state.enemies) {
         if (!enemy.alive) continue;
-        sprites.push({ x: enemy.x, y: enemy.y, color: "#6be873", label: "Slime", size: 1.0, kind: "enemy", hp: enemy.hp, maxHp: enemy.maxHp });
+        sprites.push({
+          x: enemy.x,
+          y: enemy.y,
+          color: enemy.color || "#6be873",
+          label: enemy.label || "Slime",
+          size: enemy.type === "brute" ? 1.18 : enemy.type === "spitter" ? 0.86 : 1.0,
+          kind: "enemy",
+          hp: enemy.hp,
+          maxHp: enemy.maxHp,
+        });
       }
 
       for (const resource of state.resources) {
         if (resource.harvested) continue;
         if (resource.type === "crystal") {
           sprites.push({ x: resource.x, y: resource.y, color: "#8dc4ff", label: "Crystal", size: 0.62, kind: "resource" });
+        } else if (resource.type === "archive-node") {
+          sprites.push({ x: resource.x, y: resource.y, color: "#d96cff", label: "Archive", size: 0.78, kind: "resource" });
         } else if (resource.type === "rock") {
           sprites.push({ x: resource.x, y: resource.y, color: "#8f969f", label: "Stone", size: 0.72, kind: "resource" });
         } else {
@@ -3640,7 +3886,7 @@ const canvas = document.getElementById("game");
 
     const vignette = ctx.createRadialGradient(width * 0.5, height * 0.5, width * 0.12, width * 0.5, height * 0.5, width * 0.68);
     vignette.addColorStop(0, "rgba(0,0,0,0)");
-    vignette.addColorStop(1, "rgba(0,0,0,0.38)");
+    vignette.addColorStop(1, `rgba(0,0,0,${Math.min(0.62, visualMood.vignetteStrength)})`);
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, width, height);
   }
@@ -3703,6 +3949,7 @@ const canvas = document.getElementById("game");
         if (tile === 2) color = "#548eb2";
         if (tile === 3) color = "#7a5a3a";
         if (tile === 4) color = "#ada08e";
+        if (tile === 5) color = "#5f6fa3";
 
         ctx.fillStyle = color;
         ctx.fillRect(originX + mx * cell, originY + my * cell, cell + 0.5, cell + 0.5);
@@ -3854,27 +4101,32 @@ const canvas = document.getElementById("game");
     ctx.font = "11px Georgia";
     ctx.fillText(`${t("labels.lvl")} ${state.player.level}   ${t("labels.gold")} ${state.player.gold}   ${t("labels.potions")} ${state.inventory.Potion}`, 202, hudY + 20);
     ctx.fillText(`${t("labels.crystals")} ${state.inventory["Crystal Shard"]}   ${t("labels.wood")} ${state.inventory.Wood}   ${t("labels.stone")} ${state.inventory.Stone}   ${t("labels.cores")} ${state.inventory["Slime Core"]}`, 202, hudY + 37);
+    ctx.fillText(`Weapon: ${state.player.loadout.weapon}  Stance: ${state.player.loadout.stance}  Perks: ${state.player.perks.length}`, 202, hudY + 48);
 
     const q1 = state.quests.crystal;
     const q2 = state.quests.slime;
     const q3 = state.quests.wood;
+    const q4 = state.quests.archive;
 
     const questLines = [
       `${q1.title}: ${q1.status === "locked" ? t("labels.locked") : q1.status === "turned_in" ? t("labels.done") : `${q1.progress}/${q1.need}${q1.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
       `${q2.title}: ${q2.status === "locked" ? t("labels.locked") : q2.status === "turned_in" ? t("labels.done") : `${q2.progress}/${q2.need}${q2.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
       `${q3.title}: ${q3.status === "locked" ? t("labels.locked") : q3.status === "turned_in" ? t("labels.done") : `${Math.min(q3.needWood, state.inventory.Wood)}/${q3.needWood}W ${Math.min(q3.needStone, state.inventory.Stone)}/${q3.needStone}S${q3.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
+      q4
+        ? `${q4.title}: ${q4.status === "locked" ? t("labels.locked") : q4.status === "turned_in" ? t("labels.done") : `${q4.progress}/${q4.need}${q4.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`
+        : "",
     ];
 
     ctx.fillStyle = "#f3ecd8";
     ctx.font = "11px Georgia";
-    let qy = hudY + 52;
+    let qy = hudY + 60;
     for (const line of questLines) {
       ctx.fillText(line, 202, qy);
       qy += 11;
     }
 
     ctx.fillStyle = "rgba(16, 29, 33, 0.64)";
-    ctx.fillRect(12, 12, 392, 70);
+    ctx.fillRect(12, 12, 620, 86);
     ctx.fillStyle = "#f9f1dd";
     ctx.font = "11px Georgia";
 
@@ -3882,8 +4134,13 @@ const canvas = document.getElementById("game");
     const houseStatus = state.house.unlocked ? t("labels.owned") : t("labels.locked");
     const weatherText = state.player.inHouse ? t("labels.sheltered") : weatherLabel(state.weather.kind);
     ctx.fillText(`${t("labels.location")}: ${location}   ${t("labels.house")}: ${houseStatus}   ${t("labels.weather")}: ${weatherText}`, 20, 28);
+    ctx.fillText(
+      `Chapter: ${state.narrative.chapterTitle}  CVF:${state.narrative.thematicAxes.controlVsFreedom}  TVC:${state.narrative.thematicAxes.truthVsComfort}  SVS:${state.narrative.thematicAxes.solidarityVsStatus}`,
+      20,
+      40,
+    );
 
-    let msgY = 42;
+    let msgY = 54;
     const shown = state.msg.slice(0, 2);
     if (shown.length === 0) {
       ctx.fillText(t("labels.explore"), 20, msgY);
@@ -4067,6 +4324,20 @@ const canvas = document.getElementById("game");
       logMsg(soundEnabled ? "Sound ON. Your ears will thank you. Maybe." : "Sound OFF. Blissful silence.");
     }
 
+    if (event.code === "KeyV") {
+      const order = ["cinematic", "balanced", "performance"];
+      const idx = order.indexOf(state.weather.quality);
+      state.weather.quality = order[(idx + 1) % order.length];
+      logMsg(`Visual quality profile: ${state.weather.quality}.`);
+    }
+
+    if (event.code === "KeyZ") {
+      const stances = ["balanced", "aggressive", "defensive"];
+      const idx = stances.indexOf(state.player.loadout.stance);
+      state.player.loadout.stance = stances[(idx + 1) % stances.length];
+      logMsg(`Combat stance: ${state.player.loadout.stance}.`);
+    }
+
     if (event.code === "KeyR" && state.mode === "gameover") {
       resetWorld();
       state.mode = "playing";
@@ -4183,6 +4454,14 @@ const canvas = document.getElementById("game");
         wood_required: state.quests.wood.needWood,
         stone_required: state.quests.wood.needStone,
       },
+      archive: state.quests.archive
+        ? {
+          title: state.quests.archive.title,
+          status: state.quests.archive.status,
+          progress: state.quests.archive.progress,
+          need: state.quests.archive.need,
+        }
+        : null,
     };
 
     const payload = {
@@ -4217,6 +4496,8 @@ const canvas = document.getElementById("game");
         blocking: state.player.blocking,
         combo_step: state.player.comboStep,
         swinging: state.player.swingTimer > 0,
+        loadout: state.player.loadout,
+        perks: state.player.perks,
       },
       inventory: state.inventory,
       house: {
@@ -4229,6 +4510,14 @@ const canvas = document.getElementById("game");
         },
       },
       quests,
+      narrative: {
+        chapter: state.narrative.chapter,
+        chapterTitle: state.narrative.chapterTitle,
+        factionRep: state.narrative.factionRep,
+        thematicAxes: state.narrative.thematicAxes,
+        decisions: state.narrative.decisions,
+        ending: resolveNarrativeEnding(state.narrative),
+      },
       nearby_npcs: state.player.inHouse
         ? []
         : activeNpcs
@@ -4262,6 +4551,8 @@ const canvas = document.getElementById("game");
         : activeEnemies
           .map((e) => ({
             id: e.id,
+            type: e.type,
+            label: e.label,
             x: Number(e.x.toFixed(2)),
             y: Number(e.y.toFixed(2)),
             hp: e.hp,

@@ -3,126 +3,106 @@
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=flat&logo=javascript&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Atmosphere-3178C6?style=flat&logo=typescript&logoColor=white)
 ![HTML5](https://img.shields.io/badge/HTML5-Canvas-E34F26?style=flat&logo=html5&logoColor=white)
-![Python](https://img.shields.io/badge/Python-Tools-3776AB?style=flat&logo=python&logoColor=white)
 ![Vitest](https://img.shields.io/badge/Vitest-Tests-6E9F18?style=flat&logo=vitest&logoColor=white)
 ![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33?style=flat&logo=playwright&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat)
 
-A first-person western RPG that runs in a single HTML file — raycast 3D renderer, melee combat, quest progression, dynamic weather, boid-flocked pig outlaws, and save/load. No frameworks, no engine, no build step: the rendering, physics, AI, and UI are all transparent in one readable codebase.
+Story-first western RPG in a single-page Canvas app. The flagship update adds chapter-driven narrative systems, major choice consequences, enemy archetypes, richer atmosphere profiles, and a satirical tone inspired by *Animal Farm* power critique and cyberpunk social pressure.
 
-![Gameplay preview](docs/screenshot.jpg)
+![Flagship Story Overview](docs/flagship-story-overview.svg)
+![Flagship Systems Overview](docs/flagship-systems-overview.svg)
+![Flagship NPC Cast](docs/flagship-npc-cast.svg)
 
-## Demo
+## What's New in Flagship Update
 
-Clone and run locally (see [Getting Started](#getting-started)) — the game is a static `index.html` and works offline.
+- **Story-first structure**: three-act campaign state (`act1` to `act3`) tracked in runtime and saves.
+- **Decision consequence engine**: major choices modify thematic axes, faction reputation, NPC affinity, and ending resolution.
+- **Expanded NPC framing**: core cast now has layered motivations and reactive alignment shifts.
+- **Combat depth bump**: enemy archetypes (`slime`, `charger`, `spitter`, `brute`) with behavior-specific profiles.
+- **Visual mood tuning**: chapter/weather-aware fog, shimmer, and vignette profiles plus runtime quality cycling (`V`).
+- **Data-driven quest scaffolding**: quest definitions moved into reusable registry with Glass Gulch archive nodes for multi-step branch completion.
+- **Save migration**: save payload upgraded to version `2` with backward-compatible loading for version `1`.
+- **Test expansion**: new Vitest coverage for decision logic, combat doctrine behavior, enemy archetype scaling, and quest registry progression.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/coleyrockin/WestWardRPG)
+## Feature Overview
 
-One-click deploy to Vercel (zero configuration required thanks to `vercel.json`), or use any static host (GitHub Pages, Netlify, Cloudflare Pages).
-
----
-
-## Features
-
-- **Raycast 3D renderer** — framework-free first-person view with textured walls and sprites
-- **Melee combat system** — combo swings, block timing, stamina pressure, and enemy AI
-- **Full quest loop** — gather, fight, craft, and build your house
-- **Dynamic atmosphere** — day/night cycle with weather states (rain, fog, clear)
-- **Pig chaos** — eight named outlaw pigs with boid-flocking AI, stampede triggers, and pickpocketing
-- **Save/load + autosave** — persistent progress for longer play sessions
-- **Multi-language support** — English, Español, Português, Français, Deutsch, Italiano, 日本語, Türkçe
-- **Deterministic test automation** — JSON-driven action scripts for CI validation
-
-## Tech Stack
-
-| Category | Technologies |
-|----------|-------------|
-| **Core Engine** | JavaScript ES6+, HTML5 Canvas |
-| **Typed Modules** | TypeScript (atmosphere math) |
-| **Scripting** | Python (balance tuning, test harness) |
-| **Build Tools** | Shell, Ruby (bundler), Perl (log analysis), PHP (config generator) |
-| **Testing** | Vitest unit tests, Playwright E2E, JSON action scripts, shell smoke suite |
-| **Deployment** | Static HTML — no server required |
+- **Narrative Systems**
+  - chapter progression and chapter HUD visibility
+  - thematic axes (`controlVsFreedom`, `truthVsComfort`, `solidarityVsStatus`)
+  - endings resolved from ideology outcomes, not only combat success
+- **World and Quest Systems**
+  - data-driven quest definitions
+  - branching-style archive quest progression
+  - faction/NPC consequence persistence in save data
+- **Combat and AI Systems**
+  - archetype-based enemy spawning and stats scaling
+  - behavior-aware pursuit/attack profiles
+  - weather-adjusted combat pressure
+- **Visual and Atmosphere Systems**
+  - atmosphere blend from typed weather model + mood profile
+  - quality presets for cinematic vs performance
+  - enhanced weather readability in HUD and overlays
 
 ## Getting Started
 
 ```bash
-# Clone the repository
 git clone https://github.com/coleyrockin/WestWardRPG.git
-
-# Navigate to the project
 cd WestWardRPG
-
-# Install dependencies
 npm install
-
-# Start the development server
 npm run dev
 ```
 
-Open the printed local URL to play. No build step required for the base game — just open `index.html` in a browser.
+Open <http://localhost:5173/> and play.
 
-### Running the test suite
+## Run and Verification Commands
 
 ```bash
-npm test            # Vitest unit tests
-npm run test:smoke  # Playwright end-to-end smoke scenarios
+npm run dev
+npm run test
+npm run test:smoke
+npm run test:coverage
 npm run typecheck:ts
+npm run dev:lint
+npm run qa
 ```
 
 ## Controls
 
-| Action | Key |
-|--------|-----|
-| Move | `W` `A` `S` `D` |
-| Look | Mouse |
-| Attack | Left click |
-| Block | Right click / `Shift` |
-| Interact | `E` |
-| Inventory | `I` |
-| Quest log | `Q` |
-| Save | `F5` |
-| Load | `F9` |
+- Move: `W` `A` `S` `D` or arrow keys
+- Look: mouse (pointer lock) or `ArrowLeft` / `ArrowRight`
+- Attack: left mouse or `Space`
+- Block: right mouse or `C`
+- Interact: `E` or `Enter`
+- Use potion: `Q`
+- Toggle map: `M`
+- Toggle sound: `N`
+- Toggle fullscreen: `F`
+- Save / Load: `K` / `L`
+- Recover after defeat: `R`
+- Cycle visual quality: `V`
 
 ## Project Structure
 
-```
+```text
 WestWardRPG/
-├── index.html                     # Game entry point and HUD
+├── index.html
 ├── src/
-│   ├── main.js                    # Core game loop, rendering, combat, AI, quests
-│   ├── constants.js               # Tuning constants, save keys, pig-role data
-│   └── math.js                    # Pure math utilities (clamp, lerp, dist, noise2D…)
-├── atmosphere.ts / atmosphere.js  # Typed atmosphere math (TS source + compiled JS)
-├── web_game_playwright_client.mjs # Playwright action-script runner
-├── scripts/                       # Dev tools (Shell, Python, Ruby, Perl, PHP, Rust, Go)
-├── tests/                         # Vitest unit tests
-├── test-actions/                  # Deterministic JSON test scripts
-├── test-data/                     # Fixtures for map and texture validators
-├── docs/                          # Screenshots and technical documentation
-└── package.json                   # Dependencies and scripts
+│   ├── main.js
+│   ├── constants.js
+│   ├── math.js
+│   ├── decisionEngine.js
+│   ├── combatLoadout.js
+│   ├── enemyArchetypes.js
+│   ├── questDefinitions.js
+│   ├── visualProfile.js
+│   └── storyContent.js
+├── atmosphere.ts
+├── atmosphere.js
+├── tests/
+├── test-actions/
+├── docs/
+└── package.json
 ```
-
-## Code Language Variety
-
-| Language | Purpose |
-|----------|--------|
-| **JavaScript** | Core game loop, rendering, combat, AI, save/load |
-| **TypeScript** | Typed atmosphere math module |
-| **Python** | Balance tuning and test harness |
-| **HTML5 / CSS** | Canvas shell, HUD, responsive overlays |
-| **Shell** | Dev automation and build tooling |
-| **Ruby** | Asset bundler |
-| **Perl** | Log analysis and statistics |
-| **PHP** | Web server config generator |
-| **JSON** | Deterministic test-action scripts |
-
-## What This Demonstrates
-
-- **Graphics from first principles** — a working raycast renderer (walls, sprites, depth, lighting) without a game engine or 3D library.
-- **Systems thinking** — combat, AI, quests, inventory, save/load, i18n, and atmosphere all composed in a single readable JS module.
-- **Test discipline on a toy codebase** — deterministic JSON action scripts driven by a Playwright client produce reproducible state snapshots for CI.
-- **Polyglot tooling** — the game is vanilla JS/HTML, while supporting dev utilities span Python, Shell, Ruby, Perl, PHP, Rust, and Go to exercise the full script-and-build toolbelt.
 
 ## Contributing
 
@@ -131,7 +111,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 MIT License — see [LICENSE](LICENSE).
-
----
-
-*Built with vanilla JavaScript, HTML5 Canvas, and a whole lot of pig chaos.*

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc">
+  <title id="title">WestWardRPG Flagship Story Overview</title>
+  <desc id="desc">Three-act story arc with philosophical axes and faction pressure.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1b2330"/>
+      <stop offset="100%" stop-color="#3f2b2b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <text x="60" y="74" fill="#f6e3bc" font-family="Georgia, serif" font-size="44" font-weight="700">Flagship Narrative Arc</text>
+  <text x="60" y="112" fill="#c6d4e7" font-family="Georgia, serif" font-size="22">Animal Farm satire + cyberpunk pressure + consequential frontier choices</text>
+
+  <g font-family="Georgia, serif">
+    <rect x="60" y="158" width="340" height="410" rx="16" fill="#2a3344" stroke="#f2b063" stroke-width="2"/>
+    <text x="84" y="202" fill="#f2b063" font-size="32">Act I</text>
+    <text x="84" y="236" fill="#f2f4f6" font-size="26">Dust and Debts</text>
+    <text x="84" y="280" fill="#dbe5f2" font-size="20">- Propaganda starts as comfort</text>
+    <text x="84" y="312" fill="#dbe5f2" font-size="20">- Debt books stay hidden</text>
+    <text x="84" y="344" fill="#dbe5f2" font-size="20">- Factions recruit the player</text>
+    <text x="84" y="388" fill="#ffd9b3" font-size="18">Question: Safety for whom?</text>
+  </g>
+
+  <g font-family="Georgia, serif">
+    <rect x="430" y="158" width="340" height="410" rx="16" fill="#303046" stroke="#8fc9ff" stroke-width="2"/>
+    <text x="454" y="202" fill="#8fc9ff" font-size="32">Act II</text>
+    <text x="454" y="236" fill="#f2f4f6" font-size="26">Ridiculous Cold War</text>
+    <text x="454" y="280" fill="#dbe5f2" font-size="20">- Truth gets selectively edited</text>
+    <text x="454" y="312" fill="#dbe5f2" font-size="20">- Curfew tools normalize control</text>
+    <text x="454" y="344" fill="#dbe5f2" font-size="20">- NPC loyalties fracture</text>
+    <text x="454" y="388" fill="#cfe7ff" font-size="18">Question: Comfort or transparency?</text>
+  </g>
+
+  <g font-family="Georgia, serif">
+    <rect x="800" y="158" width="340" height="410" rx="16" fill="#3a2f36" stroke="#c98e8e" stroke-width="2"/>
+    <text x="824" y="202" fill="#c98e8e" font-size="32">Act III</text>
+    <text x="824" y="236" fill="#f2f4f6" font-size="26">Reckoning Hoedown</text>
+    <text x="824" y="280" fill="#dbe5f2" font-size="20">- Contradictory choices collide</text>
+    <text x="824" y="312" fill="#dbe5f2" font-size="20">- District control changes</text>
+    <text x="824" y="344" fill="#dbe5f2" font-size="20">- Ending reflects ideology</text>
+    <text x="824" y="388" fill="#ffd7d7" font-size="18">Question: New world or new rulers?</text>
+  </g>
+
+  <text x="60" y="624" fill="#f0eadf" font-family="Georgia, serif" font-size="22">Decision Axes: Control vs Freedom | Truth vs Comfort | Solidarity vs Status</text>
+</svg>

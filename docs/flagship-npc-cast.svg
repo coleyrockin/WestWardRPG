@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc">
+  <title id="title">WestWardRPG Flagship NPC Cast</title>
+  <desc id="desc">Key NPCs and their layered motivations in the flagship update.</desc>
+  <rect width="1200" height="675" fill="#1b1f27"/>
+  <text x="56" y="74" fill="#f6e3bc" font-family="Georgia, serif" font-size="42" font-weight="700">Flagship NPC Cast</text>
+  <text x="56" y="110" fill="#d4dfec" font-family="Georgia, serif" font-size="21">Fun backgrounds, private agendas, and consequence-sensitive alliances.</text>
+
+  <g font-family="Georgia, serif" font-size="18">
+    <rect x="56" y="154" width="338" height="236" rx="14" fill="#2c3442" stroke="#f2b063"/>
+    <text x="78" y="194" fill="#f2b063" font-size="26">Clementine "Clem" Rusk</text>
+    <text x="78" y="228" fill="#edf3f8">Public: hopeful reform mayor</text>
+    <text x="78" y="260" fill="#edf3f8">Private: edits truth for stability</text>
+    <text x="78" y="292" fill="#edf3f8">Gag: motivational slogans at funerals</text>
+  </g>
+
+  <g font-family="Georgia, serif" font-size="18">
+    <rect x="430" y="154" width="338" height="236" rx="14" fill="#2e3a30" stroke="#9de297"/>
+    <text x="452" y="194" fill="#9de297" font-size="26">Marshal Brickett Boone</text>
+    <text x="452" y="228" fill="#edf3f8">Public: lawful town guardian</text>
+    <text x="452" y="260" fill="#edf3f8">Private: prefers fear to uncertainty</text>
+    <text x="452" y="292" fill="#edf3f8">Gag: writes permit-themed sonnets</text>
+  </g>
+
+  <g font-family="Georgia, serif" font-size="18">
+    <rect x="804" y="154" width="338" height="236" rx="14" fill="#3a2f2f" stroke="#e6a47f"/>
+    <text x="826" y="194" fill="#e6a47f" font-size="26">Professor Tilly Cogwheel</text>
+    <text x="826" y="228" fill="#edf3f8">Public: playful frontier inventor</text>
+    <text x="826" y="260" fill="#edf3f8">Private: tools determine class power</text>
+    <text x="826" y="292" fill="#edf3f8">Gag: calls disasters "field tests"</text>
+  </g>
+
+  <g font-family="Georgia, serif" font-size="18">
+    <rect x="242" y="418" width="338" height="210" rx="14" fill="#352f3f" stroke="#8fc9ff"/>
+    <text x="264" y="458" fill="#8fc9ff" font-size="26">Reverend Jasper Quill</text>
+    <text x="264" y="492" fill="#edf3f8">Public: compassionate guide</text>
+    <text x="264" y="524" fill="#edf3f8">Private: information market broker</text>
+    <text x="264" y="556" fill="#edf3f8">Gag: upsells absolution tiers</text>
+  </g>
+
+  <g font-family="Georgia, serif" font-size="18">
+    <rect x="620" y="418" width="338" height="210" rx="14" fill="#2f3238" stroke="#c98e8e"/>
+    <text x="642" y="458" fill="#c98e8e" font-size="26">Nora "Knuckles" Vale</text>
+    <text x="642" y="492" fill="#edf3f8">Public: innkeeper in recovery</text>
+    <text x="642" y="524" fill="#edf3f8">Private: old outlaw logistics ties</text>
+    <text x="642" y="556" fill="#edf3f8">Gag: threatens politely over tea</text>
+  </g>
+</svg>
