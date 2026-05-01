@@ -314,7 +314,7 @@ async function main() {
 
   if (args.clickSelector) {
     try {
-      await page.click(args.clickSelector, { timeout: 5000 });
+      await page.click(args.clickSelector, { timeout: 5000, force: true });
       await page.waitForTimeout(250);
     } catch (err) {
       console.warn("Failed to click selector", args.clickSelector, err);

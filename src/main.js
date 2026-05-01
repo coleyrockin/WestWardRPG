@@ -1215,7 +1215,7 @@ const canvas = document.getElementById("game");
       wind: 0.18,
       lightning: 0,
       timer: 22,
-      quality: "balanced",
+      quality: "cinematic",
     },
     player: {
       x: 9.5,
@@ -3088,28 +3088,136 @@ const canvas = document.getElementById("game");
     tickAutoSave(dt);
   }
 
+  function roundedRectPath(x, y, w, h, radius = 6) {
+    const r = Math.min(radius, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function fillRoundedRect(x, y, w, h, radius, fillStyle) {
+    roundedRectPath(x, y, w, h, radius);
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+  }
+
+  function strokeRoundedRect(x, y, w, h, radius, strokeStyle, lineWidth = 1) {
+    roundedRectPath(x, y, w, h, radius);
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  }
+
+  function drawSoftPanel(x, y, w, h, options = {}) {
+    const radius = options.radius ?? 8;
+    const top = options.top ?? "rgba(21, 31, 35, 0.86)";
+    const bottom = options.bottom ?? "rgba(8, 14, 18, 0.78)";
+    const border = options.border ?? "rgba(255, 221, 153, 0.28)";
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.32)";
+    ctx.shadowBlur = options.shadowBlur ?? 18;
+    ctx.shadowOffsetY = options.shadowOffsetY ?? 8;
+    const grad = ctx.createLinearGradient(x, y, x, y + h);
+    grad.addColorStop(0, top);
+    grad.addColorStop(1, bottom);
+    fillRoundedRect(x, y, w, h, radius, grad);
+    ctx.shadowColor = "transparent";
+    strokeRoundedRect(x + 0.5, y + 0.5, w - 1, h - 1, radius, border, 1);
+    ctx.restore();
+  }
+
+  function fitText(text, maxWidth) {
+    const source = String(text ?? "");
+    if (ctx.measureText(source).width <= maxWidth) return source;
+    let low = 0;
+    let high = source.length;
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      if (ctx.measureText(`${source.slice(0, mid)}...`).width <= maxWidth) low = mid;
+      else high = mid - 1;
+    }
+    return `${source.slice(0, Math.max(0, low))}...`;
+  }
+
+  function drawClippedText(text, x, y, maxWidth, fillStyle) {
+    ctx.fillStyle = fillStyle;
+    ctx.fillText(fitText(text, maxWidth), x, y);
+  }
+
+  function drawPillLabel(text, x, y, fillStyle = "rgba(15, 22, 24, 0.74)", textStyle = "#f7e7c7") {
+    const padX = 7;
+    const w = ctx.measureText(text).width + padX * 2;
+    const h = 18;
+    fillRoundedRect(x - w / 2, y - h, w, h, 7, fillStyle);
+    strokeRoundedRect(x - w / 2 + 0.5, y - h + 0.5, w - 1, h - 1, 7, "rgba(255, 223, 164, 0.28)", 1);
+    ctx.fillStyle = textStyle;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x, y - h / 2);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  }
+
   function drawInteriorBackdrop(width, height) {
     const horizon = Math.floor(height * 0.57);
 
     const ceilGrad = ctx.createLinearGradient(0, 0, 0, horizon);
-    ceilGrad.addColorStop(0, "#2a2d35");
-    ceilGrad.addColorStop(1, "#4b3d32");
+    ceilGrad.addColorStop(0, "#151b20");
+    ceilGrad.addColorStop(0.5, "#2b2b28");
+    ceilGrad.addColorStop(1, "#574636");
     ctx.fillStyle = ceilGrad;
     ctx.fillRect(0, 0, width, horizon);
 
     const floorGrad = ctx.createLinearGradient(0, horizon, 0, height);
-    floorGrad.addColorStop(0, "#5e4e3d");
-    floorGrad.addColorStop(1, "#2f2822");
+    floorGrad.addColorStop(0, "#75614b");
+    floorGrad.addColorStop(1, "#241e19");
     ctx.fillStyle = floorGrad;
     ctx.fillRect(0, horizon, width, height - horizon);
+
+    const lampX = width * 0.55 + Math.sin(state.time * 0.8) * 18;
+    const lampY = horizon * 0.3;
+    const lamp = ctx.createRadialGradient(lampX, lampY, 4, lampX, lampY, Math.max(width, height) * 0.48);
+    lamp.addColorStop(0, "rgba(255, 206, 128, 0.28)");
+    lamp.addColorStop(0.42, "rgba(184, 111, 58, 0.1)");
+    lamp.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = lamp;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.strokeStyle = "rgba(43, 27, 18, 0.28)";
+    ctx.lineWidth = 4;
+    for (let x = -80; x < width + 120; x += 120) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x + width * 0.18, horizon + 14);
+      ctx.stroke();
+    }
 
     for (let i = 0; i < 18; i++) {
       const t = i / 18;
       const y = horizon + t * (height - horizon);
-      ctx.strokeStyle = `rgba(34, 23, 15, ${0.16 * (1 - t)})`;
+      ctx.strokeStyle = `rgba(25, 16, 11, ${0.18 * (1 - t)})`;
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < 20; i++) {
+      const t = i / 19;
+      const floorX = width * (0.5 + (t - 0.5) * 1.8);
+      ctx.strokeStyle = `rgba(255, 219, 156, ${0.05 + 0.05 * (1 - Math.abs(t - 0.5) * 2)})`;
+      ctx.beginPath();
+      ctx.moveTo(width * 0.5, horizon);
+      ctx.lineTo(floorX, height);
       ctx.stroke();
     }
 
@@ -3176,12 +3284,20 @@ const canvas = document.getElementById("game");
       sunGrad.addColorStop(1, "rgba(255, 247, 204, 0)");
       ctx.fillStyle = sunGrad;
       ctx.fillRect(0, 0, width, horizon);
+      ctx.fillStyle = `rgba(255, 226, 149, ${0.46 * normalizedDay * (1 - weather.rain * 0.75)})`;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, sunR * 0.34, 0, TAU);
+      ctx.fill();
     } else {
       const moonGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 2.2);
       moonGrad.addColorStop(0, "rgba(220, 234, 255, 0.52)");
       moonGrad.addColorStop(1, "rgba(220, 234, 255, 0)");
       ctx.fillStyle = moonGrad;
       ctx.fillRect(0, 0, width, horizon);
+      ctx.fillStyle = `rgba(227, 238, 255, ${0.34 * (1 - weather.rain * 0.6)})`;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, sunR * 0.28, 0, TAU);
+      ctx.fill();
     }
 
     const cloudCount = 7 + Math.floor(weather.fog * 10);
@@ -3207,6 +3323,13 @@ const canvas = document.getElementById("game");
       ctx.restore();
     }
 
+    const dustLine = ctx.createLinearGradient(0, horizon - 88, 0, horizon + 22);
+    dustLine.addColorStop(0, "rgba(226, 189, 130, 0)");
+    dustLine.addColorStop(0.62, `rgba(226, 189, 130, ${0.08 + weather.fog * 0.08 + normalizedDay * 0.05})`);
+    dustLine.addColorStop(1, "rgba(226, 189, 130, 0)");
+    ctx.fillStyle = dustLine;
+    ctx.fillRect(0, horizon - 88, width, 120);
+
     const ridge = (amp, offset, elev, color) => {
       ctx.fillStyle = color;
       ctx.beginPath();
@@ -3221,10 +3344,10 @@ const canvas = document.getElementById("game");
       ctx.fill();
     };
 
-    ridge(13, state.time * 0.03, horizon - 44, `rgba(70, 108, 120, ${0.28 + normalizedDay * 0.2 + weather.fog * 0.3})`);
-    ridge(18, state.time * 0.04 + 1.4, horizon - 18, `rgba(52, 84, 98, ${0.36 + normalizedDay * 0.2 + weather.fog * 0.24})`);
+    ridge(13, state.time * 0.03, horizon - 52, `rgba(120, 98, 78, ${0.24 + normalizedDay * 0.2 + weather.fog * 0.26})`);
+    ridge(18, state.time * 0.04 + 1.4, horizon - 22, `rgba(83, 78, 72, ${0.34 + normalizedDay * 0.18 + weather.fog * 0.24})`);
 
-    ctx.fillStyle = `rgba(28, 58, 44, ${0.36 + normalizedDay * 0.12 + weather.fog * 0.1})`;
+    ctx.fillStyle = `rgba(45, 73, 50, ${0.32 + normalizedDay * 0.12 + weather.fog * 0.1})`;
     ctx.beginPath();
     ctx.moveTo(0, horizon + 24);
     for (let x = 0; x <= width + 14; x += 14) {
@@ -3242,18 +3365,44 @@ const canvas = document.getElementById("game");
     const groundGrad = ctx.createLinearGradient(0, horizon, 0, height);
     groundGrad.addColorStop(
       0,
-      `rgb(${Math.floor(lerp(50, 132, normalizedDay) * (1 - weather.rain * 0.22))}, ${Math.floor(lerp(68, 178, normalizedDay) * (1 - weather.rain * 0.28))}, ${Math.floor(
-        lerp(56, 116, normalizedDay) * (1 - weather.rain * 0.2),
+      `rgb(${Math.floor(lerp(48, 128, normalizedDay) * (1 - weather.rain * 0.18))}, ${Math.floor(lerp(61, 148, normalizedDay) * (1 - weather.rain * 0.22))}, ${Math.floor(
+        lerp(50, 96, normalizedDay) * (1 - weather.rain * 0.16),
       )})`,
     );
     groundGrad.addColorStop(
       1,
-      `rgb(${Math.floor(lerp(34, 90, normalizedDay) * (1 - weather.rain * 0.18))}, ${Math.floor(lerp(46, 126, normalizedDay) * (1 - weather.rain * 0.2))}, ${Math.floor(
-        lerp(38, 86, normalizedDay) * (1 - weather.rain * 0.14),
+      `rgb(${Math.floor(lerp(36, 91, normalizedDay) * (1 - weather.rain * 0.14))}, ${Math.floor(lerp(43, 107, normalizedDay) * (1 - weather.rain * 0.18))}, ${Math.floor(
+        lerp(34, 68, normalizedDay) * (1 - weather.rain * 0.12),
       )})`,
     );
     ctx.fillStyle = groundGrad;
     ctx.fillRect(0, horizon, width, height - horizon);
+
+    const groundDepth = height - horizon;
+    const trailCenter = width * 0.5 + Math.sin(state.player.angle * 1.7) * width * 0.08;
+    const trail = ctx.createLinearGradient(0, horizon, 0, height);
+    trail.addColorStop(0, `rgba(190, 151, 92, ${0.015 + normalizedDay * 0.02})`);
+    trail.addColorStop(1, `rgba(199, 157, 95, ${0.08 + normalizedDay * 0.06})`);
+    ctx.fillStyle = trail;
+    ctx.beginPath();
+    ctx.moveTo(trailCenter - width * 0.025, horizon + 4);
+    ctx.bezierCurveTo(width * 0.38, horizon + groundDepth * 0.36, width * 0.24, height * 0.82, width * 0.12, height + 18);
+    ctx.lineTo(width * 0.9, height + 18);
+    ctx.bezierCurveTo(width * 0.74, height * 0.82, width * 0.62, horizon + groundDepth * 0.36, trailCenter + width * 0.025, horizon + 4);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(79, 61, 39, ${0.08 + normalizedDay * 0.04})`;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 9; i++) {
+      const t = i / 8;
+      const y = horizon + Math.pow(t, 1.45) * groundDepth;
+      const spread = lerp(width * 0.04, width * 0.28, t);
+      ctx.beginPath();
+      ctx.moveTo(trailCenter - spread, y);
+      ctx.lineTo(trailCenter + spread, y + 2);
+      ctx.stroke();
+    }
 
     for (let i = 0; i < 30; i++) {
       const t = i / 29;
@@ -3321,12 +3470,43 @@ const canvas = document.getElementById("game");
       ctx.fillStyle = `rgba(${78 + near * 22}, ${84 + near * 18}, ${72 + near * 15}, ${0.09 + near * 0.18})`;
       ctx.fillRect(x, y, size, size * 0.72);
     }
+
+    const scrubCount = Math.floor(width / 64);
+    for (let i = 0; i < scrubCount; i++) {
+      const baseX = (i * 157 + 41) % width;
+      const baseY = height - 18 - ((i * 29) % 50);
+      const scale = 0.7 + ((i * 17) % 10) / 10;
+      ctx.strokeStyle = `rgba(70, 91, 58, ${0.18 + scale * 0.08})`;
+      ctx.lineWidth = 1.2;
+      for (let branch = 0; branch < 5; branch++) {
+        const angle = -Math.PI / 2 + (branch - 2) * 0.38;
+        const len = (12 + branch * 3) * scale;
+        ctx.beginPath();
+        ctx.moveTo(baseX, baseY);
+        ctx.lineTo(baseX + Math.cos(angle) * len, baseY + Math.sin(angle) * len);
+        ctx.stroke();
+      }
+    }
   }
 
   function drawWeatherOverlay() {
     if (state.player.inHouse) return;
 
     const weather = state.weather;
+    const dustAlpha = clamp((0.24 + weather.wind * 0.34) * (1 - weather.rain * 0.85), 0, 0.34);
+    if (dustAlpha > 0.03) {
+      ctx.fillStyle = `rgba(246, 214, 156, ${dustAlpha})`;
+      const motes = Math.floor(canvas.width / 18);
+      for (let i = 0; i < motes; i++) {
+        const x = ((i * 101 + state.time * (18 + weather.wind * 64)) % (canvas.width + 80)) - 40;
+        const y = ((i * 67 + Math.sin(state.time * 0.4 + i) * 30) % canvas.height);
+        const size = 0.7 + ((i * 13) % 9) * 0.11;
+        ctx.globalAlpha = dustAlpha * (0.35 + ((i * 7) % 10) / 20);
+        ctx.fillRect(x, y, size, size);
+      }
+      ctx.globalAlpha = 1;
+    }
+
     if (weather.rain > 0.03) {
       const streaks = Math.floor(canvas.width * (0.03 + weather.rain * 0.1));
       ctx.strokeStyle = `rgba(196, 218, 238, ${0.1 + weather.rain * 0.2})`;
@@ -3345,8 +3525,9 @@ const canvas = document.getElementById("game");
 
     if (weather.fog > 0.08) {
       const fog = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      fog.addColorStop(0, `rgba(214, 226, 236, ${weather.fog * 0.08})`);
-      fog.addColorStop(1, `rgba(214, 226, 236, ${weather.fog * 0.2})`);
+      fog.addColorStop(0, `rgba(229, 221, 202, ${weather.fog * 0.07})`);
+      fog.addColorStop(0.55, `rgba(220, 214, 197, ${weather.fog * 0.12})`);
+      fog.addColorStop(1, `rgba(198, 180, 150, ${weather.fog * 0.22})`);
       ctx.fillStyle = fog;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
@@ -3362,27 +3543,49 @@ const canvas = document.getElementById("game");
     ctx.save();
     ctx.translate(left, top);
 
-    ctx.fillStyle = `rgba(0, 0, 0, ${0.15 * lightFactor})`;
+    const glowColor =
+      sprite.kind === "enemy" ? "rgba(112, 246, 126, 0.38)" :
+        sprite.kind === "resource" && sprite.label === "Crystal" ? "rgba(124, 205, 255, 0.35)" :
+          sprite.kind === "resource" && sprite.label === "Archive" ? "rgba(218, 108, 255, 0.34)" :
+            "rgba(255, 220, 163, 0.16)";
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = sprite.kind === "enemy" || sprite.label === "Crystal" || sprite.label === "Archive" ? 14 : 6;
+    ctx.shadowOffsetY = 2;
+
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.24 * lightFactor})`;
     ctx.beginPath();
-    ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.94, spriteWidth * 0.36, spriteHeight * 0.08, 0, 0, TAU);
+    ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.94, spriteWidth * 0.42, spriteHeight * 0.1, 0, 0, TAU);
     ctx.fill();
+    ctx.shadowOffsetY = 0;
 
     if (sprite.kind === "npc") {
       const robe = ctx.createLinearGradient(0, 0, 0, spriteHeight);
       robe.addColorStop(0, shadeHex(sprite.color, 1.2));
       robe.addColorStop(1, shadeHex(sprite.color, 0.55));
       ctx.fillStyle = robe;
+      ctx.strokeStyle = "rgba(21, 18, 16, 0.34)";
+      ctx.lineWidth = Math.max(1, spriteWidth * 0.025);
       ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.3, spriteWidth * 0.4, spriteHeight * 0.62);
+      ctx.strokeRect(spriteWidth * 0.3, spriteHeight * 0.3, spriteWidth * 0.4, spriteHeight * 0.62);
+      ctx.fillStyle = "rgba(30, 23, 18, 0.24)";
+      ctx.fillRect(spriteWidth * 0.36, spriteHeight * 0.58, spriteWidth * 0.28, spriteHeight * 0.04);
       ctx.fillStyle = "#e0c0a7";
       ctx.beginPath();
       ctx.arc(spriteWidth * 0.5, spriteHeight * 0.2, Math.max(3, spriteWidth * 0.14), 0, TAU);
       ctx.fill();
+      ctx.fillStyle = "#4e3428";
+      ctx.fillRect(spriteWidth * 0.38, spriteHeight * 0.08, spriteWidth * 0.24, spriteHeight * 0.06);
+      ctx.fillStyle = "rgba(42, 30, 24, 0.72)";
+      ctx.fillRect(spriteWidth * 0.43, spriteHeight * 0.18, spriteWidth * 0.035, spriteHeight * 0.025);
+      ctx.fillRect(spriteWidth * 0.55, spriteHeight * 0.18, spriteWidth * 0.035, spriteHeight * 0.025);
       ctx.fillStyle = "rgba(255,255,255,0.18)";
       ctx.fillRect(spriteWidth * 0.35, spriteHeight * 0.34, spriteWidth * 0.06, spriteHeight * 0.35);
     } else if (sprite.kind === "enemy") {
       const slime = ctx.createRadialGradient(spriteWidth * 0.45, spriteHeight * 0.34, 2, spriteWidth * 0.45, spriteHeight * 0.52, spriteHeight * 0.5);
-      slime.addColorStop(0, "#bcffcc");
-      slime.addColorStop(1, "#3ea65a");
+      const enemyBase = sprite.color || "#6be873";
+      slime.addColorStop(0, shadeHex(enemyBase, 1.72));
+      slime.addColorStop(0.58, enemyBase);
+      slime.addColorStop(1, shadeHex(enemyBase, 0.5));
       ctx.fillStyle = slime;
       ctx.beginPath();
       ctx.moveTo(spriteWidth * 0.14, spriteHeight * 0.84);
@@ -3391,9 +3594,16 @@ const canvas = document.getElementById("game");
       ctx.quadraticCurveTo(spriteWidth * 0.93, spriteHeight * 0.45, spriteWidth * 0.86, spriteHeight * 0.84);
       ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = "#1f5b30";
+      ctx.strokeStyle = "rgba(10, 32, 20, 0.42)";
+      ctx.lineWidth = Math.max(1, spriteWidth * 0.028);
+      ctx.stroke();
+      ctx.fillStyle = shadeHex(enemyBase, 0.32);
       ctx.fillRect(spriteWidth * 0.34, spriteHeight * 0.43, spriteWidth * 0.08, spriteHeight * 0.06);
       ctx.fillRect(spriteWidth * 0.58, spriteHeight * 0.43, spriteWidth * 0.08, spriteHeight * 0.06);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.32)";
+      ctx.beginPath();
+      ctx.arc(spriteWidth * 0.38, spriteHeight * 0.33, spriteWidth * 0.06, 0, TAU);
+      ctx.fill();
     } else if (sprite.kind === "pig") {
       const hatColor = sprite.hatColor || "#5b4129";
       const bandanaColor = sprite.bandanaColor || "#8e4040";
@@ -3405,9 +3615,13 @@ const canvas = document.getElementById("game");
       ctx.beginPath();
       ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.62, spriteWidth * 0.32, spriteHeight * 0.24, 0, 0, TAU);
       ctx.fill();
+      ctx.strokeStyle = "rgba(80, 48, 48, 0.32)";
+      ctx.lineWidth = Math.max(1, spriteWidth * 0.025);
+      ctx.stroke();
       ctx.beginPath();
       ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.38, spriteWidth * 0.24, spriteHeight * 0.18, 0, 0, TAU);
       ctx.fill();
+      ctx.stroke();
       ctx.fillStyle = bandanaColor;
       ctx.fillRect(spriteWidth * 0.38, spriteHeight * 0.5, spriteWidth * 0.24, spriteHeight * 0.05);
       ctx.fillStyle = "#f3cbc6";
@@ -3535,7 +3749,9 @@ const canvas = document.getElementById("game");
       ctx.fillRect(spriteWidth * 0.6, spriteHeight * 0.55, spriteWidth * 0.04, spriteHeight * 0.05);
     }
 
-    ctx.fillStyle = `rgba(0, 0, 0, ${0.2 * (1 - lightFactor + 0.24)})`;
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.18 * (1 - lightFactor + 0.24)})`;
     ctx.fillRect(0, 0, spriteWidth, spriteHeight);
     ctx.restore();
   }
@@ -3891,35 +4107,51 @@ const canvas = document.getElementById("game");
         const hpRatio = clamp(sprite.hp / sprite.maxHp, 0, 1);
         const barW = spriteWidth;
         const barY = top - 6;
-        ctx.fillStyle = "#251010";
-        ctx.fillRect(left, barY, barW, 4);
-        ctx.fillStyle = "#86f493";
-        ctx.fillRect(left, barY, barW * hpRatio, 4);
+        fillRoundedRect(left, barY, barW, 5, 2, "rgba(22, 8, 8, 0.82)");
+        fillRoundedRect(left, barY, barW * hpRatio, 5, 2, "#92f0a3");
+      }
+
+      const centeredLabel = Math.abs(sprite.sx - width / 2) < width * 0.24;
+      if (state.mode === "playing" && sprite.label && centeredLabel && sprite.distToPlayer < 5.8 && sprite.kind !== "resource" && sprite.kind !== "pig") {
+        ctx.font = "bold 11px Georgia";
+        drawPillLabel(fitText(sprite.label, 116), left + spriteWidth / 2, top - 10);
       }
     }
 
-    const crossSize = state.player.blocking ? 6 : 4;
-    const crossColor = state.player.hitPulse > 0 ? "rgba(255, 186, 186, 0.95)" : "rgba(255,255,255,0.9)";
-    ctx.strokeStyle = crossColor;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(width / 2 - crossSize, height / 2);
-    ctx.lineTo(width / 2 + crossSize, height / 2);
-    ctx.moveTo(width / 2, height / 2 - crossSize);
-    ctx.lineTo(width / 2, height / 2 + crossSize);
-    ctx.stroke();
+    if (state.mode !== "menu") {
+      const crossSize = state.player.blocking ? 6 : 4;
+      const crossColor = state.player.hitPulse > 0 ? "rgba(255, 186, 159, 0.96)" : "rgba(255, 244, 218, 0.92)";
+      const cx = width / 2;
+      const cy = height / 2;
+      ctx.save();
+      ctx.shadowColor = "rgba(255, 219, 156, 0.32)";
+      ctx.shadowBlur = 8;
+      ctx.strokeStyle = crossColor;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(cx - crossSize - 7, cy);
+      ctx.lineTo(cx - crossSize, cy);
+      ctx.moveTo(cx + crossSize, cy);
+      ctx.lineTo(cx + crossSize + 7, cy);
+      ctx.moveTo(cx, cy - crossSize - 7);
+      ctx.lineTo(cx, cy - crossSize);
+      ctx.moveTo(cx, cy + crossSize);
+      ctx.lineTo(cx, cy + crossSize + 7);
+      ctx.stroke();
 
-    ctx.beginPath();
-    ctx.arc(width / 2, height / 2, state.player.blocking ? 11 : 7, 0, TAU);
-    ctx.strokeStyle = "rgba(255,255,255,0.3)";
-    ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy, state.player.blocking ? 13 : 8, 0, TAU);
+      ctx.strokeStyle = state.player.blocking ? "rgba(126, 220, 255, 0.58)" : "rgba(255, 255, 255, 0.26)";
+      ctx.stroke();
+      ctx.restore();
 
-    if (state.player.hitPulse > 0) {
-      const flash = ctx.createRadialGradient(width / 2, height / 2, 8, width / 2, height / 2, 120);
-      flash.addColorStop(0, `rgba(255, 132, 132, ${state.player.hitPulse * 0.28})`);
-      flash.addColorStop(1, "rgba(255,132,132,0)");
-      ctx.fillStyle = flash;
-      ctx.fillRect(0, 0, width, height);
+      if (state.player.hitPulse > 0) {
+        const flash = ctx.createRadialGradient(width / 2, height / 2, 8, width / 2, height / 2, 120);
+        flash.addColorStop(0, `rgba(255, 132, 132, ${state.player.hitPulse * 0.28})`);
+        flash.addColorStop(1, "rgba(255,132,132,0)");
+        ctx.fillStyle = flash;
+        ctx.fillRect(0, 0, width, height);
+      }
     }
 
     const bloom = ctx.createRadialGradient(width * 0.5, height * 0.46, width * 0.06, width * 0.5, height * 0.46, width * 0.62);
@@ -3937,16 +4169,43 @@ const canvas = document.getElementById("game");
     vignette.addColorStop(1, `rgba(0,0,0,${Math.min(0.62, visualMood.vignetteStrength)})`);
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, width, height);
+
+    const grainAlpha = 0.025 + visualMood.gradeStrength * 0.025;
+    ctx.fillStyle = `rgba(255, 244, 218, ${grainAlpha})`;
+    const grainStep = width > 900 ? 14 : 18;
+    const grainTick = Math.floor(state.time * 8);
+    for (let y = 0; y < height; y += grainStep) {
+      for (let x = (y + grainTick) % grainStep; x < width; x += grainStep * 2) {
+        if (((x * 17 + y * 31 + grainTick * 13) % 7) < 3) ctx.fillRect(x, y, 1, 1);
+      }
+    }
+
+    if (state.player.hp / state.player.maxHp < 0.32) {
+      const danger = 1 - state.player.hp / (state.player.maxHp * 0.32);
+      const hurt = ctx.createRadialGradient(width * 0.5, height * 0.48, width * 0.25, width * 0.5, height * 0.48, width * 0.72);
+      hurt.addColorStop(0, "rgba(90, 0, 0, 0)");
+      hurt.addColorStop(1, `rgba(143, 24, 18, ${0.22 * danger})`);
+      ctx.fillStyle = hurt;
+      ctx.fillRect(0, 0, width, height);
+    }
   }
 
   function drawBar(x, y, w, h, ratio, bg, fg, label) {
-    ctx.fillStyle = bg;
-    ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = fg;
-    ctx.fillRect(x, y, w * clamp(ratio, 0, 1), h);
-    ctx.fillStyle = "#fdf7ea";
-    ctx.font = "12px Georgia";
-    ctx.fillText(label, x + 6, y + h - 3);
+    fillRoundedRect(x, y, w, h, Math.min(6, h / 2), bg);
+    const safeRatio = clamp(ratio, 0, 1);
+    if (safeRatio > 0) {
+      const fillW = Math.max(h * 0.35, w * safeRatio);
+      fillRoundedRect(x, y, fillW, h, Math.min(6, h / 2), fg);
+    }
+    const shine = ctx.createLinearGradient(x, y, x, y + h);
+    shine.addColorStop(0, "rgba(255, 255, 255, 0.28)");
+    shine.addColorStop(0.45, "rgba(255, 255, 255, 0.05)");
+    shine.addColorStop(1, "rgba(0, 0, 0, 0.18)");
+    fillRoundedRect(x, y, w, h, Math.min(6, h / 2), shine);
+    strokeRoundedRect(x + 0.5, y + 0.5, w - 1, h - 1, Math.min(6, h / 2), "rgba(255, 245, 216, 0.18)", 1);
+    ctx.fillStyle = "#fff4d8";
+    ctx.font = "bold 11px Georgia";
+    ctx.fillText(fitText(label, w - 12), x + 6, y + h - 4);
   }
 
   function drawMiniMap() {
@@ -3955,22 +4214,28 @@ const canvas = document.getElementById("game");
     const map = currentMap();
     const tileRadius = state.player.inHouse ? 5 : 6;
     const cells = tileRadius * 2;
-    const mapDiameter = 164;
+    const mapDiameter = canvas.width < 620 ? 116 : canvas.width < 900 ? 138 : 164;
     const mapRadius = mapDiameter / 2;
     const cell = mapDiameter / cells;
-    const cx = canvas.width - mapRadius - 16;
-    const cy = mapRadius + 16;
+    const mapPad = canvas.width < 620 ? 10 : 16;
+    const cx = canvas.width - mapRadius - mapPad;
+    const cy = mapRadius + mapPad;
 
     ctx.save();
 
     // Outer shadow disc
-    ctx.fillStyle = "rgba(4, 10, 14, 0.5)";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.42)";
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 8;
+    ctx.fillStyle = "rgba(4, 10, 14, 0.58)";
     ctx.beginPath();
     ctx.arc(cx + 2, cy + 2, mapRadius + 6, 0, TAU);
     ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
 
     // Dark background disc
-    ctx.fillStyle = "rgba(8, 18, 20, 0.72)";
+    ctx.fillStyle = "rgba(8, 18, 20, 0.78)";
     ctx.beginPath();
     ctx.arc(cx, cy, mapRadius + 4, 0, TAU);
     ctx.fill();
@@ -4012,6 +4277,19 @@ const canvas = document.getElementById("game");
     ctx.fillRect(originX, originY, mapDiameter, mapDiameter);
 
     // Entity dot helper (draws a small glowing circle)
+    function withAlpha(color, alpha) {
+      if (color.startsWith("#") && (color.length === 7 || color.length === 4)) {
+        const full = color.length === 4
+          ? `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`
+          : color;
+        const r = parseInt(full.slice(1, 3), 16);
+        const g = parseInt(full.slice(3, 5), 16);
+        const b = parseInt(full.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+      return color.replace(")", `, ${alpha})`).replace("rgb", "rgba");
+    }
+
     function drawDot(wx, wy, color, size) {
       const dx = wx - (px - tileRadius);
       const dy = wy - (py - tileRadius);
@@ -4020,7 +4298,7 @@ const canvas = document.getElementById("game");
       const distFromCenter = Math.sqrt((dotX - cx) ** 2 + (dotY - cy) ** 2);
       if (distFromCenter > mapRadius - 2) return;
       // Glow
-      ctx.fillStyle = color.replace(")", ", 0.35)").replace("rgb", "rgba");
+      ctx.fillStyle = withAlpha(color, 0.35);
       ctx.beginPath();
       ctx.arc(dotX, dotY, size + 2, 0, TAU);
       ctx.fill();
@@ -4099,10 +4377,10 @@ const canvas = document.getElementById("game");
     ctx.stroke();
 
     // Compass cardinal directions (N/S/E/W rotated with player)
-    ctx.font = "bold 10px Georgia";
+    ctx.font = `bold ${mapDiameter < 130 ? 9 : 10}px Georgia`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const compassDist = mapRadius + 12;
+    const compassDist = mapRadius + (mapDiameter < 130 ? 8 : 12);
     const cardinals = [
       { label: "N", angle: -Math.PI / 2 },
       { label: "E", angle: 0 },
@@ -4135,33 +4413,10 @@ const canvas = document.getElementById("game");
   }
 
   function drawHud() {
-    const hudW = 432;
-    const hudX = 12;
-    const hudY = canvas.height - 100;
-    const hudGrad = ctx.createLinearGradient(hudX, hudY, hudX, hudY + 88);
-    hudGrad.addColorStop(0, "rgba(18, 30, 34, 0.82)");
-    hudGrad.addColorStop(1, "rgba(12, 20, 24, 0.74)");
-    ctx.fillStyle = hudGrad;
-    ctx.fillRect(hudX, hudY, hudW, 88);
-    ctx.strokeStyle = "rgba(255, 222, 160, 0.34)";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(hudX + 0.5, hudY + 0.5, hudW - 1, 87);
-
-    drawBar(22, hudY + 10, 168, 13, state.player.hp / state.player.maxHp, "#3a1f1e", "#e76b58", `${t("labels.hp")} ${Math.ceil(state.player.hp)}/${state.player.maxHp}`);
-    drawBar(22, hudY + 28, 168, 11, state.player.stamina / 100, "#1f2f2c", "#5fe0b5", `${t("labels.stamina")} ${Math.ceil(state.player.stamina)}`);
-    drawBar(22, hudY + 44, 168, 9, state.player.xp / state.player.nextXp, "#233145", "#79a5ff", `${t("labels.xp")} ${state.player.xp}/${state.player.nextXp}`);
-
-    ctx.fillStyle = "#f8f0dc";
-    ctx.font = "11px Georgia";
-    ctx.fillText(`${t("labels.lvl")} ${state.player.level}   ${t("labels.gold")} ${state.player.gold}   ${t("labels.potions")} ${state.inventory.Potion}`, 202, hudY + 20);
-    ctx.fillText(`${t("labels.crystals")} ${state.inventory["Crystal Shard"]}   ${t("labels.wood")} ${state.inventory.Wood}   ${t("labels.stone")} ${state.inventory.Stone}   ${t("labels.cores")} ${state.inventory["Slime Core"]}`, 202, hudY + 37);
-    ctx.fillText(`Weapon: ${state.player.loadout.weapon}  Stance: ${state.player.loadout.stance}  Perks: ${state.player.perks.length}`, 202, hudY + 48);
-
     const q1 = state.quests.crystal;
     const q2 = state.quests.slime;
     const q3 = state.quests.wood;
     const q4 = state.quests.archive;
-
     const questLines = [
       `${q1.title}: ${q1.status === "locked" ? t("labels.locked") : q1.status === "turned_in" ? t("labels.done") : `${q1.progress}/${q1.need}${q1.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
       `${q2.title}: ${q2.status === "locked" ? t("labels.locked") : q2.status === "turned_in" ? t("labels.done") : `${q2.progress}/${q2.need}${q2.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
@@ -4171,121 +4426,161 @@ const canvas = document.getElementById("game");
         : "",
     ];
 
-    ctx.fillStyle = "#f3ecd8";
-    ctx.font = "11px Georgia";
-    let qy = hudY + 60;
-    for (const line of questLines) {
-      ctx.fillText(line, 202, qy);
-      qy += 11;
-    }
+    const margin = canvas.width < 620 ? 8 : 12;
+    const compact = canvas.width < 560;
+    const hudW = Math.min(compact ? canvas.width - margin * 2 : 560, canvas.width - margin * 2);
+    const hudH = compact ? 94 : 112;
+    const hudX = margin;
+    const hudY = canvas.height - hudH - margin;
+    drawSoftPanel(hudX, hudY, hudW, hudH);
 
-    const topGrad = ctx.createLinearGradient(12, 12, 12, 98);
-    topGrad.addColorStop(0, "rgba(14, 24, 28, 0.72)");
-    topGrad.addColorStop(1, "rgba(9, 17, 22, 0.62)");
-    ctx.fillStyle = topGrad;
-    ctx.fillRect(12, 12, 620, 86);
-    ctx.strokeStyle = "rgba(255, 215, 145, 0.28)";
-    ctx.strokeRect(12.5, 12.5, 619, 85);
-    ctx.fillStyle = "#f9f1dd";
-    ctx.font = "11px Georgia";
+    const barX = hudX + 12;
+    const barW = compact ? hudW - 24 : 176;
+    drawBar(barX, hudY + 12, barW, 14, state.player.hp / state.player.maxHp, "rgba(62, 25, 23, 0.9)", "#ef725d", `${t("labels.hp")} ${Math.ceil(state.player.hp)}/${state.player.maxHp}`);
+    drawBar(barX, hudY + 32, barW, 12, state.player.stamina / 100, "rgba(26, 43, 38, 0.9)", "#5fe0b5", `${t("labels.stamina")} ${Math.ceil(state.player.stamina)}`);
+    drawBar(barX, hudY + 50, barW, 10, state.player.xp / state.player.nextXp, "rgba(28, 38, 58, 0.9)", "#7fa8ff", `${t("labels.xp")} ${state.player.xp}/${state.player.nextXp}`);
+
+    ctx.font = "bold 11px Georgia";
+    const statsX = compact ? barX : barX + barW + 16;
+    const statsY = compact ? hudY + 76 : hudY + 24;
+    const statsW = hudX + hudW - statsX - 12;
+    drawClippedText(`${t("labels.lvl")} ${state.player.level}  ${t("labels.gold")} ${state.player.gold}  ${t("labels.potions")} ${state.inventory.Potion}`, statsX, statsY, statsW, "#fff1d0");
+    if (!compact) {
+      ctx.font = "11px Georgia";
+      drawClippedText(`${t("labels.crystals")} ${state.inventory["Crystal Shard"]}  ${t("labels.wood")} ${state.inventory.Wood}  ${t("labels.stone")} ${state.inventory.Stone}  ${t("labels.cores")} ${state.inventory["Slime Core"]}`, statsX, hudY + 41, statsW, "#d7c7a7");
+      drawClippedText(`${state.player.loadout.weapon} / ${state.player.loadout.stance} / ${state.player.perks.length} perks`, statsX, hudY + 57, statsW, "#d7c7a7");
+
+      ctx.font = "10px Georgia";
+      let qy = hudY + 75;
+      for (const line of questLines.filter(Boolean).slice(0, 3)) {
+        drawClippedText(line, statsX, qy, statsW, "#f1e5c8");
+        qy += 12;
+      }
+    }
 
     const location = state.player.inHouse ? t("labels.playerHouse") : t("labels.valley");
     const houseStatus = state.house.unlocked ? t("labels.owned") : t("labels.locked");
     const weatherText = state.player.inHouse ? t("labels.sheltered") : weatherLabel(state.weather.kind);
-    ctx.fillText(`${t("labels.location")}: ${location}   ${t("labels.house")}: ${houseStatus}   ${t("labels.weather")}: ${weatherText}`, 20, 28);
-    ctx.fillText(
+    const mapReserve = state.showMap && canvas.width > 700 ? (canvas.width < 900 ? 176 : 214) : 0;
+    const topW = Math.max(240, Math.min(730, canvas.width - margin * 2 - mapReserve));
+    const topH = compact ? 78 : 92;
+    const topX = margin;
+    const topY = margin;
+    drawSoftPanel(topX, topY, topW, topH, {
+      top: "rgba(16, 25, 29, 0.78)",
+      bottom: "rgba(9, 16, 20, 0.66)",
+      shadowBlur: 12,
+      shadowOffsetY: 5,
+    });
+
+    ctx.font = "bold 11px Georgia";
+    drawClippedText(`${t("labels.location")}: ${location}   ${t("labels.house")}: ${houseStatus}   ${t("labels.weather")}: ${weatherText}`, topX + 10, topY + 20, topW - 20, "#fff1d0");
+    ctx.font = "10px Georgia";
+    drawClippedText(
       `Chapter: ${state.narrative.chapterTitle}  CVF:${state.narrative.thematicAxes.controlVsFreedom}  TVC:${state.narrative.thematicAxes.truthVsComfort}  SVS:${state.narrative.thematicAxes.solidarityVsStatus}`,
-      20,
-      40,
+      topX + 10,
+      topY + 35,
+      topW - 20,
+      "#d4c4a4",
     );
 
-    let msgY = 54;
+    let msgY = topY + 54;
     const shown = state.msg.slice(0, 2);
+    ctx.font = "11px Georgia";
     if (shown.length === 0) {
-      ctx.fillText(t("labels.explore"), 20, msgY);
+      drawClippedText(t("labels.explore"), topX + 10, msgY, topW - 20, "#f3e8cf");
     }
     for (const m of shown) {
-      ctx.fillText(m.text, 20, msgY);
+      drawClippedText(m.text, topX + 10, msgY, topW - 20, "#f3e8cf");
       msgY += 12;
     }
 
     if (state.mode === "gameover") {
-      ctx.fillStyle = "rgba(18, 4, 5, 0.8)";
+      ctx.fillStyle = "rgba(18, 4, 5, 0.78)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const panelW = Math.min(500, canvas.width - margin * 2);
+      const panelH = 150;
+      const px = (canvas.width - panelW) / 2;
+      const py = canvas.height * 0.38;
+      drawSoftPanel(px, py, panelW, panelH, {
+        top: "rgba(48, 18, 18, 0.9)",
+        bottom: "rgba(18, 8, 9, 0.88)",
+        border: "rgba(255, 166, 138, 0.36)",
+      });
+      ctx.textAlign = "center";
       ctx.fillStyle = "#ffe3d8";
-      ctx.font = "bold 42px Georgia";
-      ctx.fillText(t("labels.defeatedTitle"), canvas.width * 0.34, canvas.height * 0.43);
+      ctx.font = `bold ${compact ? 28 : 38}px Georgia`;
+      ctx.fillText(t("labels.defeatedTitle"), canvas.width * 0.5, py + 48);
       ctx.font = "20px Georgia";
-      ctx.fillText(t("labels.recover"), canvas.width * 0.38, canvas.height * 0.49);
+      ctx.fillText(t("labels.recover"), canvas.width * 0.5, py + 83);
       ctx.font = "italic 16px Georgia";
       ctx.fillStyle = "#ffa0a0";
-      ctx.fillText(t("labels.deathsLine", { deaths: state.player.deaths + 1 }), canvas.width * 0.36, canvas.height * 0.54);
+      ctx.fillText(fitText(t("labels.deathsLine", { deaths: state.player.deaths + 1 }), panelW - 36), canvas.width * 0.5, py + 112);
+      ctx.textAlign = "left";
     }
 
     /* Shop overlay */
     if (shopOpen && state.mode === "playing") {
-      const sw = 380;
+      const sw = Math.min(420, canvas.width - margin * 2);
       const sh = shopItems.length * 52 + 80;
       const sx = Math.floor((canvas.width - sw) / 2);
       const sy = Math.floor((canvas.height - sh) / 2);
 
-      ctx.fillStyle = "rgba(10, 18, 22, 0.88)";
-      ctx.fillRect(sx, sy, sw, sh);
-      ctx.strokeStyle = "#d8bc6a";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(sx, sy, sw, sh);
+      drawSoftPanel(sx, sy, sw, sh, {
+        top: "rgba(18, 28, 31, 0.94)",
+        bottom: "rgba(8, 14, 18, 0.92)",
+        border: "rgba(255, 215, 123, 0.5)",
+      });
 
       ctx.fillStyle = "#ffd77b";
       ctx.font = "bold 20px Georgia";
-      ctx.fillText(t("labels.shopTitle"), sx + 16, sy + 30);
+      drawClippedText(t("labels.shopTitle"), sx + 16, sy + 30, sw - 32, "#ffd77b");
       ctx.font = "12px Georgia";
-      ctx.fillStyle = "#c9b889";
-      ctx.fillText(t("labels.shopHeader", { gold: state.player.gold }), sx + 16, sy + 50);
+      drawClippedText(t("labels.shopHeader", { gold: state.player.gold }), sx + 16, sy + 50, sw - 32, "#c9b889");
 
       for (let i = 0; i < shopItems.length; i++) {
         const item = shopItems[i];
         const iy = sy + 62 + i * 52;
         const selected = i === shopSelection;
 
-        ctx.fillStyle = selected ? "rgba(216, 188, 106, 0.2)" : "rgba(255, 255, 255, 0.05)";
-        ctx.fillRect(sx + 8, iy, sw - 16, 46);
+        fillRoundedRect(sx + 8, iy, sw - 16, 46, 7, selected ? "rgba(216, 188, 106, 0.24)" : "rgba(255, 255, 255, 0.05)");
 
         if (selected) {
-          ctx.strokeStyle = "#ffd77b";
-          ctx.lineWidth = 1;
-          ctx.strokeRect(sx + 8, iy, sw - 16, 46);
+          strokeRoundedRect(sx + 8.5, iy + 0.5, sw - 17, 45, 7, "#ffd77b", 1);
         }
 
-        ctx.fillStyle = selected ? "#ffd77b" : "#f3ecd8";
         ctx.font = "bold 14px Georgia";
-        ctx.fillText(t(item.nameKey), sx + 20, iy + 18);
+        drawClippedText(t(item.nameKey), sx + 20, iy + 18, sw - 112, selected ? "#ffd77b" : "#f3ecd8");
 
         ctx.fillStyle = item.cost < 0 ? "#5fe0b5" : (state.player.gold >= item.cost ? "#ffd77b" : "#ff6b6b");
         ctx.font = "14px Georgia";
-        ctx.fillText(item.cost < 0 ? `+${Math.abs(item.cost)}g` : `${item.cost}g`, sx + sw - 60, iy + 18);
+        ctx.textAlign = "right";
+        ctx.fillText(item.cost < 0 ? `+${Math.abs(item.cost)}g` : `${item.cost}g`, sx + sw - 20, iy + 18);
+        ctx.textAlign = "left";
 
-        ctx.fillStyle = "#a09880";
         ctx.font = "italic 12px Georgia";
-        ctx.fillText(t(item.descKey), sx + 20, iy + 36);
+        drawClippedText(t(item.descKey), sx + 20, iy + 36, sw - 40, "#a09880");
       }
     }
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
-    ctx.font = "10px Georgia";
-    ctx.fillText(t("labels.controlsHint"), 16, canvas.height - 6);
-
-    // Graphics pass indicator for quick visual verification.
-    ctx.fillStyle = "rgba(12, 16, 20, 0.7)";
-    ctx.fillRect(canvas.width - 166, 12, 154, 20);
-    ctx.strokeStyle = "rgba(255, 205, 128, 0.5)";
-    ctx.strokeRect(canvas.width - 165.5, 12.5, 153, 19);
-    ctx.fillStyle = "#ffd28a";
-    ctx.font = "bold 11px Georgia";
-    ctx.fillText("GRAPHICS V2 ACTIVE", canvas.width - 158, 26);
+    const hintSpace = canvas.width - hudW - margin * 3;
+    if (!compact && hintSpace > 300) {
+      const hx = hudX + hudW + margin;
+      const hy = canvas.height - 36;
+      drawSoftPanel(hx, hy, hintSpace, 24, {
+        top: "rgba(18, 26, 28, 0.64)",
+        bottom: "rgba(8, 13, 16, 0.58)",
+        shadowBlur: 8,
+        shadowOffsetY: 3,
+      });
+      ctx.font = "10px Georgia";
+      drawClippedText(t("labels.controlsHint"), hx + 10, hy + 16, hintSpace - 20, "rgba(255, 245, 220, 0.86)");
+    }
   }
 
   function render() {
     render3D();
+    if (state.mode === "menu") return;
     drawWeaponOverlay();
     drawWeatherOverlay();
     drawParticles();
