@@ -8,6 +8,7 @@ This is the single planning source for future agents. Do not create separate roa
 - Tier 1 system wiring is complete: enemy behaviors, region resources/events, progression UI, Smith upgrades, quick utility effects, mini-boss spawning, and save migration backfills.
 - Tier 2 closed: gradient caching, settings modal (KeyO), accessibility controls, colorblind palettes wired into HUD/sprites/damage numbers, mini-boss scenarios + persistence, gradient-cache-on smoke run validated.
 - Engine foundations (Pillar 2): particle pool (1500-cap ring buffer, no per-frame alloc), uniform-grid spatial hash for enemy radius queries, 3-bus audio graph with per-region procedural ambient drone (Shift+M toggle), and surgical render-helpers module split (`src/render.js` factory).
+- Combat identity (Pillar 3): per-enemy status stack (burn/bleed/shock/frost) with DoT, slow, and frost-shatter; heavy archetypes (`charge`/`tank`/`shield`/`control`) wind up before striking and can be interrupted mid-windup with a stagger reward; perfect-dodge window (0.15s) refunds stamina + brief slow-mo; perfect-parry window (0.15s of block start) negates damage, doubles stagger, and refunds stamina; weapon archetype movesets (light/heavy/spear) shape arc + reach + stagger geometry beyond raw stat tweaks.
 
 ## Completed Tier 2 Work
 
@@ -29,17 +30,16 @@ This is the single planning source for future agents. Do not create separate roa
 
 ## Next Work
 
-Pillar 3 — Combat Identity (in priority order):
-1. Status effect stack (burn / bleed / shock / frost) — extend the existing
-   `searchTimer`/`flareSlowTimer`/`tonicTimer` pattern, gate behind
-   `state.combat.statusEffectsEnabled` (default off for one release).
-2. Enemy telegraph windups — `charger`, `brute`, `shield_brute`, `suppressor`
-   get a windup timer + red sprite outline pulse before strike. Player can
-   interrupt mid-windup with stagger damage. Ship `charger` first.
-3. Perfect dodge + parry windows — 0.15s detection window, stamina refund
-   on perfect dodge, doubled riposte + stagger on parry.
-4. Weapon archetype movesets — light / heavy / spear with distinct hit-arc
-   geometries beyond stat tweaks.
+Pillar 4 — World Life:
+1. Day/night cycle — `state.world.timeOfDay` 0..1 advancing on a real-time
+   schedule. Phase LUT applied as a multiplicative tint on biome grading.
+   Night doubles spawn density on hostile pool.
+2. Faction reputation actually changes shop prices, smith-tier gates, and
+   patrol density (data already in `narrative.factionRep`).
+3. POIs + cache discovery — 3–5 POIs per region, mini-map ping when player
+   approaches, persistent `regions.poisDiscovered` set.
+4. Codex — KeyL opens a tabbed lore browser (regions / enemies / items /
+   factions / ideology); entries unlock on first encounter.
 
 Outstanding verification:
 - Add pass/fail screenshot diffing if visual regression needs automation

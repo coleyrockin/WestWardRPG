@@ -52,6 +52,7 @@ import {
   applySwingLoadout,
   resolveIncomingDamage,
   getSprintModifier,
+  applyMovesetGeometry,
 } from "./combatLoadout.js";
 import { buildVisualMood } from "./visualProfile.js";
 import {
@@ -96,6 +97,13 @@ import {
   createGradientCache,
   createRenderHelpers,
 } from "./render.js";
+import {
+  applyStatus,
+  updateStatuses,
+  clearStatuses,
+  getStatusSpeedMult,
+  hasStatus,
+} from "./statusEffects.js";
 import {
   GRAPHICS_PRESETS,
   createInitialGraphicsState,
@@ -1439,6 +1447,7 @@ const canvas = document.getElementById("game");
     progression: createInitialProgressionState(),
     regions: createInitialRegionState(),
     graphics: createInitialGraphicsState(),
+    combat: { statusEffectsEnabled: true },
     npcs: [
       {
         id: "elder",
@@ -2238,7 +2247,28 @@ const canvas = document.getElementById("game");
     state.player.dodgeCooldown = 1.1;
     const freedomBonus = state.progression.traits.includes("freedom_strider") ? 0.78 : 1;
     state.player.stamina = Math.max(0, state.player.stamina - 12 * freedomBonus);
-    logMsg("Dodge step executed.");
+
+    // Perfect dodge: an enemy was about to strike within 1.2 tiles AND its
+    // attack was imminent (windupTimer near zero or attackCooldown ≤ 0.15).
+    let perfect = false;
+    queryEnemyRadius(enemyGrid, state.player.x, state.player.y, 1.2, _enemyQueryBuf);
+    for (let i = 0; i < _enemyQueryBuf.length; i++) {
+      const enemy = _enemyQueryBuf[i];
+      const imminent = (enemy.attackCooldown || 0) <= 0.15
+        || ((enemy.windupTimer || 0) > 0 && (enemy.windupTimer || 0) < 0.2);
+      if (imminent) { perfect = true; break; }
+    }
+    if (perfect) {
+      state.player.stamina = Math.min(100, state.player.stamina + 12 * freedomBonus);
+      state.player.perfectDodgeFlash = 0.4;
+      state.player.timeScale = 0.45;
+      state.player.timeScaleTimer = 0.32;
+      spawnParticles(canvas.width / 2, canvas.height * 0.45, 14, "#cce4ff", 4, 0.55, { decorative: false });
+      state.floatingTexts.push({ wx: state.player.x, wy: state.player.y, text: "PERFECT", life: 0.7, maxLife: 0.7, color: "#cce4ff" });
+      logMsg("Perfect dodge!");
+    } else {
+      logMsg("Dodge step executed.");
+    }
   }
 
   function performChargedAttack() {
@@ -2875,10 +2905,11 @@ const canvas = document.getElementById("game");
     }
     state.player.comboStep = (state.player.comboStep % combos.length) + 1;
 
-    const swing = applySwingLoadout(combos[state.player.comboStep - 1], state.player.combatProfile, {
+    const swingBase = applySwingLoadout(combos[state.player.comboStep - 1], state.player.combatProfile, {
       weatherKind: state.weather.kind,
       solidarityVsStatus: state.narrative.thematicAxes.solidarityVsStatus,
     });
+    const swing = applyMovesetGeometry(swingBase, state.progression.equipment?.weaponTier || "Common");
     state.player.attackCooldown = swing.cooldown * stance.cooldownMult;
     state.player.comboWindow = 0.55;
     state.player.swingDuration = swing.duration;
@@ -2926,8 +2957,36 @@ const canvas = document.getElementById("game");
         + Math.floor(Math.random() * 4) - 1;
       enemy.hp -= damage;
       enemy.attackCooldown += 0.45;
-      enemy.stagger = 0.2 + state.player.comboStep * 0.05;
+      enemy.stagger = 0.2 + state.player.comboStep * 0.05 + (swing.staggerBonus || 0);
       enemy.flashTimer = 0.1;
+
+      // Hit interrupts a heavy windup → big stagger reward.
+      if ((enemy.windupTimer || 0) > 0) {
+        enemy.windupTimer = 0;
+        enemy.windupConsumed = false;
+        enemy.stagger = Math.max(enemy.stagger, 0.95);
+        state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: "INTERRUPT", life: 0.7, maxLife: 0.7, color: "#ffe16a" });
+      }
+
+      if (state.combat?.statusEffectsEnabled) {
+        const tier = state.progression.equipment?.weaponTier || "Common";
+        // Bleed on charged/finisher attacks (comboStep 3 marks charged or third hit).
+        if (state.player.comboStep === 3) {
+          applyStatus(enemy, "bleed", { magnitude: 1, sourceTier: tier });
+        }
+        // Burn while flare reveal active (player just popped a flare).
+        if ((state.player.flareRevealTimer || 0) > 0) {
+          applyStatus(enemy, "burn", { magnitude: 1, sourceTier: tier });
+        }
+        // Shock with chain on Relic-tier hits, low chance to keep it special.
+        if (tier === "Relic" && Math.random() < 0.18) {
+          applyStatus(enemy, "shock", { magnitude: 1, sourceTier: tier });
+        }
+        // Frost when tonic HoT is active and the swing was a heavy/charged step.
+        if ((state.player.tonicTimer || 0) > 0 && state.player.comboStep >= 2) {
+          applyStatus(enemy, "frost", { magnitude: 1, sourceTier: tier });
+        }
+      }
 
       const nx = dx / (d + 1e-6);
       const ny = dy / (d + 1e-6);
@@ -3390,6 +3449,15 @@ const canvas = document.getElementById("game");
 
   function update(dt) {
     state.time += dt;
+    if ((state.player.timeScaleTimer || 0) > 0) {
+      state.player.timeScaleTimer = Math.max(0, state.player.timeScaleTimer - dt);
+      if (state.player.timeScaleTimer <= 0) state.player.timeScale = 1;
+    }
+    if ((state.player.perfectDodgeFlash || 0) > 0) {
+      state.player.perfectDodgeFlash = Math.max(0, state.player.perfectDodgeFlash - dt);
+    }
+    const tScale = state.player.timeScale || 1;
+    if (tScale !== 1) dt = dt * tScale;
     state.player.dodgeCooldown = Math.max(0, numberOr(state.player.dodgeCooldown, 0) - dt);
     rebuildSpatialHash(enemyGrid, state.enemies, { filter: aliveEnemy });
     rollRegionEvent(state.regions, dt);
@@ -3439,7 +3507,13 @@ const canvas = document.getElementById("game");
     player.angle = normalizeAngle(player.angle + turnInput * PLAYER_ROT_SPEED * dt + state.mouseLook);
     state.mouseLook = 0;
 
+    const wasBlocking = player.blocking;
     player.blocking = (state.mouseButtons.right || state.keys.KeyC) && player.swingTimer <= 0;
+    if (player.blocking && !wasBlocking) {
+      player.blockStartTime = state.time;
+    } else if (!player.blocking) {
+      player.blockStartTime = -Infinity;
+    }
 
     const forward = (state.keys.KeyW || state.keys.ArrowUp ? 1 : 0) - (state.keys.KeyS || state.keys.ArrowDown ? 1 : 0);
     const strafe = (state.keys.KeyD ? 1 : 0) - (state.keys.KeyA ? 1 : 0);
@@ -3540,6 +3614,7 @@ const canvas = document.getElementById("game");
           enemy.alive = true;
           enemy.attackCooldown = 0.7;
           enemy.stagger = 0;
+          clearStatuses(enemy);
         }
         continue;
       }
@@ -3549,6 +3624,22 @@ const canvas = document.getElementById("game");
         enemy.stagger -= dt;
       }
       if (enemy.searchTimer > 0) enemy.searchTimer = Math.max(0, enemy.searchTimer - dt);
+
+      if (state.combat?.statusEffectsEnabled && enemy.statuses && enemy.statuses.length > 0) {
+        updateStatuses(enemy, dt, {
+          applyDamage: (ent, amt) => {
+            ent.hp -= amt;
+            if (ent.hp <= 0 && ent.alive) {
+              ent.alive = false;
+              ent.respawn = 22 + Math.random() * 8;
+            }
+          },
+          spawnShatter: (ent) => {
+            spawnParticles(canvas.width / 2, canvas.height * 0.5, 12, "#9be0ff", 4, 0.6, { decorative: false });
+            ent.stagger = Math.max(ent.stagger || 0, 1.0);
+          },
+        });
+      }
       if (enemy.flareSlowTimer > 0) enemy.flareSlowTimer = Math.max(0, enemy.flareSlowTimer - dt);
 
       const dx = player.x - enemy.x;
@@ -3568,7 +3659,8 @@ const canvas = document.getElementById("game");
         const ny = dy * invD;
         const behaviorMove = resolveBehaviorMove(enemy, { nx, ny, distance: d, dt });
         const flareMult = (enemy.flareSlowTimer || 0) > 0 ? 0.5 : 1;
-        const move = enemy.speed * weatherPursuitMult * dt * behaviorMove.speedMult * flareMult;
+        const statusMult = state.combat?.statusEffectsEnabled ? getStatusSpeedMult(enemy) : 1;
+        const move = enemy.speed * weatherPursuitMult * dt * behaviorMove.speedMult * flareMult * statusMult;
         const nextX = enemy.x + behaviorMove.mx * move;
         const nextY = enemy.y + behaviorMove.my * move;
 
@@ -3576,8 +3668,31 @@ const canvas = document.getElementById("game");
         if (!isBlocking(enemy.x, nextY)) enemy.y = nextY;
 
         enemy.attackCooldown -= dt;
-        if (d < combatProfile.attackRange && enemy.attackCooldown <= 0) {
+        // Telegraph: heavy archetypes wind up before striking. Player can interrupt
+        // mid-windup by hitting the enemy (damage path zeroes windupTimer).
+        const heavyTelegraph = enemy.behavior === "charge"
+          || enemy.behavior === "tank"
+          || enemy.behavior === "shield"
+          || enemy.behavior === "control";
+        if (d < combatProfile.attackRange && enemy.attackCooldown <= 0 && heavyTelegraph && (enemy.windupTimer || 0) <= 0 && !enemy.windupConsumed) {
+          // Start the windup.
+          enemy.windupTimer = enemy.behavior === "tank" ? 0.95
+            : enemy.behavior === "shield" ? 0.85
+              : enemy.behavior === "control" ? 0.75
+                : 0.55;
+          enemy.windupMax = enemy.windupTimer;
+          enemy.windupConsumed = false;
+        }
+        if ((enemy.windupTimer || 0) > 0) {
+          enemy.windupTimer = Math.max(0, enemy.windupTimer - dt);
+          if (enemy.windupTimer <= 0) enemy.windupConsumed = true;
+        }
+        const heavyReady = heavyTelegraph && enemy.windupConsumed;
+        const lightReady = !heavyTelegraph;
+        if (d < combatProfile.attackRange && enemy.attackCooldown <= 0 && (lightReady || heavyReady)) {
           enemy.attackCooldown = (1 + Math.random() * 0.5) * combatProfile.cooldownFactor;
+          enemy.windupConsumed = false;
+          enemy.windupTimer = 0;
           if (player.hurtCooldown <= 0) {
             player.hurtCooldown = 0.33;
             let damage = (enemy.baseDamage || 7) + Math.floor(Math.random() * (enemy.damageVariance || 6));
@@ -3587,7 +3702,20 @@ const canvas = document.getElementById("game");
               const facingDiff = Math.abs(normalizeAngle(angleToEnemy - player.angle));
               const stance = getStanceModifiers();
               const mitigated = resolveIncomingDamage(damage, state.player.combatProfile, { blocked: true });
-              if (facingDiff < 1.12 && player.stamina > 10) {
+              const sinceBlockStart = state.time - (player.blockStartTime ?? -Infinity);
+              const parryWindow = sinceBlockStart >= 0 && sinceBlockStart <= 0.15;
+              if (parryWindow && facingDiff < 1.12) {
+                // Perfect parry: no damage, big stagger, riposte particle, refund some stamina.
+                damage = 0;
+                enemy.stagger = Math.max(enemy.stagger || 0, 1.5);
+                enemy.windupTimer = 0;
+                enemy.windupConsumed = false;
+                player.stamina = Math.min(100, player.stamina + 8);
+                state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: "PARRY!", life: 0.7, maxLife: 0.7, color: "#9be0ff" });
+                spawnParticles(canvas.width / 2, canvas.height * 0.45, 12, "#cce4ff", 4, 0.45, { decorative: false });
+                logMsg("Perfect parry! Riposte primed.");
+                sfx.blockHit();
+              } else if (facingDiff < 1.12 && player.stamina > 10) {
                 damage = Math.max(1, Math.floor(mitigated.blocked * stance.blockPenalty));
                 player.stamina = Math.max(0, player.stamina - 11);
                 logMsg("Block absorbed most of the hit. Your shield arm disagrees.");
@@ -4059,8 +4187,22 @@ const canvas = document.getElementById("game");
     const cbPalSprite = latestColorblindPalette;
     const enemyGlow = cbPalSprite ? hexToRgba(cbPalSprite.foe, 0.38) : "rgba(112, 246, 126, 0.38)";
     const npcGlow = cbPalSprite ? hexToRgba(cbPalSprite.friend, 0.32) : "rgba(255, 220, 163, 0.16)";
+    // Windup pulse: when enemy is winding up, pulse a saturated red overlay glow.
+    let enemyEffectiveGlow = enemyGlow;
+    if (sprite.kind === "enemy" && sprite.windupTimer && sprite.windupTimer > 0) {
+      const pulse = 0.55 + 0.45 * Math.sin(state.time * 18);
+      enemyEffectiveGlow = `rgba(255, 48, 48, ${0.6 + 0.35 * pulse})`;
+    }
+    // Status overlay glow when burning/freezing/shocked (visual feedback only).
+    if (sprite.kind === "enemy" && sprite.statuses && sprite.statuses.length > 0) {
+      const top = sprite.statuses[0];
+      if (top.kind === "burn") enemyEffectiveGlow = "rgba(255, 138, 56, 0.55)";
+      else if (top.kind === "frost") enemyEffectiveGlow = "rgba(140, 220, 255, 0.55)";
+      else if (top.kind === "shock") enemyEffectiveGlow = "rgba(255, 240, 140, 0.55)";
+      else if (top.kind === "bleed") enemyEffectiveGlow = "rgba(220, 60, 80, 0.55)";
+    }
     const glowColor =
-      sprite.kind === "enemy" ? enemyGlow :
+      sprite.kind === "enemy" ? enemyEffectiveGlow :
         sprite.kind === "npc" ? npcGlow :
           sprite.kind === "resource" && sprite.label === "Crystal" ? "rgba(124, 205, 255, 0.35)" :
             sprite.kind === "resource" && sprite.label === "Archive" ? "rgba(218, 108, 255, 0.34)" :
@@ -4598,6 +4740,9 @@ const canvas = document.getElementById("game");
           hp: enemy.hp,
           maxHp: enemy.maxHp,
           flashTimer: enemy.flashTimer,
+          windupTimer: enemy.windupTimer || 0,
+          windupMax: enemy.windupMax || 0,
+          statuses: enemy.statuses,
         });
       }
 

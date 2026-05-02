@@ -1,5 +1,54 @@
 import { clamp } from "./math.js";
 
+// Weapon archetype movesets — keyed off the player's current weapon tier.
+// `arcMult`, `reachMult`, `staggerBonus` shape the swing geometry while
+// the existing damage/stamina pipeline keeps controlling magnitude.
+export const MOVESET_DEFINITIONS = {
+  light: {
+    label: "Light",
+    arcMult: 1.18,
+    reachMult: 0.94,
+    staggerBonus: 0.0,
+    recoveryMult: 0.85,
+    notes: "Wide quick arc; faster recovery.",
+  },
+  heavy: {
+    label: "Heavy",
+    arcMult: 0.82,
+    reachMult: 1.18,
+    staggerBonus: 0.25,
+    recoveryMult: 1.18,
+    notes: "Narrow committed arc; more reach and stagger.",
+  },
+  spear: {
+    label: "Spear",
+    arcMult: 0.55,
+    reachMult: 1.42,
+    staggerBonus: 0.08,
+    recoveryMult: 1.05,
+    notes: "Thrusting line; longest reach, narrow hit.",
+  },
+};
+
+export function resolveMovesetForWeapon(weaponTier) {
+  if (weaponTier === "Refined") return "heavy";
+  if (weaponTier === "Relic") return "spear";
+  return "light";
+}
+
+export function applyMovesetGeometry(baseSwing, weaponTier) {
+  const id = resolveMovesetForWeapon(weaponTier || "Common");
+  const m = MOVESET_DEFINITIONS[id] || MOVESET_DEFINITIONS.light;
+  return {
+    ...baseSwing,
+    arc: clamp((baseSwing.arc || 1) * m.arcMult, 0.45, 1.5),
+    reach: (baseSwing.reach || 1.5) * m.reachMult,
+    staggerBonus: (baseSwing.staggerBonus || 0) + m.staggerBonus,
+    recoveryMult: m.recoveryMult,
+    movesetId: id,
+  };
+}
+
 const STYLE_DEFINITIONS = {
   civicBulwark: {
     label: "Civic Bulwark",
