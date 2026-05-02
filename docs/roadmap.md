@@ -4,9 +4,10 @@ This is the single planning source for future agents. Do not create separate roa
 
 ## Current State
 
-- `main` contains the v3 Shattered Frontier expansion and the first Tier 2 performance/accessibility pass.
+- `main` contains the v3 Shattered Frontier expansion, the full Tier 2 pass, and the first engine-foundations pass.
 - Tier 1 system wiring is complete: enemy behaviors, region resources/events, progression UI, Smith upgrades, quick utility effects, mini-boss spawning, and save migration backfills.
-- Tier 2 code exists for gradient caching, settings/accessibility controls, particle throttling, mini-boss scenarios, and migration tests.
+- Tier 2 closed: gradient caching, settings modal (KeyO), accessibility controls, colorblind palettes wired into HUD/sprites/damage numbers, mini-boss scenarios + persistence, gradient-cache-on smoke run validated.
+- Engine foundations (Pillar 2): particle pool (1500-cap ring buffer, no per-frame alloc), uniform-grid spatial hash for enemy radius queries, 3-bus audio graph with per-region procedural ambient drone (Shift+M toggle), and surgical render-helpers module split (`src/render.js` factory).
 
 ## Completed Tier 2 Work
 
@@ -28,15 +29,21 @@ This is the single planning source for future agents. Do not create separate roa
 
 ## Next Work
 
-1. Run and archive a full gradient-cache smoke pass:
-   - `WESTWARD_PORT=5183 WESTWARD_GRADIENT_CACHE=1 npm run test:smoke`
-2. Run and archive visual regression captures:
-   - `WESTWARD_PORT=5183 scripts/visual_regression_capture.sh`
-3. Add pass/fail screenshot diffing if visual regression needs automation beyond capture artifacts.
-4. Continue polish only after verification is green:
-   - Mini-boss encounter tuning.
-   - Accessibility copy and modal spacing on mobile.
-   - Renderer cache expansion only if profiling shows remaining gradient churn.
+Pillar 3 — Combat Identity (in priority order):
+1. Status effect stack (burn / bleed / shock / frost) — extend the existing
+   `searchTimer`/`flareSlowTimer`/`tonicTimer` pattern, gate behind
+   `state.combat.statusEffectsEnabled` (default off for one release).
+2. Enemy telegraph windups — `charger`, `brute`, `shield_brute`, `suppressor`
+   get a windup timer + red sprite outline pulse before strike. Player can
+   interrupt mid-windup with stagger damage. Ship `charger` first.
+3. Perfect dodge + parry windows — 0.15s detection window, stamina refund
+   on perfect dodge, doubled riposte + stagger on parry.
+4. Weapon archetype movesets — light / heavy / spear with distinct hit-arc
+   geometries beyond stat tweaks.
+
+Outstanding verification:
+- Add pass/fail screenshot diffing if visual regression needs automation
+  beyond capture artifacts.
 
 ## Verification Gates
 

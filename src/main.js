@@ -73,6 +73,30 @@ import {
 } from "./progressionSystem.js";
 import { REGIONS, createInitialRegionState, unlockRegion, rollRegionEvent, resolveRegionEventModifiers } from "./regionSystem.js";
 import {
+  createParticlePool,
+  spawnParticleInto,
+  updateParticlePool,
+  forEachActive as forEachActiveParticle,
+  clearPool as clearParticlePool,
+  DEFAULT_PARTICLE_CAP,
+} from "./particlePool.js";
+import {
+  createSpatialHash,
+  rebuildSpatialHash,
+  queryRadius as queryEnemyRadius,
+} from "./spatialHash.js";
+import {
+  createAudioBuses,
+  setAmbientRegion,
+  stopAmbient,
+} from "./audio.js";
+import {
+  hexToRgba as hexToRgbaUtil,
+  gradientBucket as gradientBucketUtil,
+  createGradientCache,
+  createRenderHelpers,
+} from "./render.js";
+import {
   GRAPHICS_PRESETS,
   createInitialGraphicsState,
   resolveRecommendedPreset,
@@ -794,6 +818,9 @@ const canvas = document.getElementById("game");
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   let audioCtx = null;
   let soundEnabled = true;
+  let audioBuses = null;
+  let ambientEnabled = true;
+  let lastAmbientRegion = null;
 
   function ensureAudio() {
     if (!audioCtx && AudioCtx) {
@@ -802,7 +829,18 @@ const canvas = document.getElementById("game");
     if (audioCtx && audioCtx.state === "suspended") {
       audioCtx.resume().catch(() => { });
     }
+    if (audioCtx && !audioBuses) {
+      try { audioBuses = createAudioBuses(audioCtx); } catch { audioBuses = null; }
+    }
     return audioCtx;
+  }
+
+  function syncAmbientForRegion(regionId) {
+    if (!ambientEnabled || !soundEnabled) return;
+    const ctx = ensureAudio();
+    if (!ctx || !audioBuses) return;
+    if (regionId === lastAmbientRegion) return;
+    try { setAmbientRegion(audioBuses, regionId); lastAmbientRegion = regionId; } catch { /* audio not critical */ }
   }
 
   function playTone(freq, duration, type, volume, detune) {
@@ -978,74 +1016,57 @@ const canvas = document.getElementById("game");
   let shopSelection = 0;
   let latestParticleMultiplier = 1;
   let latestColorblindPalette = null;
-  const gradientCacheStore = new Map();
-
-  function hexToRgba(hex, alpha = 1) {
-    if (typeof hex !== "string" || !hex.startsWith("#")) return hex;
-    const full = hex.length === 4
-      ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
-      : hex;
-    const r = parseInt(full.slice(1, 3), 16);
-    const g = parseInt(full.slice(3, 5), 16);
-    const b = parseInt(full.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-
-  function gradientBucket(value, bucketCount = 12) {
-    const clamped = clamp(numberOr(value, 0), 0, 1);
-    return Math.round(clamped * bucketCount) / bucketCount;
-  }
+  const _gradientCache = createGradientCache();
+  const hexToRgba = hexToRgbaUtil;
+  const gradientBucket = gradientBucketUtil;
 
   function isGradientCacheEnabled() {
     return Boolean(state?.graphics?.performance?.gradientCache);
   }
 
   function clearGradientCache() {
-    gradientCacheStore.clear();
+    _gradientCache.clear();
   }
 
   function getCachedGradient(key, buildFn, enabled) {
-    if (!enabled) return buildFn();
-    const cached = gradientCacheStore.get(key);
-    if (cached) return cached;
-    const created = buildFn();
-    gradientCacheStore.set(key, created);
-    return created;
+    return _gradientCache.fetch(key, buildFn, enabled);
   }
 
-  /* ─── Particle System ─── */
-  const particles = [];
+  /* ─── Particle System (pre-allocated pool, no per-frame alloc) ─── */
+  const particlePool = createParticlePool(DEFAULT_PARTICLE_CAP);
+
+  /* Spatial hash for enemy radius queries — rebuilt once per tick. */
+  const enemyGrid = createSpatialHash(4);
+  const _enemyQueryBuf = [];
+  function aliveEnemy(e) { return e && e.alive; }
 
   function spawnParticles(x, y, count, color, speed, life, options = {}) {
     const decorative = Boolean(options.decorative);
     const spawnChance = decorative ? clamp(latestParticleMultiplier, 0, 1) : 1;
     if (spawnChance <= 0) return;
+    const baseLife = life || 1;
+    const baseSpeed = speed || 2;
+    const fillColor = color || "#fff";
     for (let i = 0; i < count; i++) {
       if (spawnChance < 1 && Math.random() > spawnChance) continue;
-      particles.push({
+      spawnParticleInto(
+        particlePool,
         x, y,
-        vx: (Math.random() - 0.5) * (speed || 2),
-        vy: (Math.random() - 0.5) * (speed || 2),
-        life: (life || 1) * (0.5 + Math.random() * 0.5),
-        maxLife: life || 1,
-        color: color || "#fff",
-        size: 2 + Math.random() * 3,
-      });
+        (Math.random() - 0.5) * baseSpeed,
+        (Math.random() - 0.5) * baseSpeed,
+        baseLife * (0.5 + Math.random() * 0.5),
+        fillColor,
+        2 + Math.random() * 3,
+      );
     }
   }
 
   function updateParticles(dt) {
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
-      p.x += p.vx * dt * 60;
-      p.y += p.vy * dt * 60;
-      p.life -= dt;
-      if (p.life <= 0) particles.splice(i, 1);
-    }
+    updateParticlePool(particlePool, dt);
   }
 
   function drawParticles() {
-    for (const p of particles) {
+    forEachActiveParticle(particlePool, (p) => {
       const alpha = clamp(p.life / p.maxLife, 0, 1);
       const radius = Math.max(1, p.size * 0.56);
       const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius * 1.8);
@@ -1061,7 +1082,7 @@ const canvas = document.getElementById("game");
       ctx.beginPath();
       ctx.arc(p.x, p.y, radius, 0, TAU);
       ctx.fill();
-    }
+    });
     ctx.globalAlpha = 1;
   }
 
@@ -1971,6 +1992,7 @@ const canvas = document.getElementById("game");
       logMsg("Welcome to Dustward, drifter. Talk to townsfolk, duel slimes, and avoid being trampled by outlaw pigs.");
       ensureAudio();
     }
+    syncAmbientForRegion(state.regions?.activeRegion || "frontier");
     canvas.focus();
   }
 
@@ -2145,33 +2167,27 @@ const canvas = document.getElementById("game");
     unlockRegion(state.regions, next);
     const name = REGIONS[next]?.name || next;
     logMsg(`Travelled to region: ${name}.`);
+    syncAmbientForRegion(next);
   }
 
   function applySmokeBlind() {
-    let count = 0;
-    for (const enemy of state.enemies) {
-      if (!enemy.alive) continue;
-      const d = Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y);
-      if (d > 6.5) continue;
+    queryEnemyRadius(enemyGrid, state.player.x, state.player.y, 6.5, _enemyQueryBuf);
+    for (let i = 0; i < _enemyQueryBuf.length; i++) {
+      const enemy = _enemyQueryBuf[i];
       enemy.searchTimer = 3.0;
       enemy.attackCooldown = Math.max(enemy.attackCooldown || 0, 1.4);
       enemy.stagger = Math.max(enemy.stagger || 0, 0.6);
-      count += 1;
     }
-    return count;
+    return _enemyQueryBuf.length;
   }
 
   function applyFlareSlow() {
-    let count = 0;
-    for (const enemy of state.enemies) {
-      if (!enemy.alive) continue;
-      const d = Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y);
-      if (d > 9) continue;
-      enemy.flareSlowTimer = Math.max(enemy.flareSlowTimer || 0, 4.0);
-      count += 1;
+    queryEnemyRadius(enemyGrid, state.player.x, state.player.y, 9, _enemyQueryBuf);
+    for (let i = 0; i < _enemyQueryBuf.length; i++) {
+      _enemyQueryBuf[i].flareSlowTimer = Math.max(_enemyQueryBuf[i].flareSlowTimer || 0, 4.0);
     }
     state.player.flareRevealTimer = Math.max(state.player.flareRevealTimer || 0, 6.0);
-    return count;
+    return _enemyQueryBuf.length;
   }
 
   function applyTonicHoT() {
@@ -3037,6 +3053,7 @@ const canvas = document.getElementById("game");
     state.player.screenShake = 0;
     state.player.weaponSway = 0;
     state.floatingTexts = [];
+    clearParticlePool(particlePool);
     state.player.inHouse = false;
     state.player.blocking = false;
     state.player.stamina = 100;
@@ -3374,6 +3391,7 @@ const canvas = document.getElementById("game");
   function update(dt) {
     state.time += dt;
     state.player.dodgeCooldown = Math.max(0, numberOr(state.player.dodgeCooldown, 0) - dt);
+    rebuildSpatialHash(enemyGrid, state.enemies, { filter: aliveEnemy });
     rollRegionEvent(state.regions, dt);
     applyDynamicRegionProgression();
     if (state.graphics.autoRecommended) {
@@ -3631,84 +3649,14 @@ const canvas = document.getElementById("game");
     tickAutoSave(dt);
   }
 
-  function roundedRectPath(x, y, w, h, radius = 6) {
-    const r = Math.min(radius, w / 2, h / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  }
-
-  function fillRoundedRect(x, y, w, h, radius, fillStyle) {
-    roundedRectPath(x, y, w, h, radius);
-    ctx.fillStyle = fillStyle;
-    ctx.fill();
-  }
-
-  function strokeRoundedRect(x, y, w, h, radius, strokeStyle, lineWidth = 1) {
-    roundedRectPath(x, y, w, h, radius);
-    ctx.strokeStyle = strokeStyle;
-    ctx.lineWidth = lineWidth;
-    ctx.stroke();
-  }
-
-  function drawSoftPanel(x, y, w, h, options = {}) {
-    const radius = options.radius ?? 8;
-    const top = options.top ?? "rgba(21, 31, 35, 0.86)";
-    const bottom = options.bottom ?? "rgba(8, 14, 18, 0.78)";
-    const border = options.border ?? "rgba(255, 221, 153, 0.28)";
-
-    ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.32)";
-    ctx.shadowBlur = options.shadowBlur ?? 18;
-    ctx.shadowOffsetY = options.shadowOffsetY ?? 8;
-    const grad = ctx.createLinearGradient(x, y, x, y + h);
-    grad.addColorStop(0, top);
-    grad.addColorStop(1, bottom);
-    fillRoundedRect(x, y, w, h, radius, grad);
-    ctx.shadowColor = "transparent";
-    strokeRoundedRect(x + 0.5, y + 0.5, w - 1, h - 1, radius, border, 1);
-    ctx.restore();
-  }
-
-  function fitText(text, maxWidth) {
-    const source = String(text ?? "");
-    if (ctx.measureText(source).width <= maxWidth) return source;
-    let low = 0;
-    let high = source.length;
-    while (low < high) {
-      const mid = Math.ceil((low + high) / 2);
-      if (ctx.measureText(`${source.slice(0, mid)}...`).width <= maxWidth) low = mid;
-      else high = mid - 1;
-    }
-    return `${source.slice(0, Math.max(0, low))}...`;
-  }
-
-  function drawClippedText(text, x, y, maxWidth, fillStyle) {
-    ctx.fillStyle = fillStyle;
-    ctx.fillText(fitText(text, maxWidth), x, y);
-  }
-
-  function drawPillLabel(text, x, y, fillStyle = "rgba(15, 22, 24, 0.74)", textStyle = "#f7e7c7") {
-    const padX = 7;
-    const w = ctx.measureText(text).width + padX * 2;
-    const h = 18;
-    fillRoundedRect(x - w / 2, y - h, w, h, 7, fillStyle);
-    strokeRoundedRect(x - w / 2 + 0.5, y - h + 0.5, w - 1, h - 1, 7, "rgba(255, 223, 164, 0.28)", 1);
-    ctx.fillStyle = textStyle;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, x, y - h / 2);
-    ctx.textAlign = "left";
-    ctx.textBaseline = "alphabetic";
-  }
+  const _renderHelpers = createRenderHelpers(ctx);
+  const roundedRectPath = _renderHelpers.roundedRectPath;
+  const fillRoundedRect = _renderHelpers.fillRoundedRect;
+  const strokeRoundedRect = _renderHelpers.strokeRoundedRect;
+  const drawSoftPanel = _renderHelpers.drawSoftPanel;
+  const fitText = _renderHelpers.fitText;
+  const drawClippedText = _renderHelpers.drawClippedText;
+  const drawPillLabel = _renderHelpers.drawPillLabel;
 
   function drawInteriorBackdrop(width, height) {
     const horizon = Math.floor(height * 0.57);
@@ -5603,6 +5551,23 @@ const canvas = document.getElementById("game");
     if (event.code === "KeyN") {
       soundEnabled = !soundEnabled;
       logMsg(soundEnabled ? "Sound ON. Your ears will thank you. Maybe." : "Sound OFF. Blissful silence.");
+      if (!soundEnabled && audioBuses) {
+        try { stopAmbient(audioBuses); } catch { /* not critical */ }
+        lastAmbientRegion = null;
+      } else if (soundEnabled && state.mode === "playing") {
+        syncAmbientForRegion(state.regions?.activeRegion || "frontier");
+      }
+    }
+
+    if (event.code === "KeyM" && event.shiftKey) {
+      ambientEnabled = !ambientEnabled;
+      logMsg(`Ambient drone: ${ambientEnabled ? "ON" : "OFF"}.`);
+      if (!ambientEnabled && audioBuses) {
+        try { stopAmbient(audioBuses); } catch { /* not critical */ }
+        lastAmbientRegion = null;
+      } else if (ambientEnabled && state.mode === "playing") {
+        syncAmbientForRegion(state.regions?.activeRegion || "frontier");
+      }
     }
 
     if (event.code === "KeyV") {
