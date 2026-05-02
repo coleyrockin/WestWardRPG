@@ -18,8 +18,38 @@ describe("saveMigration", () => {
     expect(migrated?.graphics?.performance?.gradientCache).toBe(false);
   });
 
-  it("preserves v3 saves untouched", () => {
+  it("preserves v3 saves identity but backfills miniBosses defaults", () => {
     const save = { version: 3, savedAt: 99, player: { level: 2 } };
-    expect(migrateSaveToV3(save)).toBe(save);
+    const out = migrateSaveToV3(save);
+    expect(out).toBe(save);
+    expect(out?.regions?.miniBosses?.ashfall_scrap_tyrant?.defeated).toBe(false);
+    expect(out?.regions?.miniBosses?.ashfall_scorch_engine?.defeated).toBe(false);
+    expect(out?.regions?.miniBosses?.lantern_overseer?.defeated).toBe(false);
+    expect(out?.regions?.miniBosses?.lantern_iron_chanter?.defeated).toBe(false);
+  });
+
+  it("preserves an existing miniBoss defeated flag through migration", () => {
+    const save = {
+      version: 3,
+      savedAt: 99,
+      player: { level: 2 },
+      regions: {
+        activeRegion: "ashfall",
+        discovered: ["frontier", "ashfall"],
+        events: {},
+        miniBosses: { ashfall_scrap_tyrant: { defeated: true } },
+      },
+    };
+    const out = migrateSaveToV3(save);
+    expect(out?.regions?.miniBosses?.ashfall_scrap_tyrant?.defeated).toBe(true);
+    // missing siblings still backfilled
+    expect(out?.regions?.miniBosses?.ashfall_scorch_engine?.defeated).toBe(false);
+    expect(out?.regions?.miniBosses?.lantern_overseer?.defeated).toBe(false);
+  });
+
+  it("backfills miniBosses on v2-to-v3 migration", () => {
+    const out = migrateSaveToV3({ version: 2, savedAt: 1 });
+    expect(out?.regions?.miniBosses).toBeTruthy();
+    expect(Object.keys(out?.regions?.miniBosses || {}).length).toBeGreaterThanOrEqual(4);
   });
 });

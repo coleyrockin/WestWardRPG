@@ -56,4 +56,13 @@ describe("regionSystem", () => {
     expect(mods.priceMult).toBe(1);
     expect(mods.banner).toBeNull();
   });
+
+  it("default region state seeds all four mini-boss flags as not-defeated", () => {
+    const state = createInitialRegionState();
+    expect(state.miniBosses).toBeTruthy();
+    const ids = ["ashfall_scrap_tyrant", "ashfall_scorch_engine", "lantern_overseer", "lantern_iron_chanter"];
+    for (const id of ids) {
+      expect(state.miniBosses[id]?.defeated).toBe(false);
+    }
+  });
 });

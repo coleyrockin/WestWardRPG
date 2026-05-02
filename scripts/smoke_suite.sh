@@ -82,6 +82,16 @@ detect_url() {
 }
 
 BASE_URL="$(detect_url)"
+
+if [ "${WESTWARD_GRADIENT_CACHE:-0}" = "1" ]; then
+  if [[ "$BASE_URL" == *"?"* ]]; then
+    BASE_URL="${BASE_URL}&gradientCache=1"
+  else
+    BASE_URL="${BASE_URL}?gradientCache=1"
+  fi
+  echo "[INFO] Gradient cache forced ON via query-param."
+fi
+
 RUN_TAG="$(date +%Y%m%d-%H%M%S)"
 OUT_ROOT="$PROJECT_ROOT/output/qa-smoke-$RUN_TAG"
 mkdir -p "$OUT_ROOT"
@@ -136,6 +146,8 @@ run_scenario "combat" "test-actions/combat_block_flow.json" 2
 run_scenario "boss-fight" "test-actions/boss_fight_flow.json" 2
 run_scenario "weather-heavy" "test-actions/weather_heavy_scene.json" 2
 run_scenario "upgrade-equip" "test-actions/upgrade_purchase_equip_flow.json" 2
+run_scenario "settings-modal" "test-actions/settings_modal_flow.json" 1
+run_scenario "mini-boss" "test-actions/mini_boss_flow.json" 1
 
 echo "[SUCCESS] Functional smoke suite completed."
 echo "[SUCCESS] Artifacts: $OUT_ROOT"

@@ -17,9 +17,26 @@ function normalizeQuest(source, fallback) {
   };
 }
 
+function backfillRegionDefaults(regions) {
+  const defaults = createInitialRegionState();
+  if (!regions) return clone(defaults);
+  const next = clone(regions);
+  if (!next.miniBosses || typeof next.miniBosses !== "object") {
+    next.miniBosses = clone(defaults.miniBosses);
+  } else {
+    for (const [bossId, def] of Object.entries(defaults.miniBosses)) {
+      if (!next.miniBosses[bossId]) next.miniBosses[bossId] = clone(def);
+    }
+  }
+  return next;
+}
+
 export function migrateSaveToV3(save) {
   if (!save || typeof save !== "object") return null;
-  if (save.version === 3) return save;
+  if (save.version === 3) {
+    save.regions = backfillRegionDefaults(save.regions);
+    return save;
+  }
   if (save.version !== 2 && save.version !== 1) return null;
 
   const questDefaults = createInitialQuestState();
@@ -54,7 +71,7 @@ export function migrateSaveToV3(save) {
     narrative: clone(save.narrative || createInitialNarrativeState()),
     showMap: typeof save.showMap === "boolean" ? save.showMap : true,
     progression: clone(save.progression || createInitialProgressionState()),
-    regions: clone(save.regions || createInitialRegionState()),
+    regions: backfillRegionDefaults(save.regions),
     graphics: {
       ...clone(graphicsDefaults),
       ...(save.graphics || {}),

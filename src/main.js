@@ -77,6 +77,10 @@ import {
   createInitialGraphicsState,
   resolveRecommendedPreset,
   applyGraphicsAccessibility,
+  getColorblindPalette,
+  SETTINGS_ROWS,
+  readSettingValue,
+  stepSetting,
 } from "./graphicsSettings.js";
 
 const canvas = document.getElementById("game");
@@ -874,6 +878,8 @@ const canvas = document.getElementById("game");
 
   let skillScreenOpen = false;
   let skillSelection = 0;
+  let settingsOpen = false;
+  let settingsSelection = 0;
   const SKILL_BRANCH_LABELS = [
     { id: "survival", label: "Survival", desc: "Stamina pool, harvest yield, weather grit." },
     { id: "combat", label: "Combat", desc: "Damage, block window, crit chance." },
@@ -971,7 +977,19 @@ const canvas = document.getElementById("game");
   ];
   let shopSelection = 0;
   let latestParticleMultiplier = 1;
+  let latestColorblindPalette = null;
   const gradientCacheStore = new Map();
+
+  function hexToRgba(hex, alpha = 1) {
+    if (typeof hex !== "string" || !hex.startsWith("#")) return hex;
+    const full = hex.length === 4
+      ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+      : hex;
+    const r = parseInt(full.slice(1, 3), 16);
+    const g = parseInt(full.slice(3, 5), 16);
+    const b = parseInt(full.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
 
   function gradientBucket(value, bucketCount = 12) {
     const clamped = clamp(numberOr(value, 0), 0, 1);
@@ -4090,11 +4108,15 @@ const canvas = document.getElementById("game");
     const distNorm = clamp(numberOr(sprite.distToPlayer, MAX_RAY_DIST) / MAX_RAY_DIST, 0, 0.999);
     const distBand = Math.max(0, Math.min(7, Math.floor(distNorm * 8)));
 
+    const cbPalSprite = latestColorblindPalette;
+    const enemyGlow = cbPalSprite ? hexToRgba(cbPalSprite.foe, 0.38) : "rgba(112, 246, 126, 0.38)";
+    const npcGlow = cbPalSprite ? hexToRgba(cbPalSprite.friend, 0.32) : "rgba(255, 220, 163, 0.16)";
     const glowColor =
-      sprite.kind === "enemy" ? "rgba(112, 246, 126, 0.38)" :
-        sprite.kind === "resource" && sprite.label === "Crystal" ? "rgba(124, 205, 255, 0.35)" :
-          sprite.kind === "resource" && sprite.label === "Archive" ? "rgba(218, 108, 255, 0.34)" :
-            "rgba(255, 220, 163, 0.16)";
+      sprite.kind === "enemy" ? enemyGlow :
+        sprite.kind === "npc" ? npcGlow :
+          sprite.kind === "resource" && sprite.label === "Crystal" ? "rgba(124, 205, 255, 0.35)" :
+            sprite.kind === "resource" && sprite.label === "Archive" ? "rgba(218, 108, 255, 0.34)" :
+              "rgba(255, 220, 163, 0.16)";
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = sprite.kind === "enemy" || sprite.label === "Crystal" || sprite.label === "Archive" ? 14 : 6;
     ctx.shadowOffsetY = 2;
@@ -4520,6 +4542,7 @@ const canvas = document.getElementById("game");
     });
     const visualMood = applyGraphicsAccessibility(visualMoodBase, state.graphics.accessibility);
     latestParticleMultiplier = clamp(numberOr(visualMood.particleMultiplier, 1), 0, 1);
+    latestColorblindPalette = getColorblindPalette(visualMood.colorblindMode);
     const gradientCacheEnabled = isGradientCacheEnabled();
     const cameraShakeStrength = clamp(visualMood.cameraShake ?? 1, 0, 1.5);
 
@@ -4748,7 +4771,13 @@ const canvas = document.getElementById("game");
         const fontSize = clamp(height / (ftD + 0.01) * 0.2, 11, 26);
         ctx.font = `bold ${fontSize}px Georgia`;
         ctx.globalAlpha = alpha;
-        ctx.fillStyle = ft.color;
+        let ftColor = ft.color;
+        if (latestColorblindPalette) {
+          if (ft.text === "SLAIN" || ft.text.startsWith("-")) ftColor = latestColorblindPalette.foe;
+          else if (ft.text.startsWith("+")) ftColor = latestColorblindPalette.friend;
+          else ftColor = latestColorblindPalette.neutral;
+        }
+        ctx.fillStyle = ftColor;
         ctx.fillText(ft.text, ftSx, ftSy);
       }
       ctx.globalAlpha = 1;
@@ -5023,15 +5052,19 @@ const canvas = document.getElementById("game");
     }
 
     if (!state.player.inHouse) {
+      const cbPal = latestColorblindPalette;
+      const enemyDot = cbPal ? cbPal.foe : "#98f39b";
+      const npcDot = cbPal ? cbPal.friend : "#ffd77b";
+      const pigDot = cbPal ? cbPal.neutral : "#f0adb4";
       for (const enemy of state.enemies) {
         if (!enemy.alive) continue;
-        drawDot(enemy.x, enemy.y, "#98f39b", 2.5);
+        drawDot(enemy.x, enemy.y, enemyDot, 2.5);
       }
       for (const npc of state.npcs) {
-        drawDot(npc.x, npc.y, "#ffd77b", 2.5);
+        drawDot(npc.x, npc.y, npcDot, 2.5);
       }
       for (const pig of state.pigs) {
-        drawDot(pig.x, pig.y, "#f0adb4", 2.5);
+        drawDot(pig.x, pig.y, pigDot, 2.5);
       }
       drawDot(state.house.outsideDoor.x, state.house.outsideDoor.y,
         state.house.unlocked ? "#d8bc6a" : "#9b7b56", 3.5);
@@ -5285,6 +5318,42 @@ const canvas = document.getElementById("game");
       drawClippedText("↑/↓ select   Enter unlock   Esc close", sx + 16, sy + sh - 14, sw - 32, "#9088b0");
     }
 
+    /* Settings overlay */
+    if (settingsOpen && state.mode === "playing") {
+      const sw = Math.min(440, canvas.width - margin * 2);
+      const sh = SETTINGS_ROWS.length * 44 + 110;
+      const sx = Math.floor((canvas.width - sw) / 2);
+      const sy = Math.floor((canvas.height - sh) / 2);
+      drawSoftPanel(sx, sy, sw, sh, {
+        top: "rgba(20, 26, 36, 0.94)",
+        bottom: "rgba(8, 12, 18, 0.92)",
+        border: "rgba(168, 215, 255, 0.55)",
+      });
+      ctx.font = "bold 20px Georgia";
+      drawClippedText("Settings", sx + 16, sy + 30, sw - 32, "#cce4ff");
+      ctx.font = "12px Georgia";
+      drawClippedText("↑/↓ select  ←/→ change  Esc close", sx + 16, sy + 50, sw - 32, "#a9b8d0");
+      for (let i = 0; i < SETTINGS_ROWS.length; i++) {
+        const row = SETTINGS_ROWS[i];
+        const iy = sy + 70 + i * 44;
+        const selected = i === settingsSelection;
+        fillRoundedRect(sx + 8, iy, sw - 16, 38, 7, selected ? "rgba(168, 215, 255, 0.22)" : "rgba(255, 255, 255, 0.05)");
+        if (selected) strokeRoundedRect(sx + 8.5, iy + 0.5, sw - 17, 37, 7, "#cce4ff", 1);
+        ctx.font = "bold 14px Georgia";
+        drawClippedText(row.label, sx + 20, iy + 16, sw * 0.55, selected ? "#cce4ff" : "#f3ecd8");
+        const value = readSettingValue(state.graphics, row.id);
+        let valueText;
+        if (row.kind === "bool") valueText = value ? "ON" : "OFF";
+        else if (row.kind === "range") valueText = row.format ? row.format(value) : String(value);
+        else valueText = String(value);
+        ctx.font = "13px Georgia";
+        ctx.textAlign = "right";
+        ctx.fillStyle = selected ? "#cce4ff" : "#f3ecd8";
+        ctx.fillText(`◀ ${valueText} ▶`, sx + sw - 20, iy + 24);
+        ctx.textAlign = "left";
+      }
+    }
+
     /* Shop overlay */
     if (shopOpen && state.mode === "playing") {
       const sw = Math.min(420, canvas.width - margin * 2);
@@ -5368,6 +5437,20 @@ const canvas = document.getElementById("game");
   resize();
   syncSaveStateFromStorage();
 
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    if (params.get("gradientCache") === "1") {
+      state.graphics.performance = state.graphics.performance || { gradientCache: false };
+      state.graphics.performance.gradientCache = true;
+      clearGradientCache();
+    }
+    const cb = params.get("colorblind");
+    if (cb && ["none","deuteranopia","protanopia","tritanopia"].includes(cb)) {
+      state.graphics.accessibility = state.graphics.accessibility || {};
+      state.graphics.accessibility.colorblindMode = cb;
+    }
+  } catch {}
+
   startBtn.addEventListener("click", () => {
     ensureAudio();
     beginSession();
@@ -5381,6 +5464,37 @@ const canvas = document.getElementById("game");
 
   document.addEventListener("keydown", (event) => {
     state.keys[event.code] = true;
+
+    /* Settings modal controls */
+    if (settingsOpen) {
+      if (event.code === "ArrowUp" || event.code === "KeyW") {
+        settingsSelection = (settingsSelection - 1 + SETTINGS_ROWS.length) % SETTINGS_ROWS.length;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "ArrowDown" || event.code === "KeyS") {
+        settingsSelection = (settingsSelection + 1) % SETTINGS_ROWS.length;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "ArrowLeft" || event.code === "ArrowRight" || event.code === "Enter" || event.code === "Space" || event.code === "KeyA" || event.code === "KeyD") {
+        const row = SETTINGS_ROWS[settingsSelection];
+        const dir = (event.code === "ArrowLeft" || event.code === "KeyA") ? -1 : 1;
+        const next = stepSetting(state.graphics, row.id, dir);
+        if (row.id === "gradientCache") clearGradientCache();
+        if (row.id === "preset") {
+          state.weather.quality = state.graphics.preset === "high" ? "cinematic" : state.graphics.preset === "low" ? "performance" : "balanced";
+        }
+        logMsg(`${row.label}: ${typeof next === "boolean" ? (next ? "ON" : "OFF") : next}`);
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "Escape" || event.code === "KeyO") {
+        settingsOpen = false;
+        event.preventDefault();
+        return;
+      }
+    }
 
     /* Skill screen controls */
     if (skillScreenOpen) {
@@ -5522,6 +5636,11 @@ const canvas = document.getElementById("game");
     if (event.code === "KeyT" && state.mode === "playing" && !shopOpen) {
       skillScreenOpen = !skillScreenOpen;
       if (skillScreenOpen) logMsg("Skill tree opened.");
+    }
+
+    if (event.code === "KeyO" && state.mode === "playing" && !shopOpen && !skillScreenOpen) {
+      settingsOpen = !settingsOpen;
+      if (settingsOpen) logMsg("Settings opened.");
     }
 
     if (event.code === "KeyJ" && state.mode === "playing") {

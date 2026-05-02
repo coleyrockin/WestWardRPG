@@ -84,3 +84,55 @@ const COLORBLIND_PALETTES = {
 export function getColorblindPalette(mode) {
   return COLORBLIND_PALETTES[mode] || null;
 }
+
+export const SETTINGS_ROWS = [
+  { id: "preset", label: "Graphics Preset", kind: "enum", options: ["low", "balanced", "high"] },
+  { id: "gradientCache", label: "Gradient Cache", kind: "bool" },
+  { id: "colorblindMode", label: "Colorblind Mode", kind: "enum", options: COLORBLIND_MODES },
+  { id: "fontScale", label: "Font Scale", kind: "range", min: 0.8, max: 1.6, step: 0.1, format: (v) => `${v.toFixed(2)}x` },
+  { id: "motionReduction", label: "Motion Reduction", kind: "bool" },
+  { id: "cameraShake", label: "Camera Shake", kind: "range", min: 0, max: 1.5, step: 0.25, format: (v) => v.toFixed(2) },
+];
+
+export function readSettingValue(graphics, id) {
+  if (!graphics) return null;
+  switch (id) {
+    case "preset": return graphics.preset;
+    case "gradientCache": return Boolean(graphics.performance?.gradientCache);
+    case "colorblindMode": return graphics.accessibility?.colorblindMode ?? "none";
+    case "fontScale": return Number(graphics.accessibility?.fontScale ?? 1);
+    case "motionReduction": return Boolean(graphics.accessibility?.motionReduction);
+    case "cameraShake": return Number(graphics.accessibility?.cameraShake ?? 1);
+    default: return null;
+  }
+}
+
+export function stepSetting(graphics, id, dir) {
+  if (!graphics) return null;
+  graphics.performance = graphics.performance || { gradientCache: false };
+  graphics.accessibility = graphics.accessibility || {};
+  const row = SETTINGS_ROWS.find((r) => r.id === id);
+  if (!row) return null;
+  const current = readSettingValue(graphics, id);
+  if (row.kind === "bool") {
+    if (id === "gradientCache") graphics.performance.gradientCache = !current;
+    else if (id === "motionReduction") graphics.accessibility.motionReduction = !current;
+    return readSettingValue(graphics, id);
+  }
+  if (row.kind === "enum") {
+    const idx = row.options.indexOf(current);
+    const nextIdx = (idx + (dir > 0 ? 1 : -1) + row.options.length) % row.options.length;
+    const next = row.options[nextIdx];
+    if (id === "preset") graphics.preset = next;
+    else if (id === "colorblindMode") graphics.accessibility.colorblindMode = next;
+    return next;
+  }
+  if (row.kind === "range") {
+    const stepped = Number((current + dir * row.step).toFixed(2));
+    const clamped = Math.max(row.min, Math.min(row.max, stepped));
+    if (id === "fontScale") graphics.accessibility.fontScale = clamped;
+    else if (id === "cameraShake") graphics.accessibility.cameraShake = clamped;
+    return clamped;
+  }
+  return null;
+}
