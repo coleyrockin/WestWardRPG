@@ -38,6 +38,7 @@ The flagship update adds chapter-driven narrative consequences, faction/NPC reac
 - Keeps complexity transparent by using modular plain JavaScript files.
 - Treats narrative as gameplay logic, not only dialogue flavor.
 - Uses automated tests for core systems and progression logic.
+- Keeps future work in one roadmap: [`docs/roadmap.md`](docs/roadmap.md).
 
 ## What's New in Flagship Update
 

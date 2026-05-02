@@ -17,6 +17,39 @@ if [ ! -f "$CLIENT" ]; then
   exit 1
 fi
 
+actions_for() {
+  local profile="$1"
+  local region="$2"
+  local preset_steps=""
+  local region_steps=""
+
+  case "$profile" in
+    low)
+      preset_steps='{"buttons":["bracketleft"],"frames":2}'
+      ;;
+    balanced)
+      preset_steps='{"buttons":[],"frames":2}'
+      ;;
+    high)
+      preset_steps='{"buttons":["bracketright"],"frames":2}'
+      ;;
+  esac
+
+  case "$region" in
+    frontier)
+      region_steps='{"buttons":[],"frames":2}'
+      ;;
+    ashfall)
+      region_steps='{"buttons":["g"],"frames":2}'
+      ;;
+    ironlantern)
+      region_steps='{"buttons":["g"],"frames":2},{"buttons":["g"],"frames":2}'
+      ;;
+  esac
+
+  printf '{"steps":[{"buttons":["enter"],"frames":2},%s,%s,{"buttons":["w"],"frames":8}]}' "$preset_steps" "$region_steps"
+}
+
 capture_profile() {
   local profile="$1"
   local region="$2"
@@ -24,11 +57,11 @@ capture_profile() {
   mkdir -p "$out_dir"
   node "$CLIENT" \
     --url "$BASE_URL" \
-    --actions-json "{\"steps\":[{\"buttons\":[\"enter\"],\"frames\":2},{\"buttons\":[\"$profile\"],\"frames\":2},{\"buttons\":[\"$region\"],\"frames\":2}]}" \
+    --actions-json "$(actions_for "$profile" "$region")" \
     --click-selector "#start-btn" \
     --iterations 2 \
     --pause-ms 250 \
-    --screenshot-dir "$out_dir" || true
+    --screenshot-dir "$out_dir"
 }
 
 for region in frontier ashfall ironlantern; do

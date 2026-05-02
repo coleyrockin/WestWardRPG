@@ -1,0 +1,19 @@
+export const GRAPHICS_PRESETS: Record<string, any>;
+export const BIOME_GRADING: Record<string, any>;
+export const COLORBLIND_MODES: string[];
+export const SETTINGS_ROWS: Array<{
+  id: string;
+  label: string;
+  kind: "bool" | "enum" | "range";
+  options?: string[];
+  min?: number;
+  max?: number;
+  step?: number;
+  format?: (value: number) => string;
+}>;
+export function resolveRecommendedPreset(metrics?: any): string;
+export function createInitialGraphicsState(): any;
+export function applyGraphicsAccessibility(strengths: any, accessibility: any): any;
+export function getColorblindPalette(mode: string): any;
+export function readSettingValue(graphics: any, id: string): any;
+export function stepSetting(graphics: any, id: string, dir: number): any;
