@@ -4,6 +4,7 @@ import {
   gradientBucket,
   createGradientCache,
   createRenderHelpers,
+  resolveWallProjection,
 } from "../src/render.js";
 
 describe("render — hexToRgba", () => {
@@ -69,6 +70,36 @@ describe("render — createGradientCache", () => {
     expect(cache.size).toBe(2);
     cache.clear();
     expect(cache.size).toBe(0);
+  });
+});
+
+describe("render — resolveWallProjection", () => {
+  it("lets very near walls fill past the viewport instead of capping short", () => {
+    const projection = resolveWallProjection({
+      height: 720,
+      horizon: 360,
+      correctedDist: 0.08,
+      inHouse: false,
+      nearClip: 0.24,
+    });
+
+    expect(projection.projectedDist).toBe(0.24);
+    expect(projection.wallHeight).toBeGreaterThan(720);
+    expect(projection.y).toBeLessThan(0);
+    expect(projection.bottom).toBeGreaterThan(720);
+  });
+
+  it("keeps far walls within a normal projection range", () => {
+    const projection = resolveWallProjection({
+      height: 720,
+      horizon: 360,
+      correctedDist: 8,
+      inHouse: false,
+      nearClip: 0.24,
+    });
+
+    expect(projection.wallHeight).toBeLessThan(120);
+    expect(projection.y).toBeGreaterThan(250);
   });
 });
 

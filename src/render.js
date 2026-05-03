@@ -40,6 +40,25 @@ export function createGradientCache() {
   };
 }
 
+export function resolveWallProjection(options = {}) {
+  const height = Math.max(1, options.height || 1);
+  const horizon = Number.isFinite(options.horizon) ? options.horizon : height * 0.5;
+  const correctedDist = Math.max(0.0001, options.correctedDist || 0.0001);
+  const nearClip = Math.max(0.0001, options.nearClip || 0.24);
+  const projectedDist = Math.max(correctedDist, nearClip);
+  const wallScale = options.inHouse ? 1.07 : 0.94;
+  const wallHeightCap = height * (options.inHouse ? 1.9 : 1.75);
+  const wallHeight = Math.min(wallHeightCap, (height * wallScale) / projectedDist);
+  const y = Math.floor(horizon - wallHeight * 0.64);
+
+  return {
+    projectedDist,
+    wallHeight,
+    y,
+    bottom: y + wallHeight,
+  };
+}
+
 // Returns ctx-bound drawing helpers. Each helper closes over ctx so it
 // matches the inline-version semantics callers in main.js expect.
 export function createRenderHelpers(ctx) {

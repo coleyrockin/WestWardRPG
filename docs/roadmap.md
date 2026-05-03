@@ -18,7 +18,7 @@ Open-world RPG target: push the game toward a compact Skyrim/Oblivion feel withi
 
 Latest local verification:
 - `git diff --check` → clean.
-- `npm test` → **287 passing across 31 test files**.
+- `npm test` → **289 passing across 31 test files**.
 - `npm run typecheck:ts` → clean.
 - `npm run test:syntax` → clean.
 - `npm run dev:lint` → clean.
@@ -52,7 +52,7 @@ Latest local verification:
 - **Codex / lore browser** (`src/codex.js`) — KeyZ opens a tabbed lore screen (regions / enemies / items / factions / ideology). Entries unlock on first encounter (region unlock, first kill of an enemy archetype). Shows `???` + "(undiscovered)" until unlocked. Progress count in header.
 
 ## Test + Build Status
-- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 287 passing across 31 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
+- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 289 passing across 31 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
 - v1/v2/v3 save fixtures all migrate cleanly with backfilled defaults.
 
 ## Next Work — Pillar 5: Narrative depth
@@ -247,7 +247,7 @@ Latest local verification:
 
 ## Next Agent Handoff
 
-Current shipped direction after `7e9ac52`: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, NPC memory, first-pass gameplay-feel helpers, and smoke/debug text fields are in scope. Fast verification is 287 tests across 31 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should prioritize live gameplay feel: first-minute pressure, enemy readability, hit/reward feel, and the slow mini-boss smoke.
+Current shipped direction after `7e9ac52`: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, NPC memory, first-pass gameplay-feel helpers, near-wall projection repair, and smoke/debug text fields are in scope. Fast verification is 289 tests across 31 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should prioritize live gameplay feel: first-minute pressure, enemy readability, hit/reward feel, and the slow mini-boss smoke.
 
 ### User signal to respect
 

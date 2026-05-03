@@ -167,6 +167,7 @@ import {
   gradientBucket as gradientBucketUtil,
   createGradientCache,
   createRenderHelpers,
+  resolveWallProjection,
 } from "./render.js";
 import {
   applyStatus,
@@ -5446,12 +5447,16 @@ const canvas = document.getElementById("game");
       const hit = castRay(rayAngle);
       const correctedDist = Math.max(0.0001, hit.dist * Math.cos(rayAngle - state.player.angle));
       depth[x] = correctedDist;
-      const projectedDist = Math.max(correctedDist, WALL_RENDER_NEAR_CLIP);
-
-      const wallScale = state.player.inHouse ? 1.07 : 0.94;
-      const wallHeightCap = height * (state.player.inHouse ? 0.74 : 0.62);
-      const wallHeight = Math.min(wallHeightCap, (height * wallScale) / projectedDist);
-      const y = Math.floor(horizon - wallHeight * 0.64);
+      const projection = resolveWallProjection({
+        height,
+        horizon,
+        correctedDist,
+        inHouse: state.player.inHouse,
+        nearClip: WALL_RENDER_NEAR_CLIP,
+      });
+      const projectedDist = projection.projectedDist;
+      const wallHeight = projection.wallHeight;
+      const y = projection.y;
 
       let tex = textures.stone;
       if (hit.tileType === 2) tex = textures.water;
