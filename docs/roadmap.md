@@ -18,7 +18,7 @@ Open-world RPG target: push the game toward a compact Skyrim/Oblivion feel withi
 
 Latest local verification:
 - `git diff --check` → clean.
-- `npm test` → **283 passing across 30 test files**.
+- `npm test` → **287 passing across 31 test files**.
 - `npm run typecheck:ts` → clean.
 - `npm run test:syntax` → clean.
 - `npm run dev:lint` → clean.
@@ -52,7 +52,7 @@ Latest local verification:
 - **Codex / lore browser** (`src/codex.js`) — KeyZ opens a tabbed lore screen (regions / enemies / items / factions / ideology). Entries unlock on first encounter (region unlock, first kill of an enemy archetype). Shows `???` + "(undiscovered)" until unlocked. Progress count in header.
 
 ## Test + Build Status
-- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 283 passing across 30 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
+- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 287 passing across 31 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
 - v1/v2/v3 save fixtures all migrate cleanly with backfilled defaults.
 
 ## Next Work — Pillar 5: Narrative depth
@@ -247,7 +247,7 @@ Latest local verification:
 
 ## Next Agent Handoff
 
-Current shipped direction after `7e9ac52`: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, NPC memory, and smoke/debug text fields are in scope. Fast verification is 283 tests across 30 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should deepen forge/alchemy/map-table projects and repair the slow mini-boss smoke.
+Current shipped direction after `7e9ac52`: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, NPC memory, first-pass gameplay-feel helpers, and smoke/debug text fields are in scope. Fast verification is 287 tests across 31 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should prioritize live gameplay feel: first-minute pressure, enemy readability, hit/reward feel, and the slow mini-boss smoke.
 
 ### User signal to respect
 
@@ -263,19 +263,19 @@ The user is not asking for a prettier TODO list. They want the game to start fee
 
 ### Next build target
 
-Ship **Gear Loop 6: station depth + smoke repair.** The current foundation makes loot/workstations real and selectable, shows earned gear in the sheet/workbench, lets the workbench level up, improves level 2 crafting, and unlocks a level 3 Region Map project. The next slice should make forge/alchemy/map-table projects affect world rewards and make the mini-boss smoke deterministic enough to finish.
+Ship **Gameplay Feel 2: first-minute pressure + enemy readability.** The current foundation makes loot/workstations real and selectable, shows earned gear in the sheet/workbench, lets the workbench level up, improves level 2 crafting, unlocks a level 3 Region Map project, and adds first-pass hit feedback/opening-objective helpers. The next slice should make live play feel less static before adding more RPG data.
 
 Player-facing result:
-- Forge/alchemy/map-table projects have visible rewards beyond labels.
+- First 60 seconds have a clear action target and a nearby reward/threat.
+- Enemy windups, hit reactions, and reward drops read better without opening debug state.
 - Mini-boss smoke completes deterministically or produces a focused failure artifact.
-- Might/Grit/Craft should remain visible in outcomes: heavy weapons feel different, armor weight matters, and Craft changes cost/yield.
 - Saves preserve new gear/crafting state through v3 backfill unless a real schema bump becomes necessary.
 
 Concrete build order:
-1. Add one forge or alchemy project with a concrete gear/resource payoff.
-2. Make Region Map affect POI/cache discovery or region reward odds.
+1. Add a deterministic first-minute pressure event or nearby action marker.
+2. Make enemy hit reactions/windups more readable in the canvas, not just in logs.
 3. Shorten/fix `test-actions/mini_boss_flow.json` so the smoke does not hang.
-4. Expose project payoff state in `render_game_to_text` for smoke automation.
+4. Keep `render_game_to_text` exposing gameplay-feel state for smoke automation.
 5. Update this roadmap and verification counts after the slice lands.
 
 Quality bar:

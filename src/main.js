@@ -110,6 +110,10 @@ import {
   resolveNpcReactiveLine,
 } from "./npcMemory.js";
 import {
+  resolveHitFeedback,
+  resolveOpeningObjective,
+} from "./gameFeel.js";
+import {
   buildRegionIdentityLine,
   getRegionVisualIdentity,
 } from "./regionVisualIdentity.js";
@@ -3569,6 +3573,9 @@ const canvas = document.getElementById("game");
 
     const maxTargets = state.narrative.globalFlags.toolCommonsCreated ? 3 : 2;
     let hitCount = 0;
+    let maxDamage = 0;
+    let killedAny = false;
+    let interruptedAny = false;
     for (const enemy of targets) {
       if (hitCount >= maxTargets) break;
       const dx = enemy.x - state.player.x;
@@ -3592,6 +3599,7 @@ const canvas = document.getElementById("game");
       const damage = Math.floor((swing.damage * stance.damageMult))
         + Math.floor(state.player.level * 1.8)
         + Math.floor(Math.random() * 4) - 1;
+      maxDamage = Math.max(maxDamage, damage);
       enemy.hp -= damage;
       enemy.attackCooldown += 0.45;
       enemy.stagger = 0.2 + state.player.comboStep * 0.05 + (swing.staggerBonus || 0);
@@ -3599,10 +3607,13 @@ const canvas = document.getElementById("game");
       const phased = transitionMiniBossPhaseIfNeeded(enemy);
 
       // Hit interrupts a heavy windup → big stagger reward.
+      let interruptedHit = false;
       if ((enemy.windupTimer || 0) > 0) {
         enemy.windupTimer = 0;
         enemy.windupConsumed = false;
         enemy.stagger = Math.max(enemy.stagger, 0.95);
+        interruptedHit = true;
+        interruptedAny = true;
         state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: "INTERRUPT", life: 0.7, maxLife: 0.7, color: "#ffe16a" });
       }
 
@@ -3644,14 +3655,22 @@ const canvas = document.getElementById("game");
 
       hitCount += 1;
       const isKill = !phased && enemy.hp <= 0;
-      state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: isKill ? "SLAIN" : `-${damage}`, life: 0.72, maxLife: 0.72, color: isKill ? "#ff5555" : damage >= 24 ? "#ff9f3a" : "#ffe84e" });
+      if (isKill) killedAny = true;
+      const hitFeedback = resolveHitFeedback({
+        hitCount: 1,
+        comboStep: state.player.comboStep,
+        maxDamage: damage,
+        killed: isKill,
+        interrupted: interruptedHit,
+      });
+      state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: isKill ? "SLAIN" : `-${damage}`, life: hitFeedback.floatingTextLife, maxLife: hitFeedback.floatingTextLife, color: isKill ? "#ff5555" : damage >= 24 ? "#ff9f3a" : "#ffe84e" });
 
       const eDx = enemy.x - state.player.x;
       const eDy = enemy.y - state.player.y;
       const eAng = normalizeAngle(Math.atan2(eDy, eDx) - state.player.angle);
       const eSx = clamp(((eAng + FOV / 2) / FOV) * canvas.width, 0, canvas.width);
       const eSy = canvas.height * 0.42;
-      spawnParticles(eSx, eSy, 5, enemy.color || "#6be873", 2.5, 0.4);
+      spawnParticles(eSx, eSy, hitFeedback.particleBurst, enemy.color || "#6be873", 2.9, 0.48);
 
       if (isKill) {
         enemy.alive = false;
@@ -3715,9 +3734,18 @@ const canvas = document.getElementById("game");
       logMsg(choice(["Your strike misses. The air is very dead though.", "Swing and a miss! Elegant, yet useless.", "You hit nothing. The wind is offended."]));
       sfx.miss();
     } else {
-      state.player.hitPulse = 0.24;
-      state.player.screenShake = clamp(state.player.screenShake + 0.1 * hitCount, 0, 0.45);
-      state.player.cameraKick = clamp(state.player.cameraKick + hitCount * 0.12, 0, 1);
+      const feedback = resolveHitFeedback({
+        hitCount,
+        comboStep: state.player.comboStep,
+        maxDamage,
+        killed: killedAny,
+        interrupted: interruptedAny,
+      });
+      state.player.timeScale = Math.min(state.player.timeScale || 1, 0.54);
+      state.player.timeScaleTimer = Math.max(state.player.timeScaleTimer || 0, feedback.hitStop);
+      state.player.hitPulse = Math.max(state.player.hitPulse || 0, feedback.hitPulse);
+      state.player.screenShake = clamp(state.player.screenShake + feedback.screenShake, 0, 0.75);
+      state.player.cameraKick = clamp(state.player.cameraKick + feedback.cameraKick, 0, 1.15);
       if (hitCount > 1) logMsg("Cleave strike landed on multiple targets.");
     }
   }
@@ -6143,6 +6171,30 @@ const canvas = document.getElementById("game");
       drawClippedText(m.text, topX + 10, msgY, topW - 20, "#f3e8cf");
       msgY += 12;
     }
+    const openingObjective = resolveOpeningObjective({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      inventory: state.inventory,
+      quests: state.quests,
+    });
+    if (openingObjective && msgY <= topY + topH - 10) {
+      ctx.font = "bold 11px Georgia";
+      drawClippedText(`→ ${openingObjective.line}`, topX + 10, msgY, topW - 20, openingObjective.urgency === "high" ? "#ffd77b" : "#f3e8cf");
+    }
+    if (openingObjective) {
+      const stripY = topY + topH + 8;
+      const stripH = 28;
+      drawSoftPanel(topX, stripY, topW, stripH, {
+        top: openingObjective.urgency === "high" ? "rgba(70, 44, 17, 0.82)" : "rgba(25, 32, 25, 0.76)",
+        bottom: openingObjective.urgency === "high" ? "rgba(30, 19, 9, 0.78)" : "rgba(9, 15, 11, 0.7)",
+        border: "rgba(255, 215, 123, 0.45)",
+        shadowBlur: 8,
+        shadowOffsetY: 3,
+      });
+      ctx.font = "bold 11px Georgia";
+      drawClippedText(`${openingObjective.title}: ${openingObjective.line}`, topX + 10, stripY + 18, topW - 20, "#ffd77b");
+    }
 
     if (state.mode === "gameover") {
       ctx.fillStyle = "rgba(18, 4, 5, 0.78)";
@@ -7048,6 +7100,13 @@ const canvas = document.getElementById("game");
     const gearSummary = buildGearSummary(state.progression.equipment, identity);
     const gearInventorySummary = buildGearInventorySummary(state.progression.equipment);
     const workstationSummary = describeWorkstationState(state.house.workstation);
+    const openingObjective = resolveOpeningObjective({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      inventory: state.inventory,
+      quests: state.quests,
+    });
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const quests = {
       crystal: {
@@ -7094,6 +7153,12 @@ const canvas = document.getElementById("game");
       save: {
         has_save: hasSaveData,
         last_saved_at: lastSaveAt,
+      },
+      gameplay_feel: {
+        opening_objective: openingObjective,
+        time_scale: Number((state.player.timeScale || 1).toFixed(2)),
+        hit_pulse: Number((state.player.hitPulse || 0).toFixed(2)),
+        screen_shake: Number((state.player.screenShake || 0).toFixed(2)),
       },
       location: state.player.inHouse ? "house" : "valley",
       weather: {
