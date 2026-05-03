@@ -74,6 +74,11 @@ import {
   ARMOR_MODIFIERS,
   WEAPON_TIERS,
 } from "./progressionSystem.js";
+import {
+  attachAffix,
+  buildAffixModifiers,
+  rollAffix,
+} from "./weaponAffixes.js";
 import { REGIONS, createInitialRegionState, unlockRegion, rollRegionEvent, resolveRegionEventModifiers } from "./regionSystem.js";
 import {
   createParticlePool,
@@ -152,6 +157,8 @@ import {
   chooseEligibleCompanion,
   activateCompanion,
   updateCompanionRuntime,
+  applyCompanionThreat,
+  tickCompanionRecovery,
 } from "./companion.js";
 
 const canvas = document.getElementById("game");
@@ -257,6 +264,10 @@ const canvas = document.getElementById("game");
         armorBlockDesc: "50g + 2 Scrap Coil. Better block window.",
         armorWeatherName: "Armor: Weather Resistance",
         armorWeatherDesc: "45g + 2 Pressurized Ink. Reduced weather penalty.",
+        affixPrefixName: "Inscribe Prefix",
+        affixPrefixDesc: "80g + 2 Cipher Lens. Random prefix affix on your weapon.",
+        affixSuffixName: "Inscribe Suffix",
+        affixSuffixDesc: "80g + 2 Cipher Lens. Random suffix affix on your weapon.",
       },
     },
     es: {
@@ -767,22 +778,44 @@ const canvas = document.getElementById("game");
     return typeof value === "string" ? fmt(value, vars) : value;
   }
 
+  // Refined-menu helper: strips decorative emoji & control glyphs from
+  // localized strings without touching in-game logs. The menu chrome relies
+  // on type + atmosphere for character; emojis fight that hierarchy.
+  const EMOJI_REGEX = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu;
+  function refineMenuText(value) {
+    if (typeof value !== "string") return value;
+    return value.replace(EMOJI_REGEX, "").replace(/\s{2,}/g, " ").trim();
+  }
+  function refineMenuTitle(value) {
+    const cleaned = refineMenuText(value);
+    if (!cleaned) return cleaned;
+    // Render the title as proper title-case ("Dustward") regardless of
+    // language pack capitalization.
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+  }
+
   function localizeMenu() {
     const title = document.getElementById("menu-title");
     const subtitle = document.getElementById("menu-subtitle");
     const hint = document.getElementById("hint");
     const controls = document.querySelectorAll("[data-control-index]");
-    if (title) title.textContent = t("menu.title");
-    if (subtitle) subtitle.textContent = t("menu.subtitle");
-    if (hint) hint.textContent = t("menu.goal");
-    if (startBtn) startBtn.textContent = t("menu.start");
-    if (continueBtn) continueBtn.textContent = t("menu.continue");
-    if (langLabel) langLabel.textContent = t("labels.language");
+    if (title) {
+      title.textContent = "";
+      const span = document.createElement("span");
+      span.className = "ink";
+      span.textContent = refineMenuTitle(t("menu.title"));
+      title.appendChild(span);
+    }
+    if (subtitle) subtitle.textContent = refineMenuText(t("menu.subtitle"));
+    if (hint) hint.textContent = refineMenuText(t("menu.goal"));
+    if (startBtn) startBtn.textContent = refineMenuText(t("menu.start"));
+    if (continueBtn) continueBtn.textContent = refineMenuText(t("menu.continue"));
+    if (langLabel) langLabel.textContent = refineMenuText(t("labels.language"));
     controls.forEach((node) => {
       const index = Number(node.getAttribute("data-control-index"));
       const list = t("menu.controls");
       if (Array.isArray(list) && Number.isInteger(index) && list[index]) {
-        node.textContent = list[index];
+        node.textContent = refineMenuText(list[index]);
       }
     });
   }
@@ -1115,6 +1148,30 @@ const canvas = document.getElementById("game");
         state.inventory["Pressurized Ink"] -= 2;
         addArmorModifier(state.progression, "weather_resistance");
         logMsg("Armor modifier installed: weather resistance.");
+        return true;
+      }
+    },
+    {
+      nameKey: "shop.affixPrefixName", cost: 80, descKey: "shop.affixPrefixDesc",
+      action() {
+        if ((state.inventory["Cipher Lens"] || 0) < 2) { logMsg("Need 2 Cipher Lens to inscribe a prefix."); return false; }
+        const affix = rollAffix("prefix");
+        if (!affix) { logMsg("Smith finds no prefix to inscribe."); return false; }
+        state.inventory["Cipher Lens"] -= 2;
+        attachAffix(state.progression.equipment, affix.id);
+        logMsg(`Prefix inscribed: ${affix.label}. ${affix.description}`);
+        return true;
+      }
+    },
+    {
+      nameKey: "shop.affixSuffixName", cost: 80, descKey: "shop.affixSuffixDesc",
+      action() {
+        if ((state.inventory["Cipher Lens"] || 0) < 2) { logMsg("Need 2 Cipher Lens to inscribe a suffix."); return false; }
+        const affix = rollAffix("suffix");
+        if (!affix) { logMsg("Smith finds no suffix to inscribe."); return false; }
+        state.inventory["Cipher Lens"] -= 2;
+        attachAffix(state.progression.equipment, affix.id);
+        logMsg(`Suffix inscribed: ${affix.label}. ${affix.description}`);
         return true;
       }
     },
@@ -1546,7 +1603,7 @@ const canvas = document.getElementById("game");
     regions: createInitialRegionState(),
     graphics: createInitialGraphicsState(),
     combat: { statusEffectsEnabled: true },
-    world: { timeOfDay: 0.25, companionId: null, companionHp: null },
+    world: { timeOfDay: 0.25, companionId: null, companionHp: null, companionDowned: false, companionRecoveryTimer: 0 },
     companion: createInitialCompanionRuntime(),
     codex: { unlocked: { regions: [], enemies: [], items: [], factions: [], ideology: [] } },
     npcs: [
@@ -1904,6 +1961,8 @@ const canvas = document.getElementById("game");
         timeOfDay: typeof state.world?.timeOfDay === "number" ? state.world.timeOfDay : 0.25,
         companionId: state.companion.active ? state.companion.id : (state.world?.companionId || null),
         companionHp: state.companion.active ? Math.max(1, Math.round(state.companion.hp)) : null,
+        companionDowned: Boolean(state.companion.downed),
+        companionRecoveryTimer: Math.max(0, state.companion.recoveryTimer || 0),
       },
       narrative: state.narrative,
       showMap: state.showMap,
@@ -1975,6 +2034,8 @@ const canvas = document.getElementById("game");
       timeOfDay: typeof save.world?.timeOfDay === "number" ? save.world.timeOfDay : 0.25,
       companionId: typeof save.world?.companionId === "string" ? save.world.companionId : null,
       companionHp: typeof save.world?.companionHp === "number" ? save.world.companionHp : null,
+      companionDowned: Boolean(save.world?.companionDowned),
+      companionRecoveryTimer: Math.max(0, numberOr(save.world?.companionRecoveryTimer, 0)),
     };
     state.progression = save.progression || createInitialProgressionState();
     state.regions = save.regions || createInitialRegionState();
@@ -2047,6 +2108,11 @@ const canvas = document.getElementById("game");
     if (state.world.companionId) {
       const def = chooseEligibleCompanion({ [state.world.companionId]: 100 }, 0);
       activateCompanion(state.companion, def, state.player, state.world.companionHp);
+      if (state.world.companionDowned) {
+        state.companion.active = false;
+        state.companion.downed = true;
+        state.companion.recoveryTimer = state.world.companionRecoveryTimer;
+      }
     }
 
     updateQuestProgressFromInventory();
@@ -3094,9 +3160,11 @@ const canvas = document.getElementById("game");
     }
     state.player.comboStep = (state.player.comboStep % combos.length) + 1;
 
+    const affixMods = buildAffixModifiers(state.progression.equipment?.affixes);
     const swingBase = applySwingLoadout(combos[state.player.comboStep - 1], state.player.combatProfile, {
       weatherKind: state.weather.kind,
       solidarityVsStatus: state.narrative.thematicAxes.solidarityVsStatus,
+      affixMods,
     });
     const swing = applyMovesetGeometry(swingBase, state.progression.equipment?.weaponTier || "Common");
     state.player.attackCooldown = swing.cooldown * stance.cooldownMult;
@@ -3175,6 +3243,15 @@ const canvas = document.getElementById("game");
         if ((state.player.tonicTimer || 0) > 0 && state.player.comboStep >= 2) {
           applyStatus(enemy, "frost", { magnitude: 1, sourceTier: tier });
         }
+        // Affix-driven on-hit statuses.
+        for (const entry of affixMods.statusOnHit) {
+          applyStatus(enemy, entry.kind, { magnitude: entry.magnitude, sourceTier: tier });
+        }
+      }
+      // Affix lifesteal — heals a percentage of dealt damage, capped at maxHp.
+      if (affixMods.lifestealPct > 0 && damage > 0) {
+        const heal = Math.max(1, Math.floor(damage * affixMods.lifestealPct));
+        state.player.hp = Math.min(state.player.maxHp, state.player.hp + heal);
       }
 
       const nx = dx / (d + 1e-6);
@@ -3642,25 +3719,49 @@ const canvas = document.getElementById("game");
 
   function updateCompanion(dt) {
     if (state.player.inHouse) return;
+    if (state.companion.downed) {
+      const recovered = tickCompanionRecovery(state.companion, state.player, dt);
+      state.world.companionDowned = state.companion.downed;
+      state.world.companionRecoveryTimer = state.companion.recoveryTimer || 0;
+      if (recovered) {
+        state.world.companionHp = state.companion.hp;
+        logMsg(`${state.companion.name} recovers and rejoins you.`);
+      } else {
+        return;
+      }
+    }
     if (!state.companion.active) {
       const def = chooseEligibleCompanion(state.narrative?.npcAffinity);
       if (def && activateCompanion(state.companion, def, state.player, state.world?.companionHp)) {
         state.world.companionId = def.id;
         state.world.companionHp = state.companion.hp;
+        state.world.companionDowned = false;
+        state.world.companionRecoveryTimer = 0;
         logMsg(`${def.name} joins you as a companion.`);
       }
     }
 
     const hit = updateCompanionRuntime(state.companion, state.player, state.enemies, dt, isBlocking);
+    const threat = applyCompanionThreat(state.companion, state.enemies, dt, state.narrative?.npcAffinity);
     if (state.companion.active) {
       state.world.companionId = state.companion.id;
       state.world.companionHp = state.companion.hp;
+      state.world.companionDowned = false;
+      state.world.companionRecoveryTimer = 0;
+    } else if (state.companion.downed) {
+      state.world.companionId = state.companion.id;
+      state.world.companionHp = null;
+      state.world.companionDowned = true;
+      state.world.companionRecoveryTimer = state.companion.recoveryTimer || 0;
     }
     if (hit) {
       state.floatingTexts.push({ wx: hit.x, wy: hit.y, text: "ALLY", life: 0.58, maxLife: 0.58, color: state.companion.color });
       if (!hit.alive) {
         logMsg(`${state.companion.name} drops ${hit.label || "an enemy"}.`);
       }
+    }
+    if (threat?.downed) {
+      logMsg(`${threat.downed.name} is down and needs time to recover. Affinity -${threat.downed.affinityPenalty}.`);
     }
   }
 
@@ -6390,7 +6491,14 @@ const canvas = document.getElementById("game");
           y: Number(state.companion.y.toFixed(2)),
           distance: Number(dist(state.player, state.companion).toFixed(2)),
         }
-        : null,
+        : state.companion.downed
+          ? {
+            id: state.companion.id,
+            name: state.companion.name,
+            downed: true,
+            recoveryTimer: Number((state.companion.recoveryTimer || 0).toFixed(2)),
+          }
+          : null,
       nearby_npcs: state.player.inHouse
         ? []
         : activeNpcs

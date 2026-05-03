@@ -46,6 +46,7 @@ export function createInitialProgressionState() {
     equipment: {
       weaponTier: "Common",
       armorMods: [],
+      affixes: [],
     },
     traits: [],
   };

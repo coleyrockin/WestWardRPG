@@ -87,3 +87,36 @@ describe("combatLoadout — movesets", () => {
     expect(out.movesetId).toBe("light");
   });
 });
+
+describe("combatLoadout — affix integration", () => {
+  it("widens arc when a resonant affix is attached", () => {
+    const profile = resolveCombatProgression(createInitialNarrativeState(), 4);
+    const base = { damage: 16, stamina: 9, arc: 0.85, cooldown: 0.24, duration: 0.31, reach: 1.95, lunge: 0.12, knock: 0.18 };
+    const plain = applySwingLoadout(base, profile, {});
+    const widened = applySwingLoadout(base, profile, { affixMods: { arcBonus: 0.06, reachBonus: 0, staggerBonus: 0, lifestealPct: 0, statusOnHit: [] } });
+    expect(widened.arc).toBeGreaterThan(plain.arc);
+  });
+
+  it("extends reach when an ironbound affix is attached", () => {
+    const profile = resolveCombatProgression(createInitialNarrativeState(), 4);
+    const base = { damage: 16, stamina: 9, arc: 0.85, cooldown: 0.24, duration: 0.31, reach: 1.95, lunge: 0.12, knock: 0.18 };
+    const longer = applySwingLoadout(base, profile, { affixMods: { arcBonus: 0, reachBonus: 0.12, staggerBonus: 0, lifestealPct: 0, statusOnHit: [] } });
+    expect(longer.reach).toBeGreaterThan(base.reach);
+  });
+
+  it("adds affix stagger bonus to the swing", () => {
+    const profile = resolveCombatProgression(createInitialNarrativeState(), 4);
+    const base = { damage: 16, stamina: 9, arc: 0.85, cooldown: 0.24, duration: 0.31, reach: 1.95, lunge: 0.12, knock: 0.18, staggerBonus: 0 };
+    const swing = applySwingLoadout(base, profile, { affixMods: { arcBonus: 0, reachBonus: 0, staggerBonus: 0.1, lifestealPct: 0, statusOnHit: [] } });
+    expect(swing.staggerBonus).toBeCloseTo(0.1);
+  });
+
+  it("ignores absent affix modifiers", () => {
+    const profile = resolveCombatProgression(createInitialNarrativeState(), 4);
+    const base = { damage: 16, stamina: 9, arc: 0.85, cooldown: 0.24, duration: 0.31, reach: 1.95, lunge: 0.12, knock: 0.18 };
+    const a = applySwingLoadout(base, profile, {});
+    const b = applySwingLoadout(base, profile, { affixMods: null });
+    expect(a.arc).toBeCloseTo(b.arc);
+    expect(a.reach).toBeCloseTo(b.reach);
+  });
+});

@@ -34,6 +34,16 @@ function backfillRegionDefaults(regions) {
   return next;
 }
 
+function backfillEquipmentDefaults(equipment) {
+  const defaults = { weaponTier: "Common", armorMods: [], affixes: [] };
+  if (!equipment || typeof equipment !== "object") return clone(defaults);
+  const next = clone(equipment);
+  if (typeof next.weaponTier !== "string") next.weaponTier = defaults.weaponTier;
+  if (!Array.isArray(next.armorMods)) next.armorMods = [];
+  if (!Array.isArray(next.affixes)) next.affixes = [];
+  return next;
+}
+
 function backfillWorldDefaults(world) {
   const next = world && typeof world === "object" ? clone(world) : {};
   if (typeof next.timeOfDay !== "number" || !isFinite(next.timeOfDay)) {
@@ -45,6 +55,10 @@ function backfillWorldDefaults(world) {
   if (typeof next.companionHp !== "number" || !isFinite(next.companionHp)) {
     next.companionHp = null;
   }
+  next.companionDowned = Boolean(next.companionDowned);
+  if (typeof next.companionRecoveryTimer !== "number" || !isFinite(next.companionRecoveryTimer)) {
+    next.companionRecoveryTimer = 0;
+  }
   return next;
 }
 
@@ -53,6 +67,8 @@ export function migrateSaveToV3(save) {
   if (save.version === 3) {
     save.regions = backfillRegionDefaults(save.regions);
     save.world = backfillWorldDefaults(save.world);
+    if (!save.player) save.player = {};
+    save.player.equipment = backfillEquipmentDefaults(save.player.equipment);
     return save;
   }
   if (save.version !== 2 && save.version !== 1) return null;
@@ -66,10 +82,7 @@ export function migrateSaveToV3(save) {
     player: {
       ...(save.player || {}),
       upgradePoints: Number.isFinite(save.player?.upgradePoints) ? save.player.upgradePoints : 0,
-      equipment: clone(save.player?.equipment || {
-        weaponTier: "Common",
-        armorMods: [],
-      }),
+      equipment: backfillEquipmentDefaults(save.player?.equipment),
       traits: clone(save.player?.traits || []),
       quickUtility: clone(save.player?.quickUtility || { active: "smoke", inventory: { smoke: 1, flare: 1, tonic: 1 } }),
     },

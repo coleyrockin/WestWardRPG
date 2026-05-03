@@ -77,5 +77,39 @@ describe("saveMigration", () => {
     const out = migrateSaveToV3(save);
     expect(out?.world?.companionId).toBeNull();
     expect(out?.world?.companionHp).toBeNull();
+    expect(out?.world?.companionDowned).toBe(false);
+    expect(out?.world?.companionRecoveryTimer).toBe(0);
+  });
+
+  it("backfills equipment.affixes on v3 saves missing it", () => {
+    const save = {
+      version: 3,
+      savedAt: 99,
+      player: { equipment: { weaponTier: "Refined", armorMods: ["stamina_regen"] } },
+    };
+    const out = migrateSaveToV3(save);
+    expect(Array.isArray(out?.player?.equipment?.affixes)).toBe(true);
+    expect(out?.player?.equipment?.affixes).toEqual([]);
+    expect(out?.player?.equipment?.weaponTier).toBe("Refined");
+    expect(out?.player?.equipment?.armorMods).toEqual(["stamina_regen"]);
+  });
+
+  it("preserves existing equipment.affixes through v3 backfill", () => {
+    const save = {
+      version: 3,
+      savedAt: 99,
+      player: { equipment: { weaponTier: "Relic", armorMods: [], affixes: ["searing", "hungering"] } },
+    };
+    const out = migrateSaveToV3(save);
+    expect(out?.player?.equipment?.affixes).toEqual(["searing", "hungering"]);
+  });
+
+  it("v2 to v3 migration seeds an empty affixes array", () => {
+    const out = migrateSaveToV3({
+      version: 2,
+      savedAt: 1,
+      player: { equipment: { weaponTier: "Common", armorMods: [] } },
+    });
+    expect(out?.player?.equipment?.affixes).toEqual([]);
   });
 });

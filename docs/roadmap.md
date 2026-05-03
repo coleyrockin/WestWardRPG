@@ -1,17 +1,26 @@
 # WestWardRPG Roadmap
 
-Single planning source for future agents. Update this file; do not create new roadmap/tier/unfinished docs.
+> **Single source of truth.** This is the only roadmap document for WestWardRPG. Do not create parallel `tier-*.md`, `TODO.md`, `PLAN.md`, or `ROADMAP-*.md` files. Update this file when scope shifts.
+
+## How to use this roadmap
+
+- **Pillars are ordered.** Pillars 1–4 are shipped, 5–7 are in flight, 8–14 are next. Don't skip ahead — each pillar depends on the foundations of the previous one.
+- **Each pillar item is a thin, testable slice** scoped so a single agent can ship it in one session: file paths, helpers, and acceptance signals are spelled out.
+- **Save migration is non-negotiable.** New top-level state requires a `backfill*` helper in `saveMigration.js` and a fixture round-trip test.
+- **Never rewrite the renderer or move to WebGL** unless the user explicitly requests it.
+- **Keep test gates green at every commit.** The verification block at the bottom is the contract.
 
 ## Current State
 
-`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life). The latest audit found the next highest-value work is narrative depth: the game already tracks axes, factions, affinity, flags, decisions, endings, POIs, codex unlocks, and quest progression, but quest turn-ins still feel mostly linear.
+`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life), the first Pillar 5 narrative/companion upgrades, **Pillar 8 Item 1 (weapon affixes)** as the entry into combat depth round 2, and a **fully redesigned Apple-grade title screen** (cinematic frontier dusk, Fraunces + IBM Plex Sans + JetBrains Mono, refined disclosure-driven controls sheet). Narrative state already tracks axes, factions, affinity, flags, decisions, quest outcomes, companion state, endings, POIs, codex unlocks, and quest progression. The next highest-value work is still narrative depth + replayability: the final beat, run summary, dialogue choice surfaces, and the rest of Pillar 8.
 
-Latest local verification after Pillar 5 outcome work:
-- `npm test` → 207 passing across 20 test files.
+Latest local verification:
+- `npm test` → **228 passing across 21 test files** (was 210 before affixes).
 - `npm run typecheck:ts` → clean.
 - `npm run test:syntax` → clean.
 - `node --check src/main.js` → clean.
-- `WESTWARD_PORT=5183 npm run test:smoke` → 9/9 passing, latest artifacts in `output/qa-smoke-20260502-200448`.
+- `WESTWARD_PORT=5183 npm run test:smoke` → 9/9 passing, latest artifacts in `output/qa-smoke-20260502-213659`.
+- Title screen redesign verified across desktop / tablet / mobile breakpoints (`output/menu-redesign{,-controls,-tablet,-mobile}.png`).
 
 ## Shipped Pillars
 
@@ -41,7 +50,7 @@ Latest local verification after Pillar 5 outcome work:
 - **Codex / lore browser** (`src/codex.js`) — KeyZ opens a tabbed lore screen (regions / enemies / items / factions / ideology). Entries unlock on first encounter (region unlock, first kill of an enemy archetype). Shows `???` + "(undiscovered)" until unlocked. Progress count in header.
 
 ## Test + Build Status
-- `npm test` → 198 passing across 19 test files.
+- `npm test` → 210 passing across 20 test files.
 - `npm run typecheck:ts` → clean.
 - `npm run test:smoke` → 9/9 scenarios (`smoke`, `quest`, `combat`, `boss-fight`, `weather-heavy`, `upgrade-equip`, `settings-modal`, `mini-boss`, `codex`).
 - v1/v2/v3 save fixtures all migrate cleanly with backfilled defaults.
@@ -49,9 +58,17 @@ Latest local verification after Pillar 5 outcome work:
 ## Next Work — Pillar 5: Narrative depth
 
 1. **Branching quest outcomes** — implemented foundation. `questDefinitions.js` now supports optional `outcomes` per quest, `decisionEngine.js` has `applyQuestOutcome`, save migration backfills `state.narrative.questOutcomes`, and `main.js` opens a small consequence modal for Crystal, House, Archive, Ashfall, and Lantern turn-ins. Ashfall/Lantern resource objectives now progress from regional harvesting, and town-circle turn-in advances the next regional quest. Next: add a Playwright flow that completes one turn-in and confirms the modal choice persists.
-2. **Companion follower (1 slot)** — implemented foundation. `src/companion.js` selects eligible NPCs at affinity ≥60, activates a one-slot follower, moves them toward the player, and lets them strike nearby enemies on cooldown. `main.js` renders the active companion, updates it in the loop, exposes it in smoke state JSON, and persists `world.companionId/world.companionHp`. `saveMigration.js` backfills companion fields for existing v3 saves. Next: add companion downing/recovery rules and affinity penalty on defeat.
+2. **Companion follower (1 slot)** — implemented foundation plus recovery. `src/companion.js` selects eligible NPCs at affinity ≥60, activates a one-slot follower, moves them toward the player, lets them strike nearby enemies on cooldown, lets nearby enemies threaten them, downs them at 0 HP, applies -15 affinity, and recovers them after a timer. `main.js` renders active companions, updates recovery/threat state in the loop, exposes it in smoke state JSON, and persists `world.companionId/world.companionHp/world.companionDowned/world.companionRecoveryTimer`. `saveMigration.js` backfills companion fields for existing v3 saves. Next: add companion barks and utility synergy.
 3. **Four endings driven by thematic axes** — at chapter 3 final beat, resolve dominant axis from `narrative.thematicAxes`, render ending text + epilogue. Tie-breakers via `globalFlags`.
 4. **Lite dialogue choices** — per-NPC stateless 2–3 choice prompts per chapter. Modal applies axis/rep deltas. Not a tree — flat menu, gated by chapter + flag.
+
+## Next Work — Pillar 5.5: Story-to-run payoff
+
+1. **Final beat trigger** — make the Lantern Revolt turn-in resolve chapter 3 into a final state instead of only logging the projected ending. Reuse `resolveNarrativeEnding`, then lock the run as "victory" while still allowing save/reload.
+2. **Ending screen polish** — show ending title, summary, dominant axes, three latest decisions, and companion status. Keep it canvas-only and reuse soft-panel rendering.
+3. **Run summary data** — track `world.startedAt`, `world.kills`, `world.miniBossKills`, `world.resourcesHarvested`, `world.questOutcomesCount`, then display them on death/victory.
+4. **Quest outcome smoke coverage** — add a deterministic Playwright flow that forces a quest-ready state, confirms a modal choice, saves, reloads, and asserts `narrative.questOutcomes` persists in `render_game_to_text`.
+5. **Companion smoke coverage** — add a deterministic debug hook for high affinity, then verify companion spawn/down/recover in a short browser scenario.
 
 ## Next Work — Pillar 6: Replayability
 
@@ -68,40 +85,61 @@ Latest local verification after Pillar 5 outcome work:
 4. **Subtitle system** — combat events ("hit", "crit", "low HP", "regen") via accessibility flag.
 5. **Difficulty selector** — Easy/Normal/Hard at new-game. Disjoint from NG+ scaling — multiplicative.
 
-## Future Ideas — Beyond the Current Plan
+## Next Work — Pillar 8: Combat depth round 2
 
-These are stretch concepts only worth considering after pillars 5–7 ship.
+1. **Weapon affixes** ✅ shipped — `src/weaponAffixes.js` exposes `AFFIXES` (Searing/Counterweighted/Bleeding prefixes, Resonant/Hungering/Ironbound suffixes) plus `rollAffix`, `attachAffix`, `buildAffixModifiers`, `describeAffixes`. Persisted in `progression.equipment.affixes[]` with v3 backfill (`backfillEquipmentDefaults`). Smith shop has Inscribe Prefix / Inscribe Suffix actions (80g + 2 Cipher Lens, replaces existing slot). `applySwingLoadout` consumes `context.affixMods` (arc / reach / stagger). Attack pipeline applies affix on-hit statuses + lifesteal heal. Tests: `tests/weapon-affixes.test.ts` (11) + new affix cases in combat-loadout / save-migration suites.
+2. **Block chip + guard-break** — even on a clean block, 8% of incoming damage chips through. Stamina to 0 mid-block triggers a 1.2s guard-break stagger (`state.player.guardBroken`) with a CRACK pop and disables blocking until stamina ≥ 25. Update `resolveIncomingDamage` (extend return shape with `chip`) and the main block branch in `update()`.
+3. **Boss phase transitions** — add `phaseTwo` to each `MINI_BOSS_DEFS` entry (Scrap Tyrant brute→charger, Scorch Engine charger→tank, Lantern Overseer shield→control, Iron Chanter control→flank). At 50% HP swap behavior + add visible `PHASE 2` floating text + 0.6s i-frame.
+4. **Parry chain bonus** — track `state.player.parryChainTimer`. A second perfect parry within 2.5s of the first triggers a free `INTERRUPT` on the attacker, +14 stamina refund, and a `CHAIN!` pop. Reset on hit taken.
+5. **Charge-cancel** — convert `performChargedAttack` into a 0.3s windup. Pressing dodge during the windup cancels the swing and refunds 6 stamina. Successful release after windup fires the existing combo-3 strike.
 
-### Combat depth round 2
-- **Weapon affixes** — once status effects prove out, layer prefix/suffix mods on weapon drops (e.g. "Searing Saber" forces +1 burn magnitude on hit). Start with three suffix tiers.
-- **Block stamina chip** — currently block consumes 11 stamina per hit. Add chip damage for blocked hits and a true guard-break stagger when stamina hits 0 mid-block.
-- **Aerial / mounted combat** — only worth it if traversal expands to verticality. Skip unless map system gets a Z axis.
-- **Boss phase transitions** — bosses currently respawn flat; add 50% HP threshold transition that swaps moveset (e.g. Scrap Tyrant: brute → charger at half HP).
+## Next Work — Pillar 9: World systems round 2
 
-### World layer round 2
-- **Seasonal events** — long real-time cycle (4 in-game weeks per season). Festival in Frontier with vendor-only items, dust storm in Ashfall with reduced visibility, blackout in Iron Lantern with patrol pause. Layered on top of `timeOfDay` with `state.world.calendarDay`.
-- **Patrol entities** — civic-council patrols actually spawn as friendly NPCs that engage hostiles in your area when rep is allied. Driven off `resolvePatrolModifier`.
-- **POIs round 2** — expand from 3 per region to 6+, add randomized POI loot with seeded RNG so daily-seed runs share placement. Add a "treasure-hunter" POI kind: cryptic clue → another POI.
-- **Procedural region variants** — seed-driven layout reshuffle of region tile maps. Highest-risk save-migration item from the original plan; revisit only after NG+ ships.
+1. **Seasonal calendar** — `src/seasonSystem.js` with `state.world.calendarDay` (4 in-game weeks per season). Festival in Frontier (vendor-only flag), dust season in Ashfall (visibility −30%), blackout in Iron Lantern (patrols pause). Layered on `timeOfDay`. Backfill in save migration. Pillar 8 must land first.
+2. **Patrol entities** — civic-council allied → friendly patrol NPCs spawn and engage hostiles in player radius. Hostile rep → patrols target the player. Density driven off `resolvePatrolModifier`. Reuse companion movement.
+3. **POIs round 2** — expand each region from 3 to 6+ POIs. New `treasure-hunter` POI kind: cryptic clue → reveals next POI on minimap. Seeded placement so daily-seed runs share maps.
+4. **Journal lore drops** — letters/notes picked up at POIs surface in a new codex tab `letters`. One hand-written paragraph each. Persist in `codex.unlocked.letters`.
+5. **Weather hazards round 2** — sandstorms apply temporary `weather_blind` status (view distance −40%); neon rain reduces enemy aggro range. Tied to `state.weather.kind`, expires when weather changes.
 
-### Narrative round 2
-- **Companion combat synergy** — when companion uses a quick utility (smoke/flare/tonic), it stacks with player utility for a layered effect. Companion barks tied to `state.combat` events.
-- **NPC schedules** — NPCs have day/night home cells (already a hook in `applyDynamicRegionProgression`). Tie schedules to faction rep — allied factions' NPCs leave doors unlocked at night.
-- **Endings expansion** — from 4 to 8 by adding `globalFlags`-modulated variants per axis (e.g. "Solidarity ending: Hopeful" vs "Solidarity: Pyrrhic" depending on `ledgerPublished` + companion alive).
-- **Letters / journal entries** — picked up at POIs, viewable in codex. Hand-written paragraph per entry; reveals lore not exposed via dialogue.
+## Next Work — Pillar 10: Narrative round 2
 
-### Engine round 2
-- **Web Worker pathfinding** — current AI is line-of-sight pursuit. Move A* path planning off-thread for any new enemy archetype that needs route awareness (mounted, ranged-with-cover).
-- **OffscreenCanvas pre-render** — bake static minimap layer + biome ground tiles to off-canvas; saves redundant per-tile fills.
-- **Sprite atlas** — current `makeTexture` builds per-kind canvases on demand. Atlas everything once at session start; pre-render the bands the gradient cache tracks.
-- **Save schema bump (v4)** — once narrative/replay state grows, do a v3→v4 with explicit field additions (`world.companionId`, `world.ngPlusLevel`, `world.calendarDay`, `narrative.questOutcomes`). Keep the backfill helper pattern from saveMigration.
+1. **Eight endings** — expand `resolveNarrativeEnding` from 3 to 8 by combining dominant axis × `globalFlags` variants (e.g. Solidarity-Hopeful vs Solidarity-Pyrrhic depending on `ledgerPublished` + companion alive). Codex unlock per ending seen.
+2. **Lite dialogue choice surfaces** — per major NPC, 2–3 stateless choices per chapter using the existing quest-outcome modal pattern. Apply axis/rep deltas. Gated by chapter + flag.
+3. **Companion barks + utility synergy** — companion lines in `storyContent.js`, triggered on combat events (low HP, kill streak, status apply, region change). Companion-side smoke/flare/tonic stacks with player utility for layered effects.
+4. **NPC schedules** — wire day/night home cells per NPC. Allied factions' NPCs leave doors unlocked at night; hostile factions' NPCs vanish indoors after dusk.
+5. **Decision recap screen** — KeyP opens a timeline of all decisions with axis arrows showing cumulative drift. Reuse soft-panel rendering.
 
-### Polish & meta
-- **Visual regression diffing** — current `scripts/visual_regression_capture.sh` archives baselines; add pixelmatch-based pass/fail CI step.
-- **Telemetry / dev overlay** — toggle key for FPS, particle count, grid bucket count, ambient drone state, status-effect summary on hovered enemy.
-- **Replay system** — record input + RNG seed per run for bug repro and shareable death replays.
-- **Localization expansion** — extend the 8-language pack to cover codex entries + new combat subtitles.
-- **Mobile touch overlay** — investigation only; combat is fast enough that touch-only would need rebalanced timings.
+## Next Work — Pillar 11: Engine round 2
+
+1. **Sprite atlas + OffscreenCanvas** — bake all `makeTexture` outputs to one offscreen atlas at session start. Pre-render minimap base + biome ground bands. Cache invalidation on `resize`.
+2. **Web Worker AI** — move A* (new) and pursuit lookup off-thread for archetypes with `behavior: "ranged"|"control"|"flank"`. Boot from `src/aiWorker.js`; postMessage shape documented.
+3. **Save schema v4** — bump to v4 once Pillars 8–10 land. New fields: `progression.equipment.affixes`, `world.calendarDay`, `world.ngPlusLevel`, `narrative.endingHistory[]`, `codex.unlocked.letters`. Keep `migrateSaveToV{2,3}` chains; add `migrateSaveToV4`.
+4. **Dev telemetry overlay** — Shift+T toggles HUD with FPS, frame ms, particle active count, grid bucket count, ambient drone state, hovered-enemy status summary.
+5. **Visual regression CI** — pixelmatch-based pass/fail on `scripts/visual_regression_capture.sh` baselines; wire into `npm run qa`.
+
+## Next Work — Pillar 12: Roguelite layer
+
+1. **Procedural region variants** — seeded reshuffle of region tile maps. Same room schema, randomized POI/resource placement. Daily-seed shares layout across runs. Gated behind v4 save schema.
+2. **Run mutators** — pre-run modifiers picked at start: `glassCannon` (+30% damage / −50% HP), `stormSeason` (always storm), `solidarityFlame` (companion required for boss kills). Stack to a score multiplier.
+3. **Prestige meta-progression** — across-run currency `frontier_marks` earned per ending. Unlocks permanent passive perks at meta shop (start with +1 potion, +5g, etc.). Lives in `state.meta.*` with a separate localStorage key.
+4. **NG+ scaling round 2** — beyond `1+0.25·ngPlusLevel` HP, archetype mix shifts toward heavies, mini-bosses gain Phase 3, region events trigger 2× faster.
+5. **Run history archive** — last 20 runs persisted (seed, ending, mutators, time, kills). Viewable from main menu. Local-only.
+
+## Next Work — Pillar 13: Live ops & social
+
+1. **Daily seed leaderboard** — score = `kills*5 + gold + dayDepth*100 + endingBonus`. Submit via `api/score` (Vercel function, append-only JSON store). Show top 100. Player handle stored locally.
+2. **Ghost replay** — record `(timestamp, input, rng)` per run; replay top daily run as a translucent ghost alongside the player. Local first, cloud second.
+3. **Weekly community modifier** — server-driven mutator broadcast each Monday. Cached in localStorage, expires Sunday. No auth.
+4. **Share codes** — encode `(seed, mutators, score)` into a base36 share code with sha-1 prefix. Pasting at main menu loads identical run.
+5. **Cosmetics season pass** — purely cosmetic palettes / hat colors / bandana variants unlocked by daily completion streak. No gameplay impact, no monetization.
+
+## Next Work — Pillar 14: Platform & accessibility round 2
+
+1. **Touch overlay** — virtual D-pad + action buttons for mobile. Detect `pointerType === "touch"`. Combat timings rebalanced via per-platform `state.input.profile`.
+2. **Gamepad support** — Standard mapping via Gamepad API. Settings sub-menu shows live binding. Persists in `state.input.gamepad`.
+3. **Full keybind remap UI** — graphical remap built on the settings modal pattern; rebind any default action. Persisted in `state.input.keybinds`. Conflict detection.
+4. **Screen-reader subtitle layer** — combat / story / interaction events as ARIA live region (canvas is opaque to ATs). Toggleable. Pairs with motionReduction.
+5. **Localized codex + letters** — extend the 8-language pack to cover codex entries, letters, dialogue choices. Audit all string-table uses to ensure no hard-coded English remains.
 
 ## Verification Gates
 

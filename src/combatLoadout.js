@@ -126,9 +126,12 @@ export function resolveCombatProgression(narrativeState, level) {
 export function applySwingLoadout(baseSwing, combatProgression, context = {}) {
   const style = combatProgression?.style || STYLE_DEFINITIONS.commonsDuelist;
   const perks = new Set(combatProgression?.perks || []);
+  const affixMods = context.affixMods || null;
   let staminaCost = baseSwing.stamina * style.staminaCostMult;
   let damage = baseSwing.damage * style.attackDamageMult;
-  let arc = baseSwing.arc + style.attackArcBonus;
+  let arc = baseSwing.arc + style.attackArcBonus + (affixMods?.arcBonus || 0);
+  let reach = (baseSwing.reach || 0) + (affixMods?.reachBonus || 0);
+  let staggerBonus = (baseSwing.staggerBonus || 0) + (affixMods?.staggerBonus || 0);
 
   if (perks.has("weatheredGrip") && (context.weatherKind === "rain" || context.weatherKind === "storm")) {
     staminaCost *= 0.88;
@@ -142,6 +145,8 @@ export function applySwingLoadout(baseSwing, combatProgression, context = {}) {
     stamina: Math.max(1, Math.round(staminaCost)),
     damage: Math.round(damage),
     arc: clamp(arc, 0.62, 1.4),
+    reach: reach > 0 ? reach : baseSwing.reach,
+    staggerBonus,
   };
 }
 

@@ -4,6 +4,9 @@ import {
   chooseEligibleCompanion,
   updateCompanionRuntime,
   applyCompanionAttack,
+  applyCompanionDamage,
+  tickCompanionRecovery,
+  applyCompanionThreat,
 } from "../src/companion.js";
 
 describe("companion", () => {
@@ -52,5 +55,54 @@ describe("companion", () => {
     expect(hit?.id).toBe("near");
     expect(enemies[1].hp).toBe(12);
     expect(runtime.attackCooldown).toBeGreaterThan(0);
+  });
+
+  it("downs a companion and applies an affinity penalty", () => {
+    const runtime = createInitialCompanionRuntime();
+    runtime.active = true;
+    runtime.id = "smith";
+    runtime.name = "Professor Cogwheel";
+    runtime.hp = 6;
+    const affinity = { smith: 70 };
+
+    const downed = applyCompanionDamage(runtime, 8, affinity);
+
+    expect(downed?.id).toBe("smith");
+    expect(runtime.active).toBe(false);
+    expect(runtime.downed).toBe(true);
+    expect(runtime.recoveryTimer).toBeGreaterThan(0);
+    expect(affinity.smith).toBe(55);
+  });
+
+  it("recovers a downed companion near the player after the timer expires", () => {
+    const runtime = createInitialCompanionRuntime();
+    runtime.id = "warden";
+    runtime.name = "Marshal Boone";
+    runtime.downed = true;
+    runtime.recoveryTimer = 0.1;
+
+    const recovered = tickCompanionRecovery(runtime, { x: 4, y: 5 }, 0.2);
+
+    expect(recovered).toBe(true);
+    expect(runtime.active).toBe(true);
+    expect(runtime.downed).toBe(false);
+    expect(runtime.x).toBeCloseTo(3.25);
+    expect(runtime.hp).toBeGreaterThan(0);
+  });
+
+  it("lets nearby enemies threaten the companion", () => {
+    const runtime = createInitialCompanionRuntime();
+    runtime.active = true;
+    runtime.id = "innkeeper";
+    runtime.x = 0;
+    runtime.y = 0;
+    runtime.hp = 20;
+    const enemies = [{ x: 0.7, y: 0, alive: true, baseDamage: 6, attackReach: 1 }];
+
+    const result = applyCompanionThreat(runtime, enemies, 1, { innkeeper: 80 });
+
+    expect(result?.damage).toBe(6);
+    expect(runtime.hp).toBe(14);
+    expect(runtime.threatCooldown).toBeGreaterThan(0);
   });
 });
