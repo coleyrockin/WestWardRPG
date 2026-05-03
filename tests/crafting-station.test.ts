@@ -3,6 +3,7 @@ import { createInitialCharacterIdentity } from "../src/characterIdentity.js";
 import { createInitialProgressionState } from "../src/progressionSystem.js";
 import {
   createInitialWorkstationState,
+  describeWorkstationState,
   getAvailableCraftingActions,
   normalizeWorkstationState,
   resolveCraftingAction,
@@ -14,7 +15,7 @@ function makeContext() {
   progression.equipment.ownedArmorPieces = ["salvage_gloves"];
   progression.equipment.weaponFamilyTokens = ["hammer"];
   return {
-    inventory: { Wood: 4, Stone: 2, Ashglass: 3, "Scrap Coil": 2, Potion: 0 },
+    inventory: { Wood: 4, Stone: 2, Ashglass: 3, "Scrap Coil": 2, Potion: 0, "Cipher Lens": 0, "Pressurized Ink": 0 },
     progression,
     house: { unlocked: true, workstation: createInitialWorkstationState() },
   };
@@ -88,5 +89,39 @@ describe("craftingStation", () => {
     expect(result.house.workstation.level).toBe(2);
     expect(result.house.workstation.craftsCompleted).toBe(1);
     expect(result.message).toContain("level 2");
+  });
+
+  it("makes level 2 potion crafting stronger and refine prep cheaper", () => {
+    const context = makeContext();
+    context.house.workstation.level = 2;
+    context.inventory.Ashglass = 1;
+    context.inventory["Scrap Coil"] = 1;
+
+    const potion = resolveCraftingAction("craft_potion", context, { rng: () => 0.99 });
+    expect(potion.ok).toBe(true);
+    expect(potion.inventory.Potion).toBe(2);
+    expect(potion.message).toContain("Workbench II");
+
+    const refine = resolveCraftingAction("prepare_refine_kit", context);
+    expect(refine.ok).toBe(true);
+    expect(refine.inventory.Ashglass).toBe(0);
+    expect(refine.inventory["Scrap Coil"]).toBe(0);
+  });
+
+  it("unlocks a persistent map-table project at workstation level 3", () => {
+    const context = makeContext();
+    context.house.workstation.level = 3;
+    context.inventory["Cipher Lens"] = 1;
+    context.inventory["Pressurized Ink"] = 1;
+
+    expect(getAvailableCraftingActions(context).map((a) => a.id)).toContain("draft_region_map");
+
+    const result = resolveCraftingAction("draft_region_map", context);
+
+    expect(result.ok).toBe(true);
+    expect(result.inventory["Cipher Lens"]).toBe(0);
+    expect(result.inventory["Pressurized Ink"]).toBe(0);
+    expect(result.house.workstation.stationProjects).toEqual(["region_map"]);
+    expect(describeWorkstationState(result.house.workstation).projectsLine).toContain("Region Map");
   });
 });

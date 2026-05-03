@@ -151,7 +151,19 @@ describe("saveMigration", () => {
     const out = migrateSaveToV3(save);
     expect(out?.world?.loot?.recentDrops).toEqual([]);
     expect(out?.house?.workstation?.craftsCompleted).toBe(0);
+    expect(out?.house?.workstation?.stationProjects).toEqual([]);
     expect(out?.narrative?.npcMemory?.recentEvents).toEqual([]);
+  });
+
+  it("preserves house workstation station projects on v3 saves", () => {
+    const save = {
+      version: 3,
+      savedAt: 99,
+      house: { workstation: { level: 3, stationProjects: ["region_map", "missing", 4] } },
+    };
+    const out = migrateSaveToV3(save);
+    expect(out?.house?.workstation?.level).toBe(3);
+    expect(out?.house?.workstation?.stationProjects).toEqual(["region_map", "missing"]);
   });
 
   it("backfills narrative defaults on partial v3 saves", () => {

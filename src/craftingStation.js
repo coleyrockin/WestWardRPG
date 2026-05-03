@@ -7,6 +7,7 @@ export function createInitialWorkstationState() {
     level: 1,
     craftsCompleted: 0,
     preparedUpgrade: null,
+    stationProjects: [],
   };
 }
 
@@ -15,6 +16,7 @@ export function normalizeWorkstationState(source = {}) {
     level: Number.isFinite(source?.level) ? Math.max(1, Math.min(3, Math.floor(source.level))) : 1,
     craftsCompleted: Number.isFinite(source?.craftsCompleted) ? Math.max(0, Math.floor(source.craftsCompleted)) : 0,
     preparedUpgrade: typeof source?.preparedUpgrade === "string" ? source.preparedUpgrade : null,
+    stationProjects: Array.isArray(source?.stationProjects) ? [...new Set(source.stationProjects.filter((project) => typeof project === "string"))] : [],
   };
 }
 
@@ -61,14 +63,40 @@ function nextWorkstationUpgrade(workstation) {
   return WORKSTATION_UPGRADES[level + 1] || null;
 }
 
+function refineKitCosts(workstation) {
+  return normalizeWorkstationState(workstation).level >= 2
+    ? { Ashglass: 1, "Scrap Coil": 1 }
+    : { Ashglass: 2, "Scrap Coil": 1 };
+}
+
+export function describeWorkstationState(workstation = {}) {
+  const state = normalizeWorkstationState(workstation);
+  const benefits = ["basic crafting"];
+  if (state.level >= 2) benefits.push("Workbench II: +1 potion output, cheaper refine kits");
+  if (state.level >= 3) benefits.push("Map table: regional survey projects");
+  const projectLabels = {
+    region_map: "Region Map",
+  };
+  const projects = state.stationProjects.map((project) => projectLabels[project] || project);
+  return {
+    level: state.level,
+    stationLine: `Workbench level ${state.level}`,
+    benefits,
+    benefitLine: benefits.join(" / "),
+    projectsLine: projects.length ? projects.join(" / ") : "No station projects",
+    nextUpgrade: nextWorkstationUpgrade(state),
+  };
+}
+
 export function getAvailableCraftingActions(context = {}) {
   const inventory = context.inventory || {};
   const progression = context.progression || {};
   const equipment = normalizeGearState(progression.equipment);
+  const workstation = normalizeWorkstationState(context.house?.workstation);
   const actions = [];
 
   if (canAfford(inventory, { Wood: 2, Stone: 1 })) {
-    actions.push({ id: "craft_potion", label: "Craft Potion", description: "2 Wood + 1 Stone." });
+    actions.push({ id: "craft_potion", label: "Craft Potion", description: workstation.level >= 2 ? "2 Wood + 1 Stone. Workbench II yields 2." : "2 Wood + 1 Stone." });
   }
   if ((equipment.ownedArmorPieces || []).includes("salvage_gloves") && equipment.armorSlots?.hands !== "salvage_gloves") {
     actions.push({ id: "fit_salvage_gloves", label: "Fit Salvage Gloves", description: "Equip owned Craft gloves." });
@@ -79,8 +107,16 @@ export function getAvailableCraftingActions(context = {}) {
       actions.push({ id: `fit_weapon_${familyId}`, label: `Fit ${family.label}`, description: `Spend ${family.label} token and change weapon family.` });
     }
   }
-  if (canAfford(inventory, { Ashglass: 2, "Scrap Coil": 1 }) && context.house?.workstation?.preparedUpgrade !== "refine_weapon") {
-    actions.push({ id: "prepare_refine_kit", label: "Prepare Refine Kit", description: "2 Ashglass + 1 Scrap Coil." });
+  const refineCosts = refineKitCosts(workstation);
+  if (canAfford(inventory, refineCosts) && workstation.preparedUpgrade !== "refine_weapon") {
+    actions.push({ id: "prepare_refine_kit", label: "Prepare Refine Kit", description: workstation.level >= 2 ? "1 Ashglass + 1 Scrap Coil." : "2 Ashglass + 1 Scrap Coil." });
+  }
+  if (
+    workstation.level >= 3
+    && !workstation.stationProjects.includes("region_map")
+    && canAfford(inventory, { "Cipher Lens": 1, "Pressurized Ink": 1 })
+  ) {
+    actions.push({ id: "draft_region_map", label: "Draft Region Map", description: "1 Cipher Lens + 1 Pressurized Ink." });
   }
   const upgrade = nextWorkstationUpgrade(context.house?.workstation);
   if (upgrade && canAfford(inventory, upgrade.costs)) {
@@ -104,8 +140,12 @@ export function resolveCraftingAction(actionId, context = {}, options = {}) {
     spend(inventory, costs);
     const effects = deriveAttributeEffects(identity);
     const bonus = rng() < (effects.craftingYieldPct || 0) / 100 ? 1 : 0;
-    inventory.Potion = count(inventory, "Potion") + 1 + bonus;
+    const baseYield = house.workstation.level >= 2 ? 2 : 1;
+    inventory.Potion = count(inventory, "Potion") + baseYield + bonus;
     incrementWorkstation(house);
+    if (house.workstation.level >= 2) {
+      return { ok: true, message: bonus ? "Workbench II crafted 3 Potions with a Craft yield bonus." : "Workbench II crafted 2 Potions.", inventory, progression, house };
+    }
     return { ok: true, message: bonus ? "Crafted 2 Potions with a Craft yield bonus." : "Crafted 1 Potion.", inventory, progression, house };
   }
 
@@ -119,7 +159,7 @@ export function resolveCraftingAction(actionId, context = {}, options = {}) {
   }
 
   if (actionId === "prepare_refine_kit") {
-    const costs = { Ashglass: 2, "Scrap Coil": 1 };
+    const costs = refineKitCosts(house.workstation);
     if (house.workstation.preparedUpgrade === "refine_weapon") {
       return { ok: false, message: "A refine kit is already prepared.", inventory, progression, house };
     }
@@ -128,6 +168,23 @@ export function resolveCraftingAction(actionId, context = {}, options = {}) {
     house.workstation.preparedUpgrade = "refine_weapon";
     incrementWorkstation(house);
     return { ok: true, message: "Prepared a refine kit for the next weapon upgrade.", inventory, progression, house };
+  }
+
+  if (actionId === "draft_region_map") {
+    const costs = { "Cipher Lens": 1, "Pressurized Ink": 1 };
+    if (house.workstation.level < 3) {
+      return { ok: false, message: "Workbench III map table required.", inventory, progression, house };
+    }
+    if (house.workstation.stationProjects.includes("region_map")) {
+      return { ok: false, message: "Region map already drafted.", inventory, progression, house };
+    }
+    if (!canAfford(inventory, costs)) {
+      return { ok: false, message: "Map table needs 1 Cipher Lens and 1 Pressurized Ink.", inventory, progression, house };
+    }
+    spend(inventory, costs);
+    house.workstation.stationProjects.push("region_map");
+    incrementWorkstation(house);
+    return { ok: true, message: "Drafted a Region Map at the map table.", inventory, progression, house };
   }
 
   if (actionId.startsWith("fit_weapon_")) {

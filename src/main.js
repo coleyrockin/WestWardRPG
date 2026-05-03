@@ -92,6 +92,7 @@ import {
 } from "./gearCrafting.js";
 import {
   createInitialWorkstationState,
+  describeWorkstationState,
   getAvailableCraftingActions,
   normalizeWorkstationState,
   resolveCraftingAction,
@@ -6264,6 +6265,7 @@ const canvas = document.getElementById("game");
       const summary = buildCharacterIdentitySummary(identity);
       const gearSummary = buildGearSummary(state.progression.equipment, identity);
       const inventorySummary = buildGearInventorySummary(state.progression.equipment);
+      const workstationSummary = describeWorkstationState(state.house.workstation);
       const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
       const effects = summary.effects || {};
       const sw = Math.min(620, canvas.width - margin * 2);
@@ -6292,13 +6294,15 @@ const canvas = document.getElementById("game");
         { text: `Earned gear: ${inventorySummary.ownedArmorLine}`, color: "#d8c7a8" },
         { text: `Weapon tokens: ${inventorySummary.weaponTokenLine}`, color: "#d8c7a8" },
         { text: `Crafting: ${gearSummary.economyLine}`, color: "#d8c7a8" },
+        { text: `Station: ${workstationSummary.benefitLine}`, color: "#d8c7a8" },
+        { text: `Projects: ${workstationSummary.projectsLine}`, color: "#cbb6a2" },
         { text: `Region: ${regionProfile.label} - ${regionProfile.mood}`, color: "#ffe16a" },
         { text: `Landmarks: ${regionProfile.landmarkHints.slice(0, 4).join(", ")}`, color: "#cbb6a2" },
         { text: `Danger: ${regionProfile.dangerIdentity}`, color: "#cbb6a2" },
         { text: `Stance: ${state.player.loadout.stance}`, color: "#e6d8bd" },
         { text: `Faction lean: ${FACTION_NAMES[summary.factionLean] || summary.factionLean}`, color: "#d8c7a8" },
         { text: `Rep: ${factionLine}`, color: "#cbb6a2" },
-        { text: `Companion: ${state.companion.active ? state.companion.name : state.companion.downed ? `${state.companion.name} recovering` : "none"} / House: ${state.house.unlocked ? `owned / workbench ${state.house.workstation?.level || 1}` : "locked"}`, color: "#b8a792" },
+        { text: `Companion: ${state.companion.active ? state.companion.name : state.companion.downed ? `${state.companion.name} recovering` : "none"} / House: ${state.house.unlocked ? `owned / workbench ${workstationSummary.level}` : "locked"}`, color: "#b8a792" },
       ];
       ctx.font = "12px Georgia";
       let lineY = sy + 88;
@@ -6498,6 +6502,7 @@ const canvas = document.getElementById("game");
       const sy = Math.floor((canvas.height - sh) / 2);
       const gear = normalizeGearState(state.progression.equipment);
       const inventorySummary = buildGearInventorySummary(gear);
+      const workstationSummary = describeWorkstationState(state.house.workstation);
       drawSoftPanel(sx, sy, sw, sh, {
         top: "rgba(24, 23, 17, 0.96)",
         bottom: "rgba(10, 12, 10, 0.94)",
@@ -6506,7 +6511,7 @@ const canvas = document.getElementById("game");
       ctx.font = "bold 20px Georgia";
       drawClippedText("Workbench", sx + 16, sy + 30, sw - 32, "#ffd77b");
       ctx.font = "12px Georgia";
-      drawClippedText(`Level ${state.house.workstation?.level || 1}  Enter/E craft  ↑/↓ select  Esc close`, sx + 16, sy + 52, sw - 32, "#c9b889");
+      drawClippedText(`${workstationSummary.stationLine}  Enter/E craft  ↑/↓ select  Esc close`, sx + 16, sy + 52, sw - 32, "#c9b889");
       ctx.font = "11px Georgia";
       drawClippedText(`Gear: ${inventorySummary.ownedArmorLine} | Tokens: ${inventorySummary.weaponTokenLine}`, sx + 16, sy + 68, sw - 32, "#b8a792");
 
@@ -6528,7 +6533,8 @@ const canvas = document.getElementById("game");
         }
       }
       ctx.font = "italic 11px Georgia";
-      drawClippedText(`Crafts completed: ${state.house.workstation?.craftsCompleted || 0}  Prepared: ${state.house.workstation?.preparedUpgrade || "none"}`, sx + 16, sy + sh - 18, sw - 32, "#9d927d");
+      drawClippedText(`Benefits: ${workstationSummary.benefitLine} | Projects: ${workstationSummary.projectsLine}`, sx + 16, sy + sh - 30, sw - 32, "#9d927d");
+      drawClippedText(`Crafts completed: ${state.house.workstation?.craftsCompleted || 0}  Prepared: ${state.house.workstation?.preparedUpgrade || "none"}`, sx + 16, sy + sh - 16, sw - 32, "#9d927d");
     }
 
     const hintSpace = canvas.width - hudW - margin * 3;
@@ -7041,6 +7047,7 @@ const canvas = document.getElementById("game");
     const characterSummary = buildCharacterIdentitySummary(identity);
     const gearSummary = buildGearSummary(state.progression.equipment, identity);
     const gearInventorySummary = buildGearInventorySummary(state.progression.equipment);
+    const workstationSummary = describeWorkstationState(state.house.workstation);
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const quests = {
       crystal: {
@@ -7133,6 +7140,7 @@ const canvas = document.getElementById("game");
         unlocked: state.house.unlocked,
         visited: state.house.visits,
         workstation: state.house.workstation,
+        workstation_summary: workstationSummary,
         outside_door: {
           x: Number(state.house.outsideDoor.x.toFixed(2)),
           y: Number(state.house.outsideDoor.y.toFixed(2)),

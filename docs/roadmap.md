@@ -12,13 +12,13 @@
 
 ## Current State
 
-`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life), the first Pillar 5 narrative/companion upgrades, **Pillar 5.5 story-to-run payoff**, **Pillar 8 Items 1-5** as combat depth round 2, **Pillar 21/22 open-world RPG foundation** (character identity, attributes, origin selection, region visual identity), **Pillar 23 gear loop foundation** (weapon families, armor slots, Craft-driven repair/refine prices, regional loot tables, POI/mini-boss gear finds, selectable workbench actions, earned gear visibility), **Pillar 25 workstation foundation** (save-safe workbench levels), **Pillar 27 deterministic NPC memory foundation**, and a **fully redesigned Apple-grade title screen**. Narrative state already tracks axes, factions, affinity, flags, decisions, quest outcomes, companion state, endings, POIs, codex unlocks, quest progression, build identity, gear state, loot history, workstation state, and NPC memory. The next highest-value work is making these foundations deeper: station-specific house upgrades, pets, economy, and fuller living-world dialogue.
+`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life), the first Pillar 5 narrative/companion upgrades, **Pillar 5.5 story-to-run payoff**, **Pillar 8 Items 1-5** as combat depth round 2, **Pillar 21/22 open-world RPG foundation** (character identity, attributes, origin selection, region visual identity), **Pillar 23 gear loop foundation** (weapon families, armor slots, Craft-driven repair/refine prices, regional loot tables, POI/mini-boss gear finds, selectable workbench actions, earned gear visibility), **Pillar 25 workstation foundation** (save-safe workbench levels, level-gated benefits, map-table project), **Pillar 27 deterministic NPC memory foundation**, and a **fully redesigned Apple-grade title screen**. Narrative state already tracks axes, factions, affinity, flags, decisions, quest outcomes, companion state, endings, POIs, codex unlocks, quest progression, build identity, gear state, loot history, workstation state, station projects, and NPC memory. The next highest-value work is making these foundations deeper: richer station projects, pets, economy, and fuller living-world dialogue.
 
 Open-world RPG target: push the game toward a compact Skyrim/Oblivion feel within the existing canvas engine. The world should have stronger visual identity, character builds, loot, pets, owned spaces, regional economy, and NPCs that remember enough context to feel alive. Keep everything local-first and deterministic by default; optional network/LLM features must have handcrafted fallback content and never block core play.
 
 Latest local verification:
 - `git diff --check` → clean.
-- `npm test` → **280 passing across 30 test files**.
+- `npm test` → **283 passing across 30 test files**.
 - `npm run typecheck:ts` → clean.
 - `npm run test:syntax` → clean.
 - `npm run dev:lint` → clean.
@@ -52,7 +52,7 @@ Latest local verification:
 - **Codex / lore browser** (`src/codex.js`) — KeyZ opens a tabbed lore screen (regions / enemies / items / factions / ideology). Entries unlock on first encounter (region unlock, first kill of an enemy archetype). Shows `???` + "(undiscovered)" until unlocked. Progress count in header.
 
 ## Test + Build Status
-- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 280 passing across 30 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
+- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 283 passing across 30 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
 - v1/v2/v3 save fixtures all migrate cleanly with backfilled defaults.
 
 ## Next Work — Pillar 5: Narrative depth
@@ -210,7 +210,7 @@ Latest local verification:
 1. **Weapon families** ✅ foundation shipped — `src/gearCrafting.js` formalizes Saber, Axe, Spear, and Hammer families. Shop refitting cycles the family, Might changes heavy weapon stamina/damage feel, and combat now consumes gear damage/stamina/reach/stagger modifiers. Next: bow/crossbow, lantern-tool class, unique windups, and upgrade branches per family.
 2. **Armor slots** ✅ foundation shipped — head/body/hands/feet/trinket slots backfill through save migration. Shop fitting installs heavier armor pieces, Grit absorbs weight, armor affects stamina regen/block/weather movement, and the character sheet/debug state exposes armor line, weight, and crafting economy. Next: silhouette changes, stealth, elemental resistance, and inventory-driven equip choices.
 3. **Loot tables** ✅ foundation shipped — `src/lootSystem.js` rolls deterministic regional drops with injectable RNG tests. POIs, mini-bosses, and some regional resource harvests can now grant gear-relevant finds such as armor pieces and weapon-family tokens in addition to resources.
-4. **Crafting stations** ✅ foundation shipped — `src/craftingStation.js` defines pure workstation actions. The house stash now opens a selectable workbench overlay that can craft potions with Craft yield, fit owned Salvage Gloves, spend weapon-family tokens, prepare a refine kit from resources, or upgrade the workbench through save-safe levels.
+4. **Crafting stations** ✅ foundation shipped — `src/craftingStation.js` defines pure workstation actions. The house stash now opens a selectable workbench overlay that can craft potions with Craft yield, fit owned Salvage Gloves, spend weapon-family tokens, prepare a refine kit from resources, upgrade the workbench through save-safe levels, gain Workbench II potion/refine benefits, and draft a persistent Region Map at Workbench III.
 5. **Balance tests** — pure tests for DPS, stamina economy, block breakpoints, loot rarity, and upgrade costs so new gear does not trivialize Pillar 8 combat.
 
 ## Next Work — Pillar 24: Pets, companions, and mounts
@@ -225,7 +225,7 @@ Latest local verification:
 
 1. **House expansion stages** — shack to homestead to safehouse to small guild hall. Each stage changes interior layout, storage, workstations, NPC visits, and exterior silhouette.
 2. **Storage and displays** — stash tabs for resources/gear, trophy display for boss kills, pet bed, companion bunk, and weapon rack. Must persist and survive save migration.
-3. **Functional upgrades** ✅ foundation shipped — house stash now backfills/persists `house.workstation`, supports initial workbench crafting, and exposes level 2/3 workbench upgrades. Next: station-specific forge/alchemy/map-table benefits, passive trickle, bounties, and fast-travel hooks.
+3. **Functional upgrades** ✅ foundation shipped — house stash now backfills/persists `house.workstation`, supports initial workbench crafting, exposes level 2/3 workbench upgrades, improves potion/refine output at level 2, and unlocks a level 3 map-table project. Next: forge/alchemy station depth, passive trickle, bounties, and fast-travel hooks.
 4. **Settlement influence** — player choices shift town services, vendor stock, patrol presence, house visitors, and ambient dialogue.
 5. **Home defense event** — optional attack/raid event after major story beats. Uses existing combat systems and rewards preparation instead of punishing casual play.
 
@@ -247,7 +247,7 @@ Latest local verification:
 
 ## Next Agent Handoff
 
-Current shipped direction after `7e9ac52`: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, NPC memory, and smoke/debug text fields are in scope. Fast verification is 280 tests across 30 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should make workbench levels unlock station-specific benefits.
+Current shipped direction after `7e9ac52`: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, NPC memory, and smoke/debug text fields are in scope. Fast verification is 283 tests across 30 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should deepen forge/alchemy/map-table projects and repair the slow mini-boss smoke.
 
 ### User signal to respect
 
@@ -263,19 +263,19 @@ The user is not asking for a prettier TODO list. They want the game to start fee
 
 ### Next build target
 
-Ship **Gear Loop 5: station-specific house benefits.** The current foundation makes loot/workstations real and selectable, shows earned gear in the sheet/workbench, and lets the workbench level up. The next slice should make those levels unlock concrete forge, alchemy, and map-table benefits.
+Ship **Gear Loop 6: station depth + smoke repair.** The current foundation makes loot/workstations real and selectable, shows earned gear in the sheet/workbench, lets the workbench level up, improves level 2 crafting, and unlocks a level 3 Region Map project. The next slice should make forge/alchemy/map-table projects affect world rewards and make the mini-boss smoke deterministic enough to finish.
 
 Player-facing result:
-- Workbench level 2 improves existing crafting with a visible benefit.
-- Workbench level 3 unlocks a distinct forge/alchemy/map-table action.
+- Forge/alchemy/map-table projects have visible rewards beyond labels.
+- Mini-boss smoke completes deterministically or produces a focused failure artifact.
 - Might/Grit/Craft should remain visible in outcomes: heavy weapons feel different, armor weight matters, and Craft changes cost/yield.
 - Saves preserve new gear/crafting state through v3 backfill unless a real schema bump becomes necessary.
 
 Concrete build order:
-1. Add station-specific action unlocks for workbench levels 2/3.
-2. Add visible station labels and benefits to `render_game_to_text`.
-3. Keep upgrade-gated actions resource-based and Craft-sensitive.
-4. Expose station level/action inventory in `render_game_to_text` for smoke automation.
+1. Add one forge or alchemy project with a concrete gear/resource payoff.
+2. Make Region Map affect POI/cache discovery or region reward odds.
+3. Shorten/fix `test-actions/mini_boss_flow.json` so the smoke does not hang.
+4. Expose project payoff state in `render_game_to_text` for smoke automation.
 5. Update this roadmap and verification counts after the slice lands.
 
 Quality bar:
