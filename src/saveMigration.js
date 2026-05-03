@@ -4,6 +4,8 @@ import { createInitialProgressionState } from "./progressionSystem.js";
 import { createInitialRegionState } from "./regionSystem.js";
 import { createInitialGraphicsState } from "./graphicsSettings.js";
 import { ensureRunStats } from "./runSummary.js";
+import { normalizeCharacterIdentity } from "./characterIdentity.js";
+import { normalizeGearState } from "./gearCrafting.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -36,12 +38,22 @@ function backfillRegionDefaults(regions) {
 }
 
 function backfillEquipmentDefaults(equipment) {
-  const defaults = { weaponTier: "Common", armorMods: [], affixes: [] };
-  if (!equipment || typeof equipment !== "object") return clone(defaults);
-  const next = clone(equipment);
-  if (typeof next.weaponTier !== "string") next.weaponTier = defaults.weaponTier;
-  if (!Array.isArray(next.armorMods)) next.armorMods = [];
-  if (!Array.isArray(next.affixes)) next.affixes = [];
+  return normalizeGearState(equipment);
+}
+
+function backfillProgressionDefaults(progression) {
+  const defaults = createInitialProgressionState();
+  const next = progression && typeof progression === "object" ? clone(progression) : clone(defaults);
+  next.upgradePoints = Number.isFinite(next.upgradePoints) ? Math.max(0, Math.floor(next.upgradePoints)) : defaults.upgradePoints;
+  next.skillTree = next.skillTree && typeof next.skillTree === "object" ? next.skillTree : clone(defaults.skillTree);
+  for (const branch of Object.keys(defaults.skillTree)) {
+    next.skillTree[branch] = Number.isFinite(next.skillTree[branch])
+      ? Math.max(0, Math.floor(next.skillTree[branch]))
+      : defaults.skillTree[branch];
+  }
+  next.equipment = backfillEquipmentDefaults(next.equipment);
+  next.identity = normalizeCharacterIdentity(next.identity);
+  next.traits = Array.isArray(next.traits) ? next.traits.filter((trait) => typeof trait === "string") : [];
   return next;
 }
 
@@ -74,6 +86,7 @@ export function migrateSaveToV3(save) {
     save.world = backfillWorldDefaults(save.world, Number.isFinite(save.time) ? save.time : 0);
     if (!save.player) save.player = {};
     save.player.equipment = backfillEquipmentDefaults(save.player.equipment);
+    save.progression = backfillProgressionDefaults(save.progression);
     return save;
   }
   if (save.version !== 2 && save.version !== 1) return null;
@@ -106,7 +119,7 @@ export function migrateSaveToV3(save) {
     world: backfillWorldDefaults(save.world, Number.isFinite(save.time) ? save.time : 0),
     narrative: clone(save.narrative || createInitialNarrativeState()),
     showMap: typeof save.showMap === "boolean" ? save.showMap : true,
-    progression: clone(save.progression || createInitialProgressionState()),
+    progression: backfillProgressionDefaults(save.progression),
     regions: backfillRegionDefaults(save.regions),
     graphics: {
       ...clone(graphicsDefaults),

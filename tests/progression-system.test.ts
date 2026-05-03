@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  equipArmorPiece,
+  equipWeaponFamily,
   createInitialProgressionState,
   unlockSkill,
   upgradeWeaponTier,
@@ -7,6 +9,7 @@ import {
   buildProgressionModifiers,
   resolveIdeologyTraits,
 } from "../src/progressionSystem.js";
+import { createInitialCharacterIdentity } from "../src/characterIdentity.js";
 import { createInitialNarrativeState } from "../src/decisionEngine.js";
 
 describe("progressionSystem", () => {
@@ -35,6 +38,23 @@ describe("progressionSystem", () => {
     const mods = buildProgressionModifiers(progression);
     expect(mods.staminaRegenBonus).toBeGreaterThan(0);
     expect(mods.weatherPenaltyReduction).toBeGreaterThan(0);
+  });
+
+  it("applies weapon families and armor slots to progression modifiers", () => {
+    const progression = createInitialProgressionState();
+    progression.identity = createInitialCharacterIdentity("ash_salvager");
+
+    expect(equipWeaponFamily(progression, "spear")).toBe(true);
+    expect(equipArmorPiece(progression, "iron_duster")).toBe(true);
+    expect(equipWeaponFamily(progression, "missing")).toBe(false);
+    expect(equipArmorPiece(progression, "missing")).toBe(false);
+
+    const mods = buildProgressionModifiers(progression);
+    expect(progression.equipment.weaponFamily).toBe("spear");
+    expect(progression.equipment.armorSlots.body).toBe("iron_duster");
+    expect(mods.weaponReachMult).toBeGreaterThan(1);
+    expect(mods.armorWeight).toBeGreaterThan(0);
+    expect(mods.refineCostMult).toBeLessThan(1);
   });
 
   it("resolves ideology traits from narrative axes", () => {

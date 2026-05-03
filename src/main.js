@@ -77,6 +77,22 @@ import {
   recordRunKill,
   syncQuestOutcomeCount,
 } from "./runSummary.js";
+import {
+  ORIGINS,
+  applyOrigin,
+  buildCharacterIdentitySummary,
+  normalizeCharacterIdentity,
+  resolveIdentityShopPriceMultiplier,
+} from "./characterIdentity.js";
+import {
+  buildGearSummary,
+  normalizeGearState,
+  resolveCraftingCostMultiplier,
+} from "./gearCrafting.js";
+import {
+  buildRegionIdentityLine,
+  getRegionVisualIdentity,
+} from "./regionVisualIdentity.js";
 import { buildVisualMood } from "./visualProfile.js";
 import {
   QUEST_DEFINITIONS,
@@ -91,6 +107,8 @@ import {
   canUnlockSkill,
   upgradeWeaponTier,
   addArmorModifier,
+  equipArmorPiece,
+  equipWeaponFamily,
   resolveIdeologyTraits,
   buildProgressionModifiers,
   ARMOR_MODIFIERS,
@@ -188,6 +206,7 @@ const canvas = document.getElementById("game");
   const menu = document.getElementById("menu");
   const startBtn = document.getElementById("start-btn");
   const continueBtn = document.getElementById("continue-btn");
+  const originPicker = document.getElementById("origin-picker");
   const langSelect = document.getElementById("lang-select");
   const langLabel = document.getElementById("lang-label");
   const tsAtmosphere = window.WestWardTS && typeof window.WestWardTS.computeAtmosphere === "function"
@@ -219,7 +238,7 @@ const canvas = document.getElementById("game");
           "🛡️ Block: Right Mouse or C",
           "💬 Interact / Shop: E (talk to NPCs, browse shops)",
           "🧪 Use potion: Q",
-          "🗺️ Toggle map: M, 🔇 Sound: N, 📺 Fullscreen: F",
+          "🗺️ Toggle map: M, Character sheet: I, 🔇 Sound: N, 📺 Fullscreen: F",
           "💾 Quick save: K, Quick load: L",
         ],
         start: "⚔️ Enter The Wilds",
@@ -254,7 +273,7 @@ const canvas = document.getElementById("game");
         deathsLine: "Deaths: {deaths}. The slimes send their regards.",
         shopTitle: "🏪 Trader Nyx's Emporium",
         shopHeader: "Your Gold: {gold}   [↑/↓ to browse, Enter/E to buy, Esc to close]",
-        controlsHint: "Swing: LMB/Space  Block: RMB/C  Use: E  Potion: Q  Save/Load: K/L  Map: M  Sound: N",
+        controlsHint: "Swing: LMB/Space  Block: RMB/C  Use: E  Potion: Q  Save/Load: K/L  Map: M  Sheet: I  Sound: N",
         clear: "Clear",
         mist: "Mist",
         rain: "Rain",
@@ -303,7 +322,7 @@ const canvas = document.getElementById("game");
           "🛡️ Bloquear: Clic derecho o C",
           "💬 Interactuar / Tienda: E (habla con NPCs, compra)",
           "🧪 Usar poción: Q",
-          "🗺️ Mapa: M, 🔇 Sonido: N, 📺 Pantalla completa: F",
+          "🗺️ Mapa: M, Ficha: I, 🔇 Sonido: N, 📺 Pantalla completa: F",
           "💾 Guardado rápido: K, Carga rápida: L",
         ],
         start: "⚔️ Entrar a las Tierras",
@@ -338,7 +357,7 @@ const canvas = document.getElementById("game");
         deathsLine: "Muertes: {deaths}. Los slimes te mandan saludos.",
         shopTitle: "🏪 Emporio de Nyx",
         shopHeader: "Tu oro: {gold}   [↑/↓ navegar, Enter/E comprar, Esc cerrar]",
-        controlsHint: "Golpe: LMB/Espacio  Bloqueo: RMB/C  Usar: E  Poción: Q  Guardar/Cargar: K/L  Mapa: M  Sonido: N",
+        controlsHint: "Golpe: LMB/Espacio  Bloqueo: RMB/C  Usar: E  Poción: Q  Guardar/Cargar: K/L  Mapa: M  Ficha: I  Sonido: N",
         clear: "Despejado",
         mist: "Niebla",
         rain: "Lluvia",
@@ -373,7 +392,7 @@ const canvas = document.getElementById("game");
           "🛡️ Defesa: Botão direito ou C",
           "💬 Interagir / Loja: E (fale com NPCs, compre)",
           "🧪 Usar poção: Q",
-          "🗺️ Mapa: M, 🔇 Som: N, 📺 Tela cheia: F",
+          "🗺️ Mapa: M, Ficha: I, 🔇 Som: N, 📺 Tela cheia: F",
           "💾 Salvar rápido: K, Carregar rápido: L",
         ],
         start: "⚔️ Entrar nas Terras",
@@ -408,7 +427,7 @@ const canvas = document.getElementById("game");
         deathsLine: "Mortes: {deaths}. Os slimes mandam lembranças.",
         shopTitle: "🏪 Empório da Nyx",
         shopHeader: "Seu ouro: {gold}   [↑/↓ navegar, Enter/E comprar, Esc fechar]",
-        controlsHint: "Golpe: LMB/Espaço  Defesa: RMB/C  Usar: E  Poção: Q  Salvar/Carregar: K/L  Mapa: M  Som: N",
+        controlsHint: "Golpe: LMB/Espaço  Defesa: RMB/C  Usar: E  Poção: Q  Salvar/Carregar: K/L  Mapa: M  Ficha: I  Som: N",
         clear: "Limpo",
         mist: "Névoa",
         rain: "Chuva",
@@ -443,7 +462,7 @@ const canvas = document.getElementById("game");
           "🛡️ Parade : Clic droit ou C",
           "💬 Interaction / Boutique : E (parler aux PNJ, acheter)",
           "🧪 Utiliser une potion : Q",
-          "🗺️ Carte : M, 🔇 Son : N, 📺 Plein écran : F",
+          "🗺️ Carte : M, Fiche : I, 🔇 Son : N, 📺 Plein écran : F",
           "💾 Sauvegarde rapide : K, Chargement rapide : L",
         ],
         start: "⚔️ Entrer dans les Terres",
@@ -478,7 +497,7 @@ const canvas = document.getElementById("game");
         deathsLine: "Morts : {deaths}. Les slimes vous saluent.",
         shopTitle: "🏪 Emporium de Nyx",
         shopHeader: "Votre or : {gold}   [↑/↓ naviguer, Entrée/E acheter, Échap fermer]",
-        controlsHint: "Frappe : LMB/Espace  Parade : RMB/C  Utiliser : E  Potion : Q  Sauver/Charger : K/L  Carte : M  Son : N",
+        controlsHint: "Frappe : LMB/Espace  Parade : RMB/C  Utiliser : E  Potion : Q  Sauver/Charger : K/L  Carte : M  Fiche : I  Son : N",
         clear: "Clair",
         mist: "Brume",
         rain: "Pluie",
@@ -513,7 +532,7 @@ const canvas = document.getElementById("game");
           "🛡️ Blocken: Rechtsklick oder C",
           "💬 Interagieren / Shop: E (mit NPCs reden, kaufen)",
           "🧪 Trank benutzen: Q",
-          "🗺️ Karte: M, 🔇 Sound: N, 📺 Vollbild: F",
+          "🗺️ Karte: M, Bogen: I, 🔇 Sound: N, 📺 Vollbild: F",
           "💾 Schnell speichern: K, Schnell laden: L",
         ],
         start: "⚔️ In die Wildnis",
@@ -548,7 +567,7 @@ const canvas = document.getElementById("game");
         deathsLine: "Tode: {deaths}. Die Slimes grüßen freundlich.",
         shopTitle: "🏪 Nyx' Emporium",
         shopHeader: "Dein Gold: {gold}   [↑/↓ wählen, Enter/E kaufen, Esc schließen]",
-        controlsHint: "Schlag: LMB/Leertaste  Block: RMB/C  Nutzen: E  Trank: Q  Speichern/Laden: K/L  Karte: M  Sound: N",
+        controlsHint: "Schlag: LMB/Leertaste  Block: RMB/C  Nutzen: E  Trank: Q  Speichern/Laden: K/L  Karte: M  Bogen: I  Sound: N",
         clear: "Klar",
         mist: "Nebel",
         rain: "Regen",
@@ -583,7 +602,7 @@ const canvas = document.getElementById("game");
           "🛡️ Parata: Clic destro o C",
           "💬 Interagisci / Negozio: E (parla con gli NPC, compra)",
           "🧪 Usa pozione: Q",
-          "🗺️ Mappa: M, 🔇 Audio: N, 📺 Schermo intero: F",
+          "🗺️ Mappa: M, Scheda: I, 🔇 Audio: N, 📺 Schermo intero: F",
           "💾 Salvataggio rapido: K, Caricamento rapido: L",
         ],
         start: "⚔️ Entra nelle Terre",
@@ -618,7 +637,7 @@ const canvas = document.getElementById("game");
         deathsLine: "Morti: {deaths}. Gli slime ti salutano.",
         shopTitle: "🏪 Emporio di Nyx",
         shopHeader: "Il tuo oro: {gold}   [↑/↓ naviga, Invio/E compra, Esc chiudi]",
-        controlsHint: "Colpo: LMB/Spazio  Parata: RMB/C  Usa: E  Pozione: Q  Salva/Carica: K/L  Mappa: M  Audio: N",
+        controlsHint: "Colpo: LMB/Spazio  Parata: RMB/C  Usa: E  Pozione: Q  Salva/Carica: K/L  Mappa: M  Scheda: I  Audio: N",
         clear: "Sereno",
         mist: "Nebbia",
         rain: "Pioggia",
@@ -653,7 +672,7 @@ const canvas = document.getElementById("game");
           "🛡️ ガード: 右クリック または C",
           "💬 会話 / ショップ: E（NPCと会話、買い物）",
           "🧪 ポーション使用: Q",
-          "🗺️ マップ: M、🔇 音: N、📺 全画面: F",
+          "🗺️ マップ: M、シート: I、🔇 音: N、📺 全画面: F",
           "💾 クイックセーブ: K、クイックロード: L",
         ],
         start: "⚔️ 荒野へ出発",
@@ -688,7 +707,7 @@ const canvas = document.getElementById("game");
         deathsLine: "死亡回数: {deaths}。スライムたちが手を振っている。",
         shopTitle: "🏪 ニクス商会",
         shopHeader: "所持金: {gold}   [↑/↓ 選択, Enter/E 購入, Esc 閉じる]",
-        controlsHint: "攻撃: LMB/Space  ガード: RMB/C  使用: E  ポーション: Q  セーブ/ロード: K/L  マップ: M  音: N",
+        controlsHint: "攻撃: LMB/Space  ガード: RMB/C  使用: E  ポーション: Q  セーブ/ロード: K/L  マップ: M  シート: I  音: N",
         clear: "晴れ",
         mist: "霧",
         rain: "雨",
@@ -723,7 +742,7 @@ const canvas = document.getElementById("game");
           "🛡️ Blok: Sağ tık veya C",
           "💬 Etkileşim / Dükkan: E (NPC'lerle konuş, alışveriş yap)",
           "🧪 İksir kullan: Q",
-          "🗺️ Harita: M, 🔇 Ses: N, 📺 Tam ekran: F",
+          "🗺️ Harita: M, Sayfa: I, 🔇 Ses: N, 📺 Tam ekran: F",
           "💾 Hızlı kayıt: K, Hızlı yükleme: L",
         ],
         start: "⚔️ Vahşi Topraklara Gir",
@@ -758,7 +777,7 @@ const canvas = document.getElementById("game");
         deathsLine: "Ölümler: {deaths}. Slime'lar selam söylüyor.",
         shopTitle: "🏪 Nyx'in Dükkanı",
         shopHeader: "Altının: {gold}   [↑/↓ gezin, Enter/E satın al, Esc kapat]",
-        controlsHint: "Vuruş: LMB/Boşluk  Blok: RMB/C  Kullan: E  İksir: Q  Kaydet/Yükle: K/L  Harita: M  Ses: N",
+        controlsHint: "Vuruş: LMB/Boşluk  Blok: RMB/C  Kullan: E  İksir: Q  Kaydet/Yükle: K/L  Harita: M  Sayfa: I  Ses: N",
         clear: "Açık",
         mist: "Sis",
         rain: "Yağmur",
@@ -785,6 +804,7 @@ const canvas = document.getElementById("game");
   };
 
   let currentLang = "en";
+  let selectedOriginId = "exiled_marshal";
 
   function deepGet(obj, path) {
     return path.split(".").reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj);
@@ -840,6 +860,38 @@ const canvas = document.getElementById("game");
         node.textContent = refineMenuText(list[index]);
       }
     });
+  }
+
+  function renderOriginPicker() {
+    if (!originPicker) return;
+    originPicker.textContent = "";
+    for (const origin of Object.values(ORIGINS)) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "origin-card";
+      button.dataset.originId = origin.id;
+      button.setAttribute("aria-pressed", origin.id === selectedOriginId ? "true" : "false");
+      button.innerHTML = `<span class="origin-card__name"></span><span class="origin-card__summary"></span>`;
+      button.querySelector(".origin-card__name").textContent = origin.label;
+      button.querySelector(".origin-card__summary").textContent = origin.summary;
+      button.addEventListener("click", () => {
+        selectedOriginId = origin.id;
+        state.progression.identity = applyOrigin(state.progression.identity, selectedOriginId);
+        applyProgressionEffects();
+        updateOriginPickerSelection();
+      });
+      originPicker.appendChild(button);
+    }
+    updateOriginPickerSelection();
+  }
+
+  function updateOriginPickerSelection() {
+    if (!originPicker) return;
+    for (const button of originPicker.querySelectorAll("[data-origin-id]")) {
+      const selected = button.dataset.originId === selectedOriginId;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+    }
   }
 
   function refreshLocalizedStateText() {
@@ -1029,6 +1081,7 @@ const canvas = document.getElementById("game");
     skillScreenOpen = false;
     settingsOpen = false;
     codexOpen = false;
+    characterSheetOpen = false;
     logMsg("Choose how this quest changes Dustward.");
     return true;
   }
@@ -1080,6 +1133,7 @@ const canvas = document.getElementById("game");
     skillScreenOpen = false;
     settingsOpen = false;
     codexOpen = false;
+    characterSheetOpen = false;
     state.mouseButtons.left = false;
     state.mouseButtons.right = false;
     state.player.blocking = false;
@@ -1097,6 +1151,7 @@ const canvas = document.getElementById("game");
   let codexOpen = false;
   let codexTab = 0; // index into CODEX_TABS
   let codexEntrySel = 0;
+  let characterSheetOpen = false;
   let questOutcomeOpen = false;
   let questOutcomeSelection = 0;
   let pendingQuestOutcome = null;
@@ -1105,6 +1160,59 @@ const canvas = document.getElementById("game");
     { id: "combat", label: "Combat", desc: "Damage, block window, crit chance." },
     { id: "influence", label: "Influence", desc: "Faction sway, shop barter, ideology threshold." },
   ];
+
+  function resolveShopItemCost(item) {
+    if (item.cost < 0) return item.cost;
+    const mods = getActiveRegionEventModifiers();
+    const factionPriceMult = resolveShopPriceMultiplier(state.narrative?.factionRep);
+    const identityPriceMult = resolveIdentityShopPriceMultiplier(state.progression.identity);
+    const craftPriceMult = item.craftCostKind
+      ? resolveCraftingCostMultiplier(state.progression.identity, item.craftCostKind)
+      : 1;
+    return Math.max(1, Math.round(item.cost * mods.priceMult * factionPriceMult * identityPriceMult * craftPriceMult));
+  }
+
+  function shopItemName(item) {
+    return item.name || (item.nameKey ? t(item.nameKey) : "Trade");
+  }
+
+  function shopItemDesc(item) {
+    return item.desc || (item.descKey ? t(item.descKey) : "");
+  }
+
+  function cycleWeaponFamily() {
+    const order = ["saber", "axe", "spear", "hammer"];
+    const gear = normalizeGearState(state.progression.equipment);
+    const currentIndex = Math.max(0, order.indexOf(gear.weaponFamily));
+    const nextFamily = order[(currentIndex + 1) % order.length];
+    if (!equipWeaponFamily(state.progression, nextFamily)) return false;
+    applyProgressionEffects();
+    const summary = buildGearSummary(state.progression.equipment, state.progression.identity);
+    logMsg(`Weapon refit: ${summary.weaponLine}. ${summary.weapon.role}`);
+    return true;
+  }
+
+  function fitNextArmorPiece() {
+    const order = ["iron_duster", "salvage_gloves", "ash_mask", "lantern_charm"];
+    const gear = normalizeGearState(state.progression.equipment);
+    const nextPieceId = order.find((pieceId) => {
+      const pieceSlot = {
+        iron_duster: "body",
+        salvage_gloves: "hands",
+        ash_mask: "head",
+        lantern_charm: "trinket",
+      }[pieceId];
+      return gear.armorSlots[pieceSlot] !== pieceId;
+    });
+    if (!nextPieceId || !equipArmorPiece(state.progression, nextPieceId)) {
+      logMsg("All armor slots are already fitted.");
+      return false;
+    }
+    applyProgressionEffects();
+    const summary = buildGearSummary(state.progression.equipment, state.progression.identity);
+    logMsg(`Armor fitted: ${summary.armorLine}.`);
+    return true;
+  }
 
   let shopOpen = false;
   const shopItems = [
@@ -1140,7 +1248,21 @@ const canvas = document.getElementById("game");
       }
     },
     {
-      nameKey: "shop.refineWeaponName", cost: 60, descKey: "shop.refineWeaponDesc",
+      name: "Refit Weapon Family", cost: 45, desc: "Cycle Saber/Axe/Spear/Hammer. Might changes heft; Craft improves handling.",
+      craftCostKind: "repair",
+      action() {
+        return cycleWeaponFamily();
+      }
+    },
+    {
+      name: "Fit Armor Slot", cost: 55, desc: "Adds heavier armor pieces. Grit absorbs weight; Craft trims upkeep.",
+      craftCostKind: "repair",
+      action() {
+        return fitNextArmorPiece();
+      }
+    },
+    {
+      nameKey: "shop.refineWeaponName", cost: 60, descKey: "shop.refineWeaponDesc", craftCostKind: "refine",
       action() {
         if (state.progression.equipment.weaponTier !== "Common") { logMsg("Weapon already past Common."); return false; }
         if (!canSmithUpgradeWeapon(state.narrative?.factionRep, "Common")) {
@@ -1150,12 +1272,13 @@ const canvas = document.getElementById("game");
         if ((state.inventory.Ashglass || 0) < 4) { logMsg("Need 4 Ashglass to refine."); return false; }
         state.inventory.Ashglass -= 4;
         upgradeWeaponTier(state.progression);
+        applyProgressionEffects();
         logMsg(`Weapon refined to ${state.progression.equipment.weaponTier}.`);
         return true;
       }
     },
     {
-      nameKey: "shop.relicWeaponName", cost: 180, descKey: "shop.relicWeaponDesc",
+      nameKey: "shop.relicWeaponName", cost: 180, descKey: "shop.relicWeaponDesc", craftCostKind: "refine",
       action() {
         if (state.progression.equipment.weaponTier !== "Refined") { logMsg("Refine the weapon first."); return false; }
         if (!canSmithUpgradeWeapon(state.narrative?.factionRep, "Refined")) {
@@ -1165,63 +1288,69 @@ const canvas = document.getElementById("game");
         if ((state.inventory["Cipher Lens"] || 0) < 4) { logMsg("Need 4 Cipher Lens for relic upgrade."); return false; }
         state.inventory["Cipher Lens"] -= 4;
         upgradeWeaponTier(state.progression);
+        applyProgressionEffects();
         logMsg(`Weapon ascended to ${state.progression.equipment.weaponTier}.`);
         return true;
       }
     },
     {
-      nameKey: "shop.armorStaminaName", cost: 40, descKey: "shop.armorStaminaDesc",
+      nameKey: "shop.armorStaminaName", cost: 40, descKey: "shop.armorStaminaDesc", craftCostKind: "repair",
       action() {
         if (state.progression.equipment.armorMods.includes("stamina_regen")) { logMsg("Stamina mod already fitted."); return false; }
         if ((state.inventory["Heat Resin"] || 0) < 2) { logMsg("Need 2 Heat Resin."); return false; }
         state.inventory["Heat Resin"] -= 2;
         addArmorModifier(state.progression, "stamina_regen");
+        applyProgressionEffects();
         logMsg("Armor modifier installed: stamina regen.");
         return true;
       }
     },
     {
-      nameKey: "shop.armorBlockName", cost: 50, descKey: "shop.armorBlockDesc",
+      nameKey: "shop.armorBlockName", cost: 50, descKey: "shop.armorBlockDesc", craftCostKind: "repair",
       action() {
         if (state.progression.equipment.armorMods.includes("block_efficiency")) { logMsg("Block mod already fitted."); return false; }
         if ((state.inventory["Scrap Coil"] || 0) < 2) { logMsg("Need 2 Scrap Coil."); return false; }
         state.inventory["Scrap Coil"] -= 2;
         addArmorModifier(state.progression, "block_efficiency");
+        applyProgressionEffects();
         logMsg("Armor modifier installed: block efficiency.");
         return true;
       }
     },
     {
-      nameKey: "shop.armorWeatherName", cost: 45, descKey: "shop.armorWeatherDesc",
+      nameKey: "shop.armorWeatherName", cost: 45, descKey: "shop.armorWeatherDesc", craftCostKind: "repair",
       action() {
         if (state.progression.equipment.armorMods.includes("weather_resistance")) { logMsg("Weather mod already fitted."); return false; }
         if ((state.inventory["Pressurized Ink"] || 0) < 2) { logMsg("Need 2 Pressurized Ink."); return false; }
         state.inventory["Pressurized Ink"] -= 2;
         addArmorModifier(state.progression, "weather_resistance");
+        applyProgressionEffects();
         logMsg("Armor modifier installed: weather resistance.");
         return true;
       }
     },
     {
-      nameKey: "shop.affixPrefixName", cost: 80, descKey: "shop.affixPrefixDesc",
+      nameKey: "shop.affixPrefixName", cost: 80, descKey: "shop.affixPrefixDesc", craftCostKind: "refine",
       action() {
         if ((state.inventory["Cipher Lens"] || 0) < 2) { logMsg("Need 2 Cipher Lens to inscribe a prefix."); return false; }
         const affix = rollAffix("prefix");
         if (!affix) { logMsg("Smith finds no prefix to inscribe."); return false; }
         state.inventory["Cipher Lens"] -= 2;
         attachAffix(state.progression.equipment, affix.id);
+        applyProgressionEffects();
         logMsg(`Prefix inscribed: ${affix.label}. ${affix.description}`);
         return true;
       }
     },
     {
-      nameKey: "shop.affixSuffixName", cost: 80, descKey: "shop.affixSuffixDesc",
+      nameKey: "shop.affixSuffixName", cost: 80, descKey: "shop.affixSuffixDesc", craftCostKind: "refine",
       action() {
         if ((state.inventory["Cipher Lens"] || 0) < 2) { logMsg("Need 2 Cipher Lens to inscribe a suffix."); return false; }
         const affix = rollAffix("suffix");
         if (!affix) { logMsg("Smith finds no suffix to inscribe."); return false; }
         state.inventory["Cipher Lens"] -= 2;
         attachAffix(state.progression.equipment, affix.id);
+        applyProgressionEffects();
         logMsg(`Suffix inscribed: ${affix.label}. ${affix.description}`);
         return true;
       }
@@ -1780,6 +1909,7 @@ const canvas = document.getElementById("game");
   refreshLocalizedStateText();
   syncChapterFromProgress(state.narrative, state.player.level);
   syncCombatProfileState();
+  renderOriginPicker();
 
   let hasSaveData = false;
   let lastSaveAt = null;
@@ -1952,6 +2082,8 @@ const canvas = document.getElementById("game");
     state.narrative.ending = resolveNarrativeEnding(state.narrative);
     ensureRunStats(state.world, state.time);
     syncQuestOutcomeCount(state.world, state.narrative);
+    state.progression.identity = normalizeCharacterIdentity(state.progression.identity);
+    state.progression.equipment = normalizeGearState(state.progression.equipment);
     return {
       version: 3,
       savedAt: Date.now(),
@@ -2107,6 +2239,10 @@ const canvas = document.getElementById("game");
     };
     state.mode = save.mode === "victory" || state.world.runStats?.victory ? "victory" : state.mode;
     state.progression = save.progression || createInitialProgressionState();
+    state.progression.identity = normalizeCharacterIdentity(state.progression.identity);
+    state.progression.equipment = normalizeGearState(state.progression.equipment);
+    selectedOriginId = state.progression.identity.originId;
+    updateOriginPickerSelection();
     state.regions = save.regions || createInitialRegionState();
     const graphicsDefaults = createInitialGraphicsState();
     state.graphics = {
@@ -2247,6 +2383,9 @@ const canvas = document.getElementById("game");
     menu.style.display = "none";
     autoSaveTimer = 0;
     if (!fromLoad) {
+      state.progression.identity = applyOrigin(state.progression.identity, selectedOriginId);
+      state.progression.equipment = normalizeGearState(state.progression.equipment);
+      syncCombatProfileState();
       state.world.runStats = createInitialRunStats(state.time);
       logMsg("Welcome to Dustward, drifter. Talk to townsfolk, duel slimes, and avoid being trampled by outlaw pigs.");
       ensureAudio();
@@ -2268,8 +2407,12 @@ const canvas = document.getElementById("game");
   }
 
   function applyProgressionEffects() {
+    state.progression.identity = normalizeCharacterIdentity(state.progression.identity);
+    state.progression.equipment = normalizeGearState(state.progression.equipment);
     const modifiers = buildProgressionModifiers(state.progression);
+    const gearSummary = buildGearSummary(state.progression.equipment, state.progression.identity);
     state.player.progressionMods = modifiers;
+    state.player.loadout.weapon = gearSummary.weaponName;
     state.player.quickUtility = state.player.quickUtility || {
       active: "smoke",
       inventory: { smoke: 1, flare: 1, tonic: 1 },
@@ -3263,7 +3406,15 @@ const canvas = document.getElementById("game");
       solidarityVsStatus: state.narrative.thematicAxes.solidarityVsStatus,
       affixMods,
     });
-    const swing = applyMovesetGeometry(swingBase, state.progression.equipment?.weaponTier || "Common");
+    const progressionMods = state.player.progressionMods || buildProgressionModifiers(state.progression);
+    const swingGeometry = applyMovesetGeometry(swingBase, state.progression.equipment?.weaponTier || "Common");
+    const swing = {
+      ...swingGeometry,
+      damage: Math.max(1, Math.round(swingGeometry.damage * (progressionMods.weaponDamageMult || 1))),
+      stamina: Math.max(1, Math.round(swingGeometry.stamina * (progressionMods.weaponStaminaMult || 1))),
+      reach: swingGeometry.reach * (progressionMods.weaponReachMult || 1),
+      staggerBonus: (swingGeometry.staggerBonus || 0) + (progressionMods.weaponStaggerBonus || 0),
+    };
     state.player.attackCooldown = swing.cooldown * stance.cooldownMult;
     state.player.comboWindow = 0.55;
     state.player.swingDuration = swing.duration;
@@ -3964,12 +4115,16 @@ const canvas = document.getElementById("game");
       speedFactor = 1.42 * getSprintModifier(state.player.combatProfile) * stance.sprintMult;
       player.stamina = Math.max(0, player.stamina - dt * 24);
     } else {
-      player.stamina = Math.min(100, player.stamina + dt * (player.blocking ? 5 : 8.6));
+      const regenBonus = state.player.progressionMods?.staminaRegenBonus || 0;
+      player.stamina = Math.min(100, player.stamina + dt * ((player.blocking ? 5 : 8.6) + regenBonus));
     }
 
     if (player.blocking) speedFactor *= 0.62;
     if (player.inHouse) speedFactor *= 0.85;
-    if (!player.inHouse && state.weather.rain > 0.45) speedFactor *= 0.93;
+    if (!player.inHouse && state.weather.rain > 0.45) {
+      const weatherRelief = clamp(state.player.progressionMods?.weatherPenaltyReduction || 0, 0, 0.7);
+      speedFactor *= 1 - 0.07 * (1 - weatherRelief);
+    }
     if (!player.inHouse && player.stamina < 20) speedFactor *= 0.9;
 
     // Pre-compute trigonometric values to avoid duplicate calculations
@@ -4146,6 +4301,7 @@ const canvas = document.getElementById("game");
               const facingDiff = Math.abs(normalizeAngle(angleToEnemy - player.angle));
               const stance = getStanceModifiers();
               const mitigated = resolveIncomingDamage(damage, state.player.combatProfile, { blocked: true });
+              const blockBonus = clamp(state.player.progressionMods?.blockEfficiencyBonus || 0, 0, 0.35);
               const sinceBlockStart = state.time - (player.blockStartTime ?? -Infinity);
               const parryWindow = sinceBlockStart >= 0 && sinceBlockStart <= 0.15;
               if (parryWindow && facingDiff < 1.12) {
@@ -4165,8 +4321,8 @@ const canvas = document.getElementById("game");
                 logMsg(parry.chained ? "Parry chain! Enemy interrupted." : "Perfect parry! Riposte primed.");
                 sfx.blockHit();
               } else if (facingDiff < 1.12 && player.stamina > 10) {
-                damage = Math.max(mitigated.chip, Math.floor(mitigated.blocked * stance.blockPenalty));
-                player.stamina = Math.max(0, player.stamina - 11);
+                damage = Math.max(mitigated.chip, Math.floor(mitigated.blocked * stance.blockPenalty * (1 - blockBonus)));
+                player.stamina = Math.max(0, player.stamina - 11 * (1 - blockBonus * 0.5));
                 if (player.stamina <= 0) {
                   const guard = resolveGuardBreakState(player, 0);
                   player.guardBroken = guard.guardBroken;
@@ -4338,6 +4494,11 @@ const canvas = document.getElementById("game");
     skyGrad.addColorStop(1, `rgb(${skyBottom.r}, ${skyBottom.g}, ${skyBottom.b})`);
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, width, horizon);
+    const regionProfile = visualMood?.regionProfile || getRegionVisualIdentity(state.regions.activeRegion);
+    if (regionProfile?.skyTint) {
+      ctx.fillStyle = hexToRgba(regionProfile.skyTint, 0.1 + normalizedDay * 0.06);
+      ctx.fillRect(0, 0, width, horizon);
+    }
 
     if (normalizedDay < 0.35) {
       const starAlpha = clamp((0.35 - normalizedDay) / 0.35, 0, 1) * (1 - weather.rain * 0.75);
@@ -4455,12 +4616,18 @@ const canvas = document.getElementById("game");
     );
     ctx.fillStyle = groundGrad;
     ctx.fillRect(0, horizon, width, height - horizon);
+    if (regionProfile?.groundPalette?.length) {
+      ctx.fillStyle = hexToRgba(regionProfile.groundPalette[0], 0.1);
+      ctx.fillRect(0, horizon, width, height - horizon);
+    }
 
     const groundDepth = height - horizon;
     const trailCenter = width * 0.5 + Math.sin(state.player.angle * 1.7) * width * 0.08;
     const trail = ctx.createLinearGradient(0, horizon, 0, height);
-    trail.addColorStop(0, `rgba(190, 151, 92, ${0.015 + normalizedDay * 0.02})`);
-    trail.addColorStop(1, `rgba(199, 157, 95, ${0.08 + normalizedDay * 0.06})`);
+    const trailTop = regionProfile?.groundPalette?.[2] || "#be975c";
+    const trailBottom = regionProfile?.groundPalette?.[1] || "#c79d5f";
+    trail.addColorStop(0, hexToRgba(trailTop, 0.015 + normalizedDay * 0.02));
+    trail.addColorStop(1, hexToRgba(trailBottom, 0.08 + normalizedDay * 0.06));
     ctx.fillStyle = trail;
     ctx.beginPath();
     ctx.moveTo(trailCenter - width * 0.025, horizon + 4);
@@ -5103,6 +5270,7 @@ const canvas = document.getElementById("game");
       qualitySetting: state.weather.quality,
       biome: state.regions.activeRegion,
     });
+    visualMoodBase.regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const visualMood = applyGraphicsAccessibility(visualMoodBase, state.graphics.accessibility);
     latestParticleMultiplier = clamp(numberOr(visualMood.particleMultiplier, 1), 0, 1);
     latestColorblindPalette = getColorblindPalette(visualMood.colorblindMode);
@@ -5813,6 +5981,7 @@ const canvas = document.getElementById("game");
     const location = state.player.inHouse ? t("labels.playerHouse") : t("labels.valley");
     const houseStatus = state.house.unlocked ? t("labels.owned") : t("labels.locked");
     const weatherText = state.player.inHouse ? t("labels.sheltered") : weatherLabel(state.weather.kind);
+    const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const mapReserve = state.showMap && canvas.width > 700 ? (canvas.width < 900 ? 176 : 214) : 0;
     const topW = Math.max(240, Math.min(730, canvas.width - margin * 2 - mapReserve));
     const topH = compact ? 78 : 92;
@@ -5829,7 +5998,7 @@ const canvas = document.getElementById("game");
     drawClippedText(`${t("labels.location")}: ${location}   ${t("labels.house")}: ${houseStatus}   ${t("labels.weather")}: ${weatherText}`, topX + 10, topY + 20, topW - 20, "#fff1d0");
     ctx.font = "10px Georgia";
     drawClippedText(
-      `Region: ${state.regions.activeRegion}  Chapter: ${state.narrative.chapterTitle}  CVF:${state.narrative.thematicAxes.controlVsFreedom}  TVC:${state.narrative.thematicAxes.truthVsComfort}  SVS:${state.narrative.thematicAxes.solidarityVsStatus}`,
+      `Region: ${regionProfile.label}  Chapter: ${state.narrative.chapterTitle}  CVF:${state.narrative.thematicAxes.controlVsFreedom}  TVC:${state.narrative.thematicAxes.truthVsComfort}  SVS:${state.narrative.thematicAxes.solidarityVsStatus}`,
       topX + 10,
       topY + 35,
       topW - 20,
@@ -5966,6 +6135,57 @@ const canvas = document.getElementById("game");
       }
     }
 
+    /* Character sheet overlay */
+    if (characterSheetOpen && state.mode === "playing") {
+      const identity = normalizeCharacterIdentity(state.progression.identity);
+      const summary = buildCharacterIdentitySummary(identity);
+      const gearSummary = buildGearSummary(state.progression.equipment, identity);
+      const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
+      const effects = summary.effects || {};
+      const sw = Math.min(620, canvas.width - margin * 2);
+      const sh = Math.min(canvas.height - margin * 2, canvas.height < 380 ? canvas.height - margin * 2 : 382);
+      const sx = Math.floor((canvas.width - sw) / 2);
+      const sy = Math.max(margin, Math.floor((canvas.height - sh) / 2));
+      drawSoftPanel(sx, sy, sw, sh, {
+        top: "rgba(21, 25, 32, 0.96)",
+        bottom: "rgba(8, 11, 16, 0.94)",
+        border: "rgba(216, 188, 106, 0.55)",
+      });
+
+      ctx.font = "bold 22px Georgia";
+      drawClippedText(`${summary.originLabel} ${summary.roleLabel}`, sx + 20, sy + 34, sw - 40, "#ffd77b");
+      ctx.font = "12px Georgia";
+      drawClippedText(summary.originSummary, sx + 20, sy + 56, sw - 40, "#d8c7a8");
+
+      const factionLine = Object.entries(state.narrative.factionRep || {})
+        .map(([id, value]) => `${FACTION_NAMES[id] || id} ${value}`)
+        .join(" / ");
+      const sheetLines = [
+        { text: `Attributes: ${summary.attributeLine}`, color: "#e6d8bd" },
+        { text: `Hooks: HP +${effects.maxHpBonus || 0}, Stamina +${effects.staminaReserveBonus || 0}, Barter +${effects.barterBonusPct || 0}%, Craft +${effects.craftingYieldPct || 0}%`, color: "#d8c7a8" },
+        { text: `Weapon: ${gearSummary.weaponLine} - ${gearSummary.handlingLine}`, color: "#e6d8bd" },
+        { text: `Armor: ${gearSummary.armorLine} - weight ${gearSummary.armorWeight}`, color: "#d8c7a8" },
+        { text: `Crafting: ${gearSummary.economyLine}`, color: "#d8c7a8" },
+        { text: `Region: ${regionProfile.label} - ${regionProfile.mood}`, color: "#ffe16a" },
+        { text: `Landmarks: ${regionProfile.landmarkHints.slice(0, 4).join(", ")}`, color: "#cbb6a2" },
+        { text: `Danger: ${regionProfile.dangerIdentity}`, color: "#cbb6a2" },
+        { text: `Stance: ${state.player.loadout.stance}`, color: "#e6d8bd" },
+        { text: `Faction lean: ${FACTION_NAMES[summary.factionLean] || summary.factionLean}`, color: "#d8c7a8" },
+        { text: `Rep: ${factionLine}`, color: "#cbb6a2" },
+        { text: `Companion: ${state.companion.active ? state.companion.name : state.companion.downed ? `${state.companion.name} recovering` : "none"} / House: ${state.house.unlocked ? "owned" : "locked"}`, color: "#b8a792" },
+      ];
+      ctx.font = "12px Georgia";
+      let lineY = sy + 88;
+      const lineGap = sh < 300 ? 16 : 20;
+      for (const line of sheetLines) {
+        if (lineY > sy + sh - 24) break;
+        drawClippedText(line.text, sx + 20, lineY, sw - 40, line.color);
+        lineY += lineGap;
+      }
+      ctx.font = "italic 11px Georgia";
+      drawClippedText("Press I or Esc to close.", sx + 20, sy + sh - 14, sw - 40, "#9d927d");
+    }
+
     /* Skill screen overlay */
     if (skillScreenOpen && state.mode === "playing") {
       const sw = Math.min(440, canvas.width - margin * 2);
@@ -6096,7 +6316,9 @@ const canvas = document.getElementById("game");
     /* Shop overlay */
     if (shopOpen && state.mode === "playing") {
       const sw = Math.min(420, canvas.width - margin * 2);
-      const sh = shopItems.length * 52 + 80;
+      const visibleShopRows = Math.min(shopItems.length, Math.max(5, Math.floor((canvas.height - margin * 2 - 92) / 52)));
+      const firstShopRow = clamp(shopSelection - Math.floor(visibleShopRows / 2), 0, Math.max(0, shopItems.length - visibleShopRows));
+      const sh = visibleShopRows * 52 + 92;
       const sx = Math.floor((canvas.width - sw) / 2);
       const sy = Math.floor((canvas.height - sh) / 2);
 
@@ -6110,11 +6332,12 @@ const canvas = document.getElementById("game");
       ctx.font = "bold 20px Georgia";
       drawClippedText(t("labels.shopTitle"), sx + 16, sy + 30, sw - 32, "#ffd77b");
       ctx.font = "12px Georgia";
-      drawClippedText(t("labels.shopHeader", { gold: state.player.gold }), sx + 16, sy + 50, sw - 32, "#c9b889");
+      drawClippedText(`${t("labels.shopHeader", { gold: state.player.gold })}  ${shopSelection + 1}/${shopItems.length}`, sx + 16, sy + 50, sw - 32, "#c9b889");
 
-      for (let i = 0; i < shopItems.length; i++) {
+      for (let visible = 0; visible < visibleShopRows; visible++) {
+        const i = firstShopRow + visible;
         const item = shopItems[i];
-        const iy = sy + 62 + i * 52;
+        const iy = sy + 62 + visible * 52;
         const selected = i === shopSelection;
 
         fillRoundedRect(sx + 8, iy, sw - 16, 46, 7, selected ? "rgba(216, 188, 106, 0.24)" : "rgba(255, 255, 255, 0.05)");
@@ -6124,11 +6347,9 @@ const canvas = document.getElementById("game");
         }
 
         ctx.font = "bold 14px Georgia";
-        drawClippedText(t(item.nameKey), sx + 20, iy + 18, sw - 112, selected ? "#ffd77b" : "#f3ecd8");
+        drawClippedText(shopItemName(item), sx + 20, iy + 18, sw - 112, selected ? "#ffd77b" : "#f3ecd8");
 
-        const __mods = getActiveRegionEventModifiers();
-        const __factionMult = resolveShopPriceMultiplier(state.narrative?.factionRep);
-        const __displayCost = item.cost < 0 ? item.cost : Math.max(1, Math.round(item.cost * __mods.priceMult * __factionMult));
+        const __displayCost = resolveShopItemCost(item);
         ctx.fillStyle = item.cost < 0 ? "#5fe0b5" : (state.player.gold >= __displayCost ? "#ffd77b" : "#ff6b6b");
         ctx.font = "14px Georgia";
         ctx.textAlign = "right";
@@ -6136,7 +6357,7 @@ const canvas = document.getElementById("game");
         ctx.textAlign = "left";
 
         ctx.font = "italic 12px Georgia";
-        drawClippedText(t(item.descKey), sx + 20, iy + 36, sw - 40, "#a09880");
+        drawClippedText(shopItemDesc(item), sx + 20, iy + 36, sw - 40, "#a09880");
       }
     }
 
@@ -6222,6 +6443,17 @@ const canvas = document.getElementById("game");
       }
       if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
         confirmQuestOutcomeChoice();
+        event.preventDefault();
+        return;
+      }
+      event.preventDefault();
+      return;
+    }
+
+    /* Character sheet controls */
+    if (characterSheetOpen) {
+      if (event.code === "Escape" || event.code === "KeyI") {
+        characterSheetOpen = false;
         event.preventDefault();
         return;
       }
@@ -6335,9 +6567,7 @@ const canvas = document.getElementById("game");
       }
       if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
         const item = shopItems[shopSelection];
-        const mods = getActiveRegionEventModifiers();
-        const factionPriceMult = resolveShopPriceMultiplier(state.narrative?.factionRep);
-        const adjustedCost = item.cost < 0 ? item.cost : Math.max(1, Math.round(item.cost * mods.priceMult * factionPriceMult));
+        const adjustedCost = resolveShopItemCost(item);
         if (item.cost < 0) {
           const result = item.action();
           if (result !== false) sfx.shopBuy();
@@ -6348,7 +6578,7 @@ const canvas = document.getElementById("game");
             state.player.gold += adjustedCost;
           } else {
             sfx.shopBuy();
-            logMsg(`Bought ${t(item.nameKey)} for ${adjustedCost}g! ${choice(["Money well spent!", "Trader Nyx grins.", "Ka-ching!", "Nyx winks."])}`);
+            logMsg(`Bought ${shopItemName(item)} for ${adjustedCost}g! ${choice(["Money well spent!", "Trader Nyx grins.", "Ka-ching!", "Nyx winks."])}`);
           }
         } else {
           logMsg("Trader Nyx: No gold, no goods. That's business, baby.");
@@ -6447,17 +6677,25 @@ const canvas = document.getElementById("game");
 
     if (event.code === "KeyT" && state.mode === "playing" && !shopOpen) {
       skillScreenOpen = !skillScreenOpen;
+      if (skillScreenOpen) characterSheetOpen = false;
       if (skillScreenOpen) logMsg("Skill tree opened.");
     }
 
     if (event.code === "KeyO" && state.mode === "playing" && !shopOpen && !skillScreenOpen) {
       settingsOpen = !settingsOpen;
+      if (settingsOpen) characterSheetOpen = false;
       if (settingsOpen) logMsg("Settings opened.");
     }
 
     if (event.code === "KeyZ" && state.mode === "playing" && !shopOpen && !skillScreenOpen && !settingsOpen) {
       codexOpen = !codexOpen;
+      if (codexOpen) characterSheetOpen = false;
       if (codexOpen) logMsg("Codex opened.");
+    }
+
+    if (event.code === "KeyI" && state.mode === "playing" && !shopOpen && !skillScreenOpen && !settingsOpen && !codexOpen) {
+      characterSheetOpen = !characterSheetOpen;
+      if (characterSheetOpen) logMsg("Character sheet opened.");
     }
 
     if (event.code === "KeyJ" && state.mode === "playing") {
@@ -6598,6 +6836,10 @@ const canvas = document.getElementById("game");
     const activeNpcs = state.npcs;
     const activePigs = state.pigs;
     const runSummary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time);
+    const identity = normalizeCharacterIdentity(state.progression.identity);
+    const characterSummary = buildCharacterIdentitySummary(identity);
+    const gearSummary = buildGearSummary(state.progression.equipment, identity);
+    const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const quests = {
       crystal: {
         title: state.quests.crystal.title,
@@ -6636,6 +6878,7 @@ const canvas = document.getElementById("game");
         y_direction: "positive y moves south/down",
       },
       mode: state.mode,
+      character_sheet_open: characterSheetOpen,
       save: {
         has_save: hasSaveData,
         last_saved_at: lastSaveAt,
@@ -6667,9 +6910,18 @@ const canvas = document.getElementById("game");
         swinging: state.player.swingTimer > 0,
         loadout: state.player.loadout,
         perks: state.player.perks,
+        identity,
+        identity_summary: characterSummary,
+        gear_summary: gearSummary,
+        progression_modifiers: state.player.progressionMods,
+        identity_shop_price_multiplier: resolveIdentityShopPriceMultiplier(identity),
       },
       inventory: state.inventory,
       run_summary: runSummary,
+      region_visual_identity: {
+        ...regionProfile,
+        identity_line: buildRegionIdentityLine(state.regions.activeRegion),
+      },
       house: {
         unlocked: state.house.unlocked,
         visited: state.house.visits,

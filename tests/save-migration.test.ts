@@ -130,6 +130,37 @@ describe("saveMigration", () => {
     expect(out?.player?.equipment?.armorMods).toEqual(["stamina_regen"]);
   });
 
+  it("backfills character identity on v3 saves missing it", () => {
+    const save = { version: 3, savedAt: 99, progression: { equipment: { weaponTier: "Common" } } };
+    const out = migrateSaveToV3(save);
+    expect(out?.progression?.identity?.originId).toBe("exiled_marshal");
+    expect(out?.progression?.identity?.attributes?.grit).toBeGreaterThan(0);
+  });
+
+  it("backfills weapon families and armor slots on v3 progression saves", () => {
+    const save = { version: 3, savedAt: 99, progression: { equipment: { weaponTier: "Refined" } } };
+    const out = migrateSaveToV3(save);
+    expect(out?.progression?.equipment?.weaponFamily).toBe("saber");
+    expect(out?.progression?.equipment?.armorSlots?.body).toBe("travel_duster");
+    expect(out?.progression?.equipment?.armorSlots?.feet).toBe("trail_boots");
+  });
+
+  it("preserves existing character identity through v3 backfill", () => {
+    const save = {
+      version: 3,
+      savedAt: 99,
+      progression: {
+        identity: {
+          originId: "lantern_defector",
+          attributes: { might: 2, grit: 3, cunning: 4, craft: 2, speech: 3, lore: 5 },
+          unspentAttributePoints: 2,
+        },
+      },
+    };
+    const out = migrateSaveToV3(save);
+    expect(out?.progression?.identity).toMatchObject(save.progression.identity);
+  });
+
   it("preserves existing equipment.affixes through v3 backfill", () => {
     const save = {
       version: 3,

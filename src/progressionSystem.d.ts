@@ -8,5 +8,7 @@ export function canUnlockSkill(progression: any, branch: string, maxPerBranch?: 
 export function unlockSkill(progression: any, branch: string): boolean;
 export function upgradeWeaponTier(progression: any): boolean;
 export function addArmorModifier(progression: any, modifierId: string): boolean;
+export function equipWeaponFamily(progression: any, familyId: string): boolean;
+export function equipArmorPiece(progression: any, pieceId: string): boolean;
 export function resolveIdeologyTraits(narrativeState: any): string[];
 export function buildProgressionModifiers(progression: any): any;

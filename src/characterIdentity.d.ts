@@ -1,0 +1,10 @@
+export const ATTRIBUTE_IDS: string[];
+export const ATTRIBUTE_LABELS: Record<string, string>;
+export const ORIGINS: Record<string, any>;
+export function createInitialCharacterIdentity(originId?: string): any;
+export function normalizeCharacterIdentity(source?: any): any;
+export function applyOrigin(identity: any, originId: string): any;
+export function spendAttributePoint(identity: any, attributeId: string): any;
+export function deriveAttributeEffects(identity: any): any;
+export function resolveIdentityShopPriceMultiplier(identity: any): number;
+export function buildCharacterIdentitySummary(identity: any): any;

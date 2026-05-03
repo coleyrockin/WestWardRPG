@@ -72,6 +72,7 @@ const buttonNameToKey = {
   e: "KeyE",
   f: "KeyF",
   g: "KeyG",
+  i: "KeyI",
   j: "KeyJ",
   k: "KeyK",
   l: "KeyL",

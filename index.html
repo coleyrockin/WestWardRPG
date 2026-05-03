@@ -324,11 +324,64 @@
       text-wrap: pretty;
     }
 
+    .origin-picker {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      max-width: 720px;
+      margin-top: 24px;
+    }
+
+    .origin-card {
+      min-height: 118px;
+      padding: 12px;
+      text-align: left;
+      color: var(--cream-soft);
+      background: hsla(195, 30%, 8%, 0.46);
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      cursor: pointer;
+      transition:
+        transform 200ms var(--reveal-ease),
+        border-color 240ms var(--reveal-ease),
+        background 240ms var(--reveal-ease),
+        color 240ms var(--reveal-ease);
+    }
+
+    .origin-card:hover,
+    .origin-card.is-selected {
+      color: var(--cream);
+      border-color: var(--ember-soft);
+      background: hsla(22, 50%, 20%, 0.44);
+    }
+
+    .origin-card:hover { transform: translateY(-1px); }
+
+    .origin-card__name,
+    .origin-card__summary {
+      display: block;
+    }
+
+    .origin-card__name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.25;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .origin-card__summary {
+      margin-top: 8px;
+      font-size: 12px;
+      line-height: 1.35;
+      color: var(--cream-mute);
+    }
+
     .actions {
       display: inline-flex;
       align-items: center;
       gap: 18px;
-      margin-top: 36px;
+      margin-top: 24px;
     }
 
     #start-btn,
@@ -560,6 +613,8 @@
       .controls-sheet { left: 16px; right: 16px; bottom: 16px; padding: 18px 18px 20px; }
       h1 { font-size: clamp(48px, 14vw, 84px); }
       .subtitle { font-size: 15px; }
+      .origin-picker { grid-template-columns: 1fr; max-width: 420px; gap: 8px; }
+      .origin-card { min-height: auto; }
       .actions { flex-wrap: wrap; gap: 12px; }
       #start-btn { padding: 14px 22px; font-size: 14px; }
       ul.controls { grid-template-columns: 1fr; gap: 4px; }
@@ -640,7 +695,8 @@
           <h1 id="menu-title" class="reveal r3"><span class="ink">Dustward</span></h1>
           <p class="subtitle reveal r4" id="menu-subtitle">A story-first frontier where every choice tilts the
             valley.</p>
-          <div class="actions reveal r5">
+          <div class="origin-picker reveal r5" id="origin-picker" role="group" aria-label="Choose origin"></div>
+          <div class="actions reveal r6">
             <button id="start-btn">Begin Journey</button>
             <button id="continue-btn">Continue Journey</button>
           </div>
@@ -664,7 +720,7 @@
           <li data-control-index="3">Block — Right Mouse / C</li>
           <li data-control-index="4">Interact — E (talk to NPCs, shops)</li>
           <li data-control-index="5">Use potion — Q</li>
-          <li data-control-index="6">Map M · Sound N · Fullscreen F</li>
+          <li data-control-index="6">Map M · Sheet I · Sound N · Fullscreen F</li>
           <li data-control-index="7">Quick save K · Quick load L</li>
         </ul>
       </div>

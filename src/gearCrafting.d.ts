@@ -1,0 +1,10 @@
+export const WEAPON_FAMILIES: Record<string, any>;
+export const ARMOR_SLOT_IDS: string[];
+export const ARMOR_PIECES: Record<string, any>;
+export const DEFAULT_ARMOR_SLOTS: Record<string, string | null>;
+export function normalizeGearState(equipment?: any): any;
+export function resolveWeaponFamilyEffects(equipment: any, identity: any): any;
+export function resolveCraftingEconomy(identity: any, extra?: any): any;
+export function resolveCraftingCostMultiplier(identity: any, kind?: string): number;
+export function resolveArmorSlotEffects(equipment: any, identity: any): any;
+export function buildGearSummary(equipment: any, identity: any): any;
