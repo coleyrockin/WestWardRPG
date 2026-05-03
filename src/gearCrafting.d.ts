@@ -8,3 +8,4 @@ export function resolveCraftingEconomy(identity: any, extra?: any): any;
 export function resolveCraftingCostMultiplier(identity: any, kind?: string): number;
 export function resolveArmorSlotEffects(equipment: any, identity: any): any;
 export function buildGearSummary(equipment: any, identity: any): any;
+export function buildGearInventorySummary(equipment: any): any;

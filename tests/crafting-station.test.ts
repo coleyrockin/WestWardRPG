@@ -72,4 +72,21 @@ describe("craftingStation", () => {
     expect(normalizeWorkstationState({ craftsCompleted: 2 }).craftsCompleted).toBe(2);
     expect(normalizeWorkstationState({ preparedUpgrade: 42 }).preparedUpgrade).toBe(null);
   });
+
+  it("upgrades the house workstation with resource costs", () => {
+    const context = makeContext();
+    context.inventory.Wood = 8;
+    context.inventory.Stone = 5;
+
+    expect(getAvailableCraftingActions(context).map((a) => a.id)).toContain("upgrade_workstation_2");
+
+    const result = resolveCraftingAction("upgrade_workstation_2", context);
+
+    expect(result.ok).toBe(true);
+    expect(result.inventory.Wood).toBe(0);
+    expect(result.inventory.Stone).toBe(1);
+    expect(result.house.workstation.level).toBe(2);
+    expect(result.house.workstation.craftsCompleted).toBe(1);
+    expect(result.message).toContain("level 2");
+  });
 });

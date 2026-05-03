@@ -12,11 +12,26 @@ export function createInitialWorkstationState() {
 
 export function normalizeWorkstationState(source = {}) {
   return {
-    level: Number.isFinite(source?.level) ? Math.max(1, Math.floor(source.level)) : 1,
+    level: Number.isFinite(source?.level) ? Math.max(1, Math.min(3, Math.floor(source.level))) : 1,
     craftsCompleted: Number.isFinite(source?.craftsCompleted) ? Math.max(0, Math.floor(source.craftsCompleted)) : 0,
     preparedUpgrade: typeof source?.preparedUpgrade === "string" ? source.preparedUpgrade : null,
   };
 }
+
+export const WORKSTATION_UPGRADES = {
+  2: {
+    level: 2,
+    label: "Upgrade Workbench II",
+    description: "8 Wood + 4 Stone. Adds a sturdier field bench.",
+    costs: { Wood: 8, Stone: 4 },
+  },
+  3: {
+    level: 3,
+    label: "Upgrade Workbench III",
+    description: "12 Wood + 6 Stone + 2 Scrap Coil. Adds a smithing corner.",
+    costs: { Wood: 12, Stone: 6, "Scrap Coil": 2 },
+  },
+};
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -41,6 +56,11 @@ function incrementWorkstation(house) {
   house.workstation.craftsCompleted += 1;
 }
 
+function nextWorkstationUpgrade(workstation) {
+  const level = normalizeWorkstationState(workstation).level;
+  return WORKSTATION_UPGRADES[level + 1] || null;
+}
+
 export function getAvailableCraftingActions(context = {}) {
   const inventory = context.inventory || {};
   const progression = context.progression || {};
@@ -61,6 +81,10 @@ export function getAvailableCraftingActions(context = {}) {
   }
   if (canAfford(inventory, { Ashglass: 2, "Scrap Coil": 1 }) && context.house?.workstation?.preparedUpgrade !== "refine_weapon") {
     actions.push({ id: "prepare_refine_kit", label: "Prepare Refine Kit", description: "2 Ashglass + 1 Scrap Coil." });
+  }
+  const upgrade = nextWorkstationUpgrade(context.house?.workstation);
+  if (upgrade && canAfford(inventory, upgrade.costs)) {
+    actions.push({ id: `upgrade_workstation_${upgrade.level}`, label: upgrade.label, description: upgrade.description });
   }
   return actions;
 }
@@ -117,6 +141,21 @@ export function resolveCraftingAction(actionId, context = {}, options = {}) {
     progression.equipment.weaponFamilyTokens = tokens.filter((token) => token !== familyId);
     incrementWorkstation(house);
     return { ok: true, message: `Fitted ${family.label} weapon family.`, inventory, progression, house };
+  }
+
+  if (actionId.startsWith("upgrade_workstation_")) {
+    const level = Number(actionId.replace("upgrade_workstation_", ""));
+    const upgrade = WORKSTATION_UPGRADES[level];
+    if (!upgrade || level !== house.workstation.level + 1) {
+      return { ok: false, message: "Workbench cannot jump to that level.", inventory, progression, house };
+    }
+    if (!canAfford(inventory, upgrade.costs)) {
+      return { ok: false, message: `${upgrade.label} needs more materials.`, inventory, progression, house };
+    }
+    spend(inventory, upgrade.costs);
+    house.workstation.level = level;
+    incrementWorkstation(house);
+    return { ok: true, message: `Workbench upgraded to level ${level}.`, inventory, progression, house };
   }
 
   return { ok: false, message: "Unknown crafting action.", inventory, progression, house };

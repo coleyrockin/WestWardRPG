@@ -85,6 +85,7 @@ import {
   resolveIdentityShopPriceMultiplier,
 } from "./characterIdentity.js";
 import {
+  buildGearInventorySummary,
   buildGearSummary,
   normalizeGearState,
   resolveCraftingCostMultiplier,
@@ -6262,6 +6263,7 @@ const canvas = document.getElementById("game");
       const identity = normalizeCharacterIdentity(state.progression.identity);
       const summary = buildCharacterIdentitySummary(identity);
       const gearSummary = buildGearSummary(state.progression.equipment, identity);
+      const inventorySummary = buildGearInventorySummary(state.progression.equipment);
       const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
       const effects = summary.effects || {};
       const sw = Math.min(620, canvas.width - margin * 2);
@@ -6287,6 +6289,8 @@ const canvas = document.getElementById("game");
         { text: `Hooks: HP +${effects.maxHpBonus || 0}, Stamina +${effects.staminaReserveBonus || 0}, Barter +${effects.barterBonusPct || 0}%, Craft +${effects.craftingYieldPct || 0}%`, color: "#d8c7a8" },
         { text: `Weapon: ${gearSummary.weaponLine} - ${gearSummary.handlingLine}`, color: "#e6d8bd" },
         { text: `Armor: ${gearSummary.armorLine} - weight ${gearSummary.armorWeight}`, color: "#d8c7a8" },
+        { text: `Earned gear: ${inventorySummary.ownedArmorLine}`, color: "#d8c7a8" },
+        { text: `Weapon tokens: ${inventorySummary.weaponTokenLine}`, color: "#d8c7a8" },
         { text: `Crafting: ${gearSummary.economyLine}`, color: "#d8c7a8" },
         { text: `Region: ${regionProfile.label} - ${regionProfile.mood}`, color: "#ffe16a" },
         { text: `Landmarks: ${regionProfile.landmarkHints.slice(0, 4).join(", ")}`, color: "#cbb6a2" },
@@ -6294,7 +6298,7 @@ const canvas = document.getElementById("game");
         { text: `Stance: ${state.player.loadout.stance}`, color: "#e6d8bd" },
         { text: `Faction lean: ${FACTION_NAMES[summary.factionLean] || summary.factionLean}`, color: "#d8c7a8" },
         { text: `Rep: ${factionLine}`, color: "#cbb6a2" },
-        { text: `Companion: ${state.companion.active ? state.companion.name : state.companion.downed ? `${state.companion.name} recovering` : "none"} / House: ${state.house.unlocked ? "owned" : "locked"}`, color: "#b8a792" },
+        { text: `Companion: ${state.companion.active ? state.companion.name : state.companion.downed ? `${state.companion.name} recovering` : "none"} / House: ${state.house.unlocked ? `owned / workbench ${state.house.workstation?.level || 1}` : "locked"}`, color: "#b8a792" },
       ];
       ctx.font = "12px Georgia";
       let lineY = sy + 88;
@@ -6493,6 +6497,7 @@ const canvas = document.getElementById("game");
       const sx = Math.floor((canvas.width - sw) / 2);
       const sy = Math.floor((canvas.height - sh) / 2);
       const gear = normalizeGearState(state.progression.equipment);
+      const inventorySummary = buildGearInventorySummary(gear);
       drawSoftPanel(sx, sy, sw, sh, {
         top: "rgba(24, 23, 17, 0.96)",
         bottom: "rgba(10, 12, 10, 0.94)",
@@ -6501,16 +6506,18 @@ const canvas = document.getElementById("game");
       ctx.font = "bold 20px Georgia";
       drawClippedText("Workbench", sx + 16, sy + 30, sw - 32, "#ffd77b");
       ctx.font = "12px Georgia";
-      drawClippedText(`Enter/E craft  ↑/↓ select  Esc close  |  Owned armor: ${(gear.ownedArmorPieces || []).length}  Weapon tokens: ${(gear.weaponFamilyTokens || []).join(", ") || "none"}`, sx + 16, sy + 52, sw - 32, "#c9b889");
+      drawClippedText(`Level ${state.house.workstation?.level || 1}  Enter/E craft  ↑/↓ select  Esc close`, sx + 16, sy + 52, sw - 32, "#c9b889");
+      ctx.font = "11px Georgia";
+      drawClippedText(`Gear: ${inventorySummary.ownedArmorLine} | Tokens: ${inventorySummary.weaponTokenLine}`, sx + 16, sy + 68, sw - 32, "#b8a792");
 
       if (actions.length === 0) {
-        fillRoundedRect(sx + 10, sy + 76, sw - 20, 54, 7, "rgba(255, 255, 255, 0.055)");
+        fillRoundedRect(sx + 10, sy + 86, sw - 20, 54, 7, "rgba(255, 255, 255, 0.055)");
         ctx.font = "italic 13px Georgia";
-        drawClippedText("Bring 2 Wood + 1 Stone, gear finds, or refine materials.", sx + 22, sy + 107, sw - 44, "#b8a792");
+        drawClippedText("Bring 2 Wood + 1 Stone, gear finds, or refine materials.", sx + 22, sy + 117, sw - 44, "#b8a792");
       } else {
         for (let i = 0; i < Math.min(rows, actions.length); i++) {
           const action = actions[i];
-          const iy = sy + 72 + i * 58;
+          const iy = sy + 86 + i * 58;
           const selected = i === workbenchSelection;
           fillRoundedRect(sx + 10, iy, sw - 20, 50, 7, selected ? "rgba(216, 188, 106, 0.24)" : "rgba(255, 255, 255, 0.055)");
           if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 49, 7, "#ffd77b", 1);
@@ -7033,6 +7040,7 @@ const canvas = document.getElementById("game");
     const identity = normalizeCharacterIdentity(state.progression.identity);
     const characterSummary = buildCharacterIdentitySummary(identity);
     const gearSummary = buildGearSummary(state.progression.equipment, identity);
+    const gearInventorySummary = buildGearInventorySummary(state.progression.equipment);
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const quests = {
       crystal: {
@@ -7110,6 +7118,7 @@ const canvas = document.getElementById("game");
         identity,
         identity_summary: characterSummary,
         gear_summary: gearSummary,
+        gear_inventory: gearInventorySummary,
         progression_modifiers: state.player.progressionMods,
         identity_shop_price_multiplier: resolveIdentityShopPriceMultiplier(identity),
       },

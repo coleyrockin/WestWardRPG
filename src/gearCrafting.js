@@ -269,3 +269,26 @@ export function buildGearSummary(equipment, identity) {
     armor,
   };
 }
+
+export function buildGearInventorySummary(equipment) {
+  const gear = normalizeGearState(equipment);
+  const ownedArmor = (gear.ownedArmorPieces || [])
+    .map((pieceId) => ARMOR_PIECES[pieceId])
+    .filter(Boolean);
+  const equippedArmorIds = new Set(Object.values(gear.armorSlots).filter(Boolean));
+  const weaponTokens = (gear.weaponFamilyTokens || [])
+    .map((familyId) => WEAPON_FAMILIES[familyId])
+    .filter(Boolean);
+
+  const armorLabels = ownedArmor.map((piece) => `${piece.label} ${equippedArmorIds.has(piece.id) ? "equipped" : "owned"}`);
+  const tokenLabels = weaponTokens.map((family) => `${family.label} token`);
+
+  return {
+    ownedArmorCount: ownedArmor.length,
+    weaponTokenCount: weaponTokens.length,
+    ownedArmorLine: armorLabels.length ? armorLabels.join(" / ") : "No earned armor pieces",
+    weaponTokenLine: tokenLabels.length ? tokenLabels.join(" / ") : "No weapon-family tokens",
+    ownedArmor: ownedArmor.map((piece) => ({ id: piece.id, slot: piece.slot, label: piece.label, equipped: equippedArmorIds.has(piece.id) })),
+    weaponTokens: weaponTokens.map((family) => ({ id: family.id, label: family.label })),
+  };
+}

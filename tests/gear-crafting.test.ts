@@ -4,6 +4,7 @@ import {
   ARMOR_PIECES,
   DEFAULT_ARMOR_SLOTS,
   WEAPON_FAMILIES,
+  buildGearInventorySummary,
   buildGearSummary,
   normalizeGearState,
   resolveArmorSlotEffects,
@@ -80,5 +81,18 @@ describe("gearCrafting", () => {
     expect(summary.armorLine).toContain("Iron Duster");
     expect(summary.armorWeight).toBeGreaterThan(0);
     expect(summary.economyLine).toContain("yield");
+  });
+
+  it("builds a readable owned gear inventory summary", () => {
+    const summary = buildGearInventorySummary({
+      ownedArmorPieces: ["salvage_gloves", "lantern_charm", "missing"],
+      weaponFamilyTokens: ["hammer", "spear", "missing"],
+      armorSlots: { hands: "salvage_gloves" },
+    });
+
+    expect(summary.ownedArmorLine).toBe("Salvage Gloves equipped / Lantern Charm owned");
+    expect(summary.weaponTokenLine).toBe("Hammer token / Spear token");
+    expect(summary.ownedArmorCount).toBe(2);
+    expect(summary.weaponTokenCount).toBe(2);
   });
 });
