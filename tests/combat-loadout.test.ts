@@ -3,6 +3,7 @@ import {
   resolveCombatProgression,
   applySwingLoadout,
   resolveIncomingDamage,
+  resolveGuardBreakState,
   getSprintModifier,
   resolveMovesetForWeapon,
   applyMovesetGeometry,
@@ -39,6 +40,23 @@ describe("combatLoadout", () => {
     const profile = resolveCombatProgression(createInitialNarrativeState(), 6);
     const mitigated = resolveIncomingDamage(20, profile, { blocked: true });
     expect(mitigated.blocked).toBeLessThan(mitigated.glancing);
+  });
+
+  it("adds 8 percent chip damage for a clean block", () => {
+    const profile = resolveCombatProgression(createInitialNarrativeState(), 6);
+    const mitigated = resolveIncomingDamage(50, profile, { blocked: true });
+    expect(mitigated.chip).toBe(4);
+    expect(mitigated.blocked).toBeGreaterThanOrEqual(mitigated.chip);
+  });
+
+  it("marks guard break until stamina recovers to 25", () => {
+    expect(resolveGuardBreakState({ stamina: 0, guardBroken: false, guardBrokenTimer: 0 }, 0)).toEqual({
+      guardBroken: true,
+      guardBrokenTimer: 1.2,
+    });
+    expect(resolveGuardBreakState({ stamina: 24, guardBroken: true, guardBrokenTimer: 0 }, 0.2).guardBroken).toBe(true);
+    expect(resolveGuardBreakState({ stamina: 25, guardBroken: true, guardBrokenTimer: 0.6 }, 0.2).guardBroken).toBe(true);
+    expect(resolveGuardBreakState({ stamina: 25, guardBroken: true, guardBrokenTimer: 0 }, 0.2).guardBroken).toBe(false);
   });
 
   it("exposes sprint multiplier from doctrine", () => {

@@ -3,6 +3,7 @@ import { createInitialQuestState } from "./questDefinitions.js";
 import { createInitialProgressionState } from "./progressionSystem.js";
 import { createInitialRegionState } from "./regionSystem.js";
 import { createInitialGraphicsState } from "./graphicsSettings.js";
+import { ensureRunStats } from "./runSummary.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -44,7 +45,7 @@ function backfillEquipmentDefaults(equipment) {
   return next;
 }
 
-function backfillWorldDefaults(world) {
+function backfillWorldDefaults(world, now = 0) {
   const next = world && typeof world === "object" ? clone(world) : {};
   if (typeof next.timeOfDay !== "number" || !isFinite(next.timeOfDay)) {
     next.timeOfDay = 0.25;
@@ -59,6 +60,10 @@ function backfillWorldDefaults(world) {
   if (typeof next.companionRecoveryTimer !== "number" || !isFinite(next.companionRecoveryTimer)) {
     next.companionRecoveryTimer = 0;
   }
+  const holder = next.runStats && typeof next.runStats === "object"
+    ? { runStats: next.runStats }
+    : {};
+  next.runStats = ensureRunStats(holder, now);
   return next;
 }
 
@@ -66,7 +71,7 @@ export function migrateSaveToV3(save) {
   if (!save || typeof save !== "object") return null;
   if (save.version === 3) {
     save.regions = backfillRegionDefaults(save.regions);
-    save.world = backfillWorldDefaults(save.world);
+    save.world = backfillWorldDefaults(save.world, Number.isFinite(save.time) ? save.time : 0);
     if (!save.player) save.player = {};
     save.player.equipment = backfillEquipmentDefaults(save.player.equipment);
     return save;
@@ -98,7 +103,7 @@ export function migrateSaveToV3(save) {
       lantern_revolt: normalizeQuest(save.quests?.lantern_revolt, questDefaults.lantern_revolt),
     },
     house: clone(save.house || {}),
-    world: backfillWorldDefaults(save.world),
+    world: backfillWorldDefaults(save.world, Number.isFinite(save.time) ? save.time : 0),
     narrative: clone(save.narrative || createInitialNarrativeState()),
     showMap: typeof save.showMap === "boolean" ? save.showMap : true,
     progression: clone(save.progression || createInitialProgressionState()),

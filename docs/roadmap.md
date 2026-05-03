@@ -4,7 +4,7 @@
 
 ## How to use this roadmap
 
-- **Pillars are ordered.** Pillars 1–4 are shipped, 5–7 are in flight, 8–14 are next. Don't skip ahead — each pillar depends on the foundations of the previous one.
+- **Pillars are ordered.** Pillars 1–4, Pillar 5.5, and Pillar 8 Items 1–5 are shipped. Pillar 5's remaining dialogue/narrative depth items are active, and Pillars 6–7 plus 9–27 are planned. Don't skip ahead — each pillar depends on the foundations of the previous one.
 - **Each pillar item is a thin, testable slice** scoped so a single agent can ship it in one session: file paths, helpers, and acceptance signals are spelled out.
 - **Save migration is non-negotiable.** New top-level state requires a `backfill*` helper in `saveMigration.js` and a fixture round-trip test.
 - **Never rewrite the renderer or move to WebGL** unless the user explicitly requests it.
@@ -12,15 +12,17 @@
 
 ## Current State
 
-`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life), the first Pillar 5 narrative/companion upgrades, **Pillar 8 Item 1 (weapon affixes)** as the entry into combat depth round 2, and a **fully redesigned Apple-grade title screen** (cinematic frontier dusk, Fraunces + IBM Plex Sans + JetBrains Mono, refined disclosure-driven controls sheet). Narrative state already tracks axes, factions, affinity, flags, decisions, quest outcomes, companion state, endings, POIs, codex unlocks, and quest progression. The next highest-value work is still narrative depth + replayability: the final beat, run summary, dialogue choice surfaces, and the rest of Pillar 8.
+`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life), the first Pillar 5 narrative/companion upgrades, **Pillar 5.5 story-to-run payoff**, **Pillar 8 Items 1-5** as combat depth round 2, and a **fully redesigned Apple-grade title screen** (cinematic frontier dusk, Fraunces + IBM Plex Sans + JetBrains Mono, refined disclosure-driven controls sheet). Narrative state already tracks axes, factions, affinity, flags, decisions, quest outcomes, companion state, endings, POIs, codex unlocks, and quest progression. The next highest-value work is open-world RPG depth: visual world identity, role progression, loot/crafting, pets, housing, economy, and living-world NPC dialogue.
+
+Open-world RPG target: push the game toward a compact Skyrim/Oblivion feel within the existing canvas engine. The world should have stronger visual identity, character builds, loot, pets, owned spaces, regional economy, and NPCs that remember enough context to feel alive. Keep everything local-first and deterministic by default; optional network/LLM features must have handcrafted fallback content and never block core play.
 
 Latest local verification:
-- `npm test` → **228 passing across 21 test files** (was 210 before affixes).
+- `git diff --check` → clean.
+- `npm test` → **244 passing across 24 test files**.
 - `npm run typecheck:ts` → clean.
 - `npm run test:syntax` → clean.
-- `node --check src/main.js` → clean.
-- `WESTWARD_PORT=5183 npm run test:smoke` → 9/9 passing, latest artifacts in `output/qa-smoke-20260502-213659`.
-- Title screen redesign verified across desktop / tablet / mobile breakpoints (`output/menu-redesign{,-controls,-tablet,-mobile}.png`).
+- `npm run dev:lint` → clean.
+- Smoke and visual-regression artifacts are generated under ignored `output/`; rerun the Verification Gates before gameplay commits.
 
 ## Shipped Pillars
 
@@ -50,9 +52,7 @@ Latest local verification:
 - **Codex / lore browser** (`src/codex.js`) — KeyZ opens a tabbed lore screen (regions / enemies / items / factions / ideology). Entries unlock on first encounter (region unlock, first kill of an enemy archetype). Shows `???` + "(undiscovered)" until unlocked. Progress count in header.
 
 ## Test + Build Status
-- `npm test` → 210 passing across 20 test files.
-- `npm run typecheck:ts` → clean.
-- `npm run test:smoke` → 9/9 scenarios (`smoke`, `quest`, `combat`, `boss-fight`, `weather-heavy`, `upgrade-equip`, `settings-modal`, `mini-boss`, `codex`).
+- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 244 passing across 24 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
 - v1/v2/v3 save fixtures all migrate cleanly with backfilled defaults.
 
 ## Next Work — Pillar 5: Narrative depth
@@ -64,9 +64,9 @@ Latest local verification:
 
 ## Next Work — Pillar 5.5: Story-to-run payoff
 
-1. **Final beat trigger** — make the Lantern Revolt turn-in resolve chapter 3 into a final state instead of only logging the projected ending. Reuse `resolveNarrativeEnding`, then lock the run as "victory" while still allowing save/reload.
-2. **Ending screen polish** — show ending title, summary, dominant axes, three latest decisions, and companion status. Keep it canvas-only and reuse soft-panel rendering.
-3. **Run summary data** — track `world.startedAt`, `world.kills`, `world.miniBossKills`, `world.resourcesHarvested`, `world.questOutcomesCount`, then display them on death/victory.
+1. **Final beat trigger** ✅ shipped — Lantern Revolt turn-in resolves chapter 3 through `completeFinalBeat()`, stores the resolved ending, locks the run into `mode: "victory"`, saves immediately, and reloads as victory instead of restarting.
+2. **Ending screen polish** ✅ shipped — victory overlay shows ending title, summary, dominant axes, latest decisions, companion status, and run summary using the existing soft-panel canvas rendering.
+3. **Run summary data** ✅ shipped — `world.runStats` tracks started/ended time, victory, ending id, kills, mini-boss kills, harvested resources, and quest outcome count. Save migration backfills the shape for old v3 saves.
 4. **Quest outcome smoke coverage** — add a deterministic Playwright flow that forces a quest-ready state, confirms a modal choice, saves, reloads, and asserts `narrative.questOutcomes` persists in `render_game_to_text`.
 5. **Companion smoke coverage** — add a deterministic debug hook for high affinity, then verify companion spawn/down/recover in a short browser scenario.
 
@@ -88,10 +88,10 @@ Latest local verification:
 ## Next Work — Pillar 8: Combat depth round 2
 
 1. **Weapon affixes** ✅ shipped — `src/weaponAffixes.js` exposes `AFFIXES` (Searing/Counterweighted/Bleeding prefixes, Resonant/Hungering/Ironbound suffixes) plus `rollAffix`, `attachAffix`, `buildAffixModifiers`, `describeAffixes`. Persisted in `progression.equipment.affixes[]` with v3 backfill (`backfillEquipmentDefaults`). Smith shop has Inscribe Prefix / Inscribe Suffix actions (80g + 2 Cipher Lens, replaces existing slot). `applySwingLoadout` consumes `context.affixMods` (arc / reach / stagger). Attack pipeline applies affix on-hit statuses + lifesteal heal. Tests: `tests/weapon-affixes.test.ts` (11) + new affix cases in combat-loadout / save-migration suites.
-2. **Block chip + guard-break** — even on a clean block, 8% of incoming damage chips through. Stamina to 0 mid-block triggers a 1.2s guard-break stagger (`state.player.guardBroken`) with a CRACK pop and disables blocking until stamina ≥ 25. Update `resolveIncomingDamage` (extend return shape with `chip`) and the main block branch in `update()`.
-3. **Boss phase transitions** — add `phaseTwo` to each `MINI_BOSS_DEFS` entry (Scrap Tyrant brute→charger, Scorch Engine charger→tank, Lantern Overseer shield→control, Iron Chanter control→flank). At 50% HP swap behavior + add visible `PHASE 2` floating text + 0.6s i-frame.
-4. **Parry chain bonus** — track `state.player.parryChainTimer`. A second perfect parry within 2.5s of the first triggers a free `INTERRUPT` on the attacker, +14 stamina refund, and a `CHAIN!` pop. Reset on hit taken.
-5. **Charge-cancel** — convert `performChargedAttack` into a 0.3s windup. Pressing dodge during the windup cancels the swing and refunds 6 stamina. Successful release after windup fires the existing combo-3 strike.
+2. **Block chip + guard-break** ✅ shipped — even on a clean block, 8% of incoming damage chips through. Stamina to 0 mid-block triggers a guard-break stagger (`state.player.guardBroken`) with a CRACK pop and disables blocking until recovery.
+3. **Boss phase transitions** ✅ shipped — each mini-boss has a `phaseTwo` profile. At 50% HP, bosses swap behavior, show `PHASE 2`, gain a short i-frame, and expose phase/invulnerability in `render_game_to_text`.
+4. **Parry chain bonus** ✅ shipped — `state.player.parryChainTimer` tracks the chain window. A second perfect parry within 2.5s triggers `CHAIN!`, stronger stagger/interruption, and a larger stamina refund. Taking damage resets the chain.
+5. **Charge-cancel** ✅ shipped — charged attack now has a windup. Dodging during windup cancels and refunds stamina; successful release fires the existing combo-3 strike.
 
 ## Next Work — Pillar 9: World systems round 2
 
@@ -141,9 +141,114 @@ Latest local verification:
 4. **Screen-reader subtitle layer** — combat / story / interaction events as ARIA live region (canvas is opaque to ATs). Toggleable. Pairs with motionReduction.
 5. **Localized codex + letters** — extend the 8-language pack to cover codex entries, letters, dialogue choices. Audit all string-table uses to ensure no hard-coded English remains.
 
+## Next Work — Pillar 15: Project health & folder hygiene
+
+1. **Stale command repair** — `scripts/dev_tools.sh` still checks `game.js`; change it to validate `src/main.js` plus current syntax gates. Acceptance: `npm run dev:lint` no longer fails from a missing legacy file.
+2. **Docs drift cleanup** — README save docs still mention `westward.save.v1`, while `src/constants.js` owns `SAVE_KEY = "westward-save-v3"`. Update README and CONTRIBUTING so save keys, language-pack location, and QA commands match current code.
+3. **Ignored artifact policy** — keep `output/`, `coverage/`, generated manifests, compiled helper binaries, and `__pycache__/` ignored. Acceptance: a full smoke/QA run leaves no generated files in `git status --short` except intentional tracked artifacts.
+4. **Roadmap source discipline** — keep this file as the single roadmap; fold accepted notes from `.claude/IMPROVEMENT_BRIEF.md` into this file instead of creating parallel TODO/PLAN docs.
+5. **QA script alignment** — make `npm run qa` represent the real contract: unit tests, TypeScript, syntax check, and smoke coverage that matches the Verification Gates below.
+
+## Next Work — Pillar 16: Code findings & `main.js` decomposition
+
+1. **Save/session split** — extract `readSaveData`, `captureSaveData`, `applySaveData`, `saveGame`, `loadGame`, `beginSession`, and autosave flow from the 6.5k-line `src/main.js` into a focused session module. Acceptance: save-migration tests and a save/load smoke flow remain green.
+2. **Input routing split** — move keyboard, pointer-lock, modal navigation, and control gating into an input controller module while preserving deterministic hooks (`window.advanceTime`, `window.render_game_to_text`).
+3. **Combat runtime split** — isolate attack resolution, incoming damage, mini-boss defeat rewards, parry/dodge timing, and utility status effects behind pure helpers before adding more Pillar 8 combat work.
+4. **Overlay render split** — move gameover, quest outcome, settings, codex, shop, and skill overlays into render-facing helpers so `render()` stops owning every UI branch.
+5. **Characterization-first refactors** — before each split, add focused tests or smoke assertions for the behavior being moved; no gameplay or save-schema changes in the decomposition commits.
+
+## Next Work — Pillar 17: Onboarding & first-run
+
+1. **First 90 seconds** — script the opening path from title screen to movement, resource pickup, NPC prompt, first fight, and first reward. Acceptance: a non-RPG player can reach their first kill in <=2 minutes without reading external docs.
+2. **Contextual tutorial prompts** — canvas-native prompts for move/look/interact/block/attack that disappear after demonstrated use and stay quiet for returning players.
+3. **Skip-to-content** — continue/new-run paths bypass tutorial prompts when a save exists or when the user chooses an explicit "skip guidance" option.
+4. **Demo/embed mode** — `?demo=1` starts a short curated scenario; `?embed=1` strips page chrome for partner sites and portfolio embeds.
+5. **Onboarding smoke flow** — add a deterministic Playwright action file that verifies tutorial prompt order and first-kill completion.
+
+## Next Work — Pillar 18: Save resilience
+
+1. **Corruption recovery UI** — JSON parse failures should surface a canvas/menu message with fresh-start and backup-restore options instead of silently falling back.
+2. **Auto-backup rotation** — keep the last three successful saves under timestamped backup keys; rotate after successful primary save writes only.
+3. **Export/import** — add local JSON export/import from the title or pause flow for cloudless portability. Import validates version and payload shape before writing storage.
+4. **Schema mismatch messaging** — unsupported future versions should explain that the save is newer than the game build; older versions should show successful migration when useful.
+5. **Save resilience tests** — cover malformed JSON, unsupported version, v1/v2/v3 migration, backup restore, and export/import round trips.
+
+## Next Work — Pillar 19: Playtest telemetry & distribution
+
+1. **Privacy-respecting events** — optional local/remote events for `run_start`, `chapter_advance`, `boss_kill`, `run_end` with cause, and `setting_changed`; no account IDs or raw input logs.
+2. **Success metrics** — define a successful run numerically as chapter reached, time-to-first-kill, time-to-completion, boss kills, and ending reached.
+3. **Itch.io package** — add a build/checklist target that zips an offline-playable `index.html` package with required assets and a clean README excerpt.
+4. **Steam wrapper feasibility** — document whether a lightweight web wrapper is worth it, including save path, controller support, fullscreen, and offline constraints.
+5. **Release cadence** — maintain a minimal release checklist: tags, screenshots, itch tags, Steam page draft notes, and devlog bullets tied to shipped pillars.
+
+## Next Work — Pillar 20: Data-only mod / UGC hooks
+
+1. **Quest schema** — formalize the existing data-driven quest format into a JSON schema with objective, reward, outcome, and localization fields.
+2. **Region pack schema** — define custom region packs for map metadata, weather pools, resources, POIs, and mini-boss references without executable code.
+3. **Skin pack schema** — allow palette and sprite-overrides metadata for player/NPC/enemy presentation while keeping gameplay stats locked.
+4. **Safe loader** — validate data-only packs, reject function strings or unknown fields, and surface readable errors in development mode.
+5. **Sample pack + validator** — ship one tiny sample mod and a validator command that proves custom content can load without changing core code.
+
+## Next Work — Pillar 21: Visual world upgrade
+
+1. **Region art pass** — give Frontier, Ashfall, and Iron Lantern distinct sky tint, ground palette, landmark silhouettes, interactable props, and enemy presentation. Acceptance: screenshots are recognizable by region even without HUD text.
+2. **Landmarks and travel readability** — add visible towers, mines, shrines, roads, outposts, gates, and region borders so players navigate by place instead of coordinates.
+3. **Interior variety** — extend the existing house/interior rendering into caves, watchtowers, smithy, inn, shrine, and Iron Lantern office spaces. Keep interiors canvas-only and reuse collision maps.
+4. **Character silhouettes** — add player/NPC/companion visual layers for outfit, weapon, cloak/hat, faction accent, and combat stance. Persist cosmetic selections separately from stats.
+5. **Combat readability polish** — upgrade smoke, flare, parry, phase transition, bleed/burn/frost/shock, and boss death visuals with colorblind-safe variants and snapshot coverage.
+
+## Next Work — Pillar 22: Character progression & role identity
+
+1. **Character sheet** — add a pause/title-accessible sheet for level, attributes, faction reputation, traits, equipment, active pet/companion, housing, and current build identity.
+2. **Attributes** — add a small RPG stat set such as Might, Grit, Cunning, Craft, Speech, and Lore. Use them to gate dialogue, crafting, prices, detection, companion training, and combat modifiers.
+3. **Skill-use leveling** — track repeated play actions locally: one-handed attacks, block/parry, harvesting, crafting, speech choices, lock/repair actions. Convert usage into small XP nudges without grinding requirements.
+4. **Origins/classes** — new-run origin picks such as Exiled Marshal, Ash Salvager, Guild Errandhand, Lantern Defector. Each starts with one perk, one reputation tilt, and a small visual/codex difference.
+5. **Respec and build repair** — add an in-world trainer who can respec attributes/perks for gold/resources, with tests proving save persistence and combat recalculation.
+
+## Next Work — Pillar 23: Weapons, armor, loot, and crafting
+
+1. **Weapon families** — formalize saber, axe, spear, hammer, bow/crossbow, and wand/lantern tool classes with different reach, windup, stamina, stagger, and upgrade paths.
+2. **Armor slots** — add head/body/hands/feet/trinket slots with light/medium/heavy tradeoffs. Armor changes silhouette and affects stamina, stealth, block, and elemental resistance.
+3. **Loot tables** — introduce leveled regional loot tables for chests, bosses, bounties, shops, and POIs. Rarity must change play choices, not just numbers.
+4. **Crafting stations** — house/smith/field stations for refine, repair, inscribe, cook tonic, assemble pet gear, and craft housing upgrades. Use existing item resources as sinks.
+5. **Balance tests** — pure tests for DPS, stamina economy, block breakpoints, loot rarity, and upgrade costs so new gear does not trivialize Pillar 8 combat.
+
+## Next Work — Pillar 24: Pets, companions, and mounts
+
+1. **Pet adoption/taming** — add one active pet slot separate from human companions. Early pets: trail cat, dust hound, lantern moth, pack pig. Each has a passive and one triggered behavior.
+2. **Pet bond system** — pets gain bond through travel, feeding, survival, and quest choices. Bond unlocks utility instead of raw combat domination.
+3. **Pet gear and care** — collars, packs, charms, and stable/kennel upgrades. Persist pet identity, name, skin, bond, gear, and recovery state.
+4. **Companion personalities** — extend one-slot companions with barks, likes/dislikes, loyalty thresholds, and quest reaction memory. Companions should comment on major choices and locations.
+5. **Mount/travel prototype** — evaluate a rideable mount or fast-travel stable after pathing is stable. Acceptance: no clipping through collision, no combat exploit, no camera sickness.
+
+## Next Work — Pillar 25: Housing, settlements, and ownership
+
+1. **House expansion stages** — shack to homestead to safehouse to small guild hall. Each stage changes interior layout, storage, workstations, NPC visits, and exterior silhouette.
+2. **Storage and displays** — stash tabs for resources/gear, trophy display for boss kills, pet bed, companion bunk, and weapon rack. Must persist and survive save migration.
+3. **Functional upgrades** — garden, forge, alchemy bench, map table, stable/kennel, and dispatch board. Upgrades unlock crafting, passive resource trickle, bounties, and fast-travel hooks.
+4. **Settlement influence** — player choices shift town services, vendor stock, patrol presence, house visitors, and ambient dialogue.
+5. **Home defense event** — optional attack/raid event after major story beats. Uses existing combat systems and rewards preparation instead of punishing casual play.
+
+## Next Work — Pillar 26: Economy, jobs, and bounties
+
+1. **Regional pricing** — prices respond to faction reputation, region events, scarcity, and player quest outcomes. Keep it simple, visible, and testable.
+2. **Vendor identities** — separate merchant, smith, apothecary, stablekeeper, fence, trainer, and house steward inventories. Stock refreshes by day/region, not every frame.
+3. **Gold sinks** — repairs, housing upgrades, pet care, crafting, trainers, transport, cosmetics, and bounty licenses so gold remains meaningful.
+4. **Radiant jobs** — small deterministic jobs: bounty, courier, salvage, rescue, escort, patrol, supply run. Each uses existing map/entity systems and has clear success/fail states.
+5. **Trade and consequence hooks** — quest outcomes can open/close vendors, change prices, and reroute supplies. Smoke JSON exposes economy state for playtest debugging.
+
+## Next Work — Pillar 27: NPC communication and living-world dialogue
+
+1. **Dialogue memory model** — each major NPC tracks local memory: last greeting, faction stance, major player decisions, recent quest result, affinity, and active rumor.
+2. **Text conversation UI** — add a compact modal for 2–4 choice dialogue plus a short free-text style prompt surface for flavor questions. The first implementation should use handcrafted response tables, not network calls.
+3. **LLM provider interface** — define an optional `dialogueProvider` boundary that can call a local/free/game-oriented model later, but the shipped game must run fully offline with deterministic fallback responses.
+4. **Safety and tone filters** — constrain generated or provider-backed replies to NPC persona, known game facts, current quest state, and short in-world responses. No arbitrary code, no unbounded prompts, no save writes from generated text.
+5. **Conversation smoke coverage** — deterministic tests for NPC memory, fallback dialogue, affinity changes, quest gating, and `render_game_to_text` exposure. Optional provider tests stay mocked/off by default.
+
 ## Verification Gates
 
 ```bash
+git diff --check
 npm test
 npm run typecheck:ts
 npm run test:syntax

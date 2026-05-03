@@ -1,6 +1,7 @@
 export function resolveCombatProgression(narrativeState: any, level: number): any;
 export function applySwingLoadout(baseSwing: any, combatProgression: any, context?: any): any;
 export function resolveIncomingDamage(baseDamage: number, combatProgression: any, context?: any): any;
+export function resolveGuardBreakState(player: any, dt?: number): { guardBroken: boolean; guardBrokenTimer: number };
 export function getSprintModifier(combatProgression: any): number;
 export const MOVESET_DEFINITIONS: Record<string, {
   label: string;

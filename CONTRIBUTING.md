@@ -17,13 +17,15 @@ Thanks for contributing.
 
 ## Before Opening a PR
 
-- Run the full QA gate (lint + functional smoke suite):
+- Run the full QA gate (unit tests, lint/type/syntax checks, and functional smoke suite):
   ```bash
   npm run qa
   ```
-- Or at minimum run syntax checks:
+- Or at minimum run the fast local checks:
   ```bash
   npm test
+  npm run typecheck:ts
+  npm run test:syntax
   ```
 - Keep changes focused and small when possible.
 - Avoid unrelated formatting-only edits.
@@ -32,7 +34,7 @@ Thanks for contributing.
 
 - Preserve existing gameplay behavior unless your change intentionally modifies it.
 - Keep UI text compatible with the language system (`en`, `es`, `pt`, `fr`, `de`, `it`, `ja`, `tr`).
-- When adding user-facing strings, add translations for all 8 supported languages in the `LANGUAGE_PACKS` object in `game.js`.
+- When adding user-facing strings, add translations for all 8 supported languages in the `LANGUAGE_PACKS` object in `src/main.js`.
 - Prefer clear variable names over short abbreviations.
 - Keep deterministic hooks working:
   - `window.advanceTime(ms)`

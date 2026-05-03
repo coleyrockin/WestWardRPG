@@ -159,10 +159,23 @@ export function resolveIncomingDamage(baseDamage, combatProgression, context = {
   }
   const blockedMult = clamp(0.35 - mitigationBonus, 0.15, 0.4);
   const glancingMult = clamp(0.85 - mitigationBonus * 0.4, 0.55, 0.92);
+  const chip = Math.max(1, Math.floor(baseDamage * 0.08));
   return {
-    blocked: Math.max(1, Math.floor(baseDamage * blockedMult)),
+    blocked: Math.max(chip, Math.floor(baseDamage * blockedMult)),
+    chip,
     glancing: Math.max(1, Math.floor(baseDamage * glancingMult)),
   };
+}
+
+export function resolveGuardBreakState(player, dt = 0) {
+  const timer = Math.max(0, (player.guardBrokenTimer || 0) - Math.max(0, dt));
+  if ((player.stamina || 0) <= 0) {
+    return { guardBroken: true, guardBrokenTimer: Math.max(timer, 1.2) };
+  }
+  if (player.guardBroken && (timer > 0 || (player.stamina || 0) < 25)) {
+    return { guardBroken: true, guardBrokenTimer: timer };
+  }
+  return { guardBroken: false, guardBrokenTimer: 0 };
 }
 
 export function getSprintModifier(combatProgression) {

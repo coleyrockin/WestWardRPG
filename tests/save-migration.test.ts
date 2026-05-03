@@ -81,6 +81,42 @@ describe("saveMigration", () => {
     expect(out?.world?.companionRecoveryTimer).toBe(0);
   });
 
+  it("backfills run summary stats on v3 saves missing them", () => {
+    const save = { version: 3, savedAt: 99, time: 42, world: { timeOfDay: 0.4 } };
+    const out = migrateSaveToV3(save);
+    expect(out?.world?.runStats).toMatchObject({
+      startedAt: 42,
+      endedAt: null,
+      victory: false,
+      endingId: null,
+      kills: 0,
+      miniBossKills: 0,
+      resourcesHarvested: 0,
+      questOutcomesCount: 0,
+    });
+  });
+
+  it("preserves existing run summary stats through v3 backfill", () => {
+    const save = {
+      version: 3,
+      savedAt: 99,
+      world: {
+        runStats: {
+          startedAt: 4,
+          endedAt: 250,
+          victory: true,
+          endingId: "solidarity",
+          kills: 12,
+          miniBossKills: 3,
+          resourcesHarvested: 18,
+          questOutcomesCount: 5,
+        },
+      },
+    };
+    const out = migrateSaveToV3(save);
+    expect(out?.world?.runStats).toMatchObject(save.world.runStats);
+  });
+
   it("backfills equipment.affixes on v3 saves missing it", () => {
     const save = {
       version: 3,

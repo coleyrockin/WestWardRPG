@@ -11,7 +11,7 @@
     "test:coverage": "vitest run --coverage",
     "test:syntax": "node --check web_game_playwright_client.mjs",
     "test:smoke": "bash scripts/smoke_suite.sh",
-    "qa": "npm run dev:lint && npm run test:smoke",
+    "qa": "npm test && npm run dev:lint && npm run test:smoke",
     "report:states": "python3 scripts/state_report.py output",
     "typecheck:ts": "tsc --noEmit",
     "bundle:assets": "ruby scripts/asset_bundler.rb generate",

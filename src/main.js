@@ -52,9 +52,31 @@ import {
   resolveCombatProgression,
   applySwingLoadout,
   resolveIncomingDamage,
+  resolveGuardBreakState,
   getSprintModifier,
   applyMovesetGeometry,
 } from "./combatLoadout.js";
+import {
+  applyMiniBossPhaseTransition,
+  cancelChargedAttack,
+  clearChargedAttack,
+  getMiniBossPhaseTwo,
+  resolveParryChain,
+  resetParryChain,
+  startChargedAttack,
+  tickChargedAttack,
+  tickMiniBossInvulnerability,
+  tickParryChain,
+} from "./combatMilestones.js";
+import {
+  buildRunSummary,
+  completeVictoryRun,
+  createInitialRunStats,
+  ensureRunStats,
+  recordResourceHarvest,
+  recordRunKill,
+  syncQuestOutcomeCount,
+} from "./runSummary.js";
 import { buildVisualMood } from "./visualProfile.js";
 import {
   QUEST_DEFINITIONS,
@@ -1013,15 +1035,20 @@ const canvas = document.getElementById("game");
 
   function confirmQuestOutcomeChoice() {
     if (!pendingQuestOutcome) return;
+    const questId = pendingQuestOutcome.questId;
     const selected = pendingQuestOutcome.outcomes[questOutcomeSelection];
-    const applied = applyQuestOutcome(state.narrative, pendingQuestOutcome.questId, selected?.id);
+    const applied = applyQuestOutcome(state.narrative, questId, selected?.id);
     if (applied) {
       logMsg(`${applied.label}: ${applied.summary}`);
       logMsg(createDecisionRecap(state.narrative));
       syncCombatProfileState({ announce: true });
+      syncQuestOutcomeCount(state.world, state.narrative);
     }
     pendingQuestOutcome = null;
     questOutcomeOpen = false;
+    if (questId === "lantern_revolt") {
+      completeFinalBeat();
+    }
   }
 
   function turnInQuestWithOutcome(questId, { afterTurnIn } = {}) {
@@ -1035,8 +1062,32 @@ const canvas = document.getElementById("game");
     if (quest.reward?.potion) logMsg(`Reward: +${quest.reward.potion} Potion.`);
     afterTurnIn?.(quest);
     sfx.questDone();
-    openQuestOutcomeChoice(questId);
+    const outcomeOpened = openQuestOutcomeChoice(questId);
+    if (questId === "lantern_revolt" && !outcomeOpened) {
+      completeFinalBeat();
+    }
     return true;
+  }
+
+  function completeFinalBeat() {
+    if (state.mode === "victory") return;
+    const ending = resolveNarrativeEnding(state.narrative);
+    state.narrative.ending = ending;
+    completeVictoryRun(state.world, state.narrative, ending, state.time);
+    state.mode = "victory";
+    questOutcomeOpen = false;
+    shopOpen = false;
+    skillScreenOpen = false;
+    settingsOpen = false;
+    codexOpen = false;
+    state.mouseButtons.left = false;
+    state.mouseButtons.right = false;
+    state.player.blocking = false;
+    logMsg(`Final beat resolved: ${ending.title}.`);
+    logMsg(ending.summary);
+    spawnParticles(canvas.width / 2, canvas.height * 0.42, 30, "#ffc490", 4.5, 1.4, { decorative: true });
+    sfx.questDone();
+    saveGame({ silent: true });
   }
 
   let skillScreenOpen = false;
@@ -1564,9 +1615,14 @@ const canvas = document.getElementById("game");
       gold: 25,
       attackCooldown: 0,
       hurtCooldown: 0,
+      chargeAttackWindup: 0,
+      chargeAttackWindupMax: 0,
       walkBob: 0,
       inHouse: false,
       blocking: false,
+      guardBroken: false,
+      guardBrokenTimer: 0,
+      parryChainTimer: 0,
       comboStep: 0,
       comboWindow: 0,
       swingTimer: 0,
@@ -1603,7 +1659,14 @@ const canvas = document.getElementById("game");
     regions: createInitialRegionState(),
     graphics: createInitialGraphicsState(),
     combat: { statusEffectsEnabled: true },
-    world: { timeOfDay: 0.25, companionId: null, companionHp: null, companionDowned: false, companionRecoveryTimer: 0 },
+    world: {
+      timeOfDay: 0.25,
+      companionId: null,
+      companionHp: null,
+      companionDowned: false,
+      companionRecoveryTimer: 0,
+      runStats: createInitialRunStats(0),
+    },
     companion: createInitialCompanionRuntime(),
     codex: { unlocked: { regions: [], enemies: [], items: [], factions: [], ideology: [] } },
     npcs: [
@@ -1887,9 +1950,12 @@ const canvas = document.getElementById("game");
 
   function captureSaveData() {
     state.narrative.ending = resolveNarrativeEnding(state.narrative);
+    ensureRunStats(state.world, state.time);
+    syncQuestOutcomeCount(state.world, state.narrative);
     return {
       version: 3,
       savedAt: Date.now(),
+      mode: state.mode === "victory" ? "victory" : "playing",
       time: state.time,
       player: {
         x: state.player.x,
@@ -1963,6 +2029,7 @@ const canvas = document.getElementById("game");
         companionHp: state.companion.active ? Math.max(1, Math.round(state.companion.hp)) : null,
         companionDowned: Boolean(state.companion.downed),
         companionRecoveryTimer: Math.max(0, state.companion.recoveryTimer || 0),
+        runStats: state.world.runStats,
       },
       narrative: state.narrative,
       showMap: state.showMap,
@@ -2036,7 +2103,9 @@ const canvas = document.getElementById("game");
       companionHp: typeof save.world?.companionHp === "number" ? save.world.companionHp : null,
       companionDowned: Boolean(save.world?.companionDowned),
       companionRecoveryTimer: Math.max(0, numberOr(save.world?.companionRecoveryTimer, 0)),
+      runStats: ensureRunStats({ runStats: save.world?.runStats }, state.time),
     };
+    state.mode = save.mode === "victory" || state.world.runStats?.victory ? "victory" : state.mode;
     state.progression = save.progression || createInitialProgressionState();
     state.regions = save.regions || createInitialRegionState();
     const graphicsDefaults = createInitialGraphicsState();
@@ -2123,7 +2192,7 @@ const canvas = document.getElementById("game");
 
   function saveGame(options = {}) {
     const { silent = false } = options;
-    if (state.mode !== "playing" && state.mode !== "gameover") {
+    if (state.mode !== "playing" && state.mode !== "gameover" && state.mode !== "victory") {
       if (!silent) logMsg("Start your journey before saving.");
       return false;
     }
@@ -2164,7 +2233,7 @@ const canvas = document.getElementById("game");
     autoSaveTimer = 0;
     refreshContinueButton();
 
-    if (fromMenu || state.mode !== "playing") {
+    if ((fromMenu || state.mode !== "playing") && state.mode !== "victory") {
       beginSession({ fromLoad: true });
     }
 
@@ -2178,6 +2247,7 @@ const canvas = document.getElementById("game");
     menu.style.display = "none";
     autoSaveTimer = 0;
     if (!fromLoad) {
+      state.world.runStats = createInitialRunStats(state.time);
       logMsg("Welcome to Dustward, drifter. Talk to townsfolk, duel slimes, and avoid being trampled by outlaw pigs.");
       ensureAudio();
     }
@@ -2281,11 +2351,27 @@ const canvas = document.getElementById("game");
   }
 
   const MINI_BOSS_DEFS = {
-    ashfall_scrap_tyrant: { region: "ashfall", label: "Scrap Tyrant", behavior: "tank", baseType: "brute", spawnArea: { minX: 36, minY: 38, maxX: 50, maxY: 50 }, hpMult: 3.2, damageMult: 1.4, rewardGold: 80, rewardResource: { item: "Heat Resin", count: 2 } },
-    ashfall_scorch_engine: { region: "ashfall", label: "Scorch Engine", behavior: "charge", baseType: "charger", spawnArea: { minX: 28, minY: 32, maxX: 42, maxY: 46 }, hpMult: 2.8, damageMult: 1.3, rewardGold: 90, rewardResource: { item: "Scrap Coil", count: 2 } },
-    lantern_overseer: { region: "ironlantern", label: "Lantern Overseer", behavior: "shield", baseType: "shield_brute", spawnArea: { minX: 6, minY: 38, maxX: 22, maxY: 50 }, hpMult: 3.5, damageMult: 1.4, rewardGold: 120, rewardResource: { item: "Cipher Lens", count: 2 } },
-    lantern_iron_chanter: { region: "ironlantern", label: "Iron Chanter", behavior: "control", baseType: "suppressor", spawnArea: { minX: 10, minY: 32, maxX: 24, maxY: 44 }, hpMult: 2.6, damageMult: 1.2, rewardGold: 110, rewardResource: { item: "Pressurized Ink", count: 2 } },
+    ashfall_scrap_tyrant: { region: "ashfall", label: "Scrap Tyrant", behavior: "tank", baseType: "brute", phaseTwo: getMiniBossPhaseTwo("ashfall_scrap_tyrant"), spawnArea: { minX: 36, minY: 38, maxX: 50, maxY: 50 }, hpMult: 3.2, damageMult: 1.4, rewardGold: 80, rewardResource: { item: "Heat Resin", count: 2 } },
+    ashfall_scorch_engine: { region: "ashfall", label: "Scorch Engine", behavior: "charge", baseType: "charger", phaseTwo: getMiniBossPhaseTwo("ashfall_scorch_engine"), spawnArea: { minX: 28, minY: 32, maxX: 42, maxY: 46 }, hpMult: 2.8, damageMult: 1.3, rewardGold: 90, rewardResource: { item: "Scrap Coil", count: 2 } },
+    lantern_overseer: { region: "ironlantern", label: "Lantern Overseer", behavior: "shield", baseType: "shield_brute", phaseTwo: getMiniBossPhaseTwo("lantern_overseer"), spawnArea: { minX: 6, minY: 38, maxX: 22, maxY: 50 }, hpMult: 3.5, damageMult: 1.4, rewardGold: 120, rewardResource: { item: "Cipher Lens", count: 2 } },
+    lantern_iron_chanter: { region: "ironlantern", label: "Iron Chanter", behavior: "control", baseType: "suppressor", phaseTwo: getMiniBossPhaseTwo("lantern_iron_chanter"), spawnArea: { minX: 10, minY: 32, maxX: 24, maxY: 44 }, hpMult: 2.6, damageMult: 1.2, rewardGold: 110, rewardResource: { item: "Pressurized Ink", count: 2 } },
   };
+
+  function transitionMiniBossPhaseIfNeeded(enemy) {
+    if (!enemy?.miniBossId) return false;
+    const def = MINI_BOSS_DEFS[enemy.miniBossId];
+    const transition = applyMiniBossPhaseTransition(enemy, def?.phaseTwo);
+    if (!transition) return false;
+    const stats = createEnemyStats(transition.type, state.player.level);
+    enemy.color = stats.color || enemy.color;
+    enemy.attackReach = Math.max(enemy.attackReach || 0, stats.attackReach + 0.25);
+    enemy.damageVariance = Math.max(enemy.damageVariance || 0, stats.damageVariance + 2);
+    state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: "PHASE 2", life: 0.9, maxLife: 0.9, color: "#ffc490" });
+    spawnParticles(canvas.width / 2, canvas.height * 0.38, 18, "#ffc490", 4.2, 0.85, { decorative: false });
+    logMsg(`${def?.label || enemy.label || "Mini-boss"} enters Phase 2: ${transition.phaseLabel}.`);
+    sfx.thunder();
+    return true;
+  }
 
   function spawnMiniBossById(bossId) {
     const def = MINI_BOSS_DEFS[bossId];
@@ -2301,6 +2387,9 @@ const canvas = document.getElementById("game");
       label: def.label,
       color: stats.color,
       behavior: def.behavior,
+      phase: 1,
+      phaseTwo: def.phaseTwo,
+      invulnTimer: 0,
       x: pos.x,
       y: pos.y,
       hp: Math.round(stats.maxHp * def.hpMult),
@@ -2419,6 +2508,9 @@ const canvas = document.getElementById("game");
 
   function performDodgeStep() {
     if (state.mode !== "playing" || state.player.inHouse) return;
+    if (cancelChargedAttack(state.player)) {
+      logMsg("Charged attack canceled into a dodge.");
+    }
     if (state.player.dodgeCooldown > 0 || state.player.stamina < 12) {
       return;
     }
@@ -2454,18 +2546,21 @@ const canvas = document.getElementById("game");
   }
 
   function performChargedAttack() {
+    if (!startChargedAttack(state.player, state.progression.traits, state.mode)) return;
+    state.mouseButtons.right = false;
+    logMsg("Charged attack winding up.");
+  }
+
+  function releaseChargedAttack() {
     if (state.mode !== "playing") return;
-    if (state.player.attackCooldown > 0 || state.player.stamina < 24) {
-      return;
-    }
-    const orderKeeper = state.progression.traits.includes("order_keeper");
     const prevCombo = state.player.comboStep;
-    state.player.comboStep = 3;
+    clearChargedAttack(state.player);
+    state.player.comboWindow = Math.max(state.player.comboWindow, 0.55);
+    state.player.comboStep = 2;
     attack();
-    state.player.comboStep = prevCombo;
-    state.player.attackCooldown += orderKeeper ? 0.05 : 0.14;
-    state.player.stamina = Math.max(0, state.player.stamina - 14);
-    logMsg("Charged attack unleashed.");
+    if (state.player.comboStep !== 3) state.player.comboStep = prevCombo;
+    state.player.attackCooldown += state.progression.traits.includes("order_keeper") ? 0.05 : 0.14;
+    logMsg("Charged attack released.");
   }
 
   function isBlocking(x, y) {
@@ -3109,6 +3204,7 @@ const canvas = document.getElementById("game");
         logMsg(choice(["Collected Stone. Rock solid choice.", "Stone acquired. This one has personality.", "Got Stone! It's not just any rock. It's YOUR rock."]));
         sfx.pickup();
       }
+      recordResourceHarvest(state.world);
       updateQuestProgressFromInventory();
       return;
     }
@@ -3142,6 +3238,7 @@ const canvas = document.getElementById("game");
 
   function attack() {
     if (state.mode !== "playing") return;
+    if (state.player.chargeAttackWindup > 0) return;
     if (state.player.attackCooldown > 0) return;
     if (state.player.stamina < 8) {
       logMsg("Too exhausted to swing.");
@@ -3209,6 +3306,15 @@ const canvas = document.getElementById("game");
       const facingDiff = Math.abs(normalizeAngle(angleToEnemy - state.player.angle));
       if (facingDiff > swing.arc) continue;
 
+      if ((enemy.invulnTimer || 0) > 0) {
+        enemy.attackCooldown = Math.max(enemy.attackCooldown || 0, 0.25);
+        enemy.flashTimer = 0.1;
+        hitCount += 1;
+        state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: "IMMUNE", life: 0.55, maxLife: 0.55, color: "#ffc490" });
+        logMsg(`${enemy.label || "Enemy"} shrugs off the strike during the phase shift.`);
+        continue;
+      }
+
       const damage = Math.floor((swing.damage * stance.damageMult))
         + Math.floor(state.player.level * 1.8)
         + Math.floor(Math.random() * 4) - 1;
@@ -3216,6 +3322,7 @@ const canvas = document.getElementById("game");
       enemy.attackCooldown += 0.45;
       enemy.stagger = 0.2 + state.player.comboStep * 0.05 + (swing.staggerBonus || 0);
       enemy.flashTimer = 0.1;
+      const phased = transitionMiniBossPhaseIfNeeded(enemy);
 
       // Hit interrupts a heavy windup → big stagger reward.
       if ((enemy.windupTimer || 0) > 0) {
@@ -3262,7 +3369,7 @@ const canvas = document.getElementById("game");
       if (!isBlocking(enemy.x, pushY)) enemy.y = pushY;
 
       hitCount += 1;
-      const isKill = enemy.hp <= 0;
+      const isKill = !phased && enemy.hp <= 0;
       state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: isKill ? "SLAIN" : `-${damage}`, life: 0.72, maxLife: 0.72, color: isKill ? "#ff5555" : damage >= 24 ? "#ff9f3a" : "#ffe84e" });
 
       const eDx = enemy.x - state.player.x;
@@ -3272,8 +3379,9 @@ const canvas = document.getElementById("game");
       const eSy = canvas.height * 0.42;
       spawnParticles(eSx, eSy, 5, enemy.color || "#6be873", 2.5, 0.4);
 
-      if (enemy.hp <= 0) {
+      if (isKill) {
         enemy.alive = false;
+        recordRunKill(state.world, enemy);
         unlockCodexEntry(state, "enemies", enemy.behavior === "balanced" ? "slime" : enemy.behavior);
         unlockCodexEntry(state, "regions", "frontier");
         const spawnMods = getActiveRegionEventModifiers();
@@ -3373,6 +3481,8 @@ const canvas = document.getElementById("game");
     state.player.hp = state.player.maxHp;
     state.player.attackCooldown = 0;
     state.player.hurtCooldown = 0;
+    clearChargedAttack(state.player);
+    resetParryChain(state.player);
     state.player.walkBob = 0;
     state.player.comboStep = 0;
     state.player.comboWindow = 0;
@@ -3385,6 +3495,8 @@ const canvas = document.getElementById("game");
     clearParticlePool(particlePool);
     state.player.inHouse = false;
     state.player.blocking = false;
+    state.player.guardBroken = false;
+    state.player.guardBrokenTimer = 0;
     state.player.stamina = 100;
     if (countDeath) state.player.deaths += 1;
     state.mouseButtons.right = false;
@@ -3804,6 +3916,7 @@ const canvas = document.getElementById("game");
     const player = state.player;
     player.attackCooldown = Math.max(0, player.attackCooldown - dt);
     player.hurtCooldown = Math.max(0, player.hurtCooldown - dt);
+    tickParryChain(player, dt);
     player.comboWindow = Math.max(0, player.comboWindow - dt);
     player.swingTimer = Math.max(0, player.swingTimer - dt);
     player.hitPulse = Math.max(0, player.hitPulse - dt * 2.4);
@@ -3821,13 +3934,20 @@ const canvas = document.getElementById("game");
     updateWeather(dt);
 
     if (state.mode !== "playing") return;
+    if (tickChargedAttack(player, dt)) {
+      releaseChargedAttack();
+    }
 
     const turnInput = (state.keys.ArrowLeft ? -1 : 0) + (state.keys.ArrowRight ? 1 : 0);
     player.angle = normalizeAngle(player.angle + turnInput * PLAYER_ROT_SPEED * dt + state.mouseLook);
     state.mouseLook = 0;
 
+    const guard = resolveGuardBreakState(player, dt);
+    player.guardBroken = guard.guardBroken;
+    player.guardBrokenTimer = guard.guardBrokenTimer;
+
     const wasBlocking = player.blocking;
-    player.blocking = (state.mouseButtons.right || state.keys.KeyC) && player.swingTimer <= 0;
+    player.blocking = !player.guardBroken && (state.mouseButtons.right || state.keys.KeyC) && player.swingTimer <= 0;
     if (player.blocking && !wasBlocking) {
       player.blockStartTime = state.time;
     } else if (!player.blocking) {
@@ -3940,6 +4060,7 @@ const canvas = document.getElementById("game");
       }
 
       if (enemy.flashTimer > 0) enemy.flashTimer = Math.max(0, enemy.flashTimer - dt);
+      tickMiniBossInvulnerability(enemy, dt);
       if (enemy.stagger > 0) {
         enemy.stagger -= dt;
       }
@@ -3948,9 +4069,12 @@ const canvas = document.getElementById("game");
       if (state.combat?.statusEffectsEnabled && enemy.statuses && enemy.statuses.length > 0) {
         updateStatuses(enemy, dt, {
           applyDamage: (ent, amt) => {
+            if ((ent.invulnTimer || 0) > 0) return;
             ent.hp -= amt;
+            if (transitionMiniBossPhaseIfNeeded(ent)) return;
             if (ent.hp <= 0 && ent.alive) {
               ent.alive = false;
+              recordRunKill(state.world, ent);
               ent.respawn = 22 + Math.random() * 8;
             }
           },
@@ -4025,26 +4149,41 @@ const canvas = document.getElementById("game");
               const sinceBlockStart = state.time - (player.blockStartTime ?? -Infinity);
               const parryWindow = sinceBlockStart >= 0 && sinceBlockStart <= 0.15;
               if (parryWindow && facingDiff < 1.12) {
-                // Perfect parry: no damage, big stagger, riposte particle, refund some stamina.
+                // Perfect parry: no damage, stagger, riposte particle, refund stamina.
+                const parry = resolveParryChain(player);
                 damage = 0;
-                enemy.stagger = Math.max(enemy.stagger || 0, 1.5);
+                enemy.stagger = Math.max(enemy.stagger || 0, parry.stagger);
                 enemy.windupTimer = 0;
                 enemy.windupConsumed = false;
-                player.stamina = Math.min(100, player.stamina + 8);
-                state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: "PARRY!", life: 0.7, maxLife: 0.7, color: "#9be0ff" });
+                if (parry.chained) {
+                  enemy.attackCooldown = Math.max(enemy.attackCooldown || 0, 0.85);
+                }
+                player.stamina = Math.min(100, player.stamina + parry.staminaRefund);
+                player.parryChainTimer = parry.nextTimer;
+                state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: parry.text, life: 0.7, maxLife: 0.7, color: parry.chained ? "#ffe16a" : "#9be0ff" });
                 spawnParticles(canvas.width / 2, canvas.height * 0.45, 12, "#cce4ff", 4, 0.45, { decorative: false });
-                logMsg("Perfect parry! Riposte primed.");
+                logMsg(parry.chained ? "Parry chain! Enemy interrupted." : "Perfect parry! Riposte primed.");
                 sfx.blockHit();
               } else if (facingDiff < 1.12 && player.stamina > 10) {
-                damage = Math.max(1, Math.floor(mitigated.blocked * stance.blockPenalty));
+                damage = Math.max(mitigated.chip, Math.floor(mitigated.blocked * stance.blockPenalty));
                 player.stamina = Math.max(0, player.stamina - 11);
-                logMsg("Block absorbed most of the hit. Your shield arm disagrees.");
+                if (player.stamina <= 0) {
+                  const guard = resolveGuardBreakState(player, 0);
+                  player.guardBroken = guard.guardBroken;
+                  player.guardBrokenTimer = guard.guardBrokenTimer;
+                  player.blocking = false;
+                  state.floatingTexts.push({ wx: player.x, wy: player.y, text: "CRACK", life: 0.75, maxLife: 0.75, color: "#ffcf8a" });
+                  logMsg("Guard broken! Recover stamina before blocking again.");
+                } else {
+                  logMsg(`Block absorbed most of the hit. ${mitigated.chip} chip damage slipped through.`);
+                }
                 sfx.blockHit();
               } else {
                 damage = Math.max(1, Math.floor(mitigated.glancing));
               }
             }
 
+            if (damage > 0) resetParryChain(player);
             player.hp -= damage;
             player.hitPulse = Math.max(player.hitPulse, 0.16);
             player.cameraKick = clamp(player.cameraKick + 0.18, 0, 1);
@@ -5736,6 +5875,68 @@ const canvas = document.getElementById("game");
       ctx.textAlign = "left";
     }
 
+    if (state.mode === "victory") {
+      const ending = state.narrative.ending || resolveNarrativeEnding(state.narrative);
+      const summary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time);
+      ctx.fillStyle = "rgba(8, 11, 16, 0.8)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const panelW = Math.min(620, canvas.width - margin * 2);
+      const panelH = compact ? 330 : 365;
+      const px = Math.floor((canvas.width - panelW) / 2);
+      const py = Math.max(margin, Math.floor((canvas.height - panelH) / 2));
+      drawSoftPanel(px, py, panelW, panelH, {
+        top: "rgba(34, 28, 42, 0.95)",
+        bottom: "rgba(8, 12, 18, 0.94)",
+        border: "rgba(255, 196, 144, 0.58)",
+      });
+
+      ctx.textAlign = "left";
+      ctx.font = `bold ${compact ? 26 : 34}px Georgia`;
+      drawClippedText(ending.title || "Lantern Revolt Complete", px + 22, py + 46, panelW - 44, "#ffc490");
+      ctx.font = "14px Georgia";
+      drawClippedText(ending.summary || "Dustward will remember what you changed.", px + 22, py + 72, panelW - 44, "#f3ecd8");
+
+      ctx.font = "bold 13px Georgia";
+      drawClippedText("Run Summary", px + 22, py + 110, panelW - 44, "#ffe16a");
+      ctx.font = "12px Georgia";
+      const leftX = px + 22;
+      const rightX = px + Math.floor(panelW * 0.52);
+      const rows = [
+        [`Time`, summary.durationLabel],
+        [`Kills`, String(summary.kills)],
+        [`Mini-bosses`, String(summary.miniBossKills)],
+        [`Resources`, String(summary.resourcesHarvested)],
+        [`Quest outcomes`, String(summary.questOutcomesCount)],
+        [`Gold`, String(summary.gold)],
+        [`Level`, String(summary.level)],
+        [`Companion`, summary.companion],
+      ];
+      for (let i = 0; i < rows.length; i++) {
+        const x = i < 4 ? leftX : rightX;
+        const y = py + 135 + (i % 4) * 23;
+        drawClippedText(`${rows[i][0]}: ${rows[i][1]}`, x, y, panelW * 0.44, "#e6d8bd");
+      }
+
+      const axes = summary.axes || {};
+      ctx.font = "12px Georgia";
+      drawClippedText(
+        `Axes: Control/Freedom ${axes.controlVsFreedom || 0}, Truth/Comfort ${axes.truthVsComfort || 0}, Solidarity/Status ${axes.solidarityVsStatus || 0}`,
+        px + 22,
+        py + 238,
+        panelW - 44,
+        "#cbb6a2",
+      );
+      ctx.font = "bold 12px Georgia";
+      drawClippedText("Latest Decisions", px + 22, py + 266, panelW - 44, "#ffe16a");
+      ctx.font = "11px Georgia";
+      const decisions = summary.latestDecisions.length ? summary.latestDecisions : ["No major decisions recorded."];
+      for (let i = 0; i < Math.min(3, decisions.length); i++) {
+        drawClippedText(`- ${decisions[i]}`, px + 22, py + 287 + i * 18, panelW - 44, "#e6d8bd");
+      }
+      ctx.font = "italic 11px Georgia";
+      drawClippedText("Progress is saved. Load this ending from the title screen later.", px + 22, py + panelH - 20, panelW - 44, "#b8a792");
+    }
+
     /* Quest outcome overlay */
     if (questOutcomeOpen && pendingQuestOutcome && state.mode === "playing") {
       const outcomes = pendingQuestOutcome.outcomes;
@@ -6396,6 +6597,7 @@ const canvas = document.getElementById("game");
     const activeResources = state.resources.filter((r) => !r.harvested);
     const activeNpcs = state.npcs;
     const activePigs = state.pigs;
+    const runSummary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time);
     const quests = {
       crystal: {
         title: state.quests.crystal.title,
@@ -6457,12 +6659,17 @@ const canvas = document.getElementById("game");
         stamina: Math.round(state.player.stamina),
         gold: state.player.gold,
         blocking: state.player.blocking,
+        guard_broken: Boolean(state.player.guardBroken),
+        guard_broken_timer: Number((state.player.guardBrokenTimer || 0).toFixed(2)),
+        parry_chain_timer: Number((state.player.parryChainTimer || 0).toFixed(2)),
+        charge_windup: Number((state.player.chargeAttackWindup || 0).toFixed(2)),
         combo_step: state.player.comboStep,
         swinging: state.player.swingTimer > 0,
         loadout: state.player.loadout,
         perks: state.player.perks,
       },
       inventory: state.inventory,
+      run_summary: runSummary,
       house: {
         unlocked: state.house.unlocked,
         visited: state.house.visits,
@@ -6534,6 +6741,10 @@ const canvas = document.getElementById("game");
             id: e.id,
             type: e.type,
             label: e.label,
+            behavior: e.behavior,
+            mini_boss_id: e.miniBossId || null,
+            phase: e.phase || 1,
+            invuln_timer: Number((e.invulnTimer || 0).toFixed(2)),
             x: Number(e.x.toFixed(2)),
             y: Number(e.y.toFixed(2)),
             hp: e.hp,

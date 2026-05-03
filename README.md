@@ -145,8 +145,9 @@ npm run dev
 
 # Verification
 npm test
-npm run test:syntax
 npm run typecheck:ts
+npm run test:syntax
+npm run dev:lint
 npm run test:coverage
 npm run test:smoke
 npm run qa
@@ -154,7 +155,7 @@ npm run qa
 
 ## Save Format & Migration
 
-Saves live in `localStorage` under the `westward.save.v1` key. The on-disk schema version field tracks compatibility:
+Saves live in `localStorage` under the `westward-save-v3` key. Legacy keys (`westward-save-v2`, `westward-save-v1`, `dustward-save-v1`) are read and migrated forward. The on-disk schema version field tracks compatibility:
 
 | Version | Adds                                                                     |
 | ------- | ------------------------------------------------------------------------ |
@@ -168,7 +169,7 @@ Saves live in `localStorage` under the `westward.save.v1` key. The on-disk schem
 
 - **Wrong app appears on localhost**: another process is using `5173`; run on `5183`.
 - **No audio at start**: click canvas first to unlock browser audio context.
-- **`npm run dev:lint` failure mentioning `game.js`**: this script references older repo layout; use `npm test` + `node --check src/main.js` + `npm run typecheck:ts` for current validation.
+- **QA creates local artifacts**: smoke and visual checks write to ignored `output/`; remove it when you want a clean workspace.
 
 ## Contributing
 
