@@ -113,6 +113,10 @@ function cloneArray(source) {
   return Array.isArray(source) ? source.filter((item) => typeof item === "string") : [];
 }
 
+function uniqueStrings(source) {
+  return [...new Set(cloneArray(source))];
+}
+
 function roundHundredths(value) {
   return Number(value.toFixed(2));
 }
@@ -145,6 +149,8 @@ export function normalizeGearState(equipment = {}) {
     armorMods: cloneArray(source.armorMods),
     armorSlots: normalizeArmorSlots(source.armorSlots),
     affixes: cloneArray(source.affixes),
+    ownedArmorPieces: uniqueStrings(source.ownedArmorPieces),
+    weaponFamilyTokens: uniqueStrings(source.weaponFamilyTokens),
   };
 }
 

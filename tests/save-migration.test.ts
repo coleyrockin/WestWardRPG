@@ -22,6 +22,7 @@ describe("saveMigration", () => {
     const save = { version: 3, savedAt: 99, player: { level: 2 } };
     const out = migrateSaveToV3(save);
     expect(out).toBe(save);
+    expect(out?.regions?.events?.patrol_crackdown?.severity).toBe(0);
     expect(out?.regions?.miniBosses?.ashfall_scrap_tyrant?.defeated).toBe(false);
     expect(out?.regions?.miniBosses?.ashfall_scorch_engine?.defeated).toBe(false);
     expect(out?.regions?.miniBosses?.lantern_overseer?.defeated).toBe(false);
@@ -143,6 +144,43 @@ describe("saveMigration", () => {
     expect(out?.progression?.equipment?.weaponFamily).toBe("saber");
     expect(out?.progression?.equipment?.armorSlots?.body).toBe("travel_duster");
     expect(out?.progression?.equipment?.armorSlots?.feet).toBe("trail_boots");
+  });
+
+  it("backfills loot, workstation, and npc memory on v3 saves", () => {
+    const save = { version: 3, savedAt: 99, house: { unlocked: true }, world: {}, narrative: {} };
+    const out = migrateSaveToV3(save);
+    expect(out?.world?.loot?.recentDrops).toEqual([]);
+    expect(out?.house?.workstation?.craftsCompleted).toBe(0);
+    expect(out?.narrative?.npcMemory?.recentEvents).toEqual([]);
+  });
+
+  it("backfills narrative defaults on partial v3 saves", () => {
+    const out = migrateSaveToV3({
+      version: 3,
+      savedAt: 99,
+      narrative: { factionRep: { workersGuild: 7 } },
+    });
+    expect(out?.narrative?.thematicAxes).toMatchObject({
+      controlVsFreedom: 0,
+      truthVsComfort: 0,
+      solidarityVsStatus: 0,
+    });
+    expect(out?.narrative?.factionRep?.workersGuild).toBe(7);
+    expect(out?.narrative?.factionRep?.civicCouncil).toBe(0);
+    expect(out?.narrative?.decisions).toEqual([]);
+    expect(out?.narrative?.questOutcomes).toEqual({});
+  });
+
+  it("repairs malformed quick utility state on v3 saves", () => {
+    const out = migrateSaveToV3({
+      version: 3,
+      savedAt: 99,
+      player: { quickUtility: "Potion" },
+    });
+    expect(out?.player?.quickUtility).toEqual({
+      active: "smoke",
+      inventory: { smoke: 1, flare: 1, tonic: 1 },
+    });
   });
 
   it("preserves existing character identity through v3 backfill", () => {

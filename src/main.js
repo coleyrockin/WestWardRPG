@@ -90,6 +90,24 @@ import {
   resolveCraftingCostMultiplier,
 } from "./gearCrafting.js";
 import {
+  createInitialWorkstationState,
+  getAvailableCraftingActions,
+  normalizeWorkstationState,
+  resolveCraftingAction,
+} from "./craftingStation.js";
+import {
+  applyLootDropToState,
+  createInitialLootState,
+  normalizeLootState,
+  rollLootDrop,
+} from "./lootSystem.js";
+import {
+  createInitialNpcMemoryState,
+  normalizeNpcMemoryState,
+  recordNpcMemoryEvent,
+  resolveNpcReactiveLine,
+} from "./npcMemory.js";
+import {
   buildRegionIdentityLine,
   getRegionVisualIdentity,
 } from "./regionVisualIdentity.js";
@@ -1215,6 +1233,8 @@ const canvas = document.getElementById("game");
   }
 
   let shopOpen = false;
+  let workbenchOpen = false;
+  let workbenchSelection = 0;
   const shopItems = [
     {
       nameKey: "shop.healthPotionName", cost: 18, descKey: "shop.healthPotionDesc",
@@ -1783,7 +1803,10 @@ const canvas = document.getElementById("game");
       "Pressurized Ink": 0,
     },
     quests: createInitialQuestState(),
-    narrative: createInitialNarrativeState(),
+    narrative: {
+      ...createInitialNarrativeState(),
+      npcMemory: createInitialNpcMemoryState(),
+    },
     progression: createInitialProgressionState(),
     regions: createInitialRegionState(),
     graphics: createInitialGraphicsState(),
@@ -1795,6 +1818,7 @@ const canvas = document.getElementById("game");
       companionDowned: false,
       companionRecoveryTimer: 0,
       runStats: createInitialRunStats(0),
+      loot: createInitialLootState(),
     },
     companion: createInitialCompanionRuntime(),
     codex: { unlocked: { regions: [], enemies: [], items: [], factions: [], ideology: [] } },
@@ -1902,6 +1926,7 @@ const canvas = document.getElementById("game");
       bed: { x: 4.4, y: 5.2 },
       stash: { x: 13.3, y: 3.4 },
       visits: 0,
+      workstation: createInitialWorkstationState(),
     },
   };
 
@@ -2146,6 +2171,7 @@ const canvas = document.getElementById("game");
         unlocked: state.house.unlocked,
         built: state.house.built,
         visits: state.house.visits,
+        workstation: state.house.workstation,
       },
       world: {
         chest: {
@@ -2162,6 +2188,7 @@ const canvas = document.getElementById("game");
         companionDowned: Boolean(state.companion.downed),
         companionRecoveryTimer: Math.max(0, state.companion.recoveryTimer || 0),
         runStats: state.world.runStats,
+        loot: state.world.loot,
       },
       narrative: state.narrative,
       showMap: state.showMap,
@@ -2226,9 +2253,11 @@ const canvas = document.getElementById("game");
     state.house.unlocked = Boolean(save.house?.unlocked);
     state.house.built = Boolean(save.house?.built || state.house.unlocked);
     state.house.visits = Math.max(0, Math.floor(numberOr(save.house?.visits, state.house.visits)));
+    state.house.workstation = normalizeWorkstationState(save.house?.workstation);
 
     state.showMap = typeof save.showMap === "boolean" ? save.showMap : state.showMap;
     state.narrative = migrateNarrativeState(save);
+    state.narrative.npcMemory = normalizeNpcMemoryState(save.narrative?.npcMemory);
     state.world = {
       timeOfDay: typeof save.world?.timeOfDay === "number" ? save.world.timeOfDay : 0.25,
       companionId: typeof save.world?.companionId === "string" ? save.world.companionId : null,
@@ -2236,6 +2265,7 @@ const canvas = document.getElementById("game");
       companionDowned: Boolean(save.world?.companionDowned),
       companionRecoveryTimer: Math.max(0, numberOr(save.world?.companionRecoveryTimer, 0)),
       runStats: ensureRunStats({ runStats: save.world?.runStats }, state.time),
+      loot: normalizeLootState(save.world?.loot),
     };
     state.mode = save.mode === "victory" || state.world.runStats?.victory ? "victory" : state.mode;
     state.progression = save.progression || createInitialProgressionState();
@@ -2841,7 +2871,92 @@ const canvas = document.getElementById("game");
     }
   }
 
+  function grantRolledLoot(source, regionId, baseGold = 0) {
+    state.world.loot = normalizeLootState(state.world.loot);
+    const drop = rollLootDrop({
+      source,
+      regionId,
+      playerLevel: state.player.level,
+      identity: state.progression.identity,
+    });
+    const applied = applyLootDropToState({
+      lootState: state.world.loot,
+      inventory: state.inventory,
+      progression: state.progression,
+      drop,
+    });
+    state.player.gold += baseGold + applied.gold;
+    state.progression.equipment = normalizeGearState(state.progression.equipment);
+    applyProgressionEffects();
+    updateQuestProgressFromInventory();
+    logMsg(`Loot found: ${drop.summary}.`);
+    return drop;
+  }
+
+  function getWorkbenchActions() {
+    return getAvailableCraftingActions({
+      inventory: state.inventory,
+      progression: state.progression,
+      house: state.house,
+    });
+  }
+
+  function openWorkbench() {
+    workbenchOpen = true;
+    workbenchSelection = 0;
+    shopOpen = false;
+    skillScreenOpen = false;
+    settingsOpen = false;
+    codexOpen = false;
+    characterSheetOpen = false;
+    logMsg("Workbench opened.");
+  }
+
+  function applyCraftingResult(result) {
+    state.inventory = result.inventory;
+    state.progression = result.progression;
+    state.progression.identity = normalizeCharacterIdentity(state.progression.identity);
+    state.progression.equipment = normalizeGearState(state.progression.equipment);
+    state.house = {
+      ...state.house,
+      ...result.house,
+      outsideDoor: state.house.outsideDoor,
+      outsideSpawn: state.house.outsideSpawn,
+      outsideReturn: state.house.outsideReturn,
+      interiorDoor: state.house.interiorDoor,
+      bed: state.house.bed,
+      stash: state.house.stash,
+    };
+    applyProgressionEffects();
+    updateQuestProgressFromInventory();
+  }
+
+  function confirmWorkbenchAction() {
+    const actions = getWorkbenchActions();
+    if (actions.length === 0) {
+      logMsg("Workbench: bring 2 Wood + 1 Stone, gear finds, or refine materials.");
+      return;
+    }
+    const action = actions[clamp(workbenchSelection, 0, actions.length - 1)];
+    const result = resolveCraftingAction(action.id, {
+      inventory: state.inventory,
+      progression: state.progression,
+      house: state.house,
+    });
+    if (result.ok) {
+      applyCraftingResult(result);
+      sfx.pickup();
+    }
+    logMsg(`Workbench: ${result.message}`);
+  }
+
   function storyReactiveQuip(npcId) {
+    const memoryLine = resolveNpcReactiveLine(npcId, state.narrative.npcMemory, {
+      factionRep: state.narrative.factionRep,
+      recentQuestOutcome: Object.values(state.narrative.questOutcomes || {}).slice(-1)[0] || null,
+    });
+    if (memoryLine) return memoryLine;
+
     const affinity = state.narrative.npcAffinity[npcId] || 0;
     const control = state.narrative.thematicAxes.controlVsFreedom;
     const truth = state.narrative.thematicAxes.truthVsComfort;
@@ -2875,6 +2990,21 @@ const canvas = document.getElementById("game");
     const stance =
       affinity >= 15 ? "allied" : affinity <= -10 ? "hostile" : "uncertain";
     logMsg(`${profile.name} profile: public "${profile.publicPersona}" | private "${profile.privateTruth}" | relationship ${stance} (${affinity}).`);
+  }
+
+  function recordNpcInteraction(npcId) {
+    state.narrative.npcMemory = normalizeNpcMemoryState(state.narrative.npcMemory);
+    const identity = normalizeCharacterIdentity(state.progression.identity);
+    const gearSummary = buildGearSummary(state.progression.equipment, identity);
+    return recordNpcMemoryEvent(state.narrative.npcMemory, npcId, {
+      type: "greeting",
+      at: Math.round(state.time),
+      originId: identity.originId,
+      regionId: state.regions.activeRegion,
+      houseUnlocked: state.house.unlocked,
+      gearMilestone: gearSummary.weaponLine,
+      recentQuestOutcome: Object.values(state.narrative.questOutcomes || {}).slice(-1)[0] || null,
+    });
   }
 
   function tickNarrativeEvents(dt) {
@@ -2973,6 +3103,7 @@ const canvas = document.getElementById("game");
           summary += `. +${poi.buff.stamina} stamina`;
         }
         logMsg(summary + ".");
+        grantRolledLoot(poi.kind === "camp" ? "poi_camp" : "poi_cache", state.regions.activeRegion);
         sfx.pickup();
         spawnParticles(canvas.width / 2, canvas.height * 0.5, 12, kind.color, 3, 0.6, { decorative: false });
         return;
@@ -2995,21 +3126,7 @@ const canvas = document.getElementById("game");
       }
 
       if (dist(state.player, state.house.stash) < 1.7) {
-        if (state.inventory["Slime Core"] > 0) {
-          state.inventory["Slime Core"] -= 1;
-          state.player.gold += 18;
-          logMsg("Sold one Slime Core from your stash. +18 gold. It was grosser than expected.");
-          sfx.shopBuy();
-        } else if (state.inventory.Wood >= 2 && state.inventory.Stone >= 1) {
-          state.inventory.Wood -= 2;
-          state.inventory.Stone -= 1;
-          state.inventory.Potion += 1;
-          logMsg("Crafted one Potion at your workbench. It bubbles ominously. That's normal... right?");
-          sfx.pickup();
-        } else {
-          logMsg("Workbench: deposit Slime Cores or 2 Wood + 1 Stone.");
-        }
-        updateQuestProgressFromInventory();
+        openWorkbench();
         return;
       }
 
@@ -3039,6 +3156,7 @@ const canvas = document.getElementById("game");
 
     const npc = nearestEntity(state.npcs, () => true, 1.95);
     if (npc) {
+      recordNpcInteraction(npc.id);
       if (npc.id === "elder") {
         if (turnInQuestWithOutcome("ashfall_intro", {
           afterTurnIn() {
@@ -3339,6 +3457,9 @@ const canvas = document.getElementById("game");
           }
         }
         logMsg(`Harvested ${def.label}.`);
+        if (Math.random() < 0.35) {
+          grantRolledLoot("resource_find", def.region);
+        }
         sfx.pickup();
       } else {
         resource.respawn = 22;
@@ -3555,6 +3676,7 @@ const canvas = document.getElementById("game");
             grantXp(120);
             enemy.respawn = 1e9;
             logMsg(`Mini-boss defeated: ${def.label}! +${def.rewardGold}g, +${def.rewardResource.count} ${def.rewardResource.item}, +1 upgrade point.`);
+            grantRolledLoot("mini_boss", def.region);
             if (enemy.miniBossId === "ashfall_scrap_tyrant" && state.quests.ashfall_boss?.status === "active") {
               state.quests.ashfall_boss.status = "complete";
               state.quests.ashfall_boss.progress = state.quests.ashfall_boss.need;
@@ -6361,6 +6483,47 @@ const canvas = document.getElementById("game");
       }
     }
 
+    /* Workbench overlay */
+    if (workbenchOpen && state.mode === "playing") {
+      const actions = getWorkbenchActions();
+      if (workbenchSelection >= actions.length) workbenchSelection = Math.max(0, actions.length - 1);
+      const sw = Math.min(500, canvas.width - margin * 2);
+      const rows = Math.max(3, Math.min(6, actions.length || 1));
+      const sh = rows * 58 + 124;
+      const sx = Math.floor((canvas.width - sw) / 2);
+      const sy = Math.floor((canvas.height - sh) / 2);
+      const gear = normalizeGearState(state.progression.equipment);
+      drawSoftPanel(sx, sy, sw, sh, {
+        top: "rgba(24, 23, 17, 0.96)",
+        bottom: "rgba(10, 12, 10, 0.94)",
+        border: "rgba(216, 188, 106, 0.58)",
+      });
+      ctx.font = "bold 20px Georgia";
+      drawClippedText("Workbench", sx + 16, sy + 30, sw - 32, "#ffd77b");
+      ctx.font = "12px Georgia";
+      drawClippedText(`Enter/E craft  ↑/↓ select  Esc close  |  Owned armor: ${(gear.ownedArmorPieces || []).length}  Weapon tokens: ${(gear.weaponFamilyTokens || []).join(", ") || "none"}`, sx + 16, sy + 52, sw - 32, "#c9b889");
+
+      if (actions.length === 0) {
+        fillRoundedRect(sx + 10, sy + 76, sw - 20, 54, 7, "rgba(255, 255, 255, 0.055)");
+        ctx.font = "italic 13px Georgia";
+        drawClippedText("Bring 2 Wood + 1 Stone, gear finds, or refine materials.", sx + 22, sy + 107, sw - 44, "#b8a792");
+      } else {
+        for (let i = 0; i < Math.min(rows, actions.length); i++) {
+          const action = actions[i];
+          const iy = sy + 72 + i * 58;
+          const selected = i === workbenchSelection;
+          fillRoundedRect(sx + 10, iy, sw - 20, 50, 7, selected ? "rgba(216, 188, 106, 0.24)" : "rgba(255, 255, 255, 0.055)");
+          if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 49, 7, "#ffd77b", 1);
+          ctx.font = "bold 14px Georgia";
+          drawClippedText(action.label, sx + 22, iy + 19, sw - 44, selected ? "#ffd77b" : "#f3ecd8");
+          ctx.font = "italic 12px Georgia";
+          drawClippedText(action.description, sx + 22, iy + 38, sw - 44, "#a09880");
+        }
+      }
+      ctx.font = "italic 11px Georgia";
+      drawClippedText(`Crafts completed: ${state.house.workstation?.craftsCompleted || 0}  Prepared: ${state.house.workstation?.preparedUpgrade || "none"}`, sx + 16, sy + sh - 18, sw - 32, "#9d927d");
+    }
+
     const hintSpace = canvas.width - hudW - margin * 3;
     if (!compact && hintSpace > 300) {
       const hx = hudX + hudW + margin;
@@ -6454,6 +6617,34 @@ const canvas = document.getElementById("game");
     if (characterSheetOpen) {
       if (event.code === "Escape" || event.code === "KeyI") {
         characterSheetOpen = false;
+        event.preventDefault();
+        return;
+      }
+      event.preventDefault();
+      return;
+    }
+
+    /* Workbench controls */
+    if (workbenchOpen) {
+      const actions = getWorkbenchActions();
+      const len = actions.length || 1;
+      if (event.code === "ArrowUp" || event.code === "KeyW") {
+        workbenchSelection = (workbenchSelection - 1 + len) % len;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "ArrowDown" || event.code === "KeyS") {
+        workbenchSelection = (workbenchSelection + 1) % len;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
+        confirmWorkbenchAction();
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "Escape") {
+        workbenchOpen = false;
         event.preventDefault();
         return;
       }
@@ -6678,22 +6869,25 @@ const canvas = document.getElementById("game");
     if (event.code === "KeyT" && state.mode === "playing" && !shopOpen) {
       skillScreenOpen = !skillScreenOpen;
       if (skillScreenOpen) characterSheetOpen = false;
+      if (skillScreenOpen) workbenchOpen = false;
       if (skillScreenOpen) logMsg("Skill tree opened.");
     }
 
     if (event.code === "KeyO" && state.mode === "playing" && !shopOpen && !skillScreenOpen) {
       settingsOpen = !settingsOpen;
       if (settingsOpen) characterSheetOpen = false;
+      if (settingsOpen) workbenchOpen = false;
       if (settingsOpen) logMsg("Settings opened.");
     }
 
     if (event.code === "KeyZ" && state.mode === "playing" && !shopOpen && !skillScreenOpen && !settingsOpen) {
       codexOpen = !codexOpen;
       if (codexOpen) characterSheetOpen = false;
+      if (codexOpen) workbenchOpen = false;
       if (codexOpen) logMsg("Codex opened.");
     }
 
-    if (event.code === "KeyI" && state.mode === "playing" && !shopOpen && !skillScreenOpen && !settingsOpen && !codexOpen) {
+    if (event.code === "KeyI" && state.mode === "playing" && !shopOpen && !skillScreenOpen && !settingsOpen && !codexOpen && !workbenchOpen) {
       characterSheetOpen = !characterSheetOpen;
       if (characterSheetOpen) logMsg("Character sheet opened.");
     }
@@ -6879,6 +7073,9 @@ const canvas = document.getElementById("game");
       },
       mode: state.mode,
       character_sheet_open: characterSheetOpen,
+      workbench_open: workbenchOpen,
+      workbench_selection: workbenchSelection,
+      workbench_actions: getWorkbenchActions(),
       save: {
         has_save: hasSaveData,
         last_saved_at: lastSaveAt,
@@ -6917,6 +7114,7 @@ const canvas = document.getElementById("game");
         identity_shop_price_multiplier: resolveIdentityShopPriceMultiplier(identity),
       },
       inventory: state.inventory,
+      loot: state.world.loot,
       run_summary: runSummary,
       region_visual_identity: {
         ...regionProfile,
@@ -6925,6 +7123,7 @@ const canvas = document.getElementById("game");
       house: {
         unlocked: state.house.unlocked,
         visited: state.house.visits,
+        workstation: state.house.workstation,
         outside_door: {
           x: Number(state.house.outsideDoor.x.toFixed(2)),
           y: Number(state.house.outsideDoor.y.toFixed(2)),
@@ -6939,6 +7138,7 @@ const canvas = document.getElementById("game");
         thematicAxes: state.narrative.thematicAxes,
         decisions: state.narrative.decisions,
         questOutcomes: state.narrative.questOutcomes,
+        npcMemory: state.narrative.npcMemory,
         ending: resolveNarrativeEnding(state.narrative),
       },
       companion: state.companion.active

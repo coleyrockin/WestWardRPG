@@ -12,17 +12,17 @@
 
 ## Current State
 
-`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life), the first Pillar 5 narrative/companion upgrades, **Pillar 5.5 story-to-run payoff**, **Pillar 8 Items 1-5** as combat depth round 2, **Pillar 21/22 open-world RPG foundation** (character identity, attributes, origin selection, region visual identity), **Pillar 23 gear foundation** (weapon families, armor slots, Craft-driven repair/refine prices), and a **fully redesigned Apple-grade title screen** (cinematic frontier dusk, Fraunces + IBM Plex Sans + JetBrains Mono, refined disclosure-driven controls sheet). Narrative state already tracks axes, factions, affinity, flags, decisions, quest outcomes, companion state, endings, POIs, codex unlocks, quest progression, build identity, and gear state. The next highest-value work is making RPG hooks affect more real interactions: loot drops, crafting stations, housing, pets, economy, and living-world NPC dialogue.
+`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life), the first Pillar 5 narrative/companion upgrades, **Pillar 5.5 story-to-run payoff**, **Pillar 8 Items 1-5** as combat depth round 2, **Pillar 21/22 open-world RPG foundation** (character identity, attributes, origin selection, region visual identity), **Pillar 23 gear loop foundation** (weapon families, armor slots, Craft-driven repair/refine prices, regional loot tables, POI/mini-boss gear finds, selectable workbench actions), **Pillar 25 workstation foundation**, **Pillar 27 deterministic NPC memory foundation**, and a **fully redesigned Apple-grade title screen**. Narrative state already tracks axes, factions, affinity, flags, decisions, quest outcomes, companion state, endings, POIs, codex unlocks, quest progression, build identity, gear state, loot history, workstation state, and NPC memory. The next highest-value work is making these foundations deeper: equipment inventory display, housing upgrades, pets, economy, and fuller living-world dialogue.
 
 Open-world RPG target: push the game toward a compact Skyrim/Oblivion feel within the existing canvas engine. The world should have stronger visual identity, character builds, loot, pets, owned spaces, regional economy, and NPCs that remember enough context to feel alive. Keep everything local-first and deterministic by default; optional network/LLM features must have handcrafted fallback content and never block core play.
 
 Latest local verification:
 - `git diff --check` → clean.
-- `npm test` → **262 passing across 27 test files**.
+- `npm test` → **278 passing across 30 test files**.
 - `npm run typecheck:ts` → clean.
 - `npm run test:syntax` → clean.
 - `npm run dev:lint` → clean.
-- Browser smoke covered KeyI character sheet rendering plus a focused Lantern Defector origin selection state check. Smoke and visual-regression artifacts are generated under ignored `output/`; rerun the Verification Gates before gameplay commits.
+- Browser smoke covered new-run state surfaces plus a partial-save house workbench flow: load save, open stash workbench, list craft/potion/armor/token/refine actions, and equip Salvage Gloves. Smoke and visual-regression artifacts are generated under ignored `output/`; rerun the Verification Gates before gameplay commits.
 
 ## Shipped Pillars
 
@@ -52,7 +52,7 @@ Latest local verification:
 - **Codex / lore browser** (`src/codex.js`) — KeyZ opens a tabbed lore screen (regions / enemies / items / factions / ideology). Entries unlock on first encounter (region unlock, first kill of an enemy archetype). Shows `???` + "(undiscovered)" until unlocked. Progress count in header.
 
 ## Test + Build Status
-- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 262 passing across 27 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
+- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 278 passing across 30 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
 - v1/v2/v3 save fixtures all migrate cleanly with backfilled defaults.
 
 ## Next Work — Pillar 5: Narrative depth
@@ -209,8 +209,8 @@ Latest local verification:
 
 1. **Weapon families** ✅ foundation shipped — `src/gearCrafting.js` formalizes Saber, Axe, Spear, and Hammer families. Shop refitting cycles the family, Might changes heavy weapon stamina/damage feel, and combat now consumes gear damage/stamina/reach/stagger modifiers. Next: bow/crossbow, lantern-tool class, unique windups, and upgrade branches per family.
 2. **Armor slots** ✅ foundation shipped — head/body/hands/feet/trinket slots backfill through save migration. Shop fitting installs heavier armor pieces, Grit absorbs weight, armor affects stamina regen/block/weather movement, and the character sheet/debug state exposes armor line, weight, and crafting economy. Next: silhouette changes, stealth, elemental resistance, and inventory-driven equip choices.
-3. **Loot tables** — introduce leveled regional loot tables for chests, bosses, bounties, shops, and POIs. Rarity must change play choices, not just numbers.
-4. **Crafting stations** — house/smith/field stations for refine, repair, inscribe, cook tonic, assemble pet gear, and craft housing upgrades. Use existing item resources as sinks.
+3. **Loot tables** ✅ foundation shipped — `src/lootSystem.js` rolls deterministic regional drops with injectable RNG tests. POIs, mini-bosses, and some regional resource harvests can now grant gear-relevant finds such as armor pieces and weapon-family tokens in addition to resources.
+4. **Crafting stations** ✅ foundation shipped — `src/craftingStation.js` defines pure workstation actions. The house stash now opens a selectable workbench overlay that can craft potions with Craft yield, fit owned Salvage Gloves, spend weapon-family tokens, or prepare a refine kit from resources.
 5. **Balance tests** — pure tests for DPS, stamina economy, block breakpoints, loot rarity, and upgrade costs so new gear does not trivialize Pillar 8 combat.
 
 ## Next Work — Pillar 24: Pets, companions, and mounts
@@ -225,7 +225,7 @@ Latest local verification:
 
 1. **House expansion stages** — shack to homestead to safehouse to small guild hall. Each stage changes interior layout, storage, workstations, NPC visits, and exterior silhouette.
 2. **Storage and displays** — stash tabs for resources/gear, trophy display for boss kills, pet bed, companion bunk, and weapon rack. Must persist and survive save migration.
-3. **Functional upgrades** — garden, forge, alchemy bench, map table, stable/kennel, and dispatch board. Upgrades unlock crafting, passive resource trickle, bounties, and fast-travel hooks.
+3. **Functional upgrades** ✅ foundation shipped — house stash now backfills/persists `house.workstation` and supports initial workbench crafting. Next: visible station UI, forge/alchemy/map table upgrade levels, passive trickle, bounties, and fast-travel hooks.
 4. **Settlement influence** — player choices shift town services, vendor stock, patrol presence, house visitors, and ambient dialogue.
 5. **Home defense event** — optional attack/raid event after major story beats. Uses existing combat systems and rewards preparation instead of punishing casual play.
 
@@ -239,7 +239,7 @@ Latest local verification:
 
 ## Next Work — Pillar 27: NPC communication and living-world dialogue
 
-1. **Dialogue memory model** — each major NPC tracks local memory: last greeting, faction stance, major player decisions, recent quest result, affinity, and active rumor.
+1. **Dialogue memory model** ✅ foundation shipped — `src/npcMemory.js` tracks per-NPC greetings, last origin, last region, house state, recent quest outcome, and notable gear milestone. Major NPC idle/reactive lines can now respond deterministically before any LLM provider exists.
 2. **Text conversation UI** — add a compact modal for 2–4 choice dialogue plus a short free-text style prompt surface for flavor questions. The first implementation should use handcrafted response tables, not network calls.
 3. **LLM provider interface** — define an optional `dialogueProvider` boundary that can call a local/free/game-oriented model later, but the shipped game must run fully offline with deterministic fallback responses.
 4. **Safety and tone filters** — constrain generated or provider-backed replies to NPC persona, known game facts, current quest state, and short in-world responses. No arbitrary code, no unbounded prompts, no save writes from generated text.
@@ -247,7 +247,7 @@ Latest local verification:
 
 ## Next Agent Handoff
 
-Current shipped direction after `7e9ac52`: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, and smoke/debug text fields are in scope. Fast verification is 262 tests across 27 files plus typecheck, syntax, dev lint, and focused browser smoke for the character sheet/origin picker. Next functional slice should be loot tables + crafting stations or housing workstations so gear stops being shop-only.
+Current shipped direction after `7e9ac52`: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, NPC memory, and smoke/debug text fields are in scope. Fast verification is 278 tests across 30 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should make earned equipment more visible and add house upgrade levels.
 
 ### User signal to respect
 
@@ -263,19 +263,19 @@ The user is not asking for a prettier TODO list. They want the game to start fee
 
 ### Next build target
 
-Ship **Gear Loop 2: loot tables + crafting stations.** The current gear foundation is shop-only; the next slice should make world rewards and house/smith stations feed weapon families, armor slots, repair/refine costs, and Craft yield.
+Ship **Gear Loop 4: equipment inventory display + house upgrade levels.** The current foundation makes loot/workstations real and selectable. The next slice should make earned gear easier to inspect and expand the house into upgradeable stations.
 
 Player-facing result:
-- Regional chests, POIs, bosses, and bounties can award gear materials or simple equipment finds.
-- The house or smith exposes at least one crafting/refine station so gear progression is no longer just a vendor purchase.
+- Earned armor pieces and weapon-family tokens appear clearly in the character sheet and workbench.
+- House workstation upgrades unlock forge/alchemy/map-table actions.
 - Might/Grit/Craft should remain visible in outcomes: heavy weapons feel different, armor weight matters, and Craft changes cost/yield.
 - Saves preserve new gear/crafting state through v3 backfill unless a real schema bump becomes necessary.
 
 Concrete build order:
-1. Add pure loot-table helpers and tests before touching `main.js`.
-2. Add one crafting-station interaction path at the smith or house, reusing existing resource inventory.
-3. Feed loot into at least two existing reward paths: POI cache and mini-boss/boss reward.
-4. Expose loot/crafting state in `render_game_to_text` for smoke automation.
+1. Add owned gear inventory lines to the character sheet and workbench.
+2. Add `house.workstation.level` upgrade costs and visible station labels.
+3. Unlock one new action per level: forge, alchemy, map table.
+4. Expose station level/action inventory in `render_game_to_text` for smoke automation.
 5. Update this roadmap and verification counts after the slice lands.
 
 Quality bar:

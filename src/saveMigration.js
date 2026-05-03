@@ -6,6 +6,9 @@ import { createInitialGraphicsState } from "./graphicsSettings.js";
 import { ensureRunStats } from "./runSummary.js";
 import { normalizeCharacterIdentity } from "./characterIdentity.js";
 import { normalizeGearState } from "./gearCrafting.js";
+import { normalizeLootState } from "./lootSystem.js";
+import { normalizeWorkstationState } from "./craftingStation.js";
+import { normalizeNpcMemoryState } from "./npcMemory.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -24,6 +27,13 @@ function backfillRegionDefaults(regions) {
   const defaults = createInitialRegionState();
   if (!regions) return clone(defaults);
   const next = clone(regions);
+  if (!next.events || typeof next.events !== "object") {
+    next.events = clone(defaults.events);
+  } else {
+    for (const [eventId, def] of Object.entries(defaults.events)) {
+      if (!next.events[eventId]) next.events[eventId] = clone(def);
+    }
+  }
   if (!next.miniBosses || typeof next.miniBosses !== "object") {
     next.miniBosses = clone(defaults.miniBosses);
   } else {
@@ -76,6 +86,64 @@ function backfillWorldDefaults(world, now = 0) {
     ? { runStats: next.runStats }
     : {};
   next.runStats = ensureRunStats(holder, now);
+  next.loot = normalizeLootState(next.loot);
+  return next;
+}
+
+function backfillHouseDefaults(house) {
+  const next = house && typeof house === "object" ? clone(house) : {};
+  next.workstation = normalizeWorkstationState(next.workstation);
+  return next;
+}
+
+function backfillQuickUtilityDefaults(quickUtility) {
+  const defaults = { active: "smoke", inventory: { smoke: 1, flare: 1, tonic: 1 } };
+  if (!quickUtility || typeof quickUtility !== "object" || Array.isArray(quickUtility)) {
+    return clone(defaults);
+  }
+  const sourceInventory = quickUtility.inventory && typeof quickUtility.inventory === "object"
+    ? quickUtility.inventory
+    : {};
+  const inventory = {};
+  for (const slot of ["smoke", "flare", "tonic"]) {
+    inventory[slot] = Number.isFinite(sourceInventory[slot])
+      ? Math.max(0, Math.floor(sourceInventory[slot]))
+      : defaults.inventory[slot];
+  }
+  const active = ["smoke", "flare", "tonic"].includes(quickUtility.active)
+    ? quickUtility.active
+    : defaults.active;
+  return { active, inventory };
+}
+
+function backfillNarrativeDefaults(narrative) {
+  const defaults = createInitialNarrativeState();
+  const source = narrative && typeof narrative === "object" ? clone(narrative) : {};
+  const next = {
+    ...defaults,
+    ...source,
+    factionRep: {
+      ...defaults.factionRep,
+      ...(source.factionRep || {}),
+    },
+    npcAffinity: {
+      ...defaults.npcAffinity,
+      ...(source.npcAffinity || {}),
+    },
+    thematicAxes: {
+      ...defaults.thematicAxes,
+      ...(source.thematicAxes || {}),
+    },
+    globalFlags: {
+      ...defaults.globalFlags,
+      ...(source.globalFlags || {}),
+    },
+    decisions: Array.isArray(source.decisions) ? source.decisions : defaults.decisions,
+    questOutcomes: source.questOutcomes && typeof source.questOutcomes === "object"
+      ? source.questOutcomes
+      : defaults.questOutcomes,
+  };
+  next.npcMemory = normalizeNpcMemoryState(next.npcMemory);
   return next;
 }
 
@@ -84,7 +152,10 @@ export function migrateSaveToV3(save) {
   if (save.version === 3) {
     save.regions = backfillRegionDefaults(save.regions);
     save.world = backfillWorldDefaults(save.world, Number.isFinite(save.time) ? save.time : 0);
+    save.house = backfillHouseDefaults(save.house);
+    save.narrative = backfillNarrativeDefaults(save.narrative);
     if (!save.player) save.player = {};
+    save.player.quickUtility = backfillQuickUtilityDefaults(save.player.quickUtility);
     save.player.equipment = backfillEquipmentDefaults(save.player.equipment);
     save.progression = backfillProgressionDefaults(save.progression);
     return save;
@@ -102,7 +173,7 @@ export function migrateSaveToV3(save) {
       upgradePoints: Number.isFinite(save.player?.upgradePoints) ? save.player.upgradePoints : 0,
       equipment: backfillEquipmentDefaults(save.player?.equipment),
       traits: clone(save.player?.traits || []),
-      quickUtility: clone(save.player?.quickUtility || { active: "smoke", inventory: { smoke: 1, flare: 1, tonic: 1 } }),
+      quickUtility: backfillQuickUtilityDefaults(save.player?.quickUtility),
     },
     inventory: clone(save.inventory || {}),
     quests: {
@@ -115,9 +186,9 @@ export function migrateSaveToV3(save) {
       lantern_probe: normalizeQuest(save.quests?.lantern_probe, questDefaults.lantern_probe),
       lantern_revolt: normalizeQuest(save.quests?.lantern_revolt, questDefaults.lantern_revolt),
     },
-    house: clone(save.house || {}),
+    house: backfillHouseDefaults(save.house),
     world: backfillWorldDefaults(save.world, Number.isFinite(save.time) ? save.time : 0),
-    narrative: clone(save.narrative || createInitialNarrativeState()),
+    narrative: backfillNarrativeDefaults(save.narrative),
     showMap: typeof save.showMap === "boolean" ? save.showMap : true,
     progression: backfillProgressionDefaults(save.progression),
     regions: backfillRegionDefaults(save.regions),

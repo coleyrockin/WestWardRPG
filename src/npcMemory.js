@@ -1,0 +1,85 @@
+const NPC_NAMES = {
+  elder: "Mayor Clem",
+  warden: "Marshal Boone",
+  smith: "Professor Cogwheel",
+  merchant: "Reverend Quill",
+  innkeeper: "Nora Knuckles",
+  bard: "Bard Jingles",
+  cat: "Whiskers the Cat",
+};
+
+export function createInitialNpcMemoryState() {
+  return {
+    byNpc: {},
+    recentEvents: [],
+  };
+}
+
+function normalizeEntry(source = {}) {
+  return {
+    greetings: Number.isFinite(source?.greetings) ? Math.max(0, Math.floor(source.greetings)) : 0,
+    lastOriginId: typeof source?.lastOriginId === "string" ? source.lastOriginId : null,
+    lastRegionId: typeof source?.lastRegionId === "string" ? source.lastRegionId : null,
+    houseUnlocked: Boolean(source?.houseUnlocked),
+    recentQuestOutcome: typeof source?.recentQuestOutcome === "string" ? source.recentQuestOutcome : null,
+    notableGearMilestone: typeof source?.notableGearMilestone === "string" ? source.notableGearMilestone : null,
+  };
+}
+
+export function normalizeNpcMemoryState(source = {}) {
+  const byNpc = {};
+  if (source?.byNpc && typeof source.byNpc === "object") {
+    for (const [npcId, entry] of Object.entries(source.byNpc)) {
+      if (typeof npcId === "string") byNpc[npcId] = normalizeEntry(entry);
+    }
+  }
+  return {
+    byNpc,
+    recentEvents: Array.isArray(source?.recentEvents)
+      ? source.recentEvents.filter((event) => event && typeof event === "object").slice(0, 8)
+      : [],
+  };
+}
+
+export function recordNpcMemoryEvent(memory, npcId, event = {}) {
+  const safe = normalizeNpcMemoryState(memory);
+  Object.assign(memory, safe);
+  memory.byNpc[npcId] = normalizeEntry(memory.byNpc[npcId]);
+  const entry = memory.byNpc[npcId];
+  if (event.type === "greeting") entry.greetings += 1;
+  if (typeof event.originId === "string") entry.lastOriginId = event.originId;
+  if (typeof event.regionId === "string") entry.lastRegionId = event.regionId;
+  if (typeof event.houseUnlocked === "boolean") entry.houseUnlocked = event.houseUnlocked;
+  if (typeof event.recentQuestOutcome === "string") entry.recentQuestOutcome = event.recentQuestOutcome;
+  if (typeof event.gearMilestone === "string") entry.notableGearMilestone = event.gearMilestone;
+  memory.recentEvents.unshift({ npcId, type: event.type || "memory", at: event.at || 0 });
+  memory.recentEvents = memory.recentEvents.slice(0, 8);
+  return entry;
+}
+
+export function resolveNpcReactiveLine(npcId, memory, context = {}) {
+  const safe = normalizeNpcMemoryState(memory);
+  const entry = normalizeEntry(safe.byNpc[npcId]);
+  const name = NPC_NAMES[npcId] || "NPC";
+  const rep = context.factionRep || {};
+
+  if (npcId === "smith" && entry.houseUnlocked) {
+    return `${name}: Your workbench is more than furniture now. Bring me salvage and we turn it into leverage.`;
+  }
+  if (npcId === "smith" && entry.notableGearMilestone) {
+    return `${name}: I saw that ${entry.notableGearMilestone}. Good tools change the worker and the work.`;
+  }
+  if (npcId === "merchant" && rep.marketCartel < -10) {
+    return `${name}: Word travels. Discounts do not, at least not for enemies of the ledger.`;
+  }
+  if (npcId === "elder" && context.recentQuestOutcome) {
+    return `${name}: Choices leave paperwork. Yours left ${context.recentQuestOutcome} in the margins.`;
+  }
+  if (entry.lastOriginId === "lantern_defector") {
+    return `${name}: You carry Lantern habits in your shoulders. Try not to let them steer your hands.`;
+  }
+  if (entry.lastRegionId === "ashfall") {
+    return `${name}: Ashfall dust is still on you. That place keeps receipts in soot.`;
+  }
+  return null;
+}
