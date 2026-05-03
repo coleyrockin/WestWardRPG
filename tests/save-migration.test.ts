@@ -71,4 +71,11 @@ describe("saveMigration", () => {
     const out = migrateSaveToV3({ version: 2, savedAt: 1 });
     expect(typeof out?.world?.timeOfDay).toBe("number");
   });
+
+  it("backfills companion world fields without selecting a companion", () => {
+    const save = { version: 3, savedAt: 99, world: { timeOfDay: 0.4 } };
+    const out = migrateSaveToV3(save);
+    expect(out?.world?.companionId).toBeNull();
+    expect(out?.world?.companionHp).toBeNull();
+  });
 });

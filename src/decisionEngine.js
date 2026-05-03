@@ -1,3 +1,5 @@
+import { QUEST_DEFINITIONS } from "./questDefinitions.js";
+
 const clampAxis = (value) => Math.max(-100, Math.min(100, Math.round(value)));
 
 export const STORY_CHAPTERS = [
@@ -119,8 +121,27 @@ export function createInitialNarrativeState() {
     },
     globalFlags: {},
     decisions: [],
+    questOutcomes: {},
     ending: null,
   };
+}
+
+function applyEffectBundle(narrativeState, effects = {}) {
+  for (const axis of ["controlVsFreedom", "truthVsComfort", "solidarityVsStatus"]) {
+    if (Number.isFinite(effects[axis])) {
+      narrativeState.thematicAxes[axis] = clampAxis((narrativeState.thematicAxes[axis] || 0) + effects[axis]);
+    }
+  }
+
+  for (const [faction, delta] of Object.entries(effects.factionRep || {})) {
+    narrativeState.factionRep[faction] = clampAxis((narrativeState.factionRep[faction] || 0) + delta);
+  }
+  for (const [npc, delta] of Object.entries(effects.npcAffinity || {})) {
+    narrativeState.npcAffinity[npc] = clampAxis((narrativeState.npcAffinity[npc] || 0) + delta);
+  }
+  for (const [flag, value] of Object.entries(effects.flags || {})) {
+    narrativeState.globalFlags[flag] = value;
+  }
 }
 
 export function getChapterByLevel(level) {
@@ -141,25 +162,7 @@ export function applyMajorDecision(narrativeState, npcId) {
   if (!spec) return null;
   if (narrativeState.globalFlags[`decision_${spec.id}`]) return null;
 
-  narrativeState.thematicAxes.controlVsFreedom = clampAxis(
-    narrativeState.thematicAxes.controlVsFreedom + spec.effects.controlVsFreedom,
-  );
-  narrativeState.thematicAxes.truthVsComfort = clampAxis(
-    narrativeState.thematicAxes.truthVsComfort + spec.effects.truthVsComfort,
-  );
-  narrativeState.thematicAxes.solidarityVsStatus = clampAxis(
-    narrativeState.thematicAxes.solidarityVsStatus + spec.effects.solidarityVsStatus,
-  );
-
-  for (const [faction, delta] of Object.entries(spec.effects.factionRep)) {
-    narrativeState.factionRep[faction] = clampAxis((narrativeState.factionRep[faction] || 0) + delta);
-  }
-  for (const [npc, delta] of Object.entries(spec.effects.npcAffinity)) {
-    narrativeState.npcAffinity[npc] = clampAxis((narrativeState.npcAffinity[npc] || 0) + delta);
-  }
-  for (const [flag, value] of Object.entries(spec.effects.flags)) {
-    narrativeState.globalFlags[flag] = value;
-  }
+  applyEffectBundle(narrativeState, spec.effects);
 
   narrativeState.globalFlags[`decision_${spec.id}`] = true;
   narrativeState.decisions.push({
@@ -169,6 +172,26 @@ export function applyMajorDecision(narrativeState, npcId) {
     log: spec.immediateLog,
   });
 
+  return spec;
+}
+
+export function applyQuestOutcome(narrativeState, questId, outcomeId) {
+  const spec = QUEST_DEFINITIONS[questId]?.outcomes?.[outcomeId];
+  if (!spec) return null;
+  if (!narrativeState.questOutcomes || typeof narrativeState.questOutcomes !== "object") {
+    narrativeState.questOutcomes = {};
+  }
+  if (narrativeState.questOutcomes[questId]) return null;
+
+  applyEffectBundle(narrativeState, spec.effects);
+  narrativeState.questOutcomes[questId] = outcomeId;
+  narrativeState.decisions.push({
+    id: `quest_${questId}_${outcomeId}`,
+    questId,
+    outcomeId,
+    prompt: spec.label,
+    log: spec.summary,
+  });
   return spec;
 }
 
@@ -202,6 +225,9 @@ export function createDecisionRecap(narrativeState) {
 }
 
 export function migrateNarrativeState(save) {
-  if (save.version >= 2 && save.narrative) return save.narrative;
-  return createInitialNarrativeState();
+  const narrative = save.version >= 2 && save.narrative ? save.narrative : createInitialNarrativeState();
+  if (!narrative.questOutcomes || typeof narrative.questOutcomes !== "object") {
+    narrative.questOutcomes = {};
+  }
+  return narrative;
 }

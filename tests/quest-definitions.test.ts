@@ -41,4 +41,18 @@ describe("questDefinitions", () => {
     expect(QUEST_DEFINITIONS.lantern_probe).toBeDefined();
     expect(QUEST_DEFINITIONS.lantern_revolt).toBeDefined();
   });
+
+  it("defines two branch outcomes for story-relevant quests", () => {
+    expect(QUEST_DEFINITIONS.crystal.outcomes.truth.label).toBe("Publish the survey");
+    expect(QUEST_DEFINITIONS.crystal.outcomes.comfort.label).toBe("Quiet the findings");
+    expect(QUEST_DEFINITIONS.archive.outcomes.truth.effects.flags.archivePublished).toBe(true);
+    expect(QUEST_DEFINITIONS.wood.outcomes.solidarity.effects.factionRep.workersGuild).toBeGreaterThan(0);
+  });
+
+  it("defines branch outcomes for regional story quests", () => {
+    expect(QUEST_DEFINITIONS.ashfall_intro.outcomes.salvage.effects.flags.ashfallSalvageShared).toBe(true);
+    expect(QUEST_DEFINITIONS.ashfall_boss.outcomes.mercy.effects.controlVsFreedom).toBeLessThan(0);
+    expect(QUEST_DEFINITIONS.lantern_probe.outcomes.broadcast.effects.truthVsComfort).toBeGreaterThan(0);
+    expect(QUEST_DEFINITIONS.lantern_revolt.outcomes.guild.effects.solidarityVsStatus).toBeGreaterThan(0);
+  });
 });

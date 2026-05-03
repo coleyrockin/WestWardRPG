@@ -5,6 +5,7 @@ import {
   resolveNarrativeEnding,
   migrateNarrativeState,
   syncChapterFromProgress,
+  applyQuestOutcome,
 } from "../src/decisionEngine.js";
 
 describe("decisionEngine", () => {
@@ -50,5 +51,31 @@ describe("decisionEngine", () => {
     const migrated = migrateNarrativeState({ version: 1 });
     expect(migrated.chapter).toBe("act1");
     expect(migrated.decisions).toEqual([]);
+  });
+
+  it("tracks quest outcomes separately from major decisions", () => {
+    const state = createInitialNarrativeState();
+    const result = applyQuestOutcome(state, "crystal", "truth");
+    const duplicate = applyQuestOutcome(state, "crystal", "truth");
+
+    expect(result?.id).toBe("truth");
+    expect(duplicate).toBeNull();
+    expect(state.questOutcomes.crystal).toBe("truth");
+    expect(state.thematicAxes.truthVsComfort).toBeGreaterThan(0);
+    expect(state.factionRep.workersGuild).toBeGreaterThan(0);
+    expect(state.globalFlags.surveyPublished).toBe(true);
+    expect(state.decisions.at(-1)?.id).toBe("quest_crystal_truth");
+  });
+
+  it("backfills quest outcome storage on existing narrative saves", () => {
+    const migrated = migrateNarrativeState({
+      version: 3,
+      narrative: {
+        ...createInitialNarrativeState(),
+        questOutcomes: undefined,
+      },
+    });
+
+    expect(migrated.questOutcomes).toEqual({});
   });
 });

@@ -39,6 +39,12 @@ function backfillWorldDefaults(world) {
   if (typeof next.timeOfDay !== "number" || !isFinite(next.timeOfDay)) {
     next.timeOfDay = 0.25;
   }
+  if (typeof next.companionId !== "string") {
+    next.companionId = null;
+  }
+  if (typeof next.companionHp !== "number" || !isFinite(next.companionHp)) {
+    next.companionHp = null;
+  }
   return next;
 }
 

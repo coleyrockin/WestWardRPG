@@ -37,6 +37,7 @@ import {
   createInitialNarrativeState,
   syncChapterFromProgress,
   applyMajorDecision,
+  applyQuestOutcome,
   createDecisionRecap,
   resolveNarrativeEnding,
   migrateNarrativeState,
@@ -56,6 +57,7 @@ import {
 } from "./combatLoadout.js";
 import { buildVisualMood } from "./visualProfile.js";
 import {
+  QUEST_DEFINITIONS,
   createInitialQuestState,
   updateQuestProgressFromInventoryDataDriven,
 } from "./questDefinitions.js";
@@ -145,6 +147,12 @@ import {
   readSettingValue,
   stepSetting,
 } from "./graphicsSettings.js";
+import {
+  createInitialCompanionRuntime,
+  chooseEligibleCompanion,
+  activateCompanion,
+  updateCompanionRuntime,
+} from "./companion.js";
 
 const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -953,6 +961,51 @@ const canvas = document.getElementById("game");
     return resolveRegionEventModifiers(state.regions?.events);
   }
 
+  function openQuestOutcomeChoice(questId) {
+    const outcomes = QUEST_DEFINITIONS[questId]?.outcomes;
+    if (!outcomes || state.narrative?.questOutcomes?.[questId]) return false;
+    pendingQuestOutcome = {
+      questId,
+      outcomes: Object.values(outcomes),
+    };
+    questOutcomeSelection = 0;
+    questOutcomeOpen = true;
+    shopOpen = false;
+    skillScreenOpen = false;
+    settingsOpen = false;
+    codexOpen = false;
+    logMsg("Choose how this quest changes Dustward.");
+    return true;
+  }
+
+  function confirmQuestOutcomeChoice() {
+    if (!pendingQuestOutcome) return;
+    const selected = pendingQuestOutcome.outcomes[questOutcomeSelection];
+    const applied = applyQuestOutcome(state.narrative, pendingQuestOutcome.questId, selected?.id);
+    if (applied) {
+      logMsg(`${applied.label}: ${applied.summary}`);
+      logMsg(createDecisionRecap(state.narrative));
+      syncCombatProfileState({ announce: true });
+    }
+    pendingQuestOutcome = null;
+    questOutcomeOpen = false;
+  }
+
+  function turnInQuestWithOutcome(questId, { afterTurnIn } = {}) {
+    const quest = state.quests[questId];
+    if (!quest || quest.status !== "complete") return false;
+    quest.status = "turned_in";
+    grantXp(quest.reward?.xp || 0);
+    state.player.gold += quest.reward?.gold || 0;
+    if (quest.reward?.potion) state.inventory.Potion += quest.reward.potion;
+    logMsg(`Quest done: ${quest.title}. +${quest.reward?.xp || 0} XP, +${quest.reward?.gold || 0} gold.`);
+    if (quest.reward?.potion) logMsg(`Reward: +${quest.reward.potion} Potion.`);
+    afterTurnIn?.(quest);
+    sfx.questDone();
+    openQuestOutcomeChoice(questId);
+    return true;
+  }
+
   let skillScreenOpen = false;
   let skillSelection = 0;
   let settingsOpen = false;
@@ -960,6 +1013,9 @@ const canvas = document.getElementById("game");
   let codexOpen = false;
   let codexTab = 0; // index into CODEX_TABS
   let codexEntrySel = 0;
+  let questOutcomeOpen = false;
+  let questOutcomeSelection = 0;
+  let pendingQuestOutcome = null;
   const SKILL_BRANCH_LABELS = [
     { id: "survival", label: "Survival", desc: "Stamina pool, harvest yield, weather grit." },
     { id: "combat", label: "Combat", desc: "Damage, block window, crit chance." },
@@ -1490,7 +1546,8 @@ const canvas = document.getElementById("game");
     regions: createInitialRegionState(),
     graphics: createInitialGraphicsState(),
     combat: { statusEffectsEnabled: true },
-    world: { timeOfDay: 0.25 },
+    world: { timeOfDay: 0.25, companionId: null, companionHp: null },
+    companion: createInitialCompanionRuntime(),
     codex: { unlocked: { regions: [], enemies: [], items: [], factions: [], ideology: [] } },
     npcs: [
       {
@@ -1845,6 +1902,8 @@ const canvas = document.getElementById("game");
         harvestedResourceIds: state.resources.filter((resource) => resource.harvested).map((resource) => resource.id),
         defeatedEnemyIds: state.enemies.filter((enemy) => !enemy.alive).map((enemy) => enemy.id),
         timeOfDay: typeof state.world?.timeOfDay === "number" ? state.world.timeOfDay : 0.25,
+        companionId: state.companion.active ? state.companion.id : (state.world?.companionId || null),
+        companionHp: state.companion.active ? Math.max(1, Math.round(state.companion.hp)) : null,
       },
       narrative: state.narrative,
       showMap: state.showMap,
@@ -1912,6 +1971,11 @@ const canvas = document.getElementById("game");
 
     state.showMap = typeof save.showMap === "boolean" ? save.showMap : state.showMap;
     state.narrative = migrateNarrativeState(save);
+    state.world = {
+      timeOfDay: typeof save.world?.timeOfDay === "number" ? save.world.timeOfDay : 0.25,
+      companionId: typeof save.world?.companionId === "string" ? save.world.companionId : null,
+      companionHp: typeof save.world?.companionHp === "number" ? save.world.companionHp : null,
+    };
     state.progression = save.progression || createInitialProgressionState();
     state.regions = save.regions || createInitialRegionState();
     const graphicsDefaults = createInitialGraphicsState();
@@ -1979,6 +2043,11 @@ const canvas = document.getElementById("game");
       state.player.y = py;
     }
     state.player.angle = normalizeAngle(numberOr(player.angle, fallback.angle));
+    state.companion = createInitialCompanionRuntime();
+    if (state.world.companionId) {
+      const def = chooseEligibleCompanion({ [state.world.companionId]: 100 }, 0);
+      activateCompanion(state.companion, def, state.player, state.world.companionHp);
+    }
 
     updateQuestProgressFromInventory();
     syncChapterFromProgress(state.narrative, state.player.level);
@@ -2667,6 +2736,24 @@ const canvas = document.getElementById("game");
     const npc = nearestEntity(state.npcs, () => true, 1.95);
     if (npc) {
       if (npc.id === "elder") {
+        if (turnInQuestWithOutcome("ashfall_intro", {
+          afterTurnIn() {
+            if (state.quests.ashfall_boss?.status === "locked") {
+              state.quests.ashfall_boss.status = "active";
+              logMsg("Ashfall escalation: hunt the Sump Tyrant mini-boss.");
+            }
+          },
+        })) return;
+        if (turnInQuestWithOutcome("ashfall_boss")) return;
+        if (turnInQuestWithOutcome("lantern_probe", {
+          afterTurnIn() {
+            if (state.quests.lantern_revolt?.status === "locked") {
+              state.quests.lantern_revolt.status = "active";
+              logMsg("Iron Lantern escalation: pressure the district valves.");
+            }
+          },
+        })) return;
+        if (turnInQuestWithOutcome("lantern_revolt")) return;
         const q = state.quests.crystal;
         const archiveQuest = state.quests.archive;
         if (archiveQuest && archiveQuest.status === "complete") {
@@ -2684,6 +2771,7 @@ const canvas = document.getElementById("game");
           logMsg(`Quest done: ${archiveQuest.title}. +${archiveQuest.reward.xp} XP, +${archiveQuest.reward.gold} gold.`);
           logMsg(`Ending trajectory: ${state.narrative.ending.title} - ${state.narrative.ending.summary}`);
           sfx.questDone();
+          openQuestOutcomeChoice("archive");
           return;
         }
         if (q.status === "locked") {
@@ -2710,11 +2798,13 @@ const canvas = document.getElementById("game");
             state.quests.slime.status = "active";
             logMsg("Elder Nira: Warden Sol needs the marsh cleared.");
           }
-          const decision = applyMajorDecision(state.narrative, "elder");
-          if (decision) {
-            logMsg(decision.immediateLog);
-            logMsg(createDecisionRecap(state.narrative));
-            syncCombatProfileState({ announce: true });
+          if (!openQuestOutcomeChoice("crystal")) {
+            const decision = applyMajorDecision(state.narrative, "elder");
+            if (decision) {
+              logMsg(decision.immediateLog);
+              logMsg(createDecisionRecap(state.narrative));
+              syncCombatProfileState({ announce: true });
+            }
           }
           return;
         }
@@ -2800,11 +2890,13 @@ const canvas = document.getElementById("game");
           logMsg(`Quest done: ${q.title}. You now own the house! It even has a roof. Probably.`);
           sfx.questDone();
           spawnParticles(canvas.width / 2, canvas.height / 2, 25, "#d8bc6a", 4, 1.5, { decorative: true });
-          const decision = applyMajorDecision(state.narrative, "smith");
-          if (decision) {
-            logMsg(decision.immediateLog);
-            logMsg(createDecisionRecap(state.narrative));
-            syncCombatProfileState({ announce: true });
+          if (!openQuestOutcomeChoice("wood")) {
+            const decision = applyMajorDecision(state.narrative, "smith");
+            if (decision) {
+              logMsg(decision.immediateLog);
+              logMsg(createDecisionRecap(state.narrative));
+              syncCombatProfileState({ announce: true });
+            }
           }
           if (state.quests.archive && state.quests.archive.status === "locked") {
             state.quests.archive.status = "active";
@@ -2924,6 +3016,22 @@ const canvas = document.getElementById("game");
           if (q.progress >= q.need) {
             q.status = "complete";
             logMsg("Ashfall salvage objective complete. Bring it to the town circle.");
+          }
+        }
+        if (state.quests.lantern_probe && state.quests.lantern_probe.status === "active" && (resource.type === "cipher-lens" || resource.type === "lantern-filament")) {
+          const q = state.quests.lantern_probe;
+          q.progress = Math.min(q.need, q.progress + 1);
+          if (q.progress >= q.need) {
+            q.status = "complete";
+            logMsg("Lantern signal objective complete. Bring it to the town circle.");
+          }
+        }
+        if (state.quests.lantern_revolt && state.quests.lantern_revolt.status === "active" && resource.type === "pressurized-ink") {
+          const q = state.quests.lantern_revolt;
+          q.progress = Math.min(q.need, q.progress + 1);
+          if (q.progress >= q.need) {
+            q.status = "complete";
+            logMsg("District pressure objective complete. Bring it to the town circle.");
           }
         }
         logMsg(`Harvested ${def.label}.`);
@@ -3532,6 +3640,30 @@ const canvas = document.getElementById("game");
     }
   }
 
+  function updateCompanion(dt) {
+    if (state.player.inHouse) return;
+    if (!state.companion.active) {
+      const def = chooseEligibleCompanion(state.narrative?.npcAffinity);
+      if (def && activateCompanion(state.companion, def, state.player, state.world?.companionHp)) {
+        state.world.companionId = def.id;
+        state.world.companionHp = state.companion.hp;
+        logMsg(`${def.name} joins you as a companion.`);
+      }
+    }
+
+    const hit = updateCompanionRuntime(state.companion, state.player, state.enemies, dt, isBlocking);
+    if (state.companion.active) {
+      state.world.companionId = state.companion.id;
+      state.world.companionHp = state.companion.hp;
+    }
+    if (hit) {
+      state.floatingTexts.push({ wx: hit.x, wy: hit.y, text: "ALLY", life: 0.58, maxLife: 0.58, color: state.companion.color });
+      if (!hit.alive) {
+        logMsg(`${state.companion.name} drops ${hit.label || "an enemy"}.`);
+      }
+    }
+  }
+
   function update(dt) {
     state.time += dt;
     if ((state.player.timeScaleTimer || 0) > 0) {
@@ -3656,6 +3788,7 @@ const canvas = document.getElementById("game");
 
     updateNPCs(dt);
     updatePigs(dt);
+    updateCompanion(dt);
     updateAmbientSatire(dt);
     tickNarrativeEvents(dt);
 
@@ -4811,6 +4944,17 @@ const canvas = document.getElementById("game");
         sprites.push({ x: npc.x, y: npc.y, color: npc.color, label: npc.name, size: 1.04, kind: "npc" });
       }
 
+      if (state.companion.active) {
+        sprites.push({
+          x: state.companion.x,
+          y: state.companion.y,
+          color: state.companion.color,
+          label: `${state.companion.name} (Companion)`,
+          size: 0.98,
+          kind: "npc",
+        });
+      }
+
       for (const pig of state.pigs) {
         sprites.push({
           x: pig.x,
@@ -5491,6 +5635,35 @@ const canvas = document.getElementById("game");
       ctx.textAlign = "left";
     }
 
+    /* Quest outcome overlay */
+    if (questOutcomeOpen && pendingQuestOutcome && state.mode === "playing") {
+      const outcomes = pendingQuestOutcome.outcomes;
+      const sw = Math.min(520, canvas.width - margin * 2);
+      const sh = 132 + outcomes.length * 76;
+      const sx = Math.floor((canvas.width - sw) / 2);
+      const sy = Math.floor((canvas.height - sh) / 2);
+      drawSoftPanel(sx, sy, sw, sh, {
+        top: "rgba(24, 18, 31, 0.95)",
+        bottom: "rgba(10, 8, 16, 0.94)",
+        border: "rgba(255, 196, 144, 0.56)",
+      });
+      ctx.font = "bold 20px Georgia";
+      drawClippedText("Quest Outcome", sx + 18, sy + 30, sw - 36, "#ffc490");
+      ctx.font = "12px Georgia";
+      drawClippedText("Choose the consequence. ↑/↓ select  Enter confirm", sx + 18, sy + 52, sw - 36, "#cbb6a2");
+      for (let i = 0; i < outcomes.length; i++) {
+        const outcome = outcomes[i];
+        const iy = sy + 72 + i * 76;
+        const selected = i === questOutcomeSelection;
+        fillRoundedRect(sx + 10, iy, sw - 20, 66, 7, selected ? "rgba(255, 196, 144, 0.2)" : "rgba(255, 255, 255, 0.055)");
+        if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 65, 7, "#ffc490", 1);
+        ctx.font = "bold 14px Georgia";
+        drawClippedText(outcome.label, sx + 22, iy + 20, sw - 44, selected ? "#ffc490" : "#f3ecd8");
+        ctx.font = "italic 12px Georgia";
+        drawClippedText(outcome.summary, sx + 22, iy + 42, sw - 44, "#b8a792");
+      }
+    }
+
     /* Skill screen overlay */
     if (skillScreenOpen && state.mode === "playing") {
       const sw = Math.min(440, canvas.width - margin * 2);
@@ -5731,6 +5904,28 @@ const canvas = document.getElementById("game");
 
   document.addEventListener("keydown", (event) => {
     state.keys[event.code] = true;
+
+    /* Quest outcome modal controls */
+    if (questOutcomeOpen && pendingQuestOutcome) {
+      const len = pendingQuestOutcome.outcomes.length || 1;
+      if (event.code === "ArrowUp" || event.code === "KeyW" || event.code === "ArrowLeft" || event.code === "KeyA") {
+        questOutcomeSelection = (questOutcomeSelection - 1 + len) % len;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "ArrowDown" || event.code === "KeyS" || event.code === "ArrowRight" || event.code === "KeyD") {
+        questOutcomeSelection = (questOutcomeSelection + 1) % len;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
+        confirmQuestOutcomeChoice();
+        event.preventDefault();
+        return;
+      }
+      event.preventDefault();
+      return;
+    }
 
     /* Codex modal controls */
     if (codexOpen) {
@@ -6183,8 +6378,19 @@ const canvas = document.getElementById("game");
         factionRep: state.narrative.factionRep,
         thematicAxes: state.narrative.thematicAxes,
         decisions: state.narrative.decisions,
+        questOutcomes: state.narrative.questOutcomes,
         ending: resolveNarrativeEnding(state.narrative),
       },
+      companion: state.companion.active
+        ? {
+          id: state.companion.id,
+          name: state.companion.name,
+          hp: Math.round(state.companion.hp),
+          x: Number(state.companion.x.toFixed(2)),
+          y: Number(state.companion.y.toFixed(2)),
+          distance: Number(dist(state.player, state.companion).toFixed(2)),
+        }
+        : null,
       nearby_npcs: state.player.inHouse
         ? []
         : activeNpcs

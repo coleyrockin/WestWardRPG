@@ -4,7 +4,14 @@ Single planning source for future agents. Update this file; do not create new ro
 
 ## Current State
 
-`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life). 198 vitest cases green; smoke 9/9; typecheck clean.
+`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life). The latest audit found the next highest-value work is narrative depth: the game already tracks axes, factions, affinity, flags, decisions, endings, POIs, codex unlocks, and quest progression, but quest turn-ins still feel mostly linear.
+
+Latest local verification after Pillar 5 outcome work:
+- `npm test` → 207 passing across 20 test files.
+- `npm run typecheck:ts` → clean.
+- `npm run test:syntax` → clean.
+- `node --check src/main.js` → clean.
+- `WESTWARD_PORT=5183 npm run test:smoke` → 9/9 passing, latest artifacts in `output/qa-smoke-20260502-200448`.
 
 ## Shipped Pillars
 
@@ -41,8 +48,8 @@ Single planning source for future agents. Update this file; do not create new ro
 
 ## Next Work — Pillar 5: Narrative depth
 
-1. **Branching quest outcomes** — extend `questDefinitions.js` with optional `outcomes: { a, b }` per quest. At completion, modal 2-button choice routes to outcomes that apply axis/rep/flag deltas via `applyMajorDecision`. Persist in `state.narrative.questOutcomes`.
-2. **Companion follower (1 slot)** — new `src/companion.js`. NPCs follow when affinity ≥60. Companion uses simplified pursuit AI to attack enemies near player. Save adds `world.companionId`, `world.companionHp`. Death → returns to home cell, -15 affinity.
+1. **Branching quest outcomes** — implemented foundation. `questDefinitions.js` now supports optional `outcomes` per quest, `decisionEngine.js` has `applyQuestOutcome`, save migration backfills `state.narrative.questOutcomes`, and `main.js` opens a small consequence modal for Crystal, House, Archive, Ashfall, and Lantern turn-ins. Ashfall/Lantern resource objectives now progress from regional harvesting, and town-circle turn-in advances the next regional quest. Next: add a Playwright flow that completes one turn-in and confirms the modal choice persists.
+2. **Companion follower (1 slot)** — implemented foundation. `src/companion.js` selects eligible NPCs at affinity ≥60, activates a one-slot follower, moves them toward the player, and lets them strike nearby enemies on cooldown. `main.js` renders the active companion, updates it in the loop, exposes it in smoke state JSON, and persists `world.companionId/world.companionHp`. `saveMigration.js` backfills companion fields for existing v3 saves. Next: add companion downing/recovery rules and affinity penalty on defeat.
 3. **Four endings driven by thematic axes** — at chapter 3 final beat, resolve dominant axis from `narrative.thematicAxes`, render ending text + epilogue. Tie-breakers via `globalFlags`.
 4. **Lite dialogue choices** — per-NPC stateless 2–3 choice prompts per chapter. Modal applies axis/rep deltas. Not a tree — flat menu, gated by chapter + flag.
 
