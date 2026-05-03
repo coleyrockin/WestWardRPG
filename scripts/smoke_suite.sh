@@ -148,6 +148,7 @@ run_scenario "weather-heavy" "test-actions/weather_heavy_scene.json" 2
 run_scenario "upgrade-equip" "test-actions/upgrade_purchase_equip_flow.json" 2
 run_scenario "settings-modal" "test-actions/settings_modal_flow.json" 1
 run_scenario "mini-boss" "test-actions/mini_boss_flow.json" 1
+run_scenario "codex" "test-actions/codex_flow.json" 1
 
 echo "[SUCCESS] Functional smoke suite completed."
 echo "[SUCCESS] Artifacts: $OUT_ROOT"

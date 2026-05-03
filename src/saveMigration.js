@@ -28,6 +28,17 @@ function backfillRegionDefaults(regions) {
       if (!next.miniBosses[bossId]) next.miniBosses[bossId] = clone(def);
     }
   }
+  if (!Array.isArray(next.poisDiscovered)) {
+    next.poisDiscovered = [];
+  }
+  return next;
+}
+
+function backfillWorldDefaults(world) {
+  const next = world && typeof world === "object" ? clone(world) : {};
+  if (typeof next.timeOfDay !== "number" || !isFinite(next.timeOfDay)) {
+    next.timeOfDay = 0.25;
+  }
   return next;
 }
 
@@ -35,6 +46,7 @@ export function migrateSaveToV3(save) {
   if (!save || typeof save !== "object") return null;
   if (save.version === 3) {
     save.regions = backfillRegionDefaults(save.regions);
+    save.world = backfillWorldDefaults(save.world);
     return save;
   }
   if (save.version !== 2 && save.version !== 1) return null;
@@ -67,7 +79,7 @@ export function migrateSaveToV3(save) {
       lantern_revolt: normalizeQuest(save.quests?.lantern_revolt, questDefaults.lantern_revolt),
     },
     house: clone(save.house || {}),
-    world: clone(save.world || {}),
+    world: backfillWorldDefaults(save.world),
     narrative: clone(save.narrative || createInitialNarrativeState()),
     showMap: typeof save.showMap === "boolean" ? save.showMap : true,
     progression: clone(save.progression || createInitialProgressionState()),

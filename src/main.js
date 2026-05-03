@@ -105,6 +105,37 @@ import {
   hasStatus,
 } from "./statusEffects.js";
 import {
+  advanceTimeOfDay,
+  ensureWorldTimeDefaults,
+  resolvePhase,
+  resolvePhaseTint,
+  resolveSpawnModifier,
+  formatPhaseLabel,
+} from "./timeOfDay.js";
+import {
+  resolveShopPriceMultiplier,
+  canSmithUpgradeWeapon,
+  resolvePatrolModifier,
+  resolveAllFactionEffects,
+  FACTION_NAMES,
+} from "./factionEffects.js";
+import {
+  POI_KINDS,
+  ensurePoiDefaults,
+  markPOIDiscovered,
+  isPOIDiscovered,
+  findNearbyPOIs,
+  poiUnderInteraction,
+  getPOIsForRegion,
+} from "./poiSystem.js";
+import {
+  CODEX_TABS,
+  ensureCodexState,
+  unlockCodexEntry,
+  listEntriesForTab,
+  totalCodexProgress,
+} from "./codex.js";
+import {
   GRAPHICS_PRESETS,
   createInitialGraphicsState,
   resolveRecommendedPreset,
@@ -926,6 +957,9 @@ const canvas = document.getElementById("game");
   let skillSelection = 0;
   let settingsOpen = false;
   let settingsSelection = 0;
+  let codexOpen = false;
+  let codexTab = 0; // index into CODEX_TABS
+  let codexEntrySel = 0;
   const SKILL_BRANCH_LABELS = [
     { id: "survival", label: "Survival", desc: "Stamina pool, harvest yield, weather grit." },
     { id: "combat", label: "Combat", desc: "Damage, block window, crit chance." },
@@ -969,6 +1003,10 @@ const canvas = document.getElementById("game");
       nameKey: "shop.refineWeaponName", cost: 60, descKey: "shop.refineWeaponDesc",
       action() {
         if (state.progression.equipment.weaponTier !== "Common") { logMsg("Weapon already past Common."); return false; }
+        if (!canSmithUpgradeWeapon(state.narrative?.factionRep, "Common")) {
+          logMsg("Smith refuses — Workers' Guild standing too low.");
+          return false;
+        }
         if ((state.inventory.Ashglass || 0) < 4) { logMsg("Need 4 Ashglass to refine."); return false; }
         state.inventory.Ashglass -= 4;
         upgradeWeaponTier(state.progression);
@@ -980,6 +1018,10 @@ const canvas = document.getElementById("game");
       nameKey: "shop.relicWeaponName", cost: 180, descKey: "shop.relicWeaponDesc",
       action() {
         if (state.progression.equipment.weaponTier !== "Refined") { logMsg("Refine the weapon first."); return false; }
+        if (!canSmithUpgradeWeapon(state.narrative?.factionRep, "Refined")) {
+          logMsg("Smith refuses — Workers' Guild standing too low for Relic-tier work.");
+          return false;
+        }
         if ((state.inventory["Cipher Lens"] || 0) < 4) { logMsg("Need 4 Cipher Lens for relic upgrade."); return false; }
         state.inventory["Cipher Lens"] -= 4;
         upgradeWeaponTier(state.progression);
@@ -1448,6 +1490,8 @@ const canvas = document.getElementById("game");
     regions: createInitialRegionState(),
     graphics: createInitialGraphicsState(),
     combat: { statusEffectsEnabled: true },
+    world: { timeOfDay: 0.25 },
+    codex: { unlocked: { regions: [], enemies: [], items: [], factions: [], ideology: [] } },
     npcs: [
       {
         id: "elder",
@@ -1800,6 +1844,7 @@ const canvas = document.getElementById("game");
         },
         harvestedResourceIds: state.resources.filter((resource) => resource.harvested).map((resource) => resource.id),
         defeatedEnemyIds: state.enemies.filter((enemy) => !enemy.alive).map((enemy) => enemy.id),
+        timeOfDay: typeof state.world?.timeOfDay === "number" ? state.world.timeOfDay : 0.25,
       },
       narrative: state.narrative,
       showMap: state.showMap,
@@ -2153,6 +2198,7 @@ const canvas = document.getElementById("game");
       }
       logMsg("Region unlocked: Ashfall Basin. Heat haze now distorts the horizon.");
       ensureRegionMiniBosses("ashfall");
+      unlockCodexEntry(state, "regions", "ashfall");
     }
     if (state.player.level >= 7 && !state.regions.discovered.includes("ironlantern")) {
       unlockRegion(state.regions, "ironlantern");
@@ -2161,6 +2207,7 @@ const canvas = document.getElementById("game");
       }
       logMsg("Region unlocked: Iron Lantern District. Surveillance pressure is rising.");
       ensureRegionMiniBosses("ironlantern");
+      unlockCodexEntry(state, "regions", "ironlantern");
     }
   }
 
@@ -2524,6 +2571,40 @@ const canvas = document.getElementById("game");
 
   function interact() {
     if (state.mode !== "playing") return;
+
+    // POI interaction (caches / shrines / camps).
+    if (!state.player.inHouse && state.regions?.activeRegion) {
+      ensurePoiDefaults(state.regions);
+      const poi = poiUnderInteraction(state.regions, state.regions.activeRegion, state.player.x, state.player.y);
+      if (poi) {
+        markPOIDiscovered(state.regions, poi.id);
+        const kind = POI_KINDS[poi.kind] || POI_KINDS.cache;
+        let summary = `Discovered ${poi.label} (${kind.label})`;
+        if (poi.loot?.gold) {
+          state.player.gold += poi.loot.gold;
+          summary += `. +${poi.loot.gold}g`;
+        }
+        if (poi.loot?.items) {
+          for (const [name, count] of Object.entries(poi.loot.items)) {
+            state.inventory[name] = (state.inventory[name] || 0) + count;
+          }
+          const itemList = Object.entries(poi.loot.items).map(([k, v]) => `${v} ${k}`).join(", ");
+          summary += `. ${itemList}`;
+        }
+        if (poi.buff?.hp) {
+          state.player.hp = Math.min(state.player.maxHp, state.player.hp + poi.buff.hp);
+          summary += `. +${poi.buff.hp} HP`;
+        }
+        if (poi.buff?.stamina) {
+          state.player.stamina = Math.min(100, state.player.stamina + poi.buff.stamina);
+          summary += `. +${poi.buff.stamina} stamina`;
+        }
+        logMsg(summary + ".");
+        sfx.pickup();
+        spawnParticles(canvas.width / 2, canvas.height * 0.5, 12, kind.color, 3, 0.6, { decorative: false });
+        return;
+      }
+    }
 
     if (state.player.inHouse) {
       if (dist(state.player, state.house.interiorDoor) < 1.7) {
@@ -3008,8 +3089,12 @@ const canvas = document.getElementById("game");
 
       if (enemy.hp <= 0) {
         enemy.alive = false;
+        unlockCodexEntry(state, "enemies", enemy.behavior === "balanced" ? "slime" : enemy.behavior);
+        unlockCodexEntry(state, "regions", "frontier");
         const spawnMods = getActiveRegionEventModifiers();
-        enemy.respawn = (22 + Math.random() * 8) / Math.max(0.4, spawnMods.spawnDensityMult);
+        const phaseMods = state.world ? resolveSpawnModifier(state.world.timeOfDay || 0) : { hostileMult: 1 };
+        const totalDensity = Math.max(0.4, spawnMods.spawnDensityMult * phaseMods.hostileMult);
+        enemy.respawn = (22 + Math.random() * 8) / totalDensity;
         state.inventory["Slime Core"] += 1;
         const civicBounty = state.narrative.globalFlags.curfewNormalized ? 3 : 0;
         const truthBonusXp = state.narrative.globalFlags.ledgerPublished ? 4 : 0;
@@ -3458,6 +3543,7 @@ const canvas = document.getElementById("game");
     }
     const tScale = state.player.timeScale || 1;
     if (tScale !== 1) dt = dt * tScale;
+    if (state.world) advanceTimeOfDay(state.world, dt);
     state.player.dodgeCooldown = Math.max(0, numberOr(state.player.dodgeCooldown, 0) - dt);
     rebuildSpatialHash(enemyGrid, state.enemies, { filter: aliveEnemy });
     rollRegionEvent(state.regions, dt);
@@ -4047,6 +4133,20 @@ const canvas = document.getElementById("game");
       const tint = visualMood.skyTint;
       ctx.fillStyle = `rgba(${tint.r + 40}, ${tint.g + 20}, ${tint.b + 50}, ${Math.min(0.24, visualMood.gradeStrength * 0.46)})`;
       ctx.fillRect(0, 0, width, height);
+    }
+
+    // Day/night phase tint — multiplicative-ish overlay. Day is neutral
+    // (effectively a no-op); dusk/night darken and shift.
+    if (state.world && typeof state.world.timeOfDay === "number") {
+      const phaseTint = resolvePhaseTint(state.world.timeOfDay);
+      if (phaseTint.brightness < 0.999) {
+        const darken = Math.min(0.9, (1 - phaseTint.brightness) * 0.85);
+        const shiftR = Math.round(20 * (phaseTint.r - 1));
+        const shiftG = Math.round(20 * (phaseTint.g - 1));
+        const shiftB = Math.round(40 * (phaseTint.b - 1));
+        ctx.fillStyle = `rgba(${10 + shiftR}, ${10 + shiftG}, ${30 + shiftB}, ${darken})`;
+        ctx.fillRect(0, 0, width, height);
+      }
     }
 
     return horizon;
@@ -5161,6 +5261,17 @@ const canvas = document.getElementById("game");
       }
       drawDot(state.house.outsideDoor.x, state.house.outsideDoor.y,
         state.house.unlocked ? "#d8bc6a" : "#9b7b56", 3.5);
+
+      // POI pings: blink nearby undiscovered POIs.
+      if (state.regions?.activeRegion) {
+        const nearbyPOIs = findNearbyPOIs(state.regions, state.regions.activeRegion, state.player.x, state.player.y, 4);
+        const blink = (Math.sin(state.time * 4) + 1) * 0.5;
+        for (let i = 0; i < nearbyPOIs.length; i++) {
+          const poi = nearbyPOIs[i];
+          const kind = POI_KINDS[poi.kind] || { color: "#fff" };
+          drawDot(poi.x, poi.y, kind.color, 2.2 + blink * 1.3);
+        }
+      }
     } else {
       drawDot(state.house.bed.x, state.house.bed.y, "#d8a7a7", 3);
       drawDot(state.house.stash.x, state.house.stash.y, "#c9b372", 3);
@@ -5447,6 +5558,66 @@ const canvas = document.getElementById("game");
       }
     }
 
+    /* Codex overlay */
+    if (codexOpen && state.mode === "playing") {
+      ensureCodexState(state);
+      const sw = Math.min(560, canvas.width - margin * 2);
+      const sh = Math.min(420, canvas.height - margin * 2);
+      const sx = Math.floor((canvas.width - sw) / 2);
+      const sy = Math.floor((canvas.height - sh) / 2);
+      drawSoftPanel(sx, sy, sw, sh, {
+        top: "rgba(20, 22, 32, 0.94)",
+        bottom: "rgba(8, 10, 16, 0.92)",
+        border: "rgba(186, 168, 255, 0.55)",
+      });
+      const progress = totalCodexProgress(state);
+      ctx.font = "bold 20px Georgia";
+      drawClippedText(`Codex (${progress.unlocked}/${progress.total})`, sx + 16, sy + 28, sw - 32, "#cdb8ff");
+      ctx.font = "11px Georgia";
+      drawClippedText("Tab: ←/→  Entry: ↑/↓  Esc close", sx + 16, sy + 46, sw - 32, "#a09cba");
+
+      // Tab strip
+      const tabH = 26;
+      const tabW = (sw - 32) / CODEX_TABS.length;
+      for (let i = 0; i < CODEX_TABS.length; i++) {
+        const tx = sx + 16 + i * tabW;
+        const ty = sy + 56;
+        const isActive = i === codexTab;
+        fillRoundedRect(tx + 2, ty, tabW - 4, tabH, 6, isActive ? "rgba(186,168,255,0.32)" : "rgba(255,255,255,0.05)");
+        if (isActive) strokeRoundedRect(tx + 2.5, ty + 0.5, tabW - 5, tabH - 1, 6, "#cdb8ff", 1);
+        ctx.font = "bold 12px Georgia";
+        ctx.textAlign = "center";
+        ctx.fillStyle = isActive ? "#cdb8ff" : "#a09cba";
+        ctx.fillText(CODEX_TABS[i].toUpperCase(), tx + tabW / 2, ty + 17);
+        ctx.textAlign = "left";
+      }
+
+      const tab = CODEX_TABS[codexTab];
+      const entries = listEntriesForTab(state, tab);
+      const listY = sy + 92;
+      const listH = sh - 100;
+      const rowH = 24;
+      const visibleRows = Math.floor(listH / rowH);
+      const startIdx = Math.max(0, Math.min(entries.length - visibleRows, codexEntrySel - Math.floor(visibleRows / 2)));
+      for (let i = 0; i < visibleRows && startIdx + i < entries.length; i++) {
+        const idx = startIdx + i;
+        const entry = entries[idx];
+        const iy = listY + i * rowH;
+        const sel = idx === codexEntrySel;
+        if (sel) fillRoundedRect(sx + 16, iy, sw - 32, rowH - 2, 5, "rgba(186,168,255,0.2)");
+        ctx.font = "bold 12px Georgia";
+        const titleColor = entry.unlocked ? (sel ? "#cdb8ff" : "#f3ecd8") : "#6e6890";
+        drawClippedText(entry.unlocked ? entry.title : "???", sx + 24, iy + 16, sw * 0.32, titleColor);
+        if (entry.unlocked) {
+          ctx.font = "italic 11px Georgia";
+          drawClippedText(entry.body, sx + 24 + sw * 0.32, iy + 16, sw * 0.55, "#a09cba");
+        } else {
+          ctx.font = "italic 11px Georgia";
+          drawClippedText("(undiscovered)", sx + 24 + sw * 0.32, iy + 16, sw * 0.55, "#5a5478");
+        }
+      }
+    }
+
     /* Shop overlay */
     if (shopOpen && state.mode === "playing") {
       const sw = Math.min(420, canvas.width - margin * 2);
@@ -5480,10 +5651,13 @@ const canvas = document.getElementById("game");
         ctx.font = "bold 14px Georgia";
         drawClippedText(t(item.nameKey), sx + 20, iy + 18, sw - 112, selected ? "#ffd77b" : "#f3ecd8");
 
-        ctx.fillStyle = item.cost < 0 ? "#5fe0b5" : (state.player.gold >= item.cost ? "#ffd77b" : "#ff6b6b");
+        const __mods = getActiveRegionEventModifiers();
+        const __factionMult = resolveShopPriceMultiplier(state.narrative?.factionRep);
+        const __displayCost = item.cost < 0 ? item.cost : Math.max(1, Math.round(item.cost * __mods.priceMult * __factionMult));
+        ctx.fillStyle = item.cost < 0 ? "#5fe0b5" : (state.player.gold >= __displayCost ? "#ffd77b" : "#ff6b6b");
         ctx.font = "14px Georgia";
         ctx.textAlign = "right";
-        ctx.fillText(item.cost < 0 ? `+${Math.abs(item.cost)}g` : `${item.cost}g`, sx + sw - 20, iy + 18);
+        ctx.fillText(item.cost < 0 ? `+${Math.abs(item.cost)}g` : `${__displayCost}g`, sx + sw - 20, iy + 18);
         ctx.textAlign = "left";
 
         ctx.font = "italic 12px Georgia";
@@ -5557,6 +5731,36 @@ const canvas = document.getElementById("game");
 
   document.addEventListener("keydown", (event) => {
     state.keys[event.code] = true;
+
+    /* Codex modal controls */
+    if (codexOpen) {
+      if (event.code === "ArrowLeft" || event.code === "KeyA") {
+        codexTab = (codexTab - 1 + CODEX_TABS.length) % CODEX_TABS.length;
+        codexEntrySel = 0;
+        event.preventDefault(); return;
+      }
+      if (event.code === "ArrowRight" || event.code === "KeyD") {
+        codexTab = (codexTab + 1) % CODEX_TABS.length;
+        codexEntrySel = 0;
+        event.preventDefault(); return;
+      }
+      if (event.code === "ArrowUp" || event.code === "KeyW") {
+        const tab = CODEX_TABS[codexTab];
+        const len = (listEntriesForTab(state, tab) || []).length || 1;
+        codexEntrySel = (codexEntrySel - 1 + len) % len;
+        event.preventDefault(); return;
+      }
+      if (event.code === "ArrowDown" || event.code === "KeyS") {
+        const tab = CODEX_TABS[codexTab];
+        const len = (listEntriesForTab(state, tab) || []).length || 1;
+        codexEntrySel = (codexEntrySel + 1) % len;
+        event.preventDefault(); return;
+      }
+      if (event.code === "Escape" || event.code === "KeyZ") {
+        codexOpen = false;
+        event.preventDefault(); return;
+      }
+    }
 
     /* Settings modal controls */
     if (settingsOpen) {
@@ -5635,7 +5839,8 @@ const canvas = document.getElementById("game");
       if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
         const item = shopItems[shopSelection];
         const mods = getActiveRegionEventModifiers();
-        const adjustedCost = item.cost < 0 ? item.cost : Math.max(1, Math.round(item.cost * mods.priceMult));
+        const factionPriceMult = resolveShopPriceMultiplier(state.narrative?.factionRep);
+        const adjustedCost = item.cost < 0 ? item.cost : Math.max(1, Math.round(item.cost * mods.priceMult * factionPriceMult));
         if (item.cost < 0) {
           const result = item.action();
           if (result !== false) sfx.shopBuy();
@@ -5753,6 +5958,11 @@ const canvas = document.getElementById("game");
       if (settingsOpen) logMsg("Settings opened.");
     }
 
+    if (event.code === "KeyZ" && state.mode === "playing" && !shopOpen && !skillScreenOpen && !settingsOpen) {
+      codexOpen = !codexOpen;
+      if (codexOpen) logMsg("Codex opened.");
+    }
+
     if (event.code === "KeyJ" && state.mode === "playing") {
       state.graphics.accessibility.motionReduction = !state.graphics.accessibility.motionReduction;
       logMsg(`Motion reduction: ${state.graphics.accessibility.motionReduction ? "ON" : "OFF"}.`);
@@ -5767,6 +5977,13 @@ const canvas = document.getElementById("game");
 
     if (event.code === "KeyX") {
       performDodgeStep();
+    }
+
+    if (event.code === "KeyU" && state.mode === "playing") {
+      // Fast-forward time of day (testing/manual).
+      if (!state.world) state.world = { timeOfDay: 0.25 };
+      state.world.timeOfDay = (state.world.timeOfDay + 0.1) % 1;
+      logMsg(`Time advanced: ${formatPhaseLabel(state.world.timeOfDay)} (${(state.world.timeOfDay * 100).toFixed(0)}%).`);
     }
 
     if (event.code === "KeyB") {

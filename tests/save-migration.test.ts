@@ -52,4 +52,23 @@ describe("saveMigration", () => {
     expect(out?.regions?.miniBosses).toBeTruthy();
     expect(Object.keys(out?.regions?.miniBosses || {}).length).toBeGreaterThanOrEqual(4);
   });
+
+  it("backfills world.timeOfDay on v3 saves missing it", () => {
+    const save = { version: 3, savedAt: 99, world: {} };
+    const out = migrateSaveToV3(save);
+    expect(typeof out?.world?.timeOfDay).toBe("number");
+    expect(out?.world?.timeOfDay).toBeGreaterThanOrEqual(0);
+    expect(out?.world?.timeOfDay).toBeLessThan(1);
+  });
+
+  it("preserves existing world.timeOfDay on v3 saves", () => {
+    const save = { version: 3, savedAt: 99, world: { timeOfDay: 0.7 } };
+    const out = migrateSaveToV3(save);
+    expect(out?.world?.timeOfDay).toBe(0.7);
+  });
+
+  it("v2 to v3 migration seeds a valid timeOfDay", () => {
+    const out = migrateSaveToV3({ version: 2, savedAt: 1 });
+    expect(typeof out?.world?.timeOfDay).toBe("number");
+  });
 });
