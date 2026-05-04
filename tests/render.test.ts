@@ -4,6 +4,7 @@ import {
   gradientBucket,
   createGradientCache,
   createRenderHelpers,
+  resolveNearWallVisualTreatment,
   resolveWallProjection,
 } from "../src/render.js";
 
@@ -100,6 +101,35 @@ describe("render — resolveWallProjection", () => {
 
     expect(projection.wallHeight).toBeLessThan(120);
     expect(projection.y).toBeGreaterThan(250);
+  });
+});
+
+describe("render — resolveNearWallVisualTreatment", () => {
+  it("adds a strong close-wall softening pass near the clip distance", () => {
+    const treatment = resolveNearWallVisualTreatment({
+      correctedDist: 0.18,
+      nearClip: 0.24,
+      side: 1,
+      inHouse: false,
+    });
+
+    expect(treatment.active).toBe(true);
+    expect(treatment.alpha).toBeGreaterThan(0.35);
+    expect(treatment.edgeAlpha).toBeGreaterThan(0.1);
+    expect(treatment.sideShade).toBeGreaterThan(0);
+  });
+
+  it("stays off for normal-distance walls", () => {
+    expect(resolveNearWallVisualTreatment({
+      correctedDist: 1.4,
+      nearClip: 0.24,
+      side: 0,
+      inHouse: false,
+    })).toMatchObject({
+      active: false,
+      alpha: 0,
+      edgeAlpha: 0,
+    });
   });
 });
 

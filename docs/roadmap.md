@@ -18,7 +18,7 @@ Open-world RPG target: push the game toward a compact Skyrim/Oblivion feel withi
 
 Latest local verification:
 - `git diff --check` → clean.
-- `npm test` -> **337 passing across 35 test files**.
+- `npm test` -> **341 passing across 35 test files**.
 - `npm run typecheck:ts` → clean.
 - `npm run test:syntax` → clean.
 - `npm run dev:lint` → clean.
@@ -36,7 +36,7 @@ Build slices:
 1. **First-minute pressure** — within the first 15-30 seconds, place a readable nearby objective, threat, and reward: a smoking cache, wounded NPC callout, patrol marker, or small resource trail that pulls the player into movement and combat.
 2. **Landmark composition** — give each region a horizon identity: Frontier watchtower/road posts, Ashfall plume/mine ribs, Iron Lantern signal mast/gate lights. The player should navigate by place, not only by minimap.
 3. **Roads, props, and traversal dressing** — add non-blocking roads, fences, crates, carts, grasses, lamps, signs, ash drifts, pipes, rails, and shrine markers with deterministic placement and no collision surprises.
-4. **Enemy readability** — make aggro, windup, stagger, phase transition, and death states obvious from silhouettes, color-safe VFX, hit-stop, screen feedback, and animation posture.
+4. **Enemy readability** — first pass shipped: aggro, windup, stagger, phase, hit, death, and reward-drop cues now expose stronger draw instructions and floating reward callouts. Next: boss-specific silhouettes, phase VFX, and death smoke variants.
 5. **HUD clarity pass** — keep opening objectives, minimap, region label, loot popups, and workbench prompts from overlapping on narrow browser widths.
 6. **Acceptance** — a human tester can start a new run, understand where to go, see why a region is distinct, identify enemy intent, earn a reward, and describe one visible landmark after two minutes.
 
@@ -61,7 +61,7 @@ Build slices:
 2. **Workbench depth** — Workbench II/III benefits should become obvious: better potion/tonic yield, cheaper repair/refine prep, forge/alchemy/map-table actions, and visible station project progress.
 3. **Armor and weapon choices** — armor slots and weapon families should change stamina, protection, movement, reach, windup, and role identity enough for the character sheet to matter.
 4. **House utility** — the house should become a hub with stash tabs, station previews, trophy display, pet bed, companion bunk, map table, and cheaper Craft-heavy upgrades.
-5. **Economy pressure** — Boone's job-board foundation is now playable: deterministic bounty, salvage, courier, patrol, supply-run, rescue, and escort listings; one active job; kill/collect/pickup/delivery/checkpoint/dropoff/rescue/escort progress; reward payout; failure/report states; save migration; HUD/minimap prompts; vendor service notes; and `render_game_to_text` exposure. Next: stock refresh, regional board props, and gold sinks for repair, housing, pet care, trainers, transport, and cosmetics.
+5. **Economy pressure** — Boone's job-board foundation is now playable: deterministic bounty, salvage, courier, patrol, supply-run, rescue, and escort listings; one active job; kill/collect/pickup/delivery/checkpoint/dropoff/rescue/escort progress; reward payout; failure/report states; save migration; HUD/minimap prompts; vendor service notes; regional board props/copy; and `render_game_to_text` exposure. Next: stock refresh and gold sinks for repair, housing, pet care, trainers, transport, and cosmetics.
 6. **Acceptance** — a tester can explain why they want one attribute, one weapon family, one armor piece, one workstation level, and one resource route.
 
 ### Phase D — NPC life + local conversation
@@ -87,6 +87,86 @@ Build slices:
 4. **Playtest instrumentation** — optional local metrics for time-to-first-kill, chapter reached, boss kills, run end cause, setting changes, and first-session friction.
 5. **Distribution** — offline itch package first; Steam wrapper feasibility only after input, fullscreen, save path, and controller support are stronger.
 6. **Acceptance** — a human tester can start, pause, save, reload, recover from a bad save, finish or die, and send useful feedback from one play session.
+
+## Finish Line Roadmap
+
+This section defines what "finish the game" means from the current build. It is ordered by player impact and dependency. Do not start a later milestone until the earlier one has a playable slice, tests, and roadmap status updated.
+
+### Finish Milestone 1 — First 10 minutes are readable
+
+Goal: a new player understands movement, route markers, Boone's board, first combat, first reward, and one reason to keep playing.
+
+Required slices:
+1. **Opening route clarity** — first-minute cache, Boone's board, and the nearest low-risk job all show action, distance, region, reward, and threat text.
+2. **Starting town composition** — Dustward Frontier start view has readable roads, signs, fence/camp/board silhouettes, a landmark, and no harsh wall approach.
+3. **First combat readability** — aggro, windup, stagger, death, and reward drops are visible without debug state.
+4. **First reward loop** — player can earn cache loot, job pay, and one useful crafting/gear resource within 10 minutes.
+5. **Acceptance** — a tester can start a new run and explain where to go, what pays, what is dangerous, and what they earned.
+
+### Finish Milestone 2 — Core RPG loop is real
+
+Goal: attributes, jobs, loot, gear, house/workbench, and economy form a repeatable loop rather than isolated menus.
+
+Required slices:
+1. **Gear choice pressure** — armor/weapon families visibly affect stamina, protection, movement, reach, windup, or role summary.
+2. **Earned upgrades** — POIs, mini-bosses, region boards, and resource finds unlock or discount upgrades outside the shop.
+3. **Workbench purpose** — Workbench II/III benefits, forge/alchemy/map-table previews, and station project progress are clear from the house.
+4. **Gold sinks** — repairs, housing/workbench upgrades, pet care, trainers, cosmetics, transport, or bounty permits give players useful spending decisions.
+5. **Acceptance** — after one short session, a tester can name one build choice, one resource route, one home benefit, and one gold sink.
+
+### Finish Milestone 3 — World feels alive offline
+
+Goal: NPCs, regions, services, and job boards react enough to make the world feel local-first and deterministic.
+
+Required slices:
+1. **Dialogue UI** — major NPCs have a compact 2-4 choice dialogue modal using handcrafted memory-aware responses.
+2. **Memory reactions** — NPC lines react to origin, current region, house state, recent quest outcome, active job, faction stance, and notable gear.
+3. **Visible consequences** — at least one quest outcome changes NPC copy, shop/service note, board listing, patrol presence, house visitor, or town dressing.
+4. **Regional job identity** — Ashfall and Iron Lantern boards have jobs, copy, props, and route markers that feel distinct from Frontier work.
+5. **Acceptance** — the game works fully offline and at least three current-run facts show up in NPC or service text.
+
+### Finish Milestone 4 — Story can be completed and understood
+
+Goal: the player can finish a run and understand why the ending happened.
+
+Required slices:
+1. **Quest outcome coverage** — major quest turn-ins, modal choices, save/reload, and `narrative.questOutcomes` are covered by tests.
+2. **Companion barks** — low HP, first kill, boss phase, region entry, house unlock, and key quest outcomes have short deterministic lines.
+3. **Ending variants** — endings reflect thematic axes, factions, quest outcomes, companion state, and key flags.
+4. **Run summary** — kills, time, mini-boss kills, jobs completed/failed, resources, quest outcomes, origin, gear highlights, and ending cause are visible.
+5. **Acceptance** — after a completed run, a tester can explain the ending and identify at least two choices that affected it.
+
+### Finish Milestone 5 — Playtest-ready build
+
+Goal: the game is stable enough for a human test session without developer hand-holding.
+
+Required slices:
+1. **Pause/settings path** — Esc pause, resume, settings, codex, quit/new-run path, difficulty option, and safe combat timing.
+2. **Save resilience** — save slots, backup rotation, corruption recovery UI, export/import, and future-schema messaging.
+3. **Run history** — local run history tracks end state, core stats, build identity, and replay notes.
+4. **Playtest instrumentation** — optional local metrics for time-to-first-kill, first job accepted, first reward, death cause, chapter reached, and settings changes.
+5. **Acceptance** — a tester can start, pause, save, reload, recover from a bad save, finish or die, and send useful feedback.
+
+### Finish Milestone 6 — Release package
+
+Goal: package the finished local-first version without changing the engine or requiring network services.
+
+Required slices:
+1. **Offline package** — itch-style local package with clear controls, save path notes, and no required server/network.
+2. **Release smoke** — browser smoke covers title, new run, origin selection, first cache, first job, combat, save/load, house/workbench, and ending/run summary path where practical.
+3. **Known-limits file** — document intentionally unfinished stretch goals such as optional LLM dialogue, Steam wrapper, controller polish, or WebGL rewrite.
+4. **Final audit** — `README.md`, this roadmap, scripts, ignored artifacts, and generated outputs match the actual shipped state.
+5. **Acceptance** — a non-developer can download, launch, play, save, reload, and report feedback without Codex or repo knowledge.
+
+### Definition Of Done
+
+The game is roadmap-finished when:
+- The first 10 minutes are readable and rewarding.
+- The core RPG loop repeats through jobs, loot, upgrades, house/workbench, and economy.
+- NPCs and services respond offline to current-run facts.
+- A run can end with a clear summary and understandable ending.
+- Save/reload/recovery and pause/settings are stable enough for human playtest.
+- Release packaging works without network, LLM, WebGL, or developer-only steps.
 
 ## Shipped Pillars
 
@@ -347,7 +427,7 @@ The user is not asking for a prettier TODO list. They want the game to start fee
 
 ### Next build target
 
-Ship **Phase C / Jobs 8 + Phase A visual pressure.** The current foundation makes loot/workstations/jobs real and selectable, shows earned gear and active jobs in player-facing surfaces, lets Boone present up to seven job choices, adds salvage/courier/patrol/supply/rescue/escort jobs, resolves richer route markers, gives Boone's board an in-world sprite/minimap/interact presence, adds timed bonuses, late bonus misses, failed-job report states, Ashfall/Iron Lantern non-combat job depth, vendor service notes, validated road dressing, workbench levels, level 2 crafting, a level 3 Region Map project, and first-pass hit feedback/opening-objective/enemy readability helpers. The next slice should add regional board props, local dialogue UI, pet/house utility, or stronger starting-view reward feel.
+Ship **Finish Milestone 1 / first 10 minutes readability.** The current foundation makes loot/workstations/jobs real and selectable, shows earned gear and active jobs in player-facing surfaces, lets Boone present up to seven job choices, adds salvage/courier/patrol/supply/rescue/escort jobs, resolves richer route markers, gives Boone's board an in-world sprite/minimap/interact presence, adds timed bonuses, late bonus misses, failed-job report states, Ashfall/Iron Lantern non-combat job depth, vendor service notes, validated road dressing, workbench levels, level 2 crafting, a level 3 Region Map project, and first-pass hit feedback/opening-objective/enemy readability helpers. The next slice should make the start view and first fight read like a finished game: stronger road/sign/landmark composition, clearer enemy windup/death/reward feedback, and narrow-width HUD overlap cleanup.
 
 Player-facing result:
 - First 60 seconds have a clear action target, visible route, landmark hint, and nearby reward/threat.
@@ -359,14 +439,14 @@ Player-facing result:
 - Saves preserve new gear/crafting state through v3 backfill unless a real schema bump becomes necessary.
 
 Concrete build order:
-1. Add optional bonus/failure conditions for timed supply runs, safe patrol completion, and no-damage courier delivery.
-2. Add broader regional job sets for Ashfall and Iron Lantern using the same route-marker interface.
-3. Add deeper visual composition: more road bands, signposts, fences, carts, lamps, ash drifts, rails, pipes, and horizon silhouettes.
-4. Expand enemy readability into boss-specific silhouettes, phase VFX, death smoke, and reward-drop callouts.
-5. Fix HUD/objective/minimap overlap at narrow browser widths.
-6. Shorten/fix `test-actions/mini_boss_flow.json` so the smoke does not hang.
-7. Keep `render_game_to_text` exposing gameplay-feel, visual-world, and job-board state for smoke automation.
-8. Update this roadmap and verification counts after the slice lands.
+1. Finish first-10-minutes readability: starting-view composition, objective/HUD overlap, enemy windup/death/reward callouts, and route clarity.
+2. Make the core RPG loop repeatable: earned upgrades, gear tradeoffs, workbench purpose, and visible gold sinks.
+3. Add pet/house utility hooks only when they connect to existing house state: pet bed, companion bunk, trophy display, or care cost.
+4. Add local dialogue UI and handcrafted response tables backed by deterministic NPC memory.
+5. Add visible consequence surfaces from quest outcomes, faction stance, current origin, and notable gear/job milestones.
+6. Add save slots, recovery UI, run history, and playtest instrumentation.
+7. Add offline release packaging and a final smoke checklist.
+8. Update this roadmap and verification counts after every landed slice.
 
 Quality bar:
 - This is not a cosmetic-only pass. Attributes must have at least small derived effects or clear future hooks surfaced in data.

@@ -121,7 +121,10 @@ import {
   buildEconomySnapshot,
   getVendorServiceProfile,
 } from "./economyServices.js";
-import { resolveEnemyReadabilityCue } from "./combatReadability.js";
+import {
+  resolveEnemyDefeatCallout,
+  resolveEnemyReadabilityCue,
+} from "./combatReadability.js";
 import {
   createInitialNpcMemoryState,
   normalizeNpcMemoryState,
@@ -190,6 +193,7 @@ import {
   gradientBucket as gradientBucketUtil,
   createGradientCache,
   createRenderHelpers,
+  resolveNearWallVisualTreatment,
   resolveWallProjection,
 } from "./render.js";
 import {
@@ -4134,6 +4138,22 @@ const canvas = document.getElementById("game");
         const truthBonusXp = state.narrative.globalFlags.ledgerPublished ? 4 : 0;
         state.player.gold += 10 + civicBounty;
         grantXp(22 + truthBonusXp);
+        const normalDefeatCallout = resolveEnemyDefeatCallout({
+          label: enemy.label || "Slime",
+          gold: 10 + civicBounty,
+          xp: 22 + truthBonusXp,
+          items: { "Slime Core": 1 },
+          color: enemy.color || "#6be873",
+        });
+        state.floatingTexts.push({
+          wx: enemy.x,
+          wy: enemy.y,
+          text: normalDefeatCallout.floatingText,
+          life: 0.9,
+          maxLife: 0.9,
+          color: "#ffd77b",
+        });
+        state.player.screenShake = clamp(state.player.screenShake + normalDefeatCallout.screenShake, 0, 0.75);
 
         if (enemy.miniBossId) {
           const def = MINI_BOSS_DEFS[enemy.miniBossId];
@@ -4144,6 +4164,23 @@ const canvas = document.getElementById("game");
             state.progression.upgradePoints += 1;
             grantXp(120);
             enemy.respawn = 1e9;
+            const bossCallout = resolveEnemyDefeatCallout({
+              label: def.label,
+              miniBoss: true,
+              gold: def.rewardGold,
+              xp: 120,
+              items: { [def.rewardResource.item]: def.rewardResource.count },
+              color: enemy.color || "#ffc490",
+            });
+            state.floatingTexts.push({
+              wx: enemy.x,
+              wy: enemy.y,
+              text: bossCallout.floatingText,
+              life: 1.15,
+              maxLife: 1.15,
+              color: "#ffc490",
+            });
+            state.player.screenShake = clamp(state.player.screenShake + bossCallout.screenShake, 0, 0.95);
             logMsg(`Mini-boss defeated: ${def.label}! +${def.rewardGold}g, +${def.rewardResource.count} ${def.rewardResource.item}, +1 upgrade point.`);
             grantRolledLoot("mini_boss", def.region);
             if (enemy.miniBossId === "ashfall_scrap_tyrant" && state.quests.ashfall_boss?.status === "active") {
@@ -5498,6 +5535,23 @@ const canvas = document.getElementById("game");
     } else if (sprite.kind === "enemy") {
       const enemyBase = sprite.color || "#6be873";
       const enemyTypeKey = sprite.enemyType || "slime";
+      const cue = sprite.readabilityCue || resolveEnemyReadabilityCue(sprite);
+      const bodyScale = clamp(cue.bodyScale || 1, 0.9, 1.14);
+      if (cue.fillAlpha > 0) {
+        const pulse = cue.pulseRate ? (Math.sin(state.time * cue.pulseRate) * 0.5 + 0.5) : 0.5;
+        ctx.fillStyle = hexToRgbaUtil(cue.color || "#ffd77b", clamp(cue.fillAlpha + pulse * 0.08, 0, 0.32));
+        ctx.beginPath();
+        ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.5, spriteWidth * 0.52, spriteHeight * 0.48, 0, 0, TAU);
+        ctx.fill();
+      }
+      if (cue.outlineAlpha > 0.3) {
+        const ringPulse = cue.pulseRate ? (Math.sin(state.time * cue.pulseRate) * 0.5 + 0.5) : 0.4;
+        ctx.strokeStyle = hexToRgbaUtil(cue.ringColor || cue.color || "#ffd77b", clamp(cue.outlineAlpha * (0.72 + ringPulse * 0.28), 0, 1));
+        ctx.lineWidth = Math.max(2, spriteWidth * 0.035);
+        ctx.beginPath();
+        ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.52, spriteWidth * 0.48 * bodyScale, spriteHeight * 0.43 * bodyScale, 0, 0, TAU);
+        ctx.stroke();
+      }
       const slime = getCachedGradient(
         `sprite-enemy-core|${enemyTypeKey}|band${distBand}|${sizeKey}|${enemyBase}`,
         () => {
@@ -5512,9 +5566,9 @@ const canvas = document.getElementById("game");
       ctx.fillStyle = slime;
       ctx.beginPath();
       ctx.moveTo(spriteWidth * 0.14, spriteHeight * 0.84);
-      ctx.quadraticCurveTo(spriteWidth * 0.07, spriteHeight * 0.45, spriteWidth * 0.33, spriteHeight * 0.2);
-      ctx.quadraticCurveTo(spriteWidth * 0.5, spriteHeight * 0.08, spriteWidth * 0.67, spriteHeight * 0.2);
-      ctx.quadraticCurveTo(spriteWidth * 0.93, spriteHeight * 0.45, spriteWidth * 0.86, spriteHeight * 0.84);
+      ctx.quadraticCurveTo(spriteWidth * (0.07 - (bodyScale - 1) * 0.05), spriteHeight * 0.45, spriteWidth * 0.33, spriteHeight * (0.2 - (bodyScale - 1) * 0.06));
+      ctx.quadraticCurveTo(spriteWidth * 0.5, spriteHeight * (0.08 - (bodyScale - 1) * 0.08), spriteWidth * 0.67, spriteHeight * (0.2 - (bodyScale - 1) * 0.06));
+      ctx.quadraticCurveTo(spriteWidth * (0.93 + (bodyScale - 1) * 0.05), spriteHeight * 0.45, spriteWidth * 0.86, spriteHeight * 0.84);
       ctx.closePath();
       ctx.fill();
       ctx.strokeStyle = "rgba(10, 32, 20, 0.42)";
@@ -6110,6 +6164,23 @@ const canvas = document.getElementById("game");
       const baseShadow = clamp((projectedDist / MAX_RAY_DIST) * 0.5 + 0.06, 0.08, 0.56);
       ctx.fillStyle = `rgba(9, 14, 18, ${baseShadow})`;
       ctx.fillRect(x, y + wallHeight * 0.82, 1, wallHeight * 0.18);
+      const nearWall = resolveNearWallVisualTreatment({
+        correctedDist,
+        nearClip: WALL_RENDER_NEAR_CLIP,
+        side: hit.side,
+        inHouse: state.player.inHouse,
+      });
+      if (nearWall.active) {
+        ctx.fillStyle = `rgba(7, 10, 12, ${nearWall.alpha + nearWall.sideShade})`;
+        ctx.fillRect(x, 0, 1, height);
+        const grain = (Math.sin(state.time * 21 + x * 0.42) * 0.5 + 0.5) * nearWall.grainAlpha;
+        ctx.fillStyle = `rgba(255, 235, 190, ${grain})`;
+        ctx.fillRect(x, Math.max(0, y), 1, Math.min(height, wallHeight));
+        if (x < 3 || x > width - 4) {
+          ctx.fillStyle = `rgba(0, 0, 0, ${nearWall.edgeAlpha})`;
+          ctx.fillRect(x, 0, 1, height);
+        }
+      }
 
       if (hit.tileType === 2 && !state.player.inHouse) {
         const shimmer = (Math.sin(state.time * 3.2 + x * 0.07) * 0.5 + 0.5) * 0.2 * (1 + visualMood.shimmerStrength);

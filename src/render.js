@@ -59,6 +59,30 @@ export function resolveWallProjection(options = {}) {
   };
 }
 
+export function resolveNearWallVisualTreatment(options = {}) {
+  const correctedDist = Math.max(0.0001, options.correctedDist || 0.0001);
+  const nearClip = Math.max(0.0001, options.nearClip || 0.24);
+  const start = nearClip * (options.inHouse ? 2.6 : 3.15);
+  const closeness = Math.max(0, Math.min(1, (start - correctedDist) / Math.max(0.0001, start - nearClip * 0.55)));
+  if (closeness <= 0) {
+    return {
+      active: false,
+      alpha: 0,
+      edgeAlpha: 0,
+      sideShade: 0,
+    };
+  }
+
+  const sideShade = options.side === 1 ? 0.08 : 0.03;
+  return {
+    active: true,
+    alpha: Math.min(options.inHouse ? 0.46 : 0.54, 0.18 + closeness * 0.42),
+    edgeAlpha: Math.min(0.26, 0.05 + closeness * 0.2),
+    sideShade,
+    grainAlpha: Math.min(0.16, 0.04 + closeness * 0.12),
+  };
+}
+
 // Returns ctx-bound drawing helpers. Each helper closes over ctx so it
 // matches the inline-version semantics callers in main.js expect.
 export function createRenderHelpers(ctx) {
