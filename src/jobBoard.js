@@ -1,6 +1,6 @@
 import { getRegionVisualIdentity } from "./regionVisualIdentity.js";
 
-const JOB_STATUS = new Set(["active", "ready", "completed"]);
+const JOB_STATUS = new Set(["active", "ready", "completed", "failed"]);
 
 export const JOB_DEFINITIONS = {
   frontier_slime_bounty: {
@@ -73,6 +73,13 @@ export const JOB_DEFINITIONS = {
       deliveryNpcId: "elder",
       deliveryLabel: "Elder Nira",
     },
+    bonus: {
+      type: "time_limit",
+      seconds: 90,
+      line: "Quick handoff bonus if delivered within 90s.",
+      missedLine: "Quick handoff bonus missed.",
+      reward: { gold: 8, xp: 3 },
+    },
     reward: {
       gold: 30,
       xp: 16,
@@ -101,6 +108,13 @@ export const JOB_DEFINITIONS = {
         { id: "frontier_patrol_watchtower", label: "Watchtower Approach", x: 14.15, y: 7.15 },
       ],
     },
+    bonus: {
+      type: "time_limit",
+      seconds: 120,
+      line: "Clean patrol bonus if all posts are checked within 120s.",
+      missedLine: "Clean patrol timing missed.",
+      reward: { gold: 6, xp: 3 },
+    },
     reward: {
       gold: 28,
       xp: 14,
@@ -125,6 +139,11 @@ export const JOB_DEFINITIONS = {
       label: "supply run completed",
       pickup: { id: "frontier_supply_crate", label: "Barricade Crate", x: 12.65, y: 9.05 },
       dropoff: { id: "frontier_smith_supply_drop", label: "Smith Varo's Forge", x: 17.35, y: 10.65 },
+    },
+    failure: {
+      type: "time_limit",
+      seconds: 180,
+      line: "Urgent supply run fails if the crate reaches the forge after 180s.",
     },
     reward: {
       gold: 34,
@@ -157,6 +176,41 @@ export const JOB_DEFINITIONS = {
       items: { "Scrap Coil": 1 },
     },
   },
+  ashfall_cooling_patrol: {
+    id: "ashfall_cooling_patrol",
+    title: "Cooling Well Patrol",
+    kind: "patrol",
+    regionId: "ashfall",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Medium",
+    minLevel: 2,
+    priority: 20,
+    hint: "Check the cooling wells before salvage crews cross the slag road.",
+    boardNote: "Ashfall crews need someone fast enough to read steam gauges and leave.",
+    objective: {
+      type: "patrol",
+      count: 3,
+      label: "cooling wells checked",
+      checkpoints: [
+        { id: "ashfall_well_west", label: "West Cooling Well", x: 41.0, y: 39.7 },
+        { id: "ashfall_slag_rib", label: "Slag Rib Gauge", x: 42.2, y: 40.8 },
+        { id: "ashfall_mine_marker", label: "Mine Cart Marker", x: 43.1, y: 39.15 },
+      ],
+    },
+    bonus: {
+      type: "time_limit",
+      seconds: 150,
+      line: "Heat-read bonus if the route is checked within 150s.",
+      missedLine: "Heat-read bonus missed.",
+      reward: { gold: 10, xp: 5 },
+    },
+    reward: {
+      gold: 54,
+      xp: 26,
+      items: { "Heat Resin": 1 },
+    },
+  },
   ironlantern_signal_breaker: {
     id: "ironlantern_signal_breaker",
     title: "Signal Breaker",
@@ -179,6 +233,39 @@ export const JOB_DEFINITIONS = {
     reward: {
       gold: 92,
       xp: 46,
+      items: { "Cipher Lens": 1 },
+    },
+  },
+  ironlantern_signal_courier: {
+    id: "ironlantern_signal_courier",
+    title: "Quiet Signal Courier",
+    kind: "courier",
+    regionId: "ironlantern",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "High",
+    minLevel: 4,
+    priority: 20,
+    hint: "Carry a coded signal plate from the gate light to Boone's quiet contact.",
+    boardNote: "Lantern work pays because every route is watched and every delay teaches the patrols.",
+    objective: {
+      type: "delivery",
+      count: 2,
+      label: "signal plate delivered",
+      pickup: { id: "ironlantern_signal_plate", label: "Signal Plate", x: 15.85, y: 39.7 },
+      deliveryNpcId: "merchant",
+      deliveryLabel: "Quiet Contact",
+    },
+    bonus: {
+      type: "time_limit",
+      seconds: 120,
+      line: "Low-profile bonus if delivered within 120s.",
+      missedLine: "Low-profile timing missed.",
+      reward: { gold: 16, xp: 8 },
+    },
+    reward: {
+      gold: 74,
+      xp: 34,
       items: { "Cipher Lens": 1 },
     },
   },
@@ -229,6 +316,36 @@ function cloneReward(reward = {}) {
   };
 }
 
+const EMPTY_REWARD = { gold: 0, xp: 0, items: {} };
+
+function combineRewards(...rewards) {
+  const combined = { gold: 0, xp: 0, items: {} };
+  for (const reward of rewards) {
+    const safe = cloneReward(reward);
+    combined.gold += safe.gold;
+    combined.xp += safe.xp;
+    for (const [name, count] of Object.entries(safe.items)) {
+      combined.items[name] = (combined.items[name] || 0) + count;
+    }
+  }
+  return combined;
+}
+
+function formatRewardLine(reward = EMPTY_REWARD) {
+  const safe = cloneReward(reward);
+  return `+${safe.gold}g, +${safe.xp} XP${Object.entries(safe.items).map(([name, count]) => `, +${count} ${name}`).join("")}`;
+}
+
+function safeTime(value, fallback = 0) {
+  return Math.max(0, Number.isFinite(value) ? Number(value) : fallback);
+}
+
+function payableReward(job, progress = {}) {
+  const base = cloneReward(job.reward);
+  if (job.bonus && progress.bonusEligible === true) return combineRewards(base, job.bonus.reward);
+  return base;
+}
+
 function cloneObjective(objective = {}) {
   return {
     ...objective,
@@ -256,6 +373,10 @@ function normalizeProgress(jobId, source = {}) {
     status,
     count,
     rewardClaimed: typeof source.rewardClaimed === "boolean" ? source.rewardClaimed : false,
+    startedAt: safeTime(source.startedAt),
+    bonusEligible: typeof source.bonusEligible === "boolean" ? source.bonusEligible : Boolean(job.bonus),
+    bonusClaimed: typeof source.bonusClaimed === "boolean" ? source.bonusClaimed : false,
+    failedReason: typeof source.failedReason === "string" ? source.failedReason : null,
   };
 }
 
@@ -282,7 +403,16 @@ export function normalizeJobBoardState(source = {}) {
     ? source.activeJobId
     : null;
   if (activeJobId && !progressByJobId[activeJobId]) {
-    progressByJobId[activeJobId] = { status: "active", count: 0, rewardClaimed: false };
+    const job = knownJob(activeJobId);
+    progressByJobId[activeJobId] = {
+      status: "active",
+      count: 0,
+      rewardClaimed: false,
+      startedAt: 0,
+      bonusEligible: Boolean(job?.bonus),
+      bonusClaimed: false,
+      failedReason: null,
+    };
   }
 
   return {
@@ -301,6 +431,9 @@ function syncJobState(jobState) {
 function buildProgressLine(job, progress = null) {
   const objective = job.objective || {};
   const count = progress?.count || 0;
+  if (progress?.status === "failed") {
+    return `Failed: ${progress.failedReason || job.failure?.line || "Report the missed work"}`;
+  }
   if (objective.type === "delivery") {
     if (progress?.status === "ready" || count >= objective.count) return `Return to ${job.npcName}`;
     if (count <= 0) return `Pick up ${objective.pickup?.label || "orders"}`;
@@ -322,17 +455,31 @@ function buildProgressLine(job, progress = null) {
 
 function decorateJob(job, progress = null) {
   const reward = cloneReward(job.reward);
+  const visibleReward = progress?.status === "ready" ? payableReward(job, progress) : reward;
   return {
     ...job,
     objective: cloneObjective(job.objective),
     reward,
+    bonus: job.bonus ? { ...job.bonus, reward: cloneReward(job.bonus.reward) } : null,
+    failure: job.failure ? { ...job.failure } : null,
     regionHint: regionHint(job.regionId),
     boardNote: job.boardNote || job.hint,
     availabilityLine: `${regionHint(job.regionId)} • ${job.threat} threat • ${job.kind}`,
     status: progress?.status || "available",
-    progress: progress ? { ...progress } : { status: "available", count: 0, rewardClaimed: false },
+    progress: progress ? { ...progress } : {
+      status: "available",
+      count: 0,
+      rewardClaimed: false,
+      startedAt: 0,
+      bonusEligible: Boolean(job.bonus),
+      bonusClaimed: false,
+      failedReason: null,
+    },
     progressLine: buildProgressLine(job, progress),
-    rewardLine: `+${reward.gold}g, +${reward.xp} XP${Object.entries(reward.items).map(([name, count]) => `, +${count} ${name}`).join("")}`,
+    rewardLine: formatRewardLine(visibleReward),
+    baseRewardLine: formatRewardLine(reward),
+    bonusLine: job.bonus ? `${job.bonus.line} ${formatRewardLine(job.bonus.reward)}` : "",
+    failureLine: job.failure?.line || "",
   };
 }
 
@@ -358,7 +505,7 @@ export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, job
     return [{
       ...active,
       boardState: active.status,
-      selectable: active.status === "ready",
+      selectable: active.status === "ready" || active.status === "failed",
     }];
   }
   return getJobListings({ regionId, playerLevel, jobState })
@@ -371,7 +518,7 @@ export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, job
     }));
 }
 
-export function acceptJob(jobState, jobId) {
+export function acceptJob(jobState, jobId, { time = 0 } = {}) {
   const state = syncJobState(jobState);
   const job = knownJob(jobId);
   if (!job) return { ok: false, message: "Job not found.", jobState: state };
@@ -385,12 +532,38 @@ export function acceptJob(jobState, jobId) {
     status: "active",
     count: state.progressByJobId[jobId]?.count || 0,
     rewardClaimed: false,
+    startedAt: safeTime(time),
+    bonusEligible: Boolean(job.bonus),
+    bonusClaimed: false,
+    failedReason: null,
   };
   return {
     ok: true,
     job: decorateJob(job, state.progressByJobId[jobId]),
     jobState: state,
     message: `Job accepted: ${job.title}. ${job.objective.label} ${state.progressByJobId[jobId].count}/${job.objective.count}.`,
+  };
+}
+
+function completionConditionResult(job, progress, event = {}) {
+  const elapsed = safeTime(event.time, progress.startedAt) - safeTime(progress.startedAt);
+  if (job.failure?.type === "time_limit" && Number.isFinite(job.failure.seconds) && elapsed > job.failure.seconds) {
+    progress.status = "failed";
+    progress.failedReason = job.failure.line || "The posted deadline was missed.";
+    return {
+      failed: true,
+      completed: false,
+      message: `Job failed: ${job.title}. ${progress.failedReason} Return to ${job.npcName}.`,
+    };
+  }
+  if (job.bonus?.type === "time_limit" && Number.isFinite(job.bonus.seconds)) {
+    progress.bonusEligible = elapsed <= job.bonus.seconds;
+  }
+  progress.status = "ready";
+  return {
+    failed: false,
+    completed: true,
+    message: `Job ready: ${job.title}. Return to ${job.npcName}.`,
   };
 }
 
@@ -415,11 +588,10 @@ function recordDeliveryEvent(job, progress, event = {}) {
   }
   if (event.type === "deliver" && progress.count >= 1 && event.npcId === objective.deliveryNpcId) {
     progress.count = objective.count;
-    progress.status = "ready";
+    const result = completionConditionResult(job, progress, event);
     return {
       ok: true,
-      completed: true,
-      message: `Job ready: ${job.title}. Return to ${job.npcName}.`,
+      ...result,
     };
   }
   return { ok: false, completed: false };
@@ -434,12 +606,12 @@ function recordPatrolEvent(job, progress, event = {}) {
   }
   progress.count = Math.min(objective.count, progress.count + 1);
   const completed = progress.count >= objective.count || progress.count >= checkpoints.length;
-  if (completed) progress.status = "ready";
+  const result = completed ? completionConditionResult(job, progress, event) : { completed: false, failed: false };
   return {
     ok: true,
-    completed,
+    ...result,
     message: completed
-      ? `Job ready: ${job.title}. Return to ${job.npcName}.`
+      ? result.message
       : `Job progress: ${job.title} checkpoint ${progress.count}/${checkpoints.length}.`,
   };
 }
@@ -456,11 +628,10 @@ function recordSupplyRunEvent(job, progress, event = {}) {
   }
   if (event.type === "dropoff" && progress.count >= 1 && event.targetId === objective.dropoff?.id) {
     progress.count = objective.count;
-    progress.status = "ready";
+    const result = completionConditionResult(job, progress, event);
     return {
       ok: true,
-      completed: true,
-      message: `Job ready: ${job.title}. Return to ${job.npcName}.`,
+      ...result,
     };
   }
   return { ok: false, completed: false };
@@ -508,15 +679,15 @@ export function recordJobEvent(jobState, event = {}) {
 
   progress.count = Math.min(job.objective.count, progress.count + 1);
   const completed = progress.count >= job.objective.count;
-  if (completed) progress.status = "ready";
+  const result = completed ? completionConditionResult(job, progress, event) : { completed: false, failed: false };
   return {
     ok: true,
-    completed,
+    ...result,
     job: decorateJob(job, progress),
     progress,
     jobState: state,
     message: completed
-      ? `Job ready: ${job.title}. Return to ${job.npcName}.`
+      ? result.message
       : `Job progress: ${job.title} ${progress.count}/${job.objective.count}.`,
   };
 }
@@ -527,18 +698,33 @@ export function claimJobReward(jobState, jobId = null) {
   const job = knownJob(targetJobId);
   const progress = targetJobId ? state.progressByJobId[targetJobId] : null;
   if (!job || !progress) return { ok: false, message: "No job reward is ready.", jobState: state };
+  if (progress.status === "failed") {
+    if (state.activeJobId === targetJobId) state.activeJobId = null;
+    delete state.progressByJobId[targetJobId];
+    return {
+      ok: true,
+      failed: true,
+      job: decorateJob(job, { ...progress, rewardClaimed: true }),
+      reward: cloneReward(EMPTY_REWARD),
+      jobState: state,
+      message: `Job closed: ${job.title}. No pay issued.`,
+    };
+  }
   if (progress.status !== "ready" || progress.rewardClaimed) {
     return { ok: false, message: "Job reward is not ready.", job: decorateJob(job, progress), jobState: state };
   }
 
   progress.status = "completed";
   progress.rewardClaimed = true;
+  progress.bonusClaimed = Boolean(job.bonus && progress.bonusEligible);
   if (!state.completedJobIds.includes(targetJobId)) state.completedJobIds.push(targetJobId);
   if (state.activeJobId === targetJobId) state.activeJobId = null;
+  const reward = payableReward(job, progress);
   return {
     ok: true,
     job: decorateJob(job, progress),
-    reward: cloneReward(job.reward),
+    reward,
+    bonusAwarded: Boolean(job.bonus && progress.bonusEligible),
     jobState: state,
     message: `Job paid: ${job.title}.`,
   };
@@ -601,6 +787,27 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
   const activeJob = getActiveJobSummary(jobState);
   if (!activeJob) return null;
   const objective = activeJob.objective || {};
+
+  if (activeJob.status === "failed") {
+    const npc = nearestMatching(npcs, player, (entry) => entry.id === activeJob.npcId);
+    if (!npc) return null;
+    return {
+      kind: "job_failed",
+      jobId: activeJob.id,
+      title: "Job failed",
+      label: `Report to ${activeJob.npcName}`,
+      line: `${activeJob.title}: ${activeJob.progressLine}`,
+      x: npc.target.x,
+      y: npc.target.y,
+      color: "#ff8f6d",
+      distance: npc.distance,
+      distanceLine: markerDistanceLine(npc.distance),
+      regionId: activeJob.regionId,
+      regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
+      action: "fail_turn_in",
+      returnTarget: activeJob.npcId,
+    };
+  }
 
   if (activeJob.status === "ready") {
     const npc = nearestMatching(npcs, player, (entry) => entry.id === activeJob.npcId);

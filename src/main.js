@@ -3058,6 +3058,7 @@ const canvas = document.getElementById("game");
       behavior: enemy?.behavior,
       label: enemy?.label,
       regionId: state.regions.activeRegion,
+      time: state.time,
     });
     if (result.ok && result.message) logMsg(result.message);
     return result;
@@ -3071,6 +3072,7 @@ const canvas = document.getElementById("game");
       item,
       label,
       regionId: state.regions.activeRegion,
+      time: state.time,
     });
     if (result.ok && result.message) logMsg(result.message);
     return result;
@@ -3082,6 +3084,7 @@ const canvas = document.getElementById("game");
       type: "pickup",
       targetId,
       regionId: state.regions.activeRegion,
+      time: state.time,
     });
     if (result.ok && result.message) logMsg(result.message);
     return result;
@@ -3093,6 +3096,7 @@ const canvas = document.getElementById("game");
       type: "deliver",
       npcId,
       regionId: state.regions.activeRegion,
+      time: state.time,
     });
     if (result.ok && result.message) logMsg(result.message);
     return result;
@@ -3104,6 +3108,7 @@ const canvas = document.getElementById("game");
       type: "checkpoint",
       targetId,
       regionId: state.regions.activeRegion,
+      time: state.time,
     });
     if (result.ok && result.message) logMsg(result.message);
     return result;
@@ -3115,6 +3120,7 @@ const canvas = document.getElementById("game");
       type: "dropoff",
       targetId,
       regionId: state.regions.activeRegion,
+      time: state.time,
     });
     if (result.ok && result.message) logMsg(result.message);
     return result;
@@ -3188,21 +3194,28 @@ const canvas = document.getElementById("game");
     jobBoardSelection = clamp(jobBoardSelection, 0, choices.length - 1);
     const choiceJob = choices[jobBoardSelection];
     if (!choiceJob) return;
-    if (choiceJob.status === "ready" || choiceJob.boardState === "ready") {
+    if (choiceJob.status === "ready" || choiceJob.boardState === "ready" || choiceJob.status === "failed" || choiceJob.boardState === "failed") {
       const paid = claimJobReward(state.world.jobs, choiceJob.id);
       if (paid.ok) {
-        grantJobReward(paid.reward);
-        logMsg(`Bounty paid: ${paid.job.title}. ${rewardLine(paid.reward)}.`);
-        sfx.questDone();
-        spawnParticles(canvas.width / 2, canvas.height / 2, 14, "#ffd36b", 3.4, 1.1, { decorative: true });
+        if (paid.failed) {
+          logMsg(paid.message || `Job closed: ${paid.job.title}. No pay issued.`);
+          sfx.npcChat();
+          spawnParticles(canvas.width / 2, canvas.height / 2, 10, "#ff8f6d", 2.4, 0.8, { decorative: true });
+        } else {
+          grantJobReward(paid.reward);
+          logMsg(`Bounty paid: ${paid.job.title}. ${rewardLine(paid.reward)}${paid.bonusAwarded ? " Bonus paid." : ""}`);
+          sfx.questDone();
+          spawnParticles(canvas.width / 2, canvas.height / 2, 14, "#ffd36b", 3.4, 1.1, { decorative: true });
+        }
         jobBoardOpen = false;
       }
       return;
     }
     if (choiceJob.boardState === "available") {
-      const accepted = acceptJob(state.world.jobs, choiceJob.id);
+      const accepted = acceptJob(state.world.jobs, choiceJob.id, { time: state.time });
       if (accepted.ok) {
-        logMsg(`Job accepted: ${accepted.job.title}. ${accepted.job.hint} Reward ${accepted.job.rewardLine}.`);
+        const condition = [accepted.job.bonusLine, accepted.job.failureLine].filter(Boolean).join(" ");
+        logMsg(`Job accepted: ${accepted.job.title}. ${accepted.job.hint} Reward ${accepted.job.rewardLine}.${condition ? ` ${condition}` : ""}`);
         sfx.shopBuy();
         jobBoardOpen = false;
       } else {
@@ -6932,11 +6945,13 @@ const canvas = document.getElementById("game");
     const jobMarker = getJobRouteMarker();
     const jobObjective = activeJob
       ? {
-        title: activeJob.status === "ready" ? "Job ready" : "Job route",
+        title: activeJob.status === "ready" ? "Job ready" : (activeJob.status === "failed" ? "Job failed" : "Job route"),
         line: activeJob.status === "ready"
           ? `Return to ${activeJob.npcName} for ${activeJob.rewardLine}${jobMarker?.distanceLine ? ` (${jobMarker.distanceLine})` : ""}`
-          : `${activeJob.title}: ${jobMarker?.regionHint ? `${jobMarker.regionHint} • ` : ""}${activeJob.progressLine}${jobMarker?.checkpointIndex ? ` • ${jobMarker.checkpointIndex}/${jobMarker.checkpointTotal}` : ""}${jobMarker?.distanceLine ? ` • ${jobMarker.distanceLine}` : ""}`,
-        urgency: activeJob.status === "ready" ? "high" : "medium",
+          : activeJob.status === "failed"
+            ? `Report to ${activeJob.npcName}: ${activeJob.progressLine}${jobMarker?.distanceLine ? ` (${jobMarker.distanceLine})` : ""}`
+            : `${activeJob.title}: ${jobMarker?.regionHint ? `${jobMarker.regionHint} • ` : ""}${activeJob.progressLine}${jobMarker?.checkpointIndex ? ` • ${jobMarker.checkpointIndex}/${jobMarker.checkpointTotal}` : ""}${jobMarker?.distanceLine ? ` • ${jobMarker.distanceLine}` : ""}`,
+        urgency: activeJob.status === "ready" || activeJob.status === "failed" ? "high" : "medium",
       }
       : null;
     const liveObjective = firstPressure || jobObjective || openingObjective || explorationLead;
@@ -7344,13 +7359,14 @@ const canvas = document.getElementById("game");
           drawClippedText(`${job.title}  [${job.threat}]`, sx + 22, iy + 19, sw - 168, selected ? "#ffd77b" : "#f3ecd8");
           ctx.font = "12px Georgia";
           ctx.textAlign = "right";
-          ctx.fillStyle = job.status === "ready" ? "#5fe0b5" : "#ffd77b";
-          ctx.fillText(job.status === "ready" ? "CLAIM" : job.kind.toUpperCase(), sx + sw - 22, iy + 19);
+          const statusLabel = job.status === "ready" ? "CLAIM" : (job.status === "failed" ? "REPORT" : job.kind.toUpperCase());
+          ctx.fillStyle = job.status === "ready" ? "#5fe0b5" : (job.status === "failed" ? "#ff8f6d" : "#ffd77b");
+          ctx.fillText(statusLabel, sx + sw - 22, iy + 19);
           ctx.textAlign = "left";
           ctx.font = "italic 12px Georgia";
-          drawClippedText(job.status === "ready" ? `Ready: ${job.rewardLine}` : job.boardNote || job.hint, sx + 22, iy + 38, sw - 44, "#a09880");
+          drawClippedText(job.status === "ready" ? `Ready: ${job.rewardLine}` : (job.status === "failed" ? job.progressLine : job.boardNote || job.hint), sx + 22, iy + 38, sw - 44, "#a09880");
           ctx.font = "11px Georgia";
-          drawClippedText(`${job.availabilityLine || job.regionHint}  ${job.progressLine}  ${job.rewardLine}`, sx + 22, iy + 58, sw - 44, "#c9b889");
+          drawClippedText(`${job.availabilityLine || job.regionHint}  ${job.progressLine}  ${job.rewardLine}${job.bonusLine && job.status === "available" ? `  ${job.bonusLine}` : ""}`, sx + 22, iy + 58, sw - 44, "#c9b889");
         }
       }
     }

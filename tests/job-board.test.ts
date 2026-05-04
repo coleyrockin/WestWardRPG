@@ -29,6 +29,10 @@ describe("jobBoard", () => {
       status: "ready",
       count: 3,
       rewardClaimed: false,
+      startedAt: 0,
+      bonusEligible: false,
+      bonusClaimed: false,
+      failedReason: null,
     });
     expect(state.progressByJobId.broken).toBeUndefined();
   });
@@ -82,13 +86,14 @@ describe("jobBoard", () => {
 
   it("accepts one active job and exposes a compact summary", () => {
     const state = createInitialJobBoardState();
-    const accepted = acceptJob(state, "frontier_slime_bounty");
+    const accepted = acceptJob(state, "frontier_slime_bounty", { time: 12.5 });
     const duplicate = acceptJob(state, "ashfall_scrap_warrant");
 
     expect(accepted.ok).toBe(true);
     expect(accepted.job?.title).toBe("Marsh Slime Bounty");
     expect(state.activeJobId).toBe("frontier_slime_bounty");
     expect(state.progressByJobId.frontier_slime_bounty.status).toBe("active");
+    expect(state.progressByJobId.frontier_slime_bounty.startedAt).toBe(12.5);
     expect(duplicate.ok).toBe(false);
     expect(getActiveJobSummary(state)?.progressLine).toBe("0/3 slimes defeated");
   });
@@ -101,6 +106,10 @@ describe("jobBoard", () => {
       status: "active",
       count: 0,
       rewardClaimed: false,
+      startedAt: 0,
+      bonusEligible: false,
+      bonusClaimed: false,
+      failedReason: null,
     });
     expect(getActiveJobSummary(state)?.status).toBe("active");
   });
@@ -139,7 +148,7 @@ describe("jobBoard", () => {
 
   it("runs courier jobs through pickup, delivery, and return route markers", () => {
     const state = createInitialJobBoardState();
-    acceptJob(state, "frontier_courier_orders");
+    acceptJob(state, "frontier_courier_orders", { time: 10 });
 
     const pickupMarker = resolveJobRouteMarker({
       jobState: state,
@@ -162,7 +171,7 @@ describe("jobBoard", () => {
     expect(pickupMarker?.line).toContain("Dustward Frontier");
     expect(getActiveJobSummary(state)?.progressLine).toBe("Pick up Sealed Orders");
 
-    const pickedUp = recordJobEvent(state, { type: "pickup", targetId: "frontier_orders_cache" });
+    const pickedUp = recordJobEvent(state, { type: "pickup", targetId: "frontier_orders_cache", time: 24 });
     const wrongDelivery = recordJobEvent(state, { type: "deliver", npcId: "merchant" });
 
     expect(pickedUp.ok).toBe(true);
@@ -189,11 +198,30 @@ describe("jobBoard", () => {
     });
     expect(deliveryMarker?.line).toContain("Dustward Frontier");
 
-    const delivered = recordJobEvent(state, { type: "deliver", npcId: "elder" });
+    const delivered = recordJobEvent(state, { type: "deliver", npcId: "elder", time: 64 });
 
     expect(delivered.completed).toBe(true);
+    expect(delivered.progress?.bonusEligible).toBe(true);
     expect(getActiveJobSummary(state)?.status).toBe("ready");
     expect(getActiveJobSummary(state)?.progressLine).toBe("Return to Marshal Boone");
+
+    const claimed = claimJobReward(state, "frontier_courier_orders");
+    expect(claimed.reward).toEqual({ gold: 38, xp: 19, items: { Potion: 1 } });
+    expect(claimed.bonusAwarded).toBe(true);
+  });
+
+  it("keeps courier jobs payable but drops the quick-delivery bonus when late", () => {
+    const state = createInitialJobBoardState();
+    acceptJob(state, "frontier_courier_orders", { time: 0 });
+    recordJobEvent(state, { type: "pickup", targetId: "frontier_orders_cache", time: 20 });
+
+    const delivered = recordJobEvent(state, { type: "deliver", npcId: "elder", time: 140 });
+    const claimed = claimJobReward(state, "frontier_courier_orders");
+
+    expect(delivered.completed).toBe(true);
+    expect(delivered.progress?.bonusEligible).toBe(false);
+    expect(claimed.reward).toEqual({ gold: 30, xp: 16, items: { Potion: 1 } });
+    expect(claimed.bonusAwarded).toBe(false);
   });
 
   it("runs patrol jobs through ordered checkpoints before return", () => {
@@ -283,6 +311,38 @@ describe("jobBoard", () => {
     const delivered = recordJobEvent(state, { type: "dropoff", targetId: "frontier_smith_supply_drop" });
     expect(delivered.completed).toBe(true);
     expect(getActiveJobSummary(state)?.status).toBe("ready");
+  });
+
+  it("fails urgent supply jobs when they miss the posted deadline and lets Boone clear the route", () => {
+    const state = createInitialJobBoardState();
+    acceptJob(state, "frontier_supply_run", { time: 0 });
+    recordJobEvent(state, { type: "pickup", targetId: "frontier_supply_crate", time: 20 });
+
+    const failed = recordJobEvent(state, { type: "dropoff", targetId: "frontier_smith_supply_drop", time: 220 });
+    const marker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 10, y: 8 },
+      resources: [],
+      enemies: [],
+      npcs: [{ id: "warden", x: 12, y: 8 }],
+    });
+
+    expect(failed.failed).toBe(true);
+    expect(getActiveJobSummary(state)?.status).toBe("failed");
+    expect(marker).toMatchObject({
+      kind: "job_failed",
+      action: "fail_turn_in",
+      label: "Report to Marshal Boone",
+      returnTarget: "warden",
+    });
+    const closed = claimJobReward(state, "frontier_supply_run");
+    expect(closed).toMatchObject({
+      ok: true,
+      failed: true,
+      reward: { gold: 0, xp: 0, items: {} },
+    });
+    expect(state.activeJobId).toBe(null);
+    expect(state.progressByJobId.frontier_supply_run).toBeUndefined();
   });
 
   it("claims rewards once and moves the job to completed history", () => {
@@ -383,5 +443,15 @@ describe("jobBoard", () => {
       x: 12.35,
       y: 8.55,
     });
+  });
+
+  it("adds non-combat regional board depth beyond the Frontier", () => {
+    const ashfall = getJobListings({ regionId: "ashfall", playerLevel: 3, jobState: createInitialJobBoardState() });
+    const lantern = getJobListings({ regionId: "ironlantern", playerLevel: 4, jobState: createInitialJobBoardState() });
+
+    expect(ashfall.map((job) => job.id)).toContain("ashfall_cooling_patrol");
+    expect(ashfall.find((job) => job.id === "ashfall_cooling_patrol")?.objective.type).toBe("patrol");
+    expect(lantern.map((job) => job.id)).toContain("ironlantern_signal_courier");
+    expect(lantern.find((job) => job.id === "ironlantern_signal_courier")?.objective.type).toBe("delivery");
   });
 });
