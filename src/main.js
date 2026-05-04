@@ -6977,9 +6977,10 @@ const canvas = document.getElementById("game");
       }
       : null;
     const liveObjective = firstPressure || jobObjective || openingObjective || explorationLead;
+    const liveObjectiveLine = liveObjective?.objectiveLine || liveObjective?.line;
     if (liveObjective && msgY <= topY + topH - 10) {
       ctx.font = "bold 11px Georgia";
-      drawClippedText(`→ ${liveObjective.line}`, topX + 10, msgY, topW - 20, liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "#ffd77b" : "#f3e8cf");
+      drawClippedText(`→ ${liveObjectiveLine}`, topX + 10, msgY, topW - 20, liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "#ffd77b" : "#f3e8cf");
     }
     if (liveObjective) {
       const stripY = topY + topH + 8;
@@ -6992,7 +6993,7 @@ const canvas = document.getElementById("game");
         shadowOffsetY: 3,
       });
       ctx.font = "bold 11px Georgia";
-      drawClippedText(`${liveObjective.title}: ${liveObjective.line}`, topX + 10, stripY + 18, topW - 20, "#ffd77b");
+      drawClippedText(`${liveObjective.title}: ${liveObjectiveLine}`, topX + 10, stripY + 18, topW - 20, "#ffd77b");
     }
 
     if (state.mode === "gameover") {

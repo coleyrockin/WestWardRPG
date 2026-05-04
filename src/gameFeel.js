@@ -122,6 +122,20 @@ const FIRST_CACHE_REWARD_BY_REGION = {
   },
 };
 
+function formatRewardLine(reward = {}) {
+  const items = Object.entries(reward.items || {})
+    .filter(([, count]) => count > 0)
+    .map(([name, count]) => `+${count} ${name}`);
+  return [`+${reward.gold || 0}g`, `+${reward.xp || 0} XP`, ...items].join(", ");
+}
+
+function distanceLine(player = {}, marker = {}) {
+  if (!Number.isFinite(player.x) || !Number.isFinite(player.y)) return "";
+  const distance = Math.hypot((marker.x || 0) - player.x, (marker.y || 0) - player.y);
+  if (!Number.isFinite(distance)) return "";
+  return `${Math.max(1, Math.round(distance))}m`;
+}
+
 export function resolveFirstMinutePressure(input = {}) {
   if (input.mode !== "playing" || input.inHouse) return null;
   const time = Math.max(0, input.time || 0);
@@ -131,24 +145,33 @@ export function resolveFirstMinutePressure(input = {}) {
   const config = FIRST_PRESSURE_BY_REGION[regionId] || FIRST_PRESSURE_BY_REGION.frontier;
   const x = config.anchorX + config.offsetX;
   const y = config.anchorY + config.offsetY;
+  const marker = {
+    kind: "pressure",
+    label: config.label,
+    x: Number(x.toFixed(2)),
+    y: Number(y.toFixed(2)),
+    color: config.color,
+    size: 0.82,
+    blocking: false,
+  };
+  const reward = FIRST_CACHE_REWARD_BY_REGION[regionId] || FIRST_CACHE_REWARD_BY_REGION.frontier;
+  const rewardLine = formatRewardLine(reward);
+  const routeDistance = distanceLine(input.player, marker);
+  const actionLabel = "Open cache";
 
   return {
     id: `${regionId}-first-pressure`,
     title: config.title,
     line: config.line,
+    objectiveLine: `${actionLabel}: ${config.label}${routeDistance ? ` • ${routeDistance}` : ""} • ${rewardLine}`,
+    actionLabel,
+    distanceLine: routeDistance,
+    rewardLine,
     routeLabel: config.routeLabel,
     rewardHint: config.rewardHint,
     threatHint: config.threatHint,
     urgency: time < 18 ? "soft" : time < 55 ? "high" : "urgent",
-    marker: {
-      kind: "pressure",
-      label: config.label,
-      x: Number(x.toFixed(2)),
-      y: Number(y.toFixed(2)),
-      color: config.color,
-      size: 0.82,
-      blocking: false,
-    },
+    marker,
   };
 }
 

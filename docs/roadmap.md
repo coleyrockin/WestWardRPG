@@ -18,7 +18,7 @@ Open-world RPG target: push the game toward a compact Skyrim/Oblivion feel withi
 
 Latest local verification:
 - `git diff --check` → clean.
-- `npm test` -> **334 passing across 35 test files**.
+- `npm test` -> **335 passing across 35 test files**.
 - `npm run typecheck:ts` → clean.
 - `npm run test:syntax` → clean.
 - `npm run dev:lint` → clean.
@@ -116,7 +116,7 @@ Build slices:
 - **Codex / lore browser** (`src/codex.js`) — KeyZ opens a tabbed lore screen (regions / enemies / items / factions / ideology). Entries unlock on first encounter (region unlock, first kill of an enemy archetype). Shows `???` + "(undiscovered)" until unlocked. Progress count in header.
 
 ## Test + Build Status
-- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 334 passing across 35 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
+- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 335 passing across 35 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
 - v1/v2/v3 save fixtures all migrate cleanly with backfilled defaults.
 
 ## Next Work — Pillar 5: Narrative depth
@@ -331,7 +331,7 @@ Build slices:
 
 ## Next Agent Handoff
 
-Current shipped direction: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, Boone job-board choices, salvage/courier/patrol/supply/rescue/escort jobs, timed job bonuses, failed-job report states, richer job route markers, in-world board prop, NPC memory, vendor service notes, first-pass enemy readability cues, first-pass gameplay-feel helpers, near-wall projection repair, and smoke/debug text fields are in scope. Fast verification is 334 tests across 35 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should keep pushing player-visible loops: pet/house utility, local dialogue UI, stronger visual open-world composition, and regional board props.
+Current shipped direction: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, Boone job-board choices, salvage/courier/patrol/supply/rescue/escort jobs, timed job bonuses, failed-job report states, richer job route markers, in-world board prop, NPC memory, vendor service notes, first-pass enemy readability cues, first-pass gameplay-feel helpers, near-wall projection repair, and smoke/debug text fields are in scope. Fast verification is 335 tests across 35 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should keep pushing player-visible loops: pet/house utility, local dialogue UI, stronger visual open-world composition, and regional board props.
 
 ### User signal to respect
 

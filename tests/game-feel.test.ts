@@ -66,6 +66,24 @@ describe("gameFeel", () => {
     expect(pressure?.threatHint.length).toBeGreaterThan(8);
   });
 
+  it("adds first-minute distance, action, and reward text for HUD clarity", () => {
+    const pressure = resolveFirstMinutePressure({
+      mode: "playing",
+      time: 24,
+      inHouse: false,
+      regionId: "frontier",
+      player: { x: 9.5, y: 8.5 },
+      inventory: { "Slime Core": 0 },
+      quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+    });
+
+    expect(pressure?.actionLabel).toBe("Open cache");
+    expect(pressure?.distanceLine).toBe("3m");
+    expect(pressure?.rewardLine).toBe("+12g, +6 XP, +1 Potion, +1 Slime Core");
+    expect(pressure?.objectiveLine).toContain("3m");
+    expect(pressure?.objectiveLine).toContain("+12g");
+  });
+
   it("anchors first-minute pressure to a real region marker instead of player movement", () => {
     const baseInput = {
       mode: "playing",

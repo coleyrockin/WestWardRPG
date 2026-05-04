@@ -55,7 +55,7 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, and early Phase A open-world pressure/dressing work.
 
-Latest local fast gate: `npm test` reports **334 passing tests across 35 files**. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **335 passing tests across 35 files**. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
