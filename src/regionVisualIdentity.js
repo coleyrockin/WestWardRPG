@@ -53,7 +53,13 @@ const REGION_PRESENTATION = {
   frontier: {
     anchor: { x: 9.5, y: 8.5 },
     routeLine: "marshal road east past the town circle",
+    compositionLine: "marshal road frames the town cluster, watchtower, and gate silhouettes from the first view",
     landmark: { kind: "landmark", label: "North Watchtower", dx: 4.7, dy: -1.25, color: "#d9b66d", size: 1.38 },
+    vistas: [
+      { kind: "town", label: "Town Silhouette", dx: 1.65, dy: -0.75, color: "#caa66c", size: 1.12 },
+      { kind: "watchtower", label: "Watchtower Frame", dx: 4.15, dy: -1.65, color: "#d9b66d", size: 1.0 },
+      { kind: "gate", label: "Town Gate Posts", dx: 2.55, dy: -0.85, color: "#b9824d", size: 0.86 },
+    ],
     roads: [
       { kind: "road", label: "Marshal Road Post", dx: 1.35, dy: 0.2, color: "#c8a56a", size: 0.42 },
       { kind: "road", label: "Town Circle Marker", dx: 2.45, dy: 0.15, color: "#d7b06d", size: 0.44 },
@@ -72,7 +78,13 @@ const REGION_PRESENTATION = {
   ashfall: {
     anchor: { x: 39.5, y: 39.5 },
     routeLine: "slag road between mine ribs and cooling wells",
+    compositionLine: "slag road frames mine ribs, heat flags, and a smoking tower from the first basin view",
     landmark: { kind: "landmark", label: "Slag Tower", dx: 3.9, dy: -1.6, color: "#e08a4a", size: 1.46 },
+    vistas: [
+      { kind: "mine", label: "Mine Rib Silhouette", dx: 1.75, dy: -0.85, color: "#80533d", size: 1.05 },
+      { kind: "tower", label: "Smoking Slag Tower", dx: 3.95, dy: -1.85, color: "#e08a4a", size: 1.08 },
+      { kind: "gate", label: "Cooling Gate", dx: 2.8, dy: -0.9, color: "#9b6753", size: 0.9 },
+    ],
     roads: [
       { kind: "road", label: "Slag Road Rib", dx: 1.25, dy: 0.15, color: "#c07a49", size: 0.44 },
       { kind: "road", label: "Cooling Well Marker", dx: 2.45, dy: 0.05, color: "#e08a4a", size: 0.44 },
@@ -89,7 +101,13 @@ const REGION_PRESENTATION = {
   ironlantern: {
     anchor: { x: 14.5, y: 39.5 },
     routeLine: "signal lane under the blue checkpoint mast",
+    compositionLine: "signal lane frames the mast, gate lights, and watched street silhouettes from the first district view",
     landmark: { kind: "landmark", label: "Signal Mast", dx: 4.2, dy: -1.35, color: "#8fc8ff", size: 1.5 },
+    vistas: [
+      { kind: "signal", label: "Signal Mast Frame", dx: 4.05, dy: -1.7, color: "#8fc8ff", size: 1.08 },
+      { kind: "checkpoint", label: "Checkpoint Silhouette", dx: 2.25, dy: -0.85, color: "#657a9b", size: 0.92 },
+      { kind: "gate", label: "Gate Light Pair", dx: 3.1, dy: -0.65, color: "#9bd3ff", size: 0.86 },
+    ],
     roads: [
       { kind: "road", label: "Signal Lane Plate", dx: 1.3, dy: 0.18, color: "#8fc8ff", size: 0.44 },
       { kind: "road", label: "Curfew Line Marker", dx: 2.45, dy: 0.02, color: "#c8a8ff", size: 0.44 },
@@ -169,7 +187,9 @@ export function buildRegionWorldPresentation(regionId, context = {}) {
     regionId: profile.id,
     label: profile.label,
     routeLine: config.routeLine,
+    compositionLine: config.compositionLine,
     landmark: placeSpec(config.landmark, anchor, context),
+    vistas: (config.vistas || []).map((vista) => placeSpec(vista, anchor, context)),
     roads: (config.roads || []).map((road) => placeSpec(road, anchor, context)),
     props: config.props.map((prop) => placeSpec(prop, anchor, context)),
   };

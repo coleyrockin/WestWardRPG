@@ -44,6 +44,21 @@ describe("regionVisualIdentity", () => {
     expect(presentation.roads.some((road: any) => road.label.includes("Marshal"))).toBe(true);
   });
 
+  it("adds first-view composition with validated vista silhouettes", () => {
+    const presentation = buildRegionWorldPresentation("frontier", { playerX: 9.5, playerY: 8.5 });
+
+    expect(presentation.compositionLine).toContain("road");
+    expect(presentation.compositionLine).toContain("town");
+    expect(presentation.vistas.length).toBeGreaterThanOrEqual(3);
+    expect(presentation.vistas.every((vista: any) => vista.blocking === false)).toBe(true);
+    expect(presentation.vistas.map((vista: any) => vista.kind)).toEqual(expect.arrayContaining([
+      "town",
+      "watchtower",
+      "gate",
+    ]));
+    expect(presentation.vistas.find((vista: any) => vista.kind === "town")?.label).toContain("Town");
+  });
+
   it("moves props to map-valid visible tiles when a generated coordinate is blocked", () => {
     const blocked = new Set(["11.50,9.10"]);
     const isPassable = (x: number, y: number) => !blocked.has(`${x.toFixed(2)},${y.toFixed(2)}`);
@@ -55,7 +70,7 @@ describe("regionVisualIdentity", () => {
       isVisible,
     });
 
-    const placements = [presentation.landmark, ...presentation.props, ...presentation.roads];
+    const placements = [presentation.landmark, ...presentation.props, ...presentation.roads, ...presentation.vistas];
     expect(placements.every((item: any) => isPassable(item.x, item.y) && isVisible(item.x, item.y))).toBe(true);
     expect(presentation.props.find((prop: any) => prop.kind === "sign")).toMatchObject({
       placement: "adjusted",
@@ -70,5 +85,6 @@ describe("regionVisualIdentity", () => {
     expect(lantern.landmark.label).toContain("Signal");
     expect(ashfall.props.map((prop: any) => prop.label)).not.toEqual(lantern.props.map((prop: any) => prop.label));
     expect(ashfall.roads.map((road: any) => road.label)).not.toEqual(lantern.roads.map((road: any) => road.label));
+    expect(ashfall.vistas.map((vista: any) => vista.label)).not.toEqual(lantern.vistas.map((vista: any) => vista.label));
   });
 });

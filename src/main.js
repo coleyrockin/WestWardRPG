@@ -5830,6 +5830,60 @@ const canvas = document.getElementById("game");
         ctx.moveTo(spriteWidth * 0.16, spriteHeight * 0.72);
         ctx.lineTo(spriteWidth * 0.84, spriteHeight * 0.62);
         ctx.stroke();
+      } else if (sprite.propKind === "town" || sprite.propKind === "checkpoint") {
+        ctx.fillStyle = shadeHex(color, 0.45);
+        ctx.fillRect(spriteWidth * 0.18, spriteHeight * 0.5, spriteWidth * 0.18, spriteHeight * 0.34);
+        ctx.fillRect(spriteWidth * 0.41, spriteHeight * 0.38, spriteWidth * 0.2, spriteHeight * 0.46);
+        ctx.fillRect(spriteWidth * 0.66, spriteHeight * 0.55, spriteWidth * 0.16, spriteHeight * 0.29);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.16, spriteHeight * 0.5);
+        ctx.lineTo(spriteWidth * 0.27, spriteHeight * 0.35);
+        ctx.lineTo(spriteWidth * 0.38, spriteHeight * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.39, spriteHeight * 0.38);
+        ctx.lineTo(spriteWidth * 0.51, spriteHeight * 0.2);
+        ctx.lineTo(spriteWidth * 0.63, spriteHeight * 0.38);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 235, 175, 0.22)";
+        ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.58, spriteWidth * 0.1, spriteHeight * 0.12);
+      } else if (sprite.propKind === "watchtower" || sprite.propKind === "tower" || sprite.propKind === "signal") {
+        ctx.fillStyle = shadeHex(color, 0.42);
+        ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.24, spriteWidth * 0.08, spriteHeight * 0.64);
+        ctx.fillStyle = color;
+        ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.16, spriteWidth * 0.4, spriteHeight * 0.12);
+        ctx.strokeStyle = hexToRgbaUtil(color, 0.55);
+        ctx.lineWidth = Math.max(1, spriteWidth * 0.028);
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.46, spriteHeight * 0.34);
+        ctx.lineTo(spriteWidth * 0.32, spriteHeight * 0.88);
+        ctx.moveTo(spriteWidth * 0.54, spriteHeight * 0.34);
+        ctx.lineTo(spriteWidth * 0.68, spriteHeight * 0.88);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255, 248, 205, 0.38)";
+        ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.08, spriteWidth * 0.06, spriteHeight * 0.12);
+      } else if (sprite.propKind === "gate") {
+        ctx.fillStyle = shadeHex(color, 0.48);
+        ctx.fillRect(spriteWidth * 0.24, spriteHeight * 0.28, spriteWidth * 0.1, spriteHeight * 0.6);
+        ctx.fillRect(spriteWidth * 0.66, spriteHeight * 0.28, spriteWidth * 0.1, spriteHeight * 0.6);
+        ctx.fillStyle = color;
+        ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.24, spriteWidth * 0.56, spriteHeight * 0.08);
+        ctx.fillStyle = "rgba(255, 235, 175, 0.3)";
+        ctx.fillRect(spriteWidth * 0.28, spriteHeight * 0.36, spriteWidth * 0.06, spriteHeight * 0.1);
+        ctx.fillRect(spriteWidth * 0.66, spriteHeight * 0.36, spriteWidth * 0.06, spriteHeight * 0.1);
+      } else if (sprite.propKind === "mine") {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(2, spriteWidth * 0.07);
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.18, spriteHeight * 0.84);
+        ctx.lineTo(spriteWidth * 0.5, spriteHeight * 0.22);
+        ctx.lineTo(spriteWidth * 0.82, spriteHeight * 0.84);
+        ctx.moveTo(spriteWidth * 0.3, spriteHeight * 0.64);
+        ctx.lineTo(spriteWidth * 0.7, spriteHeight * 0.64);
+        ctx.stroke();
       } else if (sprite.propKind === "road") {
         ctx.fillStyle = shadeHex(color, 0.52);
         ctx.fillRect(spriteWidth * 0.45, spriteHeight * 0.42, spriteWidth * 0.1, spriteHeight * 0.44);
@@ -6215,6 +6269,15 @@ const canvas = document.getElementById("game");
         label: regionPresentation.landmark.label,
         size: regionPresentation.landmark.size || 1.2,
       });
+      for (const vista of regionPresentation.vistas || []) {
+        sprites.push({
+          ...vista,
+          kind: "world-prop",
+          propKind: vista.kind,
+          label: vista.label,
+          size: vista.size || 0.94,
+        });
+      }
       for (const road of regionPresentation.roads || []) {
         sprites.push({
           ...road,
@@ -6783,6 +6846,9 @@ const canvas = document.getElementById("game");
       }
       const presentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
       drawDot(presentation.landmark.x, presentation.landmark.y, presentation.landmark.color || "#ffd77b", 3.2);
+      for (const vista of presentation.vistas || []) {
+        drawDot(vista.x, vista.y, vista.color || "#ffd77b", 2.4);
+      }
       for (const road of presentation.roads || []) {
         drawDot(road.x, road.y, road.color || "#d7b06d", 1.7);
       }
