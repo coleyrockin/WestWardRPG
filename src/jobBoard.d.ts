@@ -8,3 +8,4 @@ export function acceptJob(jobState: any, jobId: string): any;
 export function recordJobEvent(jobState: any, event?: any): any;
 export function claimJobReward(jobState: any, jobId?: string | null): any;
 export function getActiveJobSummary(jobState: any): any;
+export function resolveJobRouteMarker(options?: any): any;

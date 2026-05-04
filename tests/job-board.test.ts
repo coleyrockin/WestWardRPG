@@ -8,6 +8,7 @@ import {
   getJobListings,
   normalizeJobBoardState,
   recordJobEvent,
+  resolveJobRouteMarker,
 } from "../src/jobBoard.js";
 
 describe("jobBoard", () => {
@@ -139,5 +140,70 @@ describe("jobBoard", () => {
     expect(state.completedJobIds).toEqual(["frontier_slime_bounty"]);
     expect(state.progressByJobId.frontier_slime_bounty.rewardClaimed).toBe(true);
     expect(secondClaim.ok).toBe(false);
+  });
+
+  it("points salvage jobs at the nearest matching resource", () => {
+    const state = createInitialJobBoardState();
+    acceptJob(state, "frontier_road_salvage");
+
+    const marker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 5, y: 5 },
+      resources: [
+        { type: "tree", x: 5.5, y: 5, harvested: false },
+        { type: "rock", x: 11, y: 11, harvested: false },
+        { type: "rock", x: 6, y: 5, harvested: false },
+      ],
+      enemies: [],
+      npcs: [],
+    });
+
+    expect(marker).toMatchObject({
+      kind: "job_resource",
+      jobId: "frontier_road_salvage",
+      label: "Roadside Salvage",
+      x: 6,
+      y: 5,
+      distance: 1,
+    });
+  });
+
+  it("points bounty jobs at matching enemies and ready jobs back to the NPC", () => {
+    const state = createInitialJobBoardState();
+    acceptJob(state, "frontier_slime_bounty");
+
+    const target = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 2, y: 2 },
+      resources: [],
+      enemies: [
+        { type: "brute", behavior: "tank", x: 2.5, y: 2, alive: true },
+        { type: "slime", behavior: "balanced", x: 9, y: 9, alive: true },
+        { type: "slime", behavior: "balanced", x: 3, y: 2, alive: true },
+      ],
+      npcs: [{ id: "warden", x: 10, y: 10 }],
+    });
+
+    expect(target).toMatchObject({ kind: "job_bounty", jobId: "frontier_slime_bounty", x: 3, y: 2, distance: 1 });
+
+    recordJobEvent(state, { type: "kill", enemyType: "slime", behavior: "balanced" });
+    recordJobEvent(state, { type: "kill", enemyType: "slime", behavior: "balanced" });
+    recordJobEvent(state, { type: "kill", enemyType: "slime", behavior: "balanced" });
+
+    const turnIn = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 2, y: 2 },
+      resources: [],
+      enemies: [],
+      npcs: [{ id: "warden", x: 10, y: 10 }],
+    });
+
+    expect(turnIn).toMatchObject({
+      kind: "job_turn_in",
+      jobId: "frontier_slime_bounty",
+      label: "Return to Marshal Boone",
+      x: 10,
+      y: 10,
+    });
   });
 });

@@ -317,3 +317,87 @@ export function getActiveJobSummary(jobState) {
   if (!job) return null;
   return decorateJob(job, safeState.progressByJobId[job.id]);
 }
+
+function distanceFrom(player = {}, target = {}) {
+  const dx = (target.x || 0) - (player.x || 0);
+  const dy = (target.y || 0) - (player.y || 0);
+  return Math.hypot(dx, dy);
+}
+
+function nearestMatching(list, player, predicate) {
+  let best = null;
+  let bestDistance = Infinity;
+  for (const item of Array.isArray(list) ? list : []) {
+    if (!item || !predicate(item)) continue;
+    const distance = distanceFrom(player, item);
+    if (distance < bestDistance) {
+      best = item;
+      bestDistance = distance;
+    }
+  }
+  return best ? { target: best, distance: Number(bestDistance.toFixed(2)) } : null;
+}
+
+export function resolveJobRouteMarker({ jobState, player = {}, resources = [], enemies = [], npcs = [] } = {}) {
+  const activeJob = getActiveJobSummary(jobState);
+  if (!activeJob) return null;
+  const objective = activeJob.objective || {};
+
+  if (activeJob.status === "ready") {
+    const npc = nearestMatching(npcs, player, (entry) => entry.id === activeJob.npcId);
+    if (!npc) return null;
+    return {
+      kind: "job_turn_in",
+      jobId: activeJob.id,
+      title: "Job ready",
+      label: `Return to ${activeJob.npcName}`,
+      line: `${activeJob.title}: claim ${activeJob.rewardLine}`,
+      x: npc.target.x,
+      y: npc.target.y,
+      color: "#5fe0b5",
+      distance: npc.distance,
+    };
+  }
+
+  if (objective.type === "collect") {
+    const resource = nearestMatching(resources, player, (entry) => (
+      !entry.harvested
+      && (!objective.resourceType || entry.type === objective.resourceType)
+      && (!objective.item || entry.item === objective.item || entry.label === objective.item || objective.item === "Stone" && entry.type === "rock")
+    ));
+    if (!resource) return null;
+    return {
+      kind: "job_resource",
+      jobId: activeJob.id,
+      title: "Job target",
+      label: activeJob.title,
+      line: activeJob.progressLine,
+      x: resource.target.x,
+      y: resource.target.y,
+      color: "#ffd77b",
+      distance: resource.distance,
+    };
+  }
+
+  if (objective.type === "kill") {
+    const enemy = nearestMatching(enemies, player, (entry) => (
+      entry.alive !== false
+      && (!objective.enemyType || entry.type === objective.enemyType)
+      && (!objective.behavior || entry.behavior === objective.behavior)
+    ));
+    if (!enemy) return null;
+    return {
+      kind: "job_bounty",
+      jobId: activeJob.id,
+      title: "Bounty target",
+      label: activeJob.title,
+      line: activeJob.progressLine,
+      x: enemy.target.x,
+      y: enemy.target.y,
+      color: "#ffb46d",
+      distance: enemy.distance,
+    };
+  }
+
+  return null;
+}

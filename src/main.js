@@ -113,6 +113,7 @@ import {
   getJobListings,
   normalizeJobBoardState,
   recordJobEvent,
+  resolveJobRouteMarker,
 } from "./jobBoard.js";
 import {
   createInitialNpcMemoryState,
@@ -3079,6 +3080,17 @@ const canvas = document.getElementById("game");
     });
   }
 
+  function getJobRouteMarker() {
+    if (state.player.inHouse) return null;
+    return resolveJobRouteMarker({
+      jobState: state.world.jobs,
+      player: state.player,
+      resources: state.resources,
+      enemies: state.enemies,
+      npcs: state.npcs,
+    });
+  }
+
   function openJobBoard() {
     const choices = getWardenJobChoices();
     if (choices.length === 0) return false;
@@ -5618,6 +5630,28 @@ const canvas = document.getElementById("game");
         ctx.fillStyle = "rgba(255,255,255,0.2)";
         ctx.fillRect(spriteWidth * 0.32, spriteHeight * 0.52, spriteWidth * 0.18, spriteHeight * 0.08);
       }
+    } else if (sprite.kind === "job-route") {
+      const color = sprite.color || "#ffd77b";
+      const pulse = 0.5 + Math.sin(state.time * 5.5) * 0.5;
+      ctx.fillStyle = `rgba(255, 235, 155, ${0.16 + pulse * 0.12})`;
+      ctx.beginPath();
+      ctx.arc(spriteWidth * 0.5, spriteHeight * 0.52, spriteWidth * (0.36 + pulse * 0.1), 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = shadeHex(color, 0.48);
+      ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.36, spriteWidth * 0.08, spriteHeight * 0.5);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(spriteWidth * 0.5, spriteHeight * 0.08);
+      ctx.lineTo(spriteWidth * 0.72, spriteHeight * 0.42);
+      ctx.lineTo(spriteWidth * 0.56, spriteHeight * 0.42);
+      ctx.lineTo(spriteWidth * 0.56, spriteHeight * 0.68);
+      ctx.lineTo(spriteWidth * 0.44, spriteHeight * 0.68);
+      ctx.lineTo(spriteWidth * 0.44, spriteHeight * 0.42);
+      ctx.lineTo(spriteWidth * 0.28, spriteHeight * 0.42);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(32, 22, 10, 0.45)";
+      ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.32, spriteWidth * 0.08, spriteHeight * 0.18);
     } else if (sprite.kind === "house-door") {
       ctx.fillStyle = state.house.unlocked ? "#7f694a" : "#5f4f3a";
       ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.22, spriteWidth * 0.4, spriteHeight * 0.72);
@@ -5967,6 +6001,15 @@ const canvas = document.getElementById("game");
           size: poiLead.kind === "camp" ? 1.02 : 0.9,
         });
       }
+      const jobMarker = getJobRouteMarker();
+      if (jobMarker) {
+        sprites.push({
+          ...jobMarker,
+          kind: "job-route",
+          label: jobMarker.label,
+          size: jobMarker.kind === "job_turn_in" ? 0.94 : 0.82,
+        });
+      }
 
       for (const npc of state.npcs) {
         sprites.push({ x: npc.x, y: npc.y, color: npc.color, label: npc.name, size: 1.04, kind: "npc" });
@@ -6118,7 +6161,8 @@ const canvas = document.getElementById("game");
         || sprite.kind === "enemy"
         || sprite.kind === "chest"
         || sprite.kind === "house-door"
-        || sprite.kind === "pressure";
+        || sprite.kind === "pressure"
+        || sprite.kind === "job-route";
       if (state.mode === "playing" && sprite.label && centeredLabel && sprite.distToPlayer < 5.8 && labelImportant) {
         ctx.font = "bold 11px Georgia";
         drawPillLabel(fitText(sprite.label, 116), left + spriteWidth / 2, top - 10);
@@ -6465,6 +6509,11 @@ const canvas = document.getElementById("game");
         const blink = 0.5 + (Math.sin(state.time * 5) + 1) * 0.5;
         drawDot(pressure.marker.x, pressure.marker.y, pressure.marker.color || "#ffd77b", 2.4 + blink);
       }
+      const jobMarker = getJobRouteMarker();
+      if (jobMarker) {
+        const blink = 0.5 + (Math.sin(state.time * 5.5) + 1) * 0.5;
+        drawDot(jobMarker.x, jobMarker.y, jobMarker.color || "#ffd77b", 2.8 + blink);
+      }
 
       // POI pings: blink nearby undiscovered POIs.
       if (state.regions?.activeRegion) {
@@ -6695,10 +6744,13 @@ const canvas = document.getElementById("game");
     const explorationLead = !state.player.inHouse && state.regions?.activeRegion
       ? resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 32 })
       : null;
+    const jobMarker = getJobRouteMarker();
     const jobObjective = activeJob
       ? {
-        title: activeJob.status === "ready" ? "Bounty ready" : "Bounty",
-        line: activeJob.status === "ready" ? `Return to ${activeJob.npcName} for ${activeJob.rewardLine}` : `${activeJob.title}: ${activeJob.progressLine}`,
+        title: activeJob.status === "ready" ? "Job ready" : "Job route",
+        line: activeJob.status === "ready"
+          ? `Return to ${activeJob.npcName} for ${activeJob.rewardLine}${jobMarker ? ` (${jobMarker.distance}m)` : ""}`
+          : `${activeJob.title}: ${activeJob.progressLine}${jobMarker ? ` (${jobMarker.distance}m)` : ""}`,
         urgency: activeJob.status === "ready" ? "high" : "medium",
       }
       : null;
@@ -7741,6 +7793,7 @@ const canvas = document.getElementById("game");
       playerLevel: state.player.level,
       jobState: state.world.jobs,
     });
+    const jobRouteMarker = getJobRouteMarker();
     const quests = {
       crystal: {
         title: state.quests.crystal.title,
@@ -7854,6 +7907,7 @@ const canvas = document.getElementById("game");
         state: normalizeJobBoardState(state.world.jobs),
         active_job: activeJob,
         listings: jobListings,
+        route_marker: jobRouteMarker,
       },
       exploration_renown: explorationRenown,
       run_summary: runSummary,
