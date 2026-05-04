@@ -4,6 +4,7 @@ import {
   claimJobReward,
   createInitialJobBoardState,
   getActiveJobSummary,
+  getJobBoardPresentation,
   getJobBoardProp,
   getJobBoardChoices,
   getJobListings,
@@ -86,6 +87,26 @@ describe("jobBoard", () => {
       rewardLine: "+38g, +18 XP, +1 Potion",
       regionHint: "Dustward Frontier",
     });
+  });
+
+  it("builds region-aware job-board presentation copy", () => {
+    const frontier = getJobBoardPresentation({ regionId: "frontier" });
+    const ashfall = getJobBoardPresentation({ regionId: "ashfall" });
+    const lantern = getJobBoardPresentation({ regionId: "ironlantern" });
+
+    expect(frontier).toMatchObject({
+      title: "Marshal Boone's Job Board",
+      subtitle: "Dustward Frontier work: road law, town defense, rescue, and escort pay.",
+    });
+    expect(ashfall).toMatchObject({
+      title: "Ashfall Warrant Board",
+      subtitle: "Ashfall Basin work: salvage warrants, cooling patrols, and heat-risk bonuses.",
+    });
+    expect(lantern).toMatchObject({
+      title: "Lantern Quiet Board",
+      subtitle: "Iron Lantern work: watched routes, quiet couriers, and signal-risk pay.",
+    });
+    expect(ashfall.emptyLine).toContain("Ashfall");
   });
 
   it("accepts one active job and exposes a compact summary", () => {

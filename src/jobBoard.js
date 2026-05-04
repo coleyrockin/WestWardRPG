@@ -361,6 +361,32 @@ const JOB_BOARD_PROPS = {
   },
 };
 
+const JOB_BOARD_PRESENTATION = {
+  frontier: {
+    title: "Marshal Boone's Job Board",
+    subtitle: "Dustward Frontier work: road law, town defense, rescue, and escort pay.",
+    emptyLine: "No posted work in Dustward Frontier.",
+    openLine: "Marshal Boone opens the job board.",
+  },
+  ashfall: {
+    title: "Ashfall Warrant Board",
+    subtitle: "Ashfall Basin work: salvage warrants, cooling patrols, and heat-risk bonuses.",
+    emptyLine: "No Ashfall warrants are posted.",
+    openLine: "Marshal Boone checks the Ashfall warrant board.",
+  },
+  ironlantern: {
+    title: "Lantern Quiet Board",
+    subtitle: "Iron Lantern work: watched routes, quiet couriers, and signal-risk pay.",
+    emptyLine: "No Iron Lantern quiet work is posted.",
+    openLine: "Marshal Boone lowers his voice at the Lantern board.",
+  },
+};
+
+export function getJobBoardPresentation({ regionId = "frontier" } = {}) {
+  const presentation = JOB_BOARD_PRESENTATION[regionId] || JOB_BOARD_PRESENTATION.frontier;
+  return { ...presentation, regionId: JOB_BOARD_PRESENTATION[regionId] ? regionId : "frontier" };
+}
+
 export function getJobBoardProp({ regionId = "frontier" } = {}) {
   const prop = JOB_BOARD_PROPS[regionId] || JOB_BOARD_PROPS.frontier;
   return { ...prop };

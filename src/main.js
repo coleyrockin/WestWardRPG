@@ -109,6 +109,7 @@ import {
   claimJobReward,
   createInitialJobBoardState,
   getActiveJobSummary,
+  getJobBoardPresentation,
   getJobBoardProp,
   getJobBoardChoices,
   getJobListings,
@@ -3184,6 +3185,7 @@ const canvas = document.getElementById("game");
   function openJobBoard() {
     const choices = getBooneJobChoices();
     if (choices.length === 0) return false;
+    const boardCopy = getJobBoardPresentation({ regionId: state.regions.activeRegion });
     jobBoardOpen = true;
     jobBoardSelection = 0;
     shopOpen = false;
@@ -3192,7 +3194,7 @@ const canvas = document.getElementById("game");
     settingsOpen = false;
     codexOpen = false;
     characterSheetOpen = false;
-    logMsg("Marshal Boone opens the job board.");
+    logMsg(boardCopy.openLine);
     sfx.npcChat();
     return true;
   }
@@ -7352,6 +7354,7 @@ const canvas = document.getElementById("game");
     /* Job board overlay */
     if (jobBoardOpen && state.mode === "playing") {
       const choices = getBooneJobChoices();
+      const boardCopy = getJobBoardPresentation({ regionId: state.regions.activeRegion });
       if (jobBoardSelection >= choices.length) jobBoardSelection = Math.max(0, choices.length - 1);
       const sw = Math.min(540, canvas.width - margin * 2);
       const rows = Math.max(1, Math.min(7, choices.length || 1, Math.max(3, Math.floor((canvas.height - margin * 2 - 108) / 78))));
@@ -7365,13 +7368,13 @@ const canvas = document.getElementById("game");
         border: "rgba(255, 211, 107, 0.55)",
       });
       ctx.font = "bold 20px Georgia";
-      drawClippedText("Marshal Boone's Job Board", sx + 16, sy + 30, sw - 32, "#ffd77b");
+      drawClippedText(boardCopy.title, sx + 16, sy + 30, sw - 32, "#ffd77b");
       ctx.font = "12px Georgia";
-      drawClippedText(`↑/↓ select  Enter/E accept or claim  Esc close  ${Math.min(jobBoardSelection + 1, choices.length || 1)}/${choices.length || 0}`, sx + 16, sy + 52, sw - 32, "#c9b889");
+      drawClippedText(`${boardCopy.subtitle}  ${Math.min(jobBoardSelection + 1, choices.length || 1)}/${choices.length || 0}`, sx + 16, sy + 52, sw - 32, "#c9b889");
       if (choices.length === 0) {
         fillRoundedRect(sx + 10, sy + 72, sw - 20, 54, 7, "rgba(255, 255, 255, 0.055)");
         ctx.font = "italic 13px Georgia";
-        drawClippedText("No posted work in this region.", sx + 22, sy + 104, sw - 44, "#b8a792");
+        drawClippedText(boardCopy.emptyLine, sx + 22, sy + 104, sw - 44, "#b8a792");
       } else {
         for (let visible = 0; visible < Math.min(rows, choices.length); visible++) {
           const i = firstJobRow + visible;

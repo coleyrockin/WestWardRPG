@@ -1,4 +1,5 @@
 export const JOB_DEFINITIONS: Record<string, any>;
+export function getJobBoardPresentation(options?: any): any;
 export function getJobBoardProp(options?: any): any;
 export function createInitialJobBoardState(): any;
 export function normalizeJobBoardState(source?: any): any;
