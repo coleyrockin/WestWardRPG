@@ -109,6 +109,7 @@ import {
   claimJobReward,
   createInitialJobBoardState,
   getActiveJobSummary,
+  getJobBoardChoices,
   getJobListings,
   normalizeJobBoardState,
   recordJobEvent,
@@ -1140,6 +1141,7 @@ const canvas = document.getElementById("game");
     settingsOpen = false;
     codexOpen = false;
     characterSheetOpen = false;
+    jobBoardOpen = false;
     logMsg("Choose how this quest changes Dustward.");
     return true;
   }
@@ -1192,6 +1194,7 @@ const canvas = document.getElementById("game");
     settingsOpen = false;
     codexOpen = false;
     characterSheetOpen = false;
+    jobBoardOpen = false;
     state.mouseButtons.left = false;
     state.mouseButtons.right = false;
     state.player.blocking = false;
@@ -1275,6 +1278,8 @@ const canvas = document.getElementById("game");
   let shopOpen = false;
   let workbenchOpen = false;
   let workbenchSelection = 0;
+  let jobBoardOpen = false;
+  let jobBoardSelection = 0;
   const shopItems = [
     {
       nameKey: "shop.healthPotionName", cost: 18, descKey: "shop.healthPotionDesc",
@@ -3051,37 +3056,83 @@ const canvas = document.getElementById("game");
     return result;
   }
 
-  function handleWardenJobBoard() {
+  function recordCollectionForJobs(resourceType, item, label = item) {
     state.world.jobs = normalizeJobBoardState(state.world.jobs);
-    const activeJob = getActiveJobSummary(state.world.jobs);
-    if (activeJob?.npcId === "warden") {
-      if (activeJob.status === "ready") {
-        const paid = claimJobReward(state.world.jobs, activeJob.id);
-        if (paid.ok) {
-          grantJobReward(paid.reward);
-          logMsg(`Bounty paid: ${paid.job.title}. ${rewardLine(paid.reward)}.`);
-          sfx.questDone();
-          spawnParticles(canvas.width / 2, canvas.height / 2, 14, "#ffd36b", 3.4, 1.1, { decorative: true });
-          return true;
-        }
-      }
-      logMsg(`Marshal Boone: ${activeJob.title} is still open. ${activeJob.progressLine}.`);
-      sfx.npcChat();
-      return true;
-    }
+    const result = recordJobEvent(state.world.jobs, {
+      type: "collect",
+      resourceType,
+      item,
+      label,
+      regionId: state.regions.activeRegion,
+    });
+    if (result.ok && result.message) logMsg(result.message);
+    return result;
+  }
 
-    const listings = getJobListings({
+  function getWardenJobChoices() {
+    return getJobBoardChoices({
       regionId: state.regions.activeRegion,
       playerLevel: state.player.level,
       jobState: state.world.jobs,
-    }).filter((job) => job.npcId === "warden");
-    if (listings.length === 0) return false;
+      npcId: "warden",
+      limit: 3,
+    });
+  }
 
-    const accepted = acceptJob(state.world.jobs, listings[0].id);
-    if (!accepted.ok) return false;
-    logMsg(`Marshal Boone posted a job: ${accepted.job.title}. ${accepted.job.hint} Reward ${accepted.job.rewardLine}.`);
+  function openJobBoard() {
+    const choices = getWardenJobChoices();
+    if (choices.length === 0) return false;
+    jobBoardOpen = true;
+    jobBoardSelection = 0;
+    shopOpen = false;
+    workbenchOpen = false;
+    skillScreenOpen = false;
+    settingsOpen = false;
+    codexOpen = false;
+    characterSheetOpen = false;
+    logMsg("Marshal Boone opens the job board.");
     sfx.npcChat();
     return true;
+  }
+
+  function confirmJobBoardChoice() {
+    const choices = getWardenJobChoices();
+    if (choices.length === 0) {
+      jobBoardOpen = false;
+      return;
+    }
+    jobBoardSelection = clamp(jobBoardSelection, 0, choices.length - 1);
+    const choiceJob = choices[jobBoardSelection];
+    if (!choiceJob) return;
+    if (choiceJob.status === "ready" || choiceJob.boardState === "ready") {
+      const paid = claimJobReward(state.world.jobs, choiceJob.id);
+      if (paid.ok) {
+        grantJobReward(paid.reward);
+        logMsg(`Bounty paid: ${paid.job.title}. ${rewardLine(paid.reward)}.`);
+        sfx.questDone();
+        spawnParticles(canvas.width / 2, canvas.height / 2, 14, "#ffd36b", 3.4, 1.1, { decorative: true });
+        jobBoardOpen = false;
+      }
+      return;
+    }
+    if (choiceJob.boardState === "available") {
+      const accepted = acceptJob(state.world.jobs, choiceJob.id);
+      if (accepted.ok) {
+        logMsg(`Job accepted: ${accepted.job.title}. ${accepted.job.hint} Reward ${accepted.job.rewardLine}.`);
+        sfx.shopBuy();
+        jobBoardOpen = false;
+      } else {
+        logMsg(accepted.message);
+      }
+      return;
+    }
+    logMsg(`Marshal Boone: ${choiceJob.title} is still open. ${choiceJob.progressLine}.`);
+    jobBoardOpen = false;
+  }
+
+  function handleWardenJobBoard() {
+    state.world.jobs = normalizeJobBoardState(state.world.jobs);
+    return openJobBoard();
   }
 
   function getWorkbenchActions() {
@@ -3108,6 +3159,7 @@ const canvas = document.getElementById("game");
     settingsOpen = false;
     codexOpen = false;
     characterSheetOpen = false;
+    jobBoardOpen = false;
     logMsg("Workbench opened.");
   }
 
@@ -3555,6 +3607,7 @@ const canvas = document.getElementById("game");
       if (npc.id === "merchant") {
         shopOpen = !shopOpen;
         shopSelection = 0;
+        if (shopOpen) jobBoardOpen = false;
         if (shopOpen) {
           sfx.npcChat();
           logMsg(storyReactiveQuip("merchant") || choice(npcDialogue.merchant.idle));
@@ -3614,12 +3667,14 @@ const canvas = document.getElementById("game");
         resource.respawn = 26;
         state.inventory["Crystal Shard"] += 1;
         grantXp(6);
+        recordCollectionForJobs(resource.type, "Crystal Shard", "Crystal Shard");
         logMsg(choice(["Collected Crystal Shard. Ooh, shiny!", "Crystal Shard acquired. It's warm to the touch.", "Got a Crystal Shard! The Elder will be thrilled."]));
         sfx.pickup();
       } else if (resource.type === "tree") {
         resource.respawn = 20;
         state.inventory.Wood += 1;
         grantXp(4);
+        recordCollectionForJobs(resource.type, "Wood", "Wood");
         logMsg(choice(["Collected Wood. Timber!", "Wood acquired. Bob the Builder approves.", "Got Wood! ...phrasing."]));
         sfx.pickup();
       } else if (resource.type === "archive-node") {
@@ -3652,6 +3707,7 @@ const canvas = document.getElementById("game");
         resource.respawn = def.respawn;
         state.inventory[def.item] = (state.inventory[def.item] || 0) + 1;
         grantXp(def.xp);
+        recordCollectionForJobs(resource.type, def.item, def.label);
         if (state.quests.ashfall_intro && state.quests.ashfall_intro.status === "active" && resource.type === "ashglass") {
           const q = state.quests.ashfall_intro;
           q.progress = Math.min(q.need, q.progress + 1);
@@ -3685,6 +3741,7 @@ const canvas = document.getElementById("game");
         resource.respawn = 22;
         state.inventory.Stone += 1;
         grantXp(4);
+        recordCollectionForJobs(resource.type, "Stone", "Stone");
         logMsg(choice(["Collected Stone. Rock solid choice.", "Stone acquired. This one has personality.", "Got Stone! It's not just any rock. It's YOUR rock."]));
         sfx.pickup();
       }
@@ -7014,6 +7071,50 @@ const canvas = document.getElementById("game");
       }
     }
 
+    /* Job board overlay */
+    if (jobBoardOpen && state.mode === "playing") {
+      const choices = getWardenJobChoices();
+      if (jobBoardSelection >= choices.length) jobBoardSelection = Math.max(0, choices.length - 1);
+      const sw = Math.min(540, canvas.width - margin * 2);
+      const rows = Math.max(1, Math.min(3, choices.length || 1));
+      const sh = rows * 72 + 102;
+      const sx = Math.floor((canvas.width - sw) / 2);
+      const sy = Math.floor((canvas.height - sh) / 2);
+      drawSoftPanel(sx, sy, sw, sh, {
+        top: "rgba(20, 27, 24, 0.96)",
+        bottom: "rgba(9, 13, 12, 0.94)",
+        border: "rgba(255, 211, 107, 0.55)",
+      });
+      ctx.font = "bold 20px Georgia";
+      drawClippedText("Marshal Boone's Job Board", sx + 16, sy + 30, sw - 32, "#ffd77b");
+      ctx.font = "12px Georgia";
+      drawClippedText("↑/↓ select  Enter/E accept or claim  Esc close", sx + 16, sy + 52, sw - 32, "#c9b889");
+      if (choices.length === 0) {
+        fillRoundedRect(sx + 10, sy + 72, sw - 20, 54, 7, "rgba(255, 255, 255, 0.055)");
+        ctx.font = "italic 13px Georgia";
+        drawClippedText("No posted work in this region.", sx + 22, sy + 104, sw - 44, "#b8a792");
+      } else {
+        for (let i = 0; i < Math.min(rows, choices.length); i++) {
+          const job = choices[i];
+          const iy = sy + 68 + i * 72;
+          const selected = i === jobBoardSelection;
+          fillRoundedRect(sx + 10, iy, sw - 20, 64, 7, selected ? "rgba(216, 188, 106, 0.24)" : "rgba(255, 255, 255, 0.055)");
+          if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 63, 7, "#ffd77b", 1);
+          ctx.font = "bold 14px Georgia";
+          drawClippedText(`${job.title}  [${job.threat}]`, sx + 22, iy + 19, sw - 168, selected ? "#ffd77b" : "#f3ecd8");
+          ctx.font = "12px Georgia";
+          ctx.textAlign = "right";
+          ctx.fillStyle = job.status === "ready" ? "#5fe0b5" : "#ffd77b";
+          ctx.fillText(job.status === "ready" ? "CLAIM" : job.kind.toUpperCase(), sx + sw - 22, iy + 19);
+          ctx.textAlign = "left";
+          ctx.font = "italic 12px Georgia";
+          drawClippedText(job.status === "ready" ? `Ready: ${job.rewardLine}` : job.hint, sx + 22, iy + 39, sw - 44, "#a09880");
+          ctx.font = "11px Georgia";
+          drawClippedText(`${job.progressLine}  ${job.rewardLine}`, sx + 22, iy + 56, sw - 44, "#c9b889");
+        }
+      }
+    }
+
     /* Workbench overlay */
     if (workbenchOpen && state.mode === "playing") {
       const actions = getWorkbenchActions();
@@ -7145,6 +7246,34 @@ const canvas = document.getElementById("game");
       }
       if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
         confirmQuestOutcomeChoice();
+        event.preventDefault();
+        return;
+      }
+      event.preventDefault();
+      return;
+    }
+
+    /* Job board controls */
+    if (jobBoardOpen) {
+      const choices = getWardenJobChoices();
+      const len = choices.length || 1;
+      if (event.code === "ArrowUp" || event.code === "KeyW") {
+        jobBoardSelection = (jobBoardSelection - 1 + len) % len;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "ArrowDown" || event.code === "KeyS") {
+        jobBoardSelection = (jobBoardSelection + 1) % len;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
+        confirmJobBoardChoice();
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "Escape") {
+        jobBoardOpen = false;
         event.preventDefault();
         return;
       }
@@ -7405,28 +7534,28 @@ const canvas = document.getElementById("game");
       cycleRegion();
     }
 
-    if (event.code === "KeyT" && state.mode === "playing" && !shopOpen) {
+    if (event.code === "KeyT" && state.mode === "playing" && !shopOpen && !jobBoardOpen) {
       skillScreenOpen = !skillScreenOpen;
       if (skillScreenOpen) characterSheetOpen = false;
       if (skillScreenOpen) workbenchOpen = false;
       if (skillScreenOpen) logMsg("Skill tree opened.");
     }
 
-    if (event.code === "KeyO" && state.mode === "playing" && !shopOpen && !skillScreenOpen) {
+    if (event.code === "KeyO" && state.mode === "playing" && !shopOpen && !skillScreenOpen && !jobBoardOpen) {
       settingsOpen = !settingsOpen;
       if (settingsOpen) characterSheetOpen = false;
       if (settingsOpen) workbenchOpen = false;
       if (settingsOpen) logMsg("Settings opened.");
     }
 
-    if (event.code === "KeyZ" && state.mode === "playing" && !shopOpen && !skillScreenOpen && !settingsOpen) {
+    if (event.code === "KeyZ" && state.mode === "playing" && !shopOpen && !skillScreenOpen && !settingsOpen && !jobBoardOpen) {
       codexOpen = !codexOpen;
       if (codexOpen) characterSheetOpen = false;
       if (codexOpen) workbenchOpen = false;
       if (codexOpen) logMsg("Codex opened.");
     }
 
-    if (event.code === "KeyI" && state.mode === "playing" && !shopOpen && !skillScreenOpen && !settingsOpen && !codexOpen && !workbenchOpen) {
+    if (event.code === "KeyI" && state.mode === "playing" && !shopOpen && !skillScreenOpen && !settingsOpen && !codexOpen && !workbenchOpen && !jobBoardOpen) {
       characterSheetOpen = !characterSheetOpen;
       if (characterSheetOpen) logMsg("Character sheet opened.");
     }
@@ -7655,6 +7784,9 @@ const canvas = document.getElementById("game");
       workbench_selection: workbenchSelection,
       workbench_actions: getWorkbenchActions(),
       workbench_action_catalog: getWorkbenchActionCatalog(),
+      job_board_open: jobBoardOpen,
+      job_board_selection: jobBoardSelection,
+      job_board_choices: getWardenJobChoices(),
       save: {
         has_save: hasSaveData,
         last_saved_at: lastSaveAt,

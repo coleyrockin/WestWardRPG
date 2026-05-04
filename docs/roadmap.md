@@ -18,7 +18,7 @@ Open-world RPG target: push the game toward a compact Skyrim/Oblivion feel withi
 
 Latest local verification:
 - `git diff --check` → clean.
-- `npm test` -> **317 passing across 33 test files**.
+- `npm test` -> **319 passing across 33 test files**.
 - `npm run typecheck:ts` → clean.
 - `npm run test:syntax` → clean.
 - `npm run dev:lint` → clean.
@@ -314,8 +314,8 @@ Build slices:
 1. **Regional pricing** — prices respond to faction reputation, region events, scarcity, house station level, Speech, Craft, and player quest outcomes. Keep it simple, visible, and testable.
 2. **Vendor identities** — separate merchant, smith, apothecary, stablekeeper, fence, trainer, and house steward inventories. Stock refreshes by day/region, not every frame.
 3. **Gold sinks** — repairs, housing upgrades, pet care, crafting, trainers, transport, cosmetics, bounty licenses, and special job permits so gold remains meaningful.
-4. **Radiant jobs** ✅ foundation shipped — `src/jobBoard.js` defines deterministic regional job data, save-safe job state, active progress, matching kill events, and one-time reward claims. Next: courier, salvage, rescue, escort, patrol, supply-run, timers, optional bonus conditions, and job failure states.
-5. **Bounty board** ✅ foundation shipped — Marshal Boone can issue/turn in the first active bounty after the slime quest, Warden bounty progress is visible in HUD/live objective text, and `render_game_to_text` exposes active job state/listings for smoke automation. Next: a dedicated board surface with 1-3 choices, threat previews, and regional availability notes.
+4. **Radiant jobs** ✅ Jobs 2 shipped — `src/jobBoard.js` defines deterministic regional job data, save-safe job state, active progress, matching kill events, collection/salvage events, and one-time reward claims. The first non-kill job is Frontier roadside salvage, progressed by collecting Stone. Next: courier, rescue, escort, patrol, supply-run, timers, optional bonus conditions, and job failure states.
+5. **Bounty board** ✅ Jobs 2 shipped — Marshal Boone now opens a selectable job-board modal with 1-3 choices, threat/reward/progress previews, active-job status, and ready reward claiming. HUD/live objective text and `render_game_to_text` expose job-board choices/state for smoke automation. Next: dedicated board prop, regional availability notes, and route markers.
 6. **Trade and consequence hooks** — quest outcomes can open/close vendors, change prices, reroute supplies, add contraband risk, or unlock house visitors. Smoke JSON exposes economy state for playtest debugging.
 7. **Economy acceptance** — after a short session, the player should understand one way to earn gold, one reason to spend it, and one reason prices changed.
 
@@ -331,7 +331,7 @@ Build slices:
 
 ## Next Agent Handoff
 
-Current shipped direction: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, Warden bounty jobs, NPC memory, first-pass gameplay-feel helpers, near-wall projection repair, and smoke/debug text fields are in scope. Fast verification is 317 tests across 33 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should keep pushing player-visible loops: job-board choice surface, vendor identity, pet/house utility, and stronger visual open-world composition.
+Current shipped direction: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, Warden bounty/job-board choices, salvage jobs, NPC memory, first-pass gameplay-feel helpers, near-wall projection repair, and smoke/debug text fields are in scope. Fast verification is 319 tests across 33 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should keep pushing player-visible loops: job route markers, vendor identity, pet/house utility, and stronger visual open-world composition.
 
 ### User signal to respect
 
@@ -347,11 +347,11 @@ The user is not asking for a prettier TODO list. They want the game to start fee
 
 ### Next build target
 
-Ship **Phase C / Economy Jobs 2 + Phase A visual pressure.** The current foundation makes loot/workstations/jobs real and selectable, shows earned gear and active bounties in player-facing surfaces, lets the workbench level up, improves level 2 crafting, unlocks a level 3 Region Map project, and adds first-pass hit feedback/opening-objective helpers. The next slice should make Boone's job board a real 1-3 choice surface while continuing to improve the starting view, enemy readability, and reward feel.
+Ship **Phase C / Economy Jobs 3 + Phase A visual pressure.** The current foundation makes loot/workstations/jobs real and selectable, shows earned gear and active bounties in player-facing surfaces, lets Boone present multiple job choices, adds the first salvage job, lets the workbench level up, improves level 2 crafting, unlocks a level 3 Region Map project, and adds first-pass hit feedback/opening-objective helpers. The next slice should give accepted jobs world/map markers while continuing to improve the starting view, enemy readability, and reward feel.
 
 Player-facing result:
 - First 60 seconds have a clear action target, visible route, landmark hint, and nearby reward/threat.
-- Marshal Boone can show multiple deterministic jobs with readable rewards, region, threat, and progress state.
+- Marshal Boone shows multiple deterministic jobs with readable rewards, region, threat, and progress state.
 - The starting view contains roads/props/signage or a region-specific landmark, not empty-feeling space.
 - Enemy windups, hit reactions, and reward drops read better without opening debug state.
 - HUD elements do not overlap when the game is played in the in-app browser.
@@ -359,8 +359,8 @@ Player-facing result:
 - Saves preserve new gear/crafting state through v3 backfill unless a real schema bump becomes necessary.
 
 Concrete build order:
-1. Add a dedicated Boone/job-board choice surface for 1-3 jobs instead of auto-accepting the first listing.
-2. Add a second job type that is not just "kill N enemies": salvage pickup, courier delivery, patrol route, or supply run.
+1. Add accepted-job world/map markers for Boone jobs: nearest salvage target, bounty region hint, and return-to-Boone marker when ready.
+2. Add one more non-kill job type: courier delivery, patrol route, or supply run.
 3. Add a region prop/landmark layer for roads, signposts, fences, carts, lamps, ash drifts, rails, pipes, and horizon silhouettes.
 4. Make enemy hit reactions/windups more readable in the canvas, not just in logs.
 5. Fix HUD/objective/minimap overlap at narrow browser widths.

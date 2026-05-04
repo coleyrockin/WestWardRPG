@@ -10,6 +10,7 @@ export const JOB_DEFINITIONS = {
     npcName: "Marshal Boone",
     threat: "Low",
     minLevel: 1,
+    priority: 10,
     hint: "Clear the marsh slimes harassing the town road.",
     objective: {
       type: "kill",
@@ -24,6 +25,30 @@ export const JOB_DEFINITIONS = {
       items: { Potion: 1 },
     },
   },
+  frontier_road_salvage: {
+    id: "frontier_road_salvage",
+    title: "Roadside Salvage",
+    kind: "salvage",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 20,
+    hint: "Recover sturdy stone from the road edges for town barricades.",
+    objective: {
+      type: "collect",
+      item: "Stone",
+      resourceType: "rock",
+      count: 2,
+      label: "road salvage recovered",
+    },
+    reward: {
+      gold: 24,
+      xp: 12,
+      items: { Ashglass: 1 },
+    },
+  },
   ashfall_scrap_warrant: {
     id: "ashfall_scrap_warrant",
     title: "Scrap Warrant",
@@ -33,6 +58,7 @@ export const JOB_DEFINITIONS = {
     npcName: "Marshal Boone",
     threat: "Medium",
     minLevel: 2,
+    priority: 10,
     hint: "Break Ashfall brutes gathering salvage near the ribs.",
     objective: {
       type: "kill",
@@ -56,6 +82,7 @@ export const JOB_DEFINITIONS = {
     npcName: "Marshal Boone",
     threat: "High",
     minLevel: 4,
+    priority: 10,
     hint: "Silence Lantern suppressors guarding signal posts.",
     objective: {
       type: "kill",
@@ -174,12 +201,31 @@ export function getJobListings({ regionId = "frontier", playerLevel = 1, jobStat
     .filter((job) => job.minLevel <= safeLevel)
     .filter((job) => !safeState.completedJobIds.includes(job.id))
     .map((job) => decorateJob(job, safeState.progressByJobId[job.id]))
-    .sort((a, b) => a.minLevel - b.minLevel || a.id.localeCompare(b.id));
+    .sort((a, b) => a.minLevel - b.minLevel || (a.priority || 50) - (b.priority || 50) || a.id.localeCompare(b.id));
 }
 
 export function getJobDefinition(jobId) {
   const job = knownJob(jobId);
   return job ? decorateJob(job) : null;
+}
+
+export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState(), npcId = "warden", limit = 3 } = {}) {
+  const active = getActiveJobSummary(jobState);
+  if (active?.npcId === npcId) {
+    return [{
+      ...active,
+      boardState: active.status,
+      selectable: active.status === "ready",
+    }];
+  }
+  return getJobListings({ regionId, playerLevel, jobState })
+    .filter((job) => job.npcId === npcId)
+    .slice(0, Math.max(1, Math.floor(limit)))
+    .map((job) => ({
+      ...job,
+      boardState: "available",
+      selectable: true,
+    }));
 }
 
 export function acceptJob(jobState, jobId) {
@@ -209,6 +255,8 @@ function matchesObjective(objective, event = {}) {
   if (objective.type !== event.type) return false;
   if (objective.enemyType && event.enemyType !== objective.enemyType) return false;
   if (objective.behavior && event.behavior !== objective.behavior) return false;
+  if (objective.item && event.item !== objective.item) return false;
+  if (objective.resourceType && event.resourceType !== objective.resourceType) return false;
   return true;
 }
 

@@ -4,6 +4,7 @@ import {
   claimJobReward,
   createInitialJobBoardState,
   getActiveJobSummary,
+  getJobBoardChoices,
   getJobListings,
   normalizeJobBoardState,
   recordJobEvent,
@@ -39,9 +40,30 @@ describe("jobBoard", () => {
     expect(frontierListings.map((job) => job.id)).toContain("frontier_slime_bounty");
     expect(frontierListings.find((job) => job.id === "frontier_slime_bounty")?.reward.gold).toBe(38);
     expect(ashfallListings.map((job) => job.id)).toContain("ashfall_scrap_warrant");
+    expect(frontierListings.map((job) => job.id)).toContain("frontier_road_salvage");
 
     state.completedJobIds.push("frontier_slime_bounty");
     expect(getJobListings({ regionId: "frontier", playerLevel: 1, jobState: state }).map((job) => job.id)).not.toContain("frontier_slime_bounty");
+  });
+
+  it("builds selectable Warden board choices with reward and threat previews", () => {
+    const state = createInitialJobBoardState();
+
+    const choices = getJobBoardChoices({
+      regionId: "frontier",
+      playerLevel: 1,
+      jobState: state,
+      npcId: "warden",
+    });
+
+    expect(choices).toHaveLength(2);
+    expect(choices.map((job) => job.id)).toEqual(["frontier_slime_bounty", "frontier_road_salvage"]);
+    expect(choices[0]).toMatchObject({
+      boardState: "available",
+      selectable: true,
+      threat: "Low",
+      rewardLine: "+38g, +18 XP, +1 Potion",
+    });
   });
 
   it("accepts one active job and exposes a compact summary", () => {
@@ -83,6 +105,21 @@ describe("jobBoard", () => {
     expect(second.completed).toBe(false);
     expect(third.completed).toBe(true);
     expect(state.progressByJobId.frontier_slime_bounty).toMatchObject({ status: "ready", count: 3 });
+    expect(getActiveJobSummary(state)?.status).toBe("ready");
+  });
+
+  it("records matching collection events for salvage jobs", () => {
+    const state = createInitialJobBoardState();
+    acceptJob(state, "frontier_road_salvage");
+
+    const missed = recordJobEvent(state, { type: "collect", item: "Wood", resourceType: "tree" });
+    const first = recordJobEvent(state, { type: "collect", item: "Stone", resourceType: "rock" });
+    const second = recordJobEvent(state, { type: "collect", item: "Stone", resourceType: "rock" });
+
+    expect(missed.ok).toBe(false);
+    expect(first.progress?.count).toBe(1);
+    expect(second.completed).toBe(true);
+    expect(getActiveJobSummary(state)?.progressLine).toBe("2/2 road salvage recovered");
     expect(getActiveJobSummary(state)?.status).toBe("ready");
   });
 
