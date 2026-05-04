@@ -1,28 +1,101 @@
 # WestWardRPG Roadmap
 
-> **Single source of truth.** This is the only roadmap document for WestWardRPG. Do not create parallel `tier-*.md`, `TODO.md`, `PLAN.md`, or `ROADMAP-*.md` files. Update this file when scope shifts.
+Single source of truth for WestWardRPG. Do not create parallel `tier-*.md`, `TODO.md`, `PLAN.md`, or `ROADMAP-*.md` files. Update this file when scope shifts.
 
-## How to use this roadmap
+## Roadmap Rules
 
-- **Pillars are ordered.** Pillars 1-4, Pillar 5.5, Pillar 8 Items 1-5, and foundations from Pillars 21-23 and 25-27 are shipped. Pillar 5's remaining dialogue/narrative depth items are active, and Pillars 6-7 plus the unshipped later-pillar slices remain planned. Don't skip ahead -- each pillar depends on the foundations of the previous one.
-- **Each pillar item is a thin, testable slice** scoped so a single agent can ship it in one session: file paths, helpers, and acceptance signals are spelled out.
-- **Save migration is non-negotiable.** New top-level state requires a `backfill*` helper in `saveMigration.js` and a fixture round-trip test.
-- **Never rewrite the renderer or move to WebGL** unless the user explicitly requests it.
-- **Keep test gates green at every commit.** The verification block at the bottom is the contract.
+1. This roadmap is the only planning document.
+2. Pillars are ordered by dependency. Do not skip ahead unless the current milestone has a playable slice, tests, and updated status.
+3. Save migration is non-negotiable. New top-level state requires:
+   1. A `backfill*` helper in `saveMigration.js`
+   2. A fixture round-trip test
+   3. v1, v2, and v3 compatibility preserved
+4. Do not rewrite the renderer.
+5. Do not move to WebGL unless the user explicitly requests it.
+6. Keep verification gates green at every commit.
+7. Prefer complete player-visible slices over tiny bookkeeping commits.
 
-## Current State
+## Product Target
 
-`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life), the first Pillar 5 narrative/companion upgrades, **Pillar 5.5 story-to-run payoff**, **Pillar 8 Items 1-5** as combat depth round 2, **Pillar 21/22 open-world RPG foundation** (character identity, attributes, origin selection, region visual identity), **Pillar 23 gear loop foundation** (weapon families, armor slots, Craft-driven repair/refine prices, regional loot tables, POI/mini-boss gear finds, selectable workbench actions, earned gear visibility), **Pillar 25 workstation foundation** (save-safe workbench levels, level-gated benefits, map-table project), **Pillar 26 jobs/job-board foundation plus Jobs 7 rescue/escort pass** (deterministic bounty, salvage, courier, patrol, supply-run, rescue, and escort jobs; active progress; timed bonuses; failure/report-back states; Ashfall/Iron Lantern non-combat job depth; Boone job-board modal; in-world board prop; route markers; reward payout; save-safe state; HUD/minimap/debug visibility), **Pillar 27 deterministic NPC memory foundation**, and a **fully redesigned Apple-grade title screen**. Narrative state already tracks axes, factions, affinity, flags, decisions, quest outcomes, companion state, endings, POIs, codex unlocks, quest progression, build identity, gear state, loot history, workstation state, station projects, job-board state, and NPC memory. The next highest-value work is player-facing: stronger visual open-world feel, deeper gear/housing/economy loops, pets, richer job variety, and fuller living-world dialogue.
+WestWardRPG should become a compact open-world RPG with Skyrim and Oblivion energy, scoped to the existing canvas engine.
 
-Open-world RPG target: push the game toward a compact Skyrim/Oblivion feel within the existing canvas engine. The world should have stronger visual identity, character builds, loot, pets, owned spaces, regional economy, and NPCs that remember enough context to feel alive. Keep everything local-first and deterministic by default; optional network/LLM features must have handcrafted fallback content and never block core play.
+The game should feel local-first, deterministic, and playable offline. Optional LLM or network features can come later, but every core system must have handcrafted fallback content and must never block play.
 
-Latest local verification:
-- `git diff --check` → clean.
-- `npm test` -> **341 passing across 35 test files**.
-- `npm run typecheck:ts` → clean.
-- `npm run test:syntax` → clean.
-- `npm run dev:lint` → clean.
-- Browser/visual smoke should cover the current Phase A view: fixed first-minute pressure marker, map-validated region landmark/prop placement, readable minimap dots, and no narrow-width HUD overlap. Prior smoke coverage also includes new-run state surfaces plus a partial-save house workbench flow: load save, open stash workbench, list craft/potion/armor/token/refine actions, and equip Salvage Gloves. Smoke and visual-regression artifacts are generated under ignored `output/`; rerun the Verification Gates before gameplay commits.
+The world should have:
+
+1. Strong visual regional identity
+2. Clear first-minute direction
+3. Character builds that matter
+4. Loot and gear earned outside shops
+5. A useful house and workstation loop
+6. Jobs, bounties, and economy pressure
+7. Pets, companions, and owned spaces
+8. NPCs that remember current-run facts
+9. Story choices that surface in the world
+10. Save, pause, reload, and recovery paths fit for playtesting
+
+## Current Build State
+
+`main` currently ships:
+
+1. v3 Shattered Frontier foundation
+2. Pillars 1 through 4
+3. Pillar 5 narrative and companion foundations
+4. Pillar 5.5 story-to-run payoff
+5. Pillar 8 combat depth items 1 through 5
+6. Pillar 21 visual world foundation
+7. Pillar 22 character identity and attributes foundation
+8. Pillar 23 gear, armor, loot, and crafting foundation
+9. Pillar 25 workstation foundation
+10. Pillar 26 jobs and job-board foundation, including rescue and escort jobs
+11. Pillar 27 deterministic NPC memory foundation
+12. Redesigned Apple-grade title screen
+
+Narrative state already tracks:
+
+1. Thematic axes
+2. Factions
+3. Affinity
+4. Flags
+5. Decisions
+6. Quest outcomes
+7. Companion state
+8. Endings
+9. POIs
+10. Codex unlocks
+11. Quest progression
+12. Build identity
+13. Gear state
+14. Loot history
+15. Workstation state
+16. Station projects
+17. Job-board state
+18. NPC memory
+
+The next highest-value work is player-facing. The game needs to feel more like a finished compact RPG in the first 10 minutes.
+
+## Latest Local Verification
+
+Latest known local status:
+
+```bash
+git diff --check
+# clean
+
+npm test
+# 341 passing across 35 test files
+
+npm run typecheck:ts
+# clean
+
+npm run test:syntax
+# clean
+
+npm run dev:lint
+# clean
+```
+
+Browser/visual smoke should cover the current Phase A view: fixed first-minute pressure marker, map-validated region landmark/prop placement, readable minimap dots, near-wall visual softening, enemy reward callouts, and no narrow-width HUD overlap. Prior smoke coverage also includes new-run state surfaces plus a partial-save house workbench flow: load save, open stash workbench, list craft/potion/armor/token/refine actions, and equip Salvage Gloves. Smoke and visual-regression artifacts are generated under ignored `output/`; rerun the Verification Gates before gameplay commits.
 
 ## Current Build Phases
 
