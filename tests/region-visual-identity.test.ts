@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   REGION_VISUAL_IDENTITIES,
+  buildRegionWorldPresentation,
   buildRegionIdentityLine,
   getRegionVisualIdentity,
 } from "../src/regionVisualIdentity.js";
@@ -28,5 +29,42 @@ describe("regionVisualIdentity", () => {
     expect(line).toContain("Ashfall");
     expect(line).toContain("Landmarks");
     expect(line).toContain("Danger");
+  });
+
+  it("builds deterministic non-blocking world dressing around the start view", () => {
+    const presentation = buildRegionWorldPresentation("frontier", { playerX: 9.5, playerY: 8.5 });
+
+    expect(presentation.landmark.label).toContain("Watchtower");
+    expect(presentation.routeLine).toContain("road");
+    expect(presentation.props.length).toBeGreaterThanOrEqual(5);
+    expect(presentation.props.every((prop: any) => prop.blocking === false)).toBe(true);
+    expect(presentation.props.some((prop: any) => prop.kind === "sign")).toBe(true);
+  });
+
+  it("moves props to map-valid visible tiles when a generated coordinate is blocked", () => {
+    const blocked = new Set(["11.50,9.10"]);
+    const isPassable = (x: number, y: number) => !blocked.has(`${x.toFixed(2)},${y.toFixed(2)}`);
+    const isVisible = (x: number, y: number) => x >= 9 && x <= 16 && y >= 6 && y <= 11;
+    const presentation = buildRegionWorldPresentation("frontier", {
+      playerX: 9.5,
+      playerY: 8.5,
+      isPassable,
+      isVisible,
+    });
+
+    const placements = [presentation.landmark, ...presentation.props];
+    expect(placements.every((item: any) => isPassable(item.x, item.y) && isVisible(item.x, item.y))).toBe(true);
+    expect(presentation.props.find((prop: any) => prop.kind === "sign")).toMatchObject({
+      placement: "adjusted",
+    });
+  });
+
+  it("changes landmark and prop identity by region", () => {
+    const ashfall = buildRegionWorldPresentation("ashfall", { playerX: 38, playerY: 39 });
+    const lantern = buildRegionWorldPresentation("ironlantern", { playerX: 14, playerY: 39 });
+
+    expect(ashfall.landmark.label).toContain("Slag");
+    expect(lantern.landmark.label).toContain("Signal");
+    expect(ashfall.props.map((prop: any) => prop.label)).not.toEqual(lantern.props.map((prop: any) => prop.label));
   });
 });

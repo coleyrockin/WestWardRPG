@@ -110,11 +110,13 @@ import {
   resolveNpcReactiveLine,
 } from "./npcMemory.js";
 import {
+  resolveFirstMinutePressure,
   resolveHitFeedback,
   resolveOpeningObjective,
 } from "./gameFeel.js";
 import {
   buildRegionIdentityLine,
+  buildRegionWorldPresentation,
   getRegionVisualIdentity,
 } from "./regionVisualIdentity.js";
 import { buildVisualMood } from "./visualProfile.js";
@@ -896,9 +898,14 @@ const canvas = document.getElementById("game");
       button.className = "origin-card";
       button.dataset.originId = origin.id;
       button.setAttribute("aria-pressed", origin.id === selectedOriginId ? "true" : "false");
-      button.innerHTML = `<span class="origin-card__name"></span><span class="origin-card__summary"></span>`;
-      button.querySelector(".origin-card__name").textContent = origin.label;
-      button.querySelector(".origin-card__summary").textContent = origin.summary;
+      const name = document.createElement("span");
+      name.className = "origin-card__name";
+      name.textContent = origin.label;
+      const summary = document.createElement("span");
+      summary.className = "origin-card__summary";
+      summary.textContent = origin.summary;
+      button.appendChild(name);
+      button.appendChild(summary);
       button.addEventListener("click", () => {
         selectedOriginId = origin.id;
         state.progression.identity = applyOrigin(state.progression.identity, selectedOriginId);
@@ -2749,6 +2756,24 @@ const canvas = document.getElementById("game");
     const ty = Math.floor(y);
     if (ty < 0 || tx < 0 || ty >= map.length || tx >= map[0].length) return true;
     return map[ty][tx] !== 0;
+  }
+
+  function isWorldDecorationPlacement(x, y) {
+    if (isInHouseLot(x, y)) return false;
+    const samples = [[0, 0], [0.22, 0], [-0.22, 0], [0, 0.22], [0, -0.22]];
+    return samples.every(([ox, oy]) => {
+      const tx = Math.floor(x + ox);
+      const ty = Math.floor(y + oy);
+      if (ty < 0 || tx < 0 || ty >= worldMap.length || tx >= worldMap[0].length) return false;
+      return worldMap[ty][tx] === 0;
+    });
+  }
+
+  function worldPresentationContext() {
+    return {
+      isPassable: isWorldDecorationPlacement,
+      isVisible: isWorldDecorationPlacement,
+    };
   }
 
   function tileTypeAtCurrentMap(x, y) {
@@ -5071,6 +5096,32 @@ const canvas = document.getElementById("game");
       ctx.beginPath();
       ctx.arc(spriteWidth * 0.38, spriteHeight * 0.33, spriteWidth * 0.06, 0, TAU);
       ctx.fill();
+      if ((sprite.flashTimer || 0) > 0) {
+        ctx.fillStyle = "rgba(255, 248, 216, 0.42)";
+        ctx.beginPath();
+        ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.5, spriteWidth * 0.36, spriteHeight * 0.36, 0, 0, TAU);
+        ctx.fill();
+      }
+      if ((sprite.windupTimer || 0) > 0) {
+        const ratio = clamp(sprite.windupTimer / Math.max(0.01, sprite.windupMax || sprite.windupTimer), 0, 1);
+        ctx.strokeStyle = "rgba(255, 215, 123, 0.9)";
+        ctx.lineWidth = Math.max(2, spriteWidth * 0.045);
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.5, spriteHeight * 0.48, spriteWidth * (0.42 + (1 - ratio) * 0.16), Math.PI * 1.15, Math.PI * 1.85);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255, 72, 56, 0.94)";
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.5, spriteHeight * 0.02);
+        ctx.lineTo(spriteWidth * 0.62, spriteHeight * 0.23);
+        ctx.lineTo(spriteWidth * 0.38, spriteHeight * 0.23);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#fff4cf";
+        ctx.font = `bold ${Math.max(10, spriteWidth * 0.18)}px Georgia`;
+        ctx.textAlign = "center";
+        ctx.fillText("!", spriteWidth * 0.5, spriteHeight * 0.2);
+        ctx.textAlign = "left";
+      }
     } else if (sprite.kind === "pig") {
       const hatColor = sprite.hatColor || "#5b4129";
       const bandanaColor = sprite.bandanaColor || "#8e4040";
@@ -5202,6 +5253,67 @@ const canvas = document.getElementById("game");
       ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.52, spriteWidth * 0.08, spriteHeight * 0.22);
       ctx.fillStyle = "#8b6c3e";
       ctx.fillRect(spriteWidth * 0.18, spriteHeight * 0.42, spriteWidth * 0.64, spriteHeight * 0.08);
+    } else if (sprite.kind === "pressure") {
+      const pulse = 0.5 + Math.sin(state.time * 5) * 0.5;
+      ctx.fillStyle = "rgba(255, 215, 123, 0.18)";
+      ctx.beginPath();
+      ctx.arc(spriteWidth * 0.5, spriteHeight * 0.52, spriteWidth * (0.34 + pulse * 0.08), 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = "#6c4a2c";
+      ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.58, spriteWidth * 0.4, spriteHeight * 0.28);
+      ctx.fillStyle = sprite.color || "#ffd77b";
+      ctx.fillRect(spriteWidth * 0.34, spriteHeight * 0.52, spriteWidth * 0.32, spriteHeight * 0.08);
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = `rgba(220, 213, 188, ${0.18 + i * 0.08})`;
+        ctx.beginPath();
+        ctx.ellipse(spriteWidth * (0.4 + i * 0.08), spriteHeight * (0.36 - i * 0.08), spriteWidth * 0.12, spriteHeight * 0.1, 0, 0, TAU);
+        ctx.fill();
+      }
+    } else if (sprite.kind === "landmark") {
+      ctx.fillStyle = shadeHex(sprite.color || "#d9b66d", 0.52);
+      ctx.fillRect(spriteWidth * 0.44, spriteHeight * 0.2, spriteWidth * 0.12, spriteHeight * 0.72);
+      ctx.fillStyle = sprite.color || "#d9b66d";
+      ctx.fillRect(spriteWidth * 0.32, spriteHeight * 0.14, spriteWidth * 0.36, spriteHeight * 0.12);
+      ctx.fillStyle = "rgba(255, 236, 176, 0.45)";
+      ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.06, spriteWidth * 0.06, spriteHeight * 0.16);
+      ctx.strokeStyle = "rgba(30, 22, 16, 0.45)";
+      ctx.lineWidth = Math.max(1, spriteWidth * 0.025);
+      ctx.strokeRect(spriteWidth * 0.44, spriteHeight * 0.2, spriteWidth * 0.12, spriteHeight * 0.72);
+    } else if (sprite.kind === "world-prop") {
+      const color = sprite.color || "#b9824d";
+      if (sprite.propKind === "lamp" || sprite.propKind === "seam" || sprite.propKind === "relay") {
+        ctx.fillStyle = shadeHex(color, 0.45);
+        ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.34, spriteWidth * 0.06, spriteHeight * 0.54);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.5, spriteHeight * 0.28, spriteWidth * 0.18, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 248, 200, 0.35)";
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.5, spriteHeight * 0.28, spriteWidth * 0.28, 0, TAU);
+        ctx.fill();
+      } else if (sprite.propKind === "sign") {
+        ctx.fillStyle = "#5b402b";
+        ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.36, spriteWidth * 0.06, spriteHeight * 0.52);
+        ctx.fillStyle = color;
+        ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.24, spriteWidth * 0.56, spriteHeight * 0.2);
+        ctx.strokeStyle = "rgba(28, 18, 12, 0.5)";
+        ctx.strokeRect(spriteWidth * 0.22, spriteHeight * 0.24, spriteWidth * 0.56, spriteHeight * 0.2);
+      } else if (sprite.propKind === "fence" || sprite.propKind === "rail" || sprite.propKind === "cable") {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(2, spriteWidth * 0.08);
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.12, spriteHeight * 0.58);
+        ctx.lineTo(spriteWidth * 0.88, spriteHeight * 0.46);
+        ctx.moveTo(spriteWidth * 0.16, spriteHeight * 0.72);
+        ctx.lineTo(spriteWidth * 0.84, spriteHeight * 0.62);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = color;
+        ctx.fillRect(spriteWidth * 0.25, spriteHeight * 0.48, spriteWidth * 0.5, spriteHeight * 0.34);
+        ctx.fillStyle = "rgba(255,255,255,0.2)";
+        ctx.fillRect(spriteWidth * 0.32, spriteHeight * 0.52, spriteWidth * 0.18, spriteHeight * 0.08);
+      }
     } else if (sprite.kind === "house-door") {
       ctx.fillStyle = state.house.unlocked ? "#7f694a" : "#5f4f3a";
       ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.22, spriteWidth * 0.4, spriteHeight * 0.72);
@@ -5505,6 +5617,41 @@ const canvas = document.getElementById("game");
       sprites.push({ x: state.house.stash.x, y: state.house.stash.y, color: "#896748", label: "Stash", size: 0.9, kind: "stash" });
       sprites.push({ x: state.house.interiorDoor.x, y: state.house.interiorDoor.y, color: "#6d5a45", label: "Exit", size: 0.95, kind: "exit-door" });
     } else {
+      const regionPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
+      sprites.push({
+        ...regionPresentation.landmark,
+        kind: "landmark",
+        label: regionPresentation.landmark.label,
+        size: regionPresentation.landmark.size || 1.2,
+      });
+      for (const prop of regionPresentation.props) {
+        sprites.push({
+          ...prop,
+          kind: "world-prop",
+          propKind: prop.kind,
+          label: prop.label,
+          size: prop.size || 0.58,
+        });
+      }
+
+      const pressure = resolveFirstMinutePressure({
+        mode: state.mode,
+        time: state.time,
+        inHouse: state.player.inHouse,
+        regionId: state.regions.activeRegion,
+        player: state.player,
+        inventory: state.inventory,
+        quests: state.quests,
+      });
+      if (pressure?.marker) {
+        sprites.push({
+          ...pressure.marker,
+          kind: "pressure",
+          label: pressure.marker.label,
+          size: pressure.marker.size || 0.82,
+        });
+      }
+
       for (const npc of state.npcs) {
         sprites.push({ x: npc.x, y: npc.y, color: npc.color, label: npc.name, size: 1.04, kind: "npc" });
       }
@@ -5644,7 +5791,12 @@ const canvas = document.getElementById("game");
       }
 
       const centeredLabel = Math.abs(sprite.sx - width / 2) < width * 0.24;
-      if (state.mode === "playing" && sprite.label && centeredLabel && sprite.distToPlayer < 5.8 && sprite.kind !== "resource" && sprite.kind !== "pig") {
+      const labelImportant = sprite.kind === "npc"
+        || sprite.kind === "enemy"
+        || sprite.kind === "chest"
+        || sprite.kind === "house-door"
+        || sprite.kind === "pressure";
+      if (state.mode === "playing" && sprite.label && centeredLabel && sprite.distToPlayer < 5.8 && labelImportant) {
         ctx.font = "bold 11px Georgia";
         drawPillLabel(fitText(sprite.label, 116), left + spriteWidth / 2, top - 10);
       }
@@ -5853,7 +6005,7 @@ const canvas = document.getElementById("game");
   }
 
   function drawMiniMap() {
-    if (!state.showMap) return;
+    if (!state.showMap || canvas.width < 760) return;
 
     const map = currentMap();
     const tileRadius = state.player.inHouse ? 5 : 6;
@@ -5970,6 +6122,26 @@ const canvas = document.getElementById("game");
       }
       drawDot(state.house.outsideDoor.x, state.house.outsideDoor.y,
         state.house.unlocked ? "#d8bc6a" : "#9b7b56", 3.5);
+      const presentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
+      drawDot(presentation.landmark.x, presentation.landmark.y, presentation.landmark.color || "#ffd77b", 3.2);
+      for (const prop of presentation.props) {
+        if (prop.kind === "sign" || prop.kind === "lamp" || prop.kind === "smoke") {
+          drawDot(prop.x, prop.y, prop.color || "#d7b06d", 1.8);
+        }
+      }
+      const pressure = resolveFirstMinutePressure({
+        mode: state.mode,
+        time: state.time,
+        inHouse: state.player.inHouse,
+        regionId: state.regions.activeRegion,
+        player: state.player,
+        inventory: state.inventory,
+        quests: state.quests,
+      });
+      if (pressure?.marker) {
+        const blink = 0.5 + (Math.sin(state.time * 5) + 1) * 0.5;
+        drawDot(pressure.marker.x, pressure.marker.y, pressure.marker.color || "#ffd77b", 2.4 + blink);
+      }
 
       // POI pings: blink nearby undiscovered POIs.
       if (state.regions?.activeRegion) {
@@ -6139,7 +6311,7 @@ const canvas = document.getElementById("game");
     const houseStatus = state.house.unlocked ? t("labels.owned") : t("labels.locked");
     const weatherText = state.player.inHouse ? t("labels.sheltered") : weatherLabel(state.weather.kind);
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
-    const mapReserve = state.showMap && canvas.width > 700 ? (canvas.width < 900 ? 176 : 214) : 0;
+    const mapReserve = state.showMap && canvas.width >= 760 ? (canvas.width < 900 ? 176 : 214) : 0;
     const topW = Math.max(240, Math.min(730, canvas.width - margin * 2 - mapReserve));
     const topH = compact ? 78 : 92;
     const topX = margin;
@@ -6183,22 +6355,32 @@ const canvas = document.getElementById("game");
       inventory: state.inventory,
       quests: state.quests,
     });
-    if (openingObjective && msgY <= topY + topH - 10) {
+    const firstPressure = resolveFirstMinutePressure({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      regionId: state.regions.activeRegion,
+      player: state.player,
+      inventory: state.inventory,
+      quests: state.quests,
+    });
+    const liveObjective = firstPressure || openingObjective;
+    if (liveObjective && msgY <= topY + topH - 10) {
       ctx.font = "bold 11px Georgia";
-      drawClippedText(`→ ${openingObjective.line}`, topX + 10, msgY, topW - 20, openingObjective.urgency === "high" ? "#ffd77b" : "#f3e8cf");
+      drawClippedText(`→ ${liveObjective.line}`, topX + 10, msgY, topW - 20, liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "#ffd77b" : "#f3e8cf");
     }
-    if (openingObjective) {
+    if (liveObjective) {
       const stripY = topY + topH + 8;
       const stripH = 28;
       drawSoftPanel(topX, stripY, topW, stripH, {
-        top: openingObjective.urgency === "high" ? "rgba(70, 44, 17, 0.82)" : "rgba(25, 32, 25, 0.76)",
-        bottom: openingObjective.urgency === "high" ? "rgba(30, 19, 9, 0.78)" : "rgba(9, 15, 11, 0.7)",
+        top: liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "rgba(70, 44, 17, 0.82)" : "rgba(25, 32, 25, 0.76)",
+        bottom: liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "rgba(30, 19, 9, 0.78)" : "rgba(9, 15, 11, 0.7)",
         border: "rgba(255, 215, 123, 0.45)",
         shadowBlur: 8,
         shadowOffsetY: 3,
       });
       ctx.font = "bold 11px Georgia";
-      drawClippedText(`${openingObjective.title}: ${openingObjective.line}`, topX + 10, stripY + 18, topW - 20, "#ffd77b");
+      drawClippedText(`${liveObjective.title}: ${liveObjective.line}`, topX + 10, stripY + 18, topW - 20, "#ffd77b");
     }
 
     if (state.mode === "gameover") {
@@ -7112,7 +7294,17 @@ const canvas = document.getElementById("game");
       inventory: state.inventory,
       quests: state.quests,
     });
+    const firstMinutePressure = resolveFirstMinutePressure({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      regionId: state.regions.activeRegion,
+      player: state.player,
+      inventory: state.inventory,
+      quests: state.quests,
+    });
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
+    const worldPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
     const quests = {
       crystal: {
         title: state.quests.crystal.title,
@@ -7161,6 +7353,7 @@ const canvas = document.getElementById("game");
       },
       gameplay_feel: {
         opening_objective: openingObjective,
+        first_minute_pressure: firstMinutePressure,
         time_scale: Number((state.player.timeScale || 1).toFixed(2)),
         hit_pulse: Number((state.player.hitPulse || 0).toFixed(2)),
         screen_shake: Number((state.player.screenShake || 0).toFixed(2)),
@@ -7205,6 +7398,7 @@ const canvas = document.getElementById("game");
       region_visual_identity: {
         ...regionProfile,
         identity_line: buildRegionIdentityLine(state.regions.activeRegion),
+        world_presentation: worldPresentation,
       },
       house: {
         unlocked: state.house.unlocked,

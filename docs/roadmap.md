@@ -12,17 +12,81 @@
 
 ## Current State
 
-`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life), the first Pillar 5 narrative/companion upgrades, **Pillar 5.5 story-to-run payoff**, **Pillar 8 Items 1-5** as combat depth round 2, **Pillar 21/22 open-world RPG foundation** (character identity, attributes, origin selection, region visual identity), **Pillar 23 gear loop foundation** (weapon families, armor slots, Craft-driven repair/refine prices, regional loot tables, POI/mini-boss gear finds, selectable workbench actions, earned gear visibility), **Pillar 25 workstation foundation** (save-safe workbench levels, level-gated benefits, map-table project), **Pillar 27 deterministic NPC memory foundation**, and a **fully redesigned Apple-grade title screen**. Narrative state already tracks axes, factions, affinity, flags, decisions, quest outcomes, companion state, endings, POIs, codex unlocks, quest progression, build identity, gear state, loot history, workstation state, station projects, and NPC memory. The next highest-value work is making these foundations deeper: richer station projects, pets, economy, and fuller living-world dialogue.
+`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life), the first Pillar 5 narrative/companion upgrades, **Pillar 5.5 story-to-run payoff**, **Pillar 8 Items 1-5** as combat depth round 2, **Pillar 21/22 open-world RPG foundation** (character identity, attributes, origin selection, region visual identity), **Pillar 23 gear loop foundation** (weapon families, armor slots, Craft-driven repair/refine prices, regional loot tables, POI/mini-boss gear finds, selectable workbench actions, earned gear visibility), **Pillar 25 workstation foundation** (save-safe workbench levels, level-gated benefits, map-table project), **Pillar 27 deterministic NPC memory foundation**, and a **fully redesigned Apple-grade title screen**. Narrative state already tracks axes, factions, affinity, flags, decisions, quest outcomes, companion state, endings, POIs, codex unlocks, quest progression, build identity, gear state, loot history, workstation state, station projects, and NPC memory. The next highest-value work is player-facing: stronger visual open-world feel, first-minute pressure, deeper gear/housing/economy loops, pets, and fuller living-world dialogue.
 
 Open-world RPG target: push the game toward a compact Skyrim/Oblivion feel within the existing canvas engine. The world should have stronger visual identity, character builds, loot, pets, owned spaces, regional economy, and NPCs that remember enough context to feel alive. Keep everything local-first and deterministic by default; optional network/LLM features must have handcrafted fallback content and never block core play.
 
 Latest local verification:
 - `git diff --check` → clean.
-- `npm test` → **289 passing across 31 test files**.
+- `npm test` → **296 passing across 32 test files**.
 - `npm run typecheck:ts` → clean.
 - `npm run test:syntax` → clean.
 - `npm run dev:lint` → clean.
-- Browser smoke covered new-run state surfaces plus a partial-save house workbench flow: load save, open stash workbench, list craft/potion/armor/token/refine actions, and equip Salvage Gloves. Smoke and visual-regression artifacts are generated under ignored `output/`; rerun the Verification Gates before gameplay commits.
+- Browser/visual smoke should cover the current Phase A view: fixed first-minute pressure marker, map-validated region landmark/prop placement, readable minimap dots, and no narrow-width HUD overlap. Prior smoke coverage also includes new-run state surfaces plus a partial-save house workbench flow: load save, open stash workbench, list craft/potion/armor/token/refine actions, and equip Salvage Gloves. Smoke and visual-regression artifacts are generated under ignored `output/`; rerun the Verification Gates before gameplay commits.
+
+## Current Build Phases
+
+This section is the practical build order for the next sessions. It does not replace the pillar list below; it groups the active pillars into player-visible chunks.
+
+### Phase A — Visual open-world feel + first-minute pressure
+
+Goal: make the game read more like a compact open-world RPG the moment the player leaves the menu.
+
+Build slices:
+1. **First-minute pressure** — within the first 15-30 seconds, place a readable nearby objective, threat, and reward: a smoking cache, wounded NPC callout, patrol marker, or small resource trail that pulls the player into movement and combat.
+2. **Landmark composition** — give each region a horizon identity: Frontier watchtower/road posts, Ashfall plume/mine ribs, Iron Lantern signal mast/gate lights. The player should navigate by place, not only by minimap.
+3. **Roads, props, and traversal dressing** — add non-blocking roads, fences, crates, carts, grasses, lamps, signs, ash drifts, pipes, rails, and shrine markers with deterministic placement and no collision surprises.
+4. **Enemy readability** — make aggro, windup, stagger, phase transition, and death states obvious from silhouettes, color-safe VFX, hit-stop, screen feedback, and animation posture.
+5. **HUD clarity pass** — keep opening objectives, minimap, region label, loot popups, and workbench prompts from overlapping on narrow browser widths.
+6. **Acceptance** — a human tester can start a new run, understand where to go, see why a region is distinct, identify enemy intent, earn a reward, and describe one visible landmark after two minutes.
+
+### Phase B — Narrative payoff + visible consequence
+
+Goal: make story choices show up in the world instead of living only in debug state.
+
+Build slices:
+1. **Quest outcome smoke** — finish deterministic coverage for one quest turn-in, modal choice, save/reload, and `narrative.questOutcomes` exposure.
+2. **Companion barks** — add short lines for low HP, first kill, boss phase, region entry, house unlock, and important quest outcomes.
+3. **Town reaction layer** — major NPC idle/reactive lines should reference origin, recent quest outcome, house state, current region, and notable gear milestone through `npcMemory.js`.
+4. **Choice-visible services** — one or two quest outcomes should alter shop text, stock, price notes, patrol presence, or house visitors so decisions are visible in play.
+5. **Ending variants** — expand endings from thematic axes plus key flags only after the above consequences are visible during the run.
+6. **Acceptance** — after one consequential quest, at least one NPC, one service, and one run-summary/ending surface acknowledge what happened.
+
+### Phase C — RPG loops: gear, crafting, housing, economy
+
+Goal: make attributes, loot, workbench levels, and resources form a repeatable loop.
+
+Build slices:
+1. **Earned upgrade path** — POIs, mini-bosses, resource finds, and region rewards should drop materials that unlock armor, weapon family upgrades, affixes, repairs, and workbench projects outside the shop.
+2. **Workbench depth** — Workbench II/III benefits should become obvious: better potion/tonic yield, cheaper repair/refine prep, forge/alchemy/map-table actions, and visible station project progress.
+3. **Armor and weapon choices** — armor slots and weapon families should change stamina, protection, movement, reach, windup, and role identity enough for the character sheet to matter.
+4. **House utility** — the house should become a hub with stash tabs, station previews, trophy display, pet bed, companion bunk, map table, and cheaper Craft-heavy upgrades.
+5. **Economy pressure** — vendors should differ by identity, stock should refresh by day/region, and gold sinks should include repair, housing, pet care, trainers, bounties, transport, and cosmetics.
+6. **Acceptance** — a tester can explain why they want one attribute, one weapon family, one armor piece, one workstation level, and one resource route.
+
+### Phase D — NPC life + local conversation
+
+Goal: make NPCs feel aware without requiring network calls.
+
+Build slices:
+1. **Memory-first reactions** — continue using deterministic memory for origin, region, house, quest result, faction stance, greeting history, and gear milestones.
+2. **Compact choice UI** — add a 2-4 choice dialogue modal for major NPCs using handcrafted response tables and existing affinity/faction/axis deltas.
+3. **Free-text style prompt surface** — later, allow a short "ask about..." flavor prompt that still resolves through local tables first.
+4. **Optional provider boundary** — only after local dialogue works, define a mockable `dialogueProvider` interface for future local/free LLM experiments.
+5. **Safety rules** — generated/provider-backed text must stay short, in-world, persona-bounded, fact-bounded, and unable to execute code or mutate saves directly.
+6. **Acceptance** — the shipped game works fully offline, and an NPC can visibly respond to at least three current-run facts.
+
+### Phase E — Playtest readiness, replayability, and resilience
+
+Goal: make the game easier to test, replay, recover, and share without derailing the core RPG loop.
+
+Build slices:
+1. **Pause/settings path** — Esc pause, resume, settings, codex, quit, and a path to difficulty selection without breaking combat timing.
+2. **Save reliability** — save slots, backup rotation, corruption recovery UI, export/import, and future-schema messaging.
+3. **Replay hooks** — run summary screen, New Game+, daily seed, challenge flags, and run history after the core two-minute loop feels good.
+4. **Playtest instrumentation** — optional local metrics for time-to-first-kill, chapter reached, boss kills, run end cause, setting changes, and first-session friction.
+5. **Distribution** — offline itch package first; Steam wrapper feasibility only after input, fullscreen, save path, and controller support are stronger.
+6. **Acceptance** — a human tester can start, pause, save, reload, recover from a bad save, finish or die, and send useful feedback from one play session.
 
 ## Shipped Pillars
 
@@ -52,15 +116,17 @@ Latest local verification:
 - **Codex / lore browser** (`src/codex.js`) — KeyZ opens a tabbed lore screen (regions / enemies / items / factions / ideology). Entries unlock on first encounter (region unlock, first kill of an enemy archetype). Shows `???` + "(undiscovered)" until unlocked. Progress count in header.
 
 ## Test + Build Status
-- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 289 passing across 31 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
+- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 296 passing across 32 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
 - v1/v2/v3 save fixtures all migrate cleanly with backfilled defaults.
 
 ## Next Work — Pillar 5: Narrative depth
 
 1. **Branching quest outcomes** — implemented foundation. `questDefinitions.js` now supports optional `outcomes` per quest, `decisionEngine.js` has `applyQuestOutcome`, save migration backfills `state.narrative.questOutcomes`, and `main.js` opens a small consequence modal for Crystal, House, Archive, Ashfall, and Lantern turn-ins. Ashfall/Lantern resource objectives now progress from regional harvesting, and town-circle turn-in advances the next regional quest. Next: add a Playwright flow that completes one turn-in and confirms the modal choice persists.
 2. **Companion follower (1 slot)** — implemented foundation plus recovery. `src/companion.js` selects eligible NPCs at affinity ≥60, activates a one-slot follower, moves them toward the player, lets them strike nearby enemies on cooldown, lets nearby enemies threaten them, downs them at 0 HP, applies -15 affinity, and recovers them after a timer. `main.js` renders active companions, updates recovery/threat state in the loop, exposes it in smoke state JSON, and persists `world.companionId/world.companionHp/world.companionDowned/world.companionRecoveryTimer`. `saveMigration.js` backfills companion fields for existing v3 saves. Next: add companion barks and utility synergy.
-3. **Four endings driven by thematic axes** — at chapter 3 final beat, resolve dominant axis from `narrative.thematicAxes`, render ending text + epilogue. Tie-breakers via `globalFlags`.
-4. **Lite dialogue choices** — per-NPC stateless 2–3 choice prompts per chapter. Modal applies axis/rep deltas. Not a tree — flat menu, gated by chapter + flag.
+3. **Visible consequence layer** — after at least one quest outcome, alter a world-facing surface: NPC greeting, shop note, vendor stock, patrol presence, house visitor, town banner, or run-summary line. Acceptance: the result is visible without opening debug JSON.
+4. **Four endings driven by thematic axes** — at chapter 3 final beat, resolve dominant axis from `narrative.thematicAxes`, render ending text + epilogue. Tie-breakers use `globalFlags`, companion state, and at least one quest outcome.
+5. **Lite dialogue choices** — per-NPC stateless 2–3 choice prompts per chapter. Modal applies axis/rep deltas. Not a tree — flat menu, gated by chapter + flag.
+6. **Narrative feedback tests** — one deterministic browser or pure-helper flow proves a quest choice changes memory, a visible line, and saved outcome state after reload.
 
 ## Next Work — Pillar 5.5: Story-to-run payoff
 
@@ -72,18 +138,20 @@ Latest local verification:
 
 ## Next Work — Pillar 6: Replayability
 
-1. **Run summary screen** — death/victory shows time played, kills, gold, ideology snapshot, ending if reached. "Continue → New Game+" button on victory.
-2. **New Game+** — `state.world.ngPlusLevel` carries forward `progression.upgradePoints`/`skillTree`/`weaponTier`/`armorMods`. Resets quests/inventory/regions. Enemy HP×(1+0.25·ngPlusLevel).
-3. **Daily seed mode** — main-menu button. Seed = YYYY-MM-DD hash drives spawn order, POI placement, region-event severity. Score = `kills*5 + gold + dayDepth*100`.
-4. **Challenge runs** — new-game checkboxes: ironman (no reload after death), no-shop, no-skill. Each modestly multiplies score.
+1. **Run summary screen** — death/victory shows time played, kills, gold, ideology snapshot, boss kills, resources harvested, gear milestones, pet/companion status, and ending if reached. "Continue → New Game+" button on victory.
+2. **New Game+** — `state.world.ngPlusLevel` carries forward `progression.upgradePoints`/`skillTree`/`weaponTier`/`armorMods` plus a small earned badge/history entry. Resets quests/inventory/regions. Enemy HP×(1+0.25·ngPlusLevel) and reward quality nudges up modestly.
+3. **Daily seed mode** — main-menu button. Seed = YYYY-MM-DD hash drives spawn order, POI placement, region-event severity, first-minute pressure event, and reward order. Score = `kills*5 + gold + dayDepth*100 + endingBonus`.
+4. **Challenge runs** — new-game checkboxes: ironman (no reload after death), no-shop, no-skill, harsh weather, companion required. Each modestly multiplies score and changes summary labels.
+5. **Run history archive** — persist last 20 local runs with origin, build role, ending, score, duration, boss kills, and challenge flags. View from title screen after save slots exist.
 
 ## Next Work — Pillar 7: QoL & accessibility
 
-1. **Pause menu** — Esc pauses, scales game time to 0, opens menu (Resume / Settings / Codex / Quit).
-2. **Keybind remap** — settings modal sub-menu, persisted in `state.input.keybinds`.
-3. **Save slots (3)** — prefix `westward_save_<slot>`. Title-screen UI for slot select; existing key migrates to slot 1.
-4. **Subtitle system** — combat events ("hit", "crit", "low HP", "regen") via accessibility flag.
-5. **Difficulty selector** — Easy/Normal/Hard at new-game. Disjoint from NG+ scaling — multiplicative.
+1. **Pause menu** — Esc pauses, scales game time to 0, opens menu (Resume / Settings / Codex / Character / Save / Quit). Acceptance: pausing during combat cannot advance enemy attacks.
+2. **Keybind remap** — settings modal sub-menu, persisted in `state.input.keybinds`, with conflict detection and a reset-to-default action.
+3. **Save slots (3)** — prefix `westward_save_<slot>`. Title-screen UI for slot select; existing key migrates to slot 1. Slot card should show origin, chapter, region, time played, and last save time.
+4. **Subtitle system** — combat/story/interaction events ("hit", "crit", "low HP", "regen", NPC bark, companion warning) via accessibility flag and ARIA live region where possible.
+5. **Difficulty selector** — Easy/Normal/Hard at new-game. Disjoint from NG+ scaling, multiplicative, and visible in run summary. Avoid changing save schema unless difficulty needs persistence beyond `world`.
+6. **HUD responsive pass** — prevent minimap, objective strip, status bars, loot toasts, and workbench prompts from overlapping at narrow viewport sizes.
 
 ## Next Work — Pillar 8: Combat depth round 2
 
@@ -167,11 +235,12 @@ Latest local verification:
 
 ## Next Work — Pillar 18: Save resilience
 
-1. **Corruption recovery UI** — JSON parse failures should surface a canvas/menu message with fresh-start and backup-restore options instead of silently falling back.
-2. **Auto-backup rotation** — keep the last three successful saves under timestamped backup keys; rotate after successful primary save writes only.
-3. **Export/import** — add local JSON export/import from the title or pause flow for cloudless portability. Import validates version and payload shape before writing storage.
+1. **Corruption recovery UI** — JSON parse failures should surface a canvas/menu message with fresh-start, backup-restore, and export-bad-save options instead of silently falling back.
+2. **Auto-backup rotation** — keep the last three successful saves under timestamped backup keys; rotate after successful primary save writes only. Store slot-aware backups once save slots land.
+3. **Export/import** — add local JSON export/import from the title or pause flow for cloudless portability. Import validates version, payload shape, slot target, and future-schema compatibility before writing storage.
 4. **Schema mismatch messaging** — unsupported future versions should explain that the save is newer than the game build; older versions should show successful migration when useful.
-5. **Save resilience tests** — cover malformed JSON, unsupported version, v1/v2/v3 migration, backup restore, and export/import round trips.
+5. **Human-test recovery path** — add a visible "Reset current slot" and "Copy save debug" path so playtesters can recover or send useful state without devtools.
+6. **Save resilience tests** — cover malformed JSON, unsupported version, v1/v2/v3 migration, backup restore, export/import round trips, and corrupted slot fallback.
 
 ## Next Work — Pillar 19: Playtest telemetry & distribution
 
@@ -192,18 +261,23 @@ Latest local verification:
 ## Next Work — Pillar 21: Visual world upgrade
 
 1. **Region art pass** ✅ foundation shipped — `src/regionVisualIdentity.js` defines Frontier/Ashfall/Iron Lantern mood, sky tint, ground palette, landmark hints, prop palette, danger identity, and debug identity lines. `main.js` applies profile sky/ground/trail tinting, shows region labels in the HUD, and exposes `region_visual_identity` in `render_game_to_text`. Next: landmark silhouettes, interactable props, and enemy presentation.
-2. **Landmarks and travel readability** — add visible towers, mines, shrines, roads, outposts, gates, and region borders so players navigate by place instead of coordinates.
-3. **Interior variety** — extend the existing house/interior rendering into caves, watchtowers, smithy, inn, shrine, and Iron Lantern office spaces. Keep interiors canvas-only and reuse collision maps.
-4. **Character silhouettes** — add player/NPC/companion visual layers for outfit, weapon, cloak/hat, faction accent, and combat stance. Persist cosmetic selections separately from stats.
-5. **Combat readability polish** — upgrade smoke, flare, parry, phase transition, bleed/burn/frost/shock, and boss death visuals with colorblind-safe variants and snapshot coverage.
+2. **First-view composition pass** — when a run starts, the camera should show a road, landmark hint, nearby action marker, and one readable route choice. Keep the first screen playable, not a static title-card moment.
+3. **Landmarks and travel readability** — add visible towers, mines, shrines, roads, outposts, gates, region borders, smoke stacks, signal lights, and directional signposts so players navigate by place instead of coordinates.
+4. **Prop and dressing layer** — deterministic non-blocking props by region: Frontier fences/carts/barrels/grass tufts, Ashfall bones/ash drifts/mine rails, Iron Lantern pipes/cables/lamps/checkpoints. Expose active prop profile in `render_game_to_text` for smoke debugging.
+5. **Interior variety** — extend the existing house/interior rendering into caves, watchtowers, smithy, inn, shrine, and Iron Lantern office spaces. Keep interiors canvas-only and reuse collision maps.
+6. **Character silhouettes** — add player/NPC/companion visual layers for outfit, weapon, cloak/hat, faction accent, pet marker, and combat stance. Persist cosmetic selections separately from stats.
+7. **Combat readability polish** — upgrade smoke, flare, parry, phase transition, bleed/burn/frost/shock, and boss death visuals with colorblind-safe variants and snapshot coverage.
+8. **Visual QA path** — add focused screenshot capture for start view, near-wall view, landmark view, combat windup, and workbench UI. Store generated artifacts under ignored `output/`.
 
 ## Next Work — Pillar 22: Character progression & role identity
 
 1. **Character sheet** ✅ foundation shipped — KeyI opens a canvas character sheet with origin, role label, attributes, RPG hooks, current region identity, gear, faction lean/rep, companion state, and house state. It is exposed through `character_sheet_open` in `render_game_to_text`.
 2. **Attributes** ✅ foundation shipped — `src/characterIdentity.js` adds Might, Grit, Cunning, Craft, Speech, and Lore with origin presets, safe normalization, derived RPG hooks, and v3 save migration preservation under `progression.identity`. Speech now affects shop prices through `resolveIdentityShopPriceMultiplier`; next hooks should affect dialogue, crafting, and combat reserve.
-3. **Skill-use leveling** — track repeated play actions locally: one-handed attacks, block/parry, harvesting, crafting, speech choices, lock/repair actions. Convert usage into small XP nudges without grinding requirements.
-4. **Origins/classes** ✅ foundation shipped — title-screen new-run selection now supports Exiled Marshal, Ash Salvager, Guild Errandhand, and Lantern Defector. The selected origin writes `progression.identity`, changes the character sheet, and is verified through smoke state. Next: one starting perk, reputation tilt, and small visual/codex differences.
-5. **Respec and build repair** — add an in-world trainer who can respec attributes/perks for gold/resources, with tests proving save persistence and combat recalculation.
+3. **Attribute hooks round 2** — Might affects heavy windup/recovery, Grit affects armor burden and guard break, Cunning affects dodge/reward reveals, Craft affects workbench yield/costs, Speech affects dialogue/services, Lore affects codex/region clue surfaces.
+4. **Skill-use leveling** — track repeated play actions locally: one-handed attacks, block/parry, harvesting, crafting, speech choices, lock/repair actions. Convert usage into small XP nudges without grinding requirements.
+5. **Origins/classes** ✅ foundation shipped — title-screen new-run selection now supports Exiled Marshal, Ash Salvager, Guild Errandhand, and Lantern Defector. The selected origin writes `progression.identity`, changes the character sheet, and is verified through smoke state. Next: one starting perk, reputation tilt, starting visual accent, and small codex differences.
+6. **Respec and build repair** — add an in-world trainer who can respec attributes/perks for gold/resources, with tests proving save persistence and combat recalculation.
+7. **Role identity summary** — add a compact role sentence to the character sheet and `render_game_to_text` such as "Grit-heavy hammer defender" or "Speech/Craft salvage diplomat."
 
 ## Next Work — Pillar 23: Weapons, armor, loot, and crafting
 
@@ -211,43 +285,53 @@ Latest local verification:
 2. **Armor slots** ✅ foundation shipped — head/body/hands/feet/trinket slots backfill through save migration. Shop fitting installs heavier armor pieces, Grit absorbs weight, armor affects stamina regen/block/weather movement, and the character sheet/debug state exposes armor line, weight, and crafting economy. Next: silhouette changes, stealth, elemental resistance, and inventory-driven equip choices.
 3. **Loot tables** ✅ foundation shipped — `src/lootSystem.js` rolls deterministic regional drops with injectable RNG tests. POIs, mini-bosses, and some regional resource harvests can now grant gear-relevant finds such as armor pieces and weapon-family tokens in addition to resources.
 4. **Crafting stations** ✅ foundation shipped — `src/craftingStation.js` defines pure workstation actions. The house stash now opens a selectable workbench overlay that can craft potions with Craft yield, fit owned Salvage Gloves, spend weapon-family tokens, prepare a refine kit from resources, upgrade the workbench through save-safe levels, gain Workbench II potion/refine benefits, and draft a persistent Region Map at Workbench III.
-5. **Balance tests** — pure tests for DPS, stamina economy, block breakpoints, loot rarity, and upgrade costs so new gear does not trivialize Pillar 8 combat.
+5. **World-earned upgrade branches** — each weapon family gets a simple branch: Saber precision, Axe cleave, Spear reach/control, Hammer stagger/guard break. Branch materials should drop from POIs, mini-bosses, and regional resource finds.
+6. **Inventory-driven equipment choices** — let owned armor pieces and refit tokens be selected from house/smith UI instead of instantly replacing gear. Acceptance: the player can own more than one valid piece and choose what to equip.
+7. **Crafting recipe visibility** — character sheet/workbench should show missing resources, Craft discounts/yield, station level benefits, and why an action is blocked.
+8. **Balance tests** — pure tests for DPS, stamina economy, block breakpoints, loot rarity, upgrade costs, and station benefits so new gear does not trivialize Pillar 8 combat.
 
 ## Next Work — Pillar 24: Pets, companions, and mounts
 
-1. **Pet adoption/taming** — add one active pet slot separate from human companions. Early pets: trail cat, dust hound, lantern moth, pack pig. Each has a passive and one triggered behavior.
-2. **Pet bond system** — pets gain bond through travel, feeding, survival, and quest choices. Bond unlocks utility instead of raw combat domination.
-3. **Pet gear and care** — collars, packs, charms, and stable/kennel upgrades. Persist pet identity, name, skin, bond, gear, and recovery state.
-4. **Companion personalities** — extend one-slot companions with barks, likes/dislikes, loyalty thresholds, and quest reaction memory. Companions should comment on major choices and locations.
-5. **Mount/travel prototype** — evaluate a rideable mount or fast-travel stable after pathing is stable. Acceptance: no clipping through collision, no combat exploit, no camera sickness.
+1. **Pet adoption/taming** — add one active pet slot separate from human companions. Early pets: trail cat, dust hound, lantern moth, and pack pig. Each has a passive and one triggered behavior.
+2. **First pet slice** — ship one pet first, likely dust hound or lantern moth: visible follower, passive resource/POI hint, one cooldown utility, bond persistence, and a house pet-bed surface.
+3. **Pet bond system** — pets gain bond through travel, feeding, survival, and quest choices. Bond unlocks utility instead of raw combat domination.
+4. **Pet gear and care** — collars, packs, charms, stable/kennel upgrades, food costs, and recovery after defeat. Persist pet identity, name, skin, bond, gear, and recovery state.
+5. **Companion personalities** — extend one-slot companions with barks, likes/dislikes, loyalty thresholds, and quest reaction memory. Companions should comment on major choices, gear milestones, house upgrades, and locations.
+6. **Mount/travel prototype** — evaluate a rideable mount or fast-travel stable after pathing is stable. Acceptance: no clipping through collision, no combat exploit, no camera sickness.
 
 ## Next Work — Pillar 25: Housing, settlements, and ownership
 
-1. **House expansion stages** — shack to homestead to safehouse to small guild hall. Each stage changes interior layout, storage, workstations, NPC visits, and exterior silhouette.
-2. **Storage and displays** — stash tabs for resources/gear, trophy display for boss kills, pet bed, companion bunk, and weapon rack. Must persist and survive save migration.
+1. **House expansion stages** — shack to homestead to safehouse to small guild hall. Each stage changes interior layout, storage, workstations, NPC visits, exterior silhouette, and nearby town dressing.
+2. **Storage and displays** — stash tabs for resources/gear, trophy display for boss kills, pet bed, companion bunk, map table, armor stand, and weapon rack. Must persist and survive save migration.
 3. **Functional upgrades** ✅ foundation shipped — house stash now backfills/persists `house.workstation`, supports initial workbench crafting, exposes level 2/3 workbench upgrades, improves potion/refine output at level 2, and unlocks a level 3 map-table project. Next: forge/alchemy station depth, passive trickle, bounties, and fast-travel hooks.
-4. **Settlement influence** — player choices shift town services, vendor stock, patrol presence, house visitors, and ambient dialogue.
-5. **Home defense event** — optional attack/raid event after major story beats. Uses existing combat systems and rewards preparation instead of punishing casual play.
+4. **Station-specific benefits** — forge improves weapon/armor prep, alchemy improves potion/tonic yield, map table reveals POI clues, bunk improves companion recovery, pet bed improves bond/recovery, trophy wall unlocks boss reward recollection.
+5. **Settlement influence** — player choices shift town services, vendor stock, patrol presence, house visitors, bounties, and ambient dialogue.
+6. **Home defense event** — optional attack/raid event after major story beats. Uses existing combat systems and rewards preparation instead of punishing casual play.
+7. **Housing acceptance** — a tester should want to return home because it is cheaper, clearer, and more personal than using the shop alone.
 
 ## Next Work — Pillar 26: Economy, jobs, and bounties
 
-1. **Regional pricing** — prices respond to faction reputation, region events, scarcity, and player quest outcomes. Keep it simple, visible, and testable.
+1. **Regional pricing** — prices respond to faction reputation, region events, scarcity, house station level, Speech, Craft, and player quest outcomes. Keep it simple, visible, and testable.
 2. **Vendor identities** — separate merchant, smith, apothecary, stablekeeper, fence, trainer, and house steward inventories. Stock refreshes by day/region, not every frame.
-3. **Gold sinks** — repairs, housing upgrades, pet care, crafting, trainers, transport, cosmetics, and bounty licenses so gold remains meaningful.
+3. **Gold sinks** — repairs, housing upgrades, pet care, crafting, trainers, transport, cosmetics, bounty licenses, and special job permits so gold remains meaningful.
 4. **Radiant jobs** — small deterministic jobs: bounty, courier, salvage, rescue, escort, patrol, supply run. Each uses existing map/entity systems and has clear success/fail states.
-5. **Trade and consequence hooks** — quest outcomes can open/close vendors, change prices, and reroute supplies. Smoke JSON exposes economy state for playtest debugging.
+5. **Bounty board** — one town-facing board or NPC lists 1-3 deterministic jobs with reward, region, threat, and time/condition hints. Jobs should be save-safe and visible in `render_game_to_text`.
+6. **Trade and consequence hooks** — quest outcomes can open/close vendors, change prices, reroute supplies, add contraband risk, or unlock house visitors. Smoke JSON exposes economy state for playtest debugging.
+7. **Economy acceptance** — after a short session, the player should understand one way to earn gold, one reason to spend it, and one reason prices changed.
 
 ## Next Work — Pillar 27: NPC communication and living-world dialogue
 
 1. **Dialogue memory model** ✅ foundation shipped — `src/npcMemory.js` tracks per-NPC greetings, last origin, last region, house state, recent quest outcome, and notable gear milestone. Major NPC idle/reactive lines can now respond deterministically before any LLM provider exists.
-2. **Text conversation UI** — add a compact modal for 2–4 choice dialogue plus a short free-text style prompt surface for flavor questions. The first implementation should use handcrafted response tables, not network calls.
-3. **LLM provider interface** — define an optional `dialogueProvider` boundary that can call a local/free/game-oriented model later, but the shipped game must run fully offline with deterministic fallback responses.
-4. **Safety and tone filters** — constrain generated or provider-backed replies to NPC persona, known game facts, current quest state, and short in-world responses. No arbitrary code, no unbounded prompts, no save writes from generated text.
-5. **Conversation smoke coverage** — deterministic tests for NPC memory, fallback dialogue, affinity changes, quest gating, and `render_game_to_text` exposure. Optional provider tests stay mocked/off by default.
+2. **Text conversation UI** — add a compact modal for 2-4 choice dialogue plus a short free-text style prompt surface for flavor questions. The first implementation should use handcrafted response tables, not network calls.
+3. **Dialogue content packs** — create small local response tables per major NPC for origin, region, faction stance, house, gear milestone, active quest, and recent outcome. Keep lines short and replay-safe.
+4. **Choice consequences** — some dialogue choices should alter affinity, faction rep, thematic axes, service access, job availability, or local memory. Keep deltas small and visible.
+5. **LLM provider interface** — define an optional `dialogueProvider` boundary that can call a local/free/game-oriented model later, but the shipped game must run fully offline with deterministic fallback responses.
+6. **Safety and tone filters** — constrain generated or provider-backed replies to NPC persona, known game facts, current quest state, and short in-world responses. No arbitrary code, no unbounded prompts, no save writes from generated text.
+7. **Conversation smoke coverage** — deterministic tests for NPC memory, fallback dialogue, affinity changes, quest gating, provider-off behavior, and `render_game_to_text` exposure. Optional provider tests stay mocked/off by default.
 
 ## Next Agent Handoff
 
-Current shipped direction after `7e9ac52`: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, NPC memory, first-pass gameplay-feel helpers, near-wall projection repair, and smoke/debug text fields are in scope. Fast verification is 289 tests across 31 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should prioritize live gameplay feel: first-minute pressure, enemy readability, hit/reward feel, and the slow mini-boss smoke.
+Current shipped direction after `7132c81`: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, NPC memory, first-pass gameplay-feel helpers, near-wall projection repair, and smoke/debug text fields are in scope. Fast verification is 296 tests across 32 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should prioritize **Phase A**: first-minute pressure, visual open-world composition, enemy readability, hit/reward feel, HUD overlap cleanup, and the slow mini-boss smoke.
 
 ### User signal to respect
 
@@ -263,20 +347,24 @@ The user is not asking for a prettier TODO list. They want the game to start fee
 
 ### Next build target
 
-Ship **Gameplay Feel 2: first-minute pressure + enemy readability.** The current foundation makes loot/workstations real and selectable, shows earned gear in the sheet/workbench, lets the workbench level up, improves level 2 crafting, unlocks a level 3 Region Map project, and adds first-pass hit feedback/opening-objective helpers. The next slice should make live play feel less static before adding more RPG data.
+Ship **Phase A / Gameplay Feel 2: visual open-world feel + first-minute pressure + enemy readability.** The current foundation makes loot/workstations real and selectable, shows earned gear in the sheet/workbench, lets the workbench level up, improves level 2 crafting, unlocks a level 3 Region Map project, and adds first-pass hit feedback/opening-objective helpers. The next slice should make live play feel less static before adding more RPG data.
 
 Player-facing result:
-- First 60 seconds have a clear action target and a nearby reward/threat.
+- First 60 seconds have a clear action target, visible route, landmark hint, and nearby reward/threat.
+- The starting view contains roads/props/signage or a region-specific landmark, not empty-feeling space.
 - Enemy windups, hit reactions, and reward drops read better without opening debug state.
+- HUD elements do not overlap when the game is played in the in-app browser.
 - Mini-boss smoke completes deterministically or produces a focused failure artifact.
 - Saves preserve new gear/crafting state through v3 backfill unless a real schema bump becomes necessary.
 
 Concrete build order:
-1. Add a deterministic first-minute pressure event or nearby action marker.
-2. Make enemy hit reactions/windups more readable in the canvas, not just in logs.
-3. Shorten/fix `test-actions/mini_boss_flow.json` so the smoke does not hang.
-4. Keep `render_game_to_text` exposing gameplay-feel state for smoke automation.
-5. Update this roadmap and verification counts after the slice lands.
+1. Add a deterministic first-minute pressure event or nearby action marker with reward/threat text.
+2. Add a region prop/landmark layer for roads, signposts, fences, carts, lamps, ash drifts, rails, pipes, and horizon silhouettes.
+3. Make enemy hit reactions/windups more readable in the canvas, not just in logs.
+4. Fix HUD/objective/minimap overlap at narrow browser widths.
+5. Shorten/fix `test-actions/mini_boss_flow.json` so the smoke does not hang.
+6. Keep `render_game_to_text` exposing gameplay-feel and visual-world state for smoke automation.
+7. Update this roadmap and verification counts after the slice lands.
 
 Quality bar:
 - This is not a cosmetic-only pass. Attributes must have at least small derived effects or clear future hooks surfaced in data.
@@ -286,10 +374,10 @@ Quality bar:
 - This is not a line-count contest. The slice is successful if the player can see identity, the world reads more distinctly, saves survive, and tests prove the shape.
 
 Next after that:
-1. **Pillar 23 gear loop** — loot tables, crafting stations, and inventory-driven equipment choices that reference attributes.
-2. **Pillar 25 housing utility** — storage/workstations that use economy/crafting resources.
-3. **Pillar 24 pet slot** — one pet with bond and one utility behavior, after attributes and housing hooks exist.
-4. **Pillar 27 NPC memory** — local memory and choice surfaces before any optional LLM provider.
+1. **Phase B narrative payoff** — quest outcome smoke, companion barks, NPC/town reactions, visible service changes.
+2. **Phase C RPG loops** — inventory-driven gear choices, deeper workbench/stations, housing utility, economy pressure.
+3. **Phase D NPC life** — local dialogue UI, handcrafted memory-aware lines, optional provider boundary only after fallback works.
+4. **Phase E playtest readiness** — pause/save slots/recovery, run history, daily seed, distribution packaging.
 
 ## Verification Gates
 

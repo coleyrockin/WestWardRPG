@@ -7,10 +7,10 @@
 ![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33?style=flat&logo=playwright&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat)
 
-Story-first frontier RPG built on a custom Canvas raycasting stack.  
-No engine. No framework lock-in. Just readable systems code and a surprisingly deep game loop.
+Story-first open-world frontier RPG built on a custom Canvas raycasting stack.
+No engine. No framework lock-in. Just readable systems code, deterministic helpers, and a growing RPG loop.
 
-The flagship update adds chapter-driven narrative consequences, faction/NPC reactivity, enemy archetypes, visual mood profiles, and satirical world design inspired by *Animal Farm* power critique and cyberpunk systemic pressure.
+The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction: origins, attributes, regional identity, gear, armor, loot, workbench upgrades, housing utility, deterministic NPC memory, combat payoff, and first-pass visual open-world pressure.
 
 ## Preview
 
@@ -21,8 +21,9 @@ The flagship update adds chapter-driven narrative consequences, faction/NPC reac
 ## Table of Contents
 
 - [Why This Project](#why-this-project)
-- [What's New in Flagship Update](#whats-new-in-flagship-update)
-- [Shattered Frontier v3 Expansion](#shattered-frontier-v3-expansion)
+- [Current State](#current-state)
+- [Current Direction](#current-direction)
+- [Core Systems](#core-systems)
 - [Quick Start](#quick-start)
 - [Controls](#controls)
 - [Architecture](#architecture)
@@ -40,34 +41,45 @@ The flagship update adds chapter-driven narrative consequences, faction/NPC reac
 - Uses automated tests for core systems and progression logic.
 - Keeps future work in one roadmap: [`docs/roadmap.md`](docs/roadmap.md).
 
-## What's New in Flagship Update
+## Current State
 
-- **Three-act story progression** (`act1` -> `act3`) persisted in runtime and save data.
-- **Decision consequence engine** with thematic axes:
-  - `controlVsFreedom`
-  - `truthVsComfort`
-  - `solidarityVsStatus`
-- **Reactive cast system** where key NPC relationships and faction alignment shift from player actions.
-- **Combat depth expansion** with archetypes (`slime`, `charger`, `spitter`, `brute`) and doctrine-based loadout/perk behavior.
-- **Glass Gulch biome content** plus multi-step archive branch quest progression.
-- **Visual profile pipeline** (chapter/weather-aware fog, shimmer, vignette) with runtime quality toggle.
-- **Save migration to v2** with backward compatibility for v1 payloads.
-- **Expanded test coverage** for decisions, combat loadouts, archetype behavior, and quest definitions.
+`main` ships the Shattered Frontier v3 foundation plus several open-world RPG systems:
 
-## Shattered Frontier v3 Expansion
+- **Story + payoff**: chapter progression, thematic axes, quest outcomes, final Lantern Revolt victory trigger, ending overlay, and run summary stats.
+- **Combat depth**: enemy archetypes, status effects, perfect dodge/parry, parry chains, boss phase transitions, charge-cancel windup, weapon affixes, block chip, and guard break.
+- **World life**: day/night cycle, region events, POIs, codex unlocks, faction reputation effects, weather, and region-specific mood.
+- **Character identity**: title-screen origin selection, Might/Grit/Cunning/Craft/Speech/Lore, character sheet, role summary, and attribute hooks for pricing/gear/crafting.
+- **Gear loop foundation**: weapon families, armor slots, deterministic loot tables, POI/mini-boss gear finds, earned gear visibility, and crafting-relevant resources.
+- **Housing/workbench**: save-safe house workstation state, workbench levels, Workbench II potion/refine benefits, Workbench III map-table project, and selectable workbench actions.
+- **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
+- **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, and early Phase A open-world pressure/dressing work.
 
-The v3 expansion layers progression and biome systems on top of the flagship update:
+Latest local fast gate: `npm test` reports **296 passing tests across 32 files**. Run the verification commands below before committing gameplay changes.
 
-- **Two new regions** with distinct weather pools and hazards:
-  - *Ashfall Basin* — sandstorms, heatwaves, scrap-tier resources (`Ashglass`, `Scrap Coil`, `Heat Resin`).
+## Current Direction
+
+The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the single source of truth. The active build order is:
+
+1. **Phase A: Visual open-world feel + first-minute pressure** — landmarks, roads, props, readable enemy intent, HUD clarity, nearby early reward/threat.
+2. **Phase B: Narrative payoff + visible consequence** — quest outcome smoke, companion barks, NPC/town reactions, visible service changes.
+3. **Phase C: RPG loops** — deeper gear choices, crafting stations, housing utility, economy/jobs/bounties.
+4. **Phase D: NPC life + local conversation** — handcrafted memory-aware dialogue first; optional LLM boundary later with offline fallback.
+5. **Phase E: Playtest readiness** — pause/save slots/recovery, replay hooks, local metrics, and distribution packaging.
+
+## Core Systems
+
+- **Regions**
+  - *Dustward Frontier* — town circle, marsh road, watchtower hints, ranch/house identity.
+  - *Ashfall Basin* — sandstorms, heatwaves, slag towers, scrap-tier resources (`Ashglass`, `Scrap Coil`, `Heat Resin`).
   - *Iron Lantern District* — neon rain, surveillance pressure, signal-tier resources (`Lantern Filament`, `Cipher Lens`, `Pressurized Ink`).
-- **Region events** (`patrol_crackdown`, `market_crash`, `civic_unrest`) that ramp severity over time and decay between visits.
-- **Progression system** with three skill branches (`survival`, `combat`, `influence`), tiered weapons (`Common` → `Refined` → `Relic`), and stackable armor modifiers.
-- **Ideology traits** unlocked by extreme thematic-axis values (`freedom_strider`, `order_keeper`, `truthseeker`, `commons_guard`).
-- **Quick utility slot** with three consumables (`smoke`, `flare`, `tonic`) bound to number keys.
-- **Dodge step + charged attack** layered onto existing combat loop with stamina costs and trait-aware modifiers.
-- **Graphics presets** (`low` / `balanced` / `high`) with auto-detection from screen resolution and device memory, plus accessibility toggles for hit-marker strength, camera shake, and high contrast.
-- **Save format v3** — automatic migration from v1/v2, including new progression, region, graphics, and quest fields.
+- **Progression**
+  - Skill branches (`survival`, `combat`, `influence`), weapon tiers (`Common` -> `Refined` -> `Relic`), weapon families, armor slots, affixes, and ideology traits.
+- **Utilities**
+  - Quick utility slot with `smoke`, `flare`, and `tonic`; dodge step; charged attack; block/parry tools.
+- **Accessibility/graphics**
+  - Graphics presets, colorblind palettes, motion/camera shake settings, high contrast support, font scaling, and render helpers.
+- **Automation**
+  - Unit tests, TypeScript checks, syntax checks, smoke actions, visual-regression capture scripts, and `render_game_to_text()` for deterministic browser/state inspection.
 
 ## Quick Start
 
@@ -122,8 +134,18 @@ WestWardRPG/
 │   ├── decisionEngine.js    # chapters, axes, choices, ending resolution
 │   ├── combatLoadout.js     # combat doctrines, perks, stance effects
 │   ├── enemyArchetypes.js   # enemy families and combat profiles
+│   ├── combatMilestones.js  # boss phases, parry chains, charged-attack helpers
+│   ├── statusEffects.js     # burn/bleed/shock/frost runtime effects
 │   ├── questDefinitions.js  # data-driven quest metadata/state helpers
 │   ├── visualProfile.js     # atmosphere/quality + biome grading
+│   ├── regionVisualIdentity.js # region mood, landmarks, props, identity lines
+│   ├── gameFeel.js          # hit feedback and first-minute pressure helpers
+│   ├── characterIdentity.js # origins, attributes, role summaries
+│   ├── gearCrafting.js      # weapon families, armor, crafting economy hooks
+│   ├── craftingStation.js   # house/workbench action resolution
+│   ├── lootSystem.js        # deterministic loot tables and application
+│   ├── npcMemory.js         # deterministic NPC memory and reactive lines
+│   ├── runSummary.js        # kill/resource/victory summary helpers
 │   ├── progressionSystem.js # skill branches, weapon tiers, armor mods, traits
 │   ├── regionSystem.js      # regions, weather pools, region events
 │   ├── graphicsSettings.js  # presets, auto-detect, accessibility
@@ -151,6 +173,9 @@ npm run dev:lint
 npm run test:coverage
 npm run test:smoke
 npm run qa
+
+# Optional visual capture
+WESTWARD_PORT=5183 scripts/visual_regression_capture.sh
 ```
 
 ## Save Format & Migration
@@ -163,13 +188,14 @@ Saves live in `localStorage` under the `westward-save-v3` key. Legacy keys (`wes
 | `2`     | Narrative state (chapters, axes, decisions, NPC reactions).              |
 | `3`     | Progression, regions, graphics, quick utility, four expansion quests.    |
 
-`migrateSaveToV3` upgrades v1/v2 payloads on load — old saves remain playable. Unknown or malformed payloads are rejected silently and fall back to a fresh world.
+`migrateSaveToV3` upgrades v1/v2 payloads on load — old saves remain playable. Unknown or malformed payloads currently fall back to a fresh world; the roadmap tracks future corruption-recovery UI, backup rotation, and export/import work.
 
 ## Troubleshooting
 
 - **Wrong app appears on localhost**: another process is using `5173`; run on `5183`.
 - **No audio at start**: click canvas first to unlock browser audio context.
 - **QA creates local artifacts**: smoke and visual checks write to ignored `output/`; remove it when you want a clean workspace.
+- **Roadmap seems ahead of README**: use [`docs/roadmap.md`](docs/roadmap.md) as the detailed current plan; this README is the high-level project entry point.
 
 ## Contributing
 
