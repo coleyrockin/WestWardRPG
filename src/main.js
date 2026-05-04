@@ -210,6 +210,7 @@ import {
   ensureCodexState,
   unlockCodexEntry,
   listEntriesForTab,
+  resolveCodexUnlockForPOI,
   totalCodexProgress,
 } from "./codex.js";
 import {
@@ -1848,7 +1849,7 @@ const canvas = document.getElementById("game");
       loot: createInitialLootState(),
     },
     companion: createInitialCompanionRuntime(),
-    codex: { unlocked: { regions: [], enemies: [], items: [], factions: [], ideology: [] } },
+    codex: { unlocked: { regions: [], enemies: [], items: [], factions: [], ideology: [], letters: [] } },
     npcs: [
       {
         id: "elder",
@@ -2252,6 +2253,7 @@ const canvas = document.getElementById("game");
         loot: state.world.loot,
       },
       narrative: state.narrative,
+      codex: state.codex,
       showMap: state.showMap,
       progression: state.progression,
       regions: state.regions,
@@ -2319,6 +2321,8 @@ const canvas = document.getElementById("game");
     state.showMap = typeof save.showMap === "boolean" ? save.showMap : state.showMap;
     state.narrative = migrateNarrativeState(save);
     state.narrative.npcMemory = normalizeNpcMemoryState(save.narrative?.npcMemory);
+    state.codex = save.codex || state.codex;
+    ensureCodexState(state);
     state.world = {
       timeOfDay: typeof save.world?.timeOfDay === "number" ? save.world.timeOfDay : 0.25,
       companionId: typeof save.world?.companionId === "string" ? save.world.companionId : null,
@@ -3189,6 +3193,10 @@ const canvas = document.getElementById("game");
         markPOIDiscovered(state.regions, poi.id);
         const kind = POI_KINDS[poi.kind] || POI_KINDS.cache;
         let summary = `Discovered ${poi.label} (${kind.label})`;
+        const codexUnlock = resolveCodexUnlockForPOI(poi);
+        if (codexUnlock && unlockCodexEntry(state, codexUnlock.tab, codexUnlock.id)) {
+          summary += `. Letter unlocked: ${codexUnlock.title}`;
+        }
         if (poi.loot?.gold) {
           state.player.gold += poi.loot.gold;
           summary += `. +${poi.loot.gold}g`;
@@ -7603,6 +7611,10 @@ const canvas = document.getElementById("game");
         questOutcomes: state.narrative.questOutcomes,
         npcMemory: state.narrative.npcMemory,
         ending: resolveNarrativeEnding(state.narrative),
+      },
+      codex: {
+        progress: totalCodexProgress(state),
+        unlocked: state.codex?.unlocked || {},
       },
       companion: state.companion.active
         ? {

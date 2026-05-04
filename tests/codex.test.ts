@@ -7,12 +7,13 @@ import {
   isCodexEntryUnlocked,
   listEntriesForTab,
   getEntry,
+  resolveCodexUnlockForPOI,
   totalCodexProgress,
 } from "../src/codex.js";
 
 describe("codex — data integrity", () => {
-  it("has all five tabs", () => {
-    expect(CODEX_TABS).toEqual(["regions", "enemies", "items", "factions", "ideology"]);
+  it("has all lore tabs including POI letters", () => {
+    expect(CODEX_TABS).toEqual(["regions", "enemies", "items", "factions", "ideology", "letters"]);
   });
 
   it("each tab has at least one entry", () => {
@@ -103,5 +104,24 @@ describe("codex — listing + progress", () => {
   it("totalCodexProgress for an empty state is 0", () => {
     expect(totalCodexProgress({}).unlocked).toBe(0);
     expect(totalCodexProgress(null as any).unlocked).toBe(0);
+  });
+
+  it("maps POI discoveries to letter codex unlocks", () => {
+    const unlock = resolveCodexUnlockForPOI({ id: "frontier_old_well", label: "Old Well" });
+
+    expect(unlock).toEqual({
+      tab: "letters",
+      id: "frontier_old_well",
+      title: "Old Well",
+    });
+  });
+
+  it("unlocks a POI letter through the standard codex path", () => {
+    const s: any = {};
+    const unlock = resolveCodexUnlockForPOI({ id: "frontier_old_well", label: "Old Well" });
+
+    expect(unlockCodexEntry(s, unlock!.tab, unlock!.id)).toBe(true);
+    expect(isCodexEntryUnlocked(s, "letters", "frontier_old_well")).toBe(true);
+    expect(getEntry("letters", "frontier_old_well")?.body).toContain("well");
   });
 });

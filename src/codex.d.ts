@@ -14,4 +14,5 @@ export function unlockCodexEntry(state: any, tab: string, id: string): boolean;
 export function isCodexEntryUnlocked(state: any, tab: string, id: string): boolean;
 export function listEntriesForTab(state: any, tab: string): CodexEntry[];
 export function getEntry(tab: string, id: string): CodexEntry | null;
+export function resolveCodexUnlockForPOI(poi: any): { tab: string; id: string; title: string } | null;
 export function totalCodexProgress(state: any): { unlocked: number; total: number };

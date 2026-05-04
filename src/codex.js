@@ -4,7 +4,7 @@
 // hand-written entries. Entries unlock on first encounter — the host
 // pushes unlock events from the relevant gameplay paths.
 
-export const CODEX_TABS = ["regions", "enemies", "items", "factions", "ideology"];
+export const CODEX_TABS = ["regions", "enemies", "items", "factions", "ideology", "letters"];
 
 export const CODEX_ENTRIES = {
   regions: [
@@ -39,6 +39,17 @@ export const CODEX_ENTRIES = {
     { id: "order_keeper", title: "Order Keeper", body: "Faster recovery on charged attacks; weight tilts toward discipline." },
     { id: "truthseeker", title: "Truthseeker", body: "Bonus XP per slime kill while the Ledger is published." },
     { id: "commons_guard", title: "Commons Guard", body: "Multi-target sweep limit increases when the toolCommonsCreated flag is set." },
+  ],
+  letters: [
+    { id: "frontier_old_well", title: "Old Well", body: "A wet ledger page is pinned inside the well stones: water still moves beneath the frontier, but every bucket is counted twice before the thirsty see it." },
+    { id: "frontier_drifter_camp", title: "Drifter Camp", body: "A campfire note lists trade routes, unpaid favors, and one warning: never sleep where the road can see both your boots." },
+    { id: "frontier_chapel_shrine", title: "Frontier Chapel", body: "A chapel broadside asks whether law can survive without mercy. Someone underlined mercy, then crossed out the name of the judge." },
+    { id: "ashfall_scrap_pile", title: "Scrap Pile", body: "Stamped tags from three crews are mixed into the scrap. The basin does not lose workers all at once; it spends them by the handful." },
+    { id: "ashfall_blacksmith_kiln", title: "Smolder Kiln", body: "A smith's slate marks heat, fuel, and debt in the same column. The last line reads: refine the blade, not the lie." },
+    { id: "ashfall_outlaw_camp", title: "Outlaw Camp", body: "A torn bounty sheet has been repurposed as a dinner mat. Half the names are crossed off, but none of the crimes are settled." },
+    { id: "lantern_archive_drop", title: "Archive Drop", body: "A sealed memo says the archive is not forbidden, merely delayed until everyone who remembers the question is gone." },
+    { id: "lantern_overseer_shrine", title: "Overseer's Vigil", body: "The shrine lantern is polished daily. The inscription below it is scratched away daily. Both rituals are losing." },
+    { id: "lantern_chanter_camp", title: "Chanter Camp", body: "A chant sheet hides a cipher in the margins: meet where the blue lamps fail and bring names, not weapons." },
   ],
 };
 
@@ -77,6 +88,17 @@ export function listEntriesForTab(state, tab) {
 
 export function getEntry(tab, id) {
   return (CODEX_ENTRIES[tab] || []).find((e) => e.id === id) || null;
+}
+
+export function resolveCodexUnlockForPOI(poi) {
+  if (!poi || typeof poi.id !== "string") return null;
+  const entry = getEntry("letters", poi.id);
+  if (!entry) return null;
+  return {
+    tab: "letters",
+    id: entry.id,
+    title: entry.title,
+  };
 }
 
 export function totalCodexProgress(state) {
