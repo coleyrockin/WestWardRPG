@@ -83,7 +83,7 @@ git diff --check
 # clean
 
 npm test
-# 347 passing across 35 test files
+# 351 passing across 35 test files
 
 npm run typecheck:ts
 # clean
@@ -95,7 +95,7 @@ npm run dev:lint
 # clean
 ```
 
-Browser/visual smoke should cover the current Phase A view: fixed first-minute pressure marker, opening route guide, first-view vista silhouettes, map-validated region landmark/prop placement, readable minimap dots, near-wall visual softening, enemy reward callouts, and no narrow-width HUD overlap. Prior smoke coverage also includes new-run state surfaces plus a partial-save house workbench flow: load save, open stash workbench, list craft/potion/armor/token/refine actions, and equip Salvage Gloves. Smoke and visual-regression artifacts are generated under ignored `output/`; rerun the Verification Gates before gameplay commits.
+Browser/visual smoke should cover the current Phase A view: fixed first-minute pressure marker, opening route guide, first fight cue, first-view vista silhouettes, map-validated region landmark/prop placement, readable minimap dots, near-wall visual softening, boss phase/death VFX, enemy reward callouts, and no narrow-width HUD overlap. Prior smoke coverage also includes new-run state surfaces plus a partial-save house workbench flow: load save, open stash workbench, list craft/potion/armor/token/refine actions, and equip Salvage Gloves. Smoke and visual-regression artifacts are generated under ignored `output/`; rerun the Verification Gates before gameplay commits.
 
 ## Current Build Phases
 
@@ -106,10 +106,10 @@ This section is the practical build order for the next sessions. It does not rep
 Goal: make the game read more like a compact open-world RPG the moment the player leaves the menu.
 
 Build slices:
-1. **First-minute pressure** — first pass shipped: within the first 15-30 seconds, the HUD can show an opening route guide with cache action, distance, reward, Boone board/job context, and threat text. Next: visual smoke for route readability and first enemy placement.
+1. **First-minute pressure** — first pass shipped: within the first 15-30 seconds, the HUD can show an opening route guide with cache action, distance, reward, Boone board/job context, and first Road Slime threat text. Next: browser smoke for route readability and first enemy placement.
 2. **Landmark composition** — first pass shipped: each region now exposes first-view vista silhouettes and a composition line around the road/landmark identity: Frontier town/watchtower/gate, Ashfall mine/tower/gate, Iron Lantern mast/checkpoint/gate lights. Next: browser visual smoke and horizon/death-smoke polish.
 3. **Roads, props, and traversal dressing** — add non-blocking roads, fences, crates, carts, grasses, lamps, signs, ash drifts, pipes, rails, and shrine markers with deterministic placement and no collision surprises.
-4. **Enemy readability** — first pass shipped: aggro, windup, stagger, phase, hit, death, and reward-drop cues now expose stronger draw instructions and floating reward callouts. Next: boss-specific silhouettes, phase VFX, and death smoke variants.
+4. **Enemy readability** — second pass shipped: aggro, windup, stagger, phase, hit, death, reward-drop, boss phase, and death-smoke cues now expose stronger draw instructions and floating callouts. Next: browser smoke and boss-specific silhouette art.
 5. **HUD clarity pass** — keep opening objectives, minimap, region label, loot popups, and workbench prompts from overlapping on narrow browser widths.
 6. **Acceptance** — a human tester can start a new run, understand where to go, see why a region is distinct, identify enemy intent, earn a reward, and describe one visible landmark after two minutes.
 

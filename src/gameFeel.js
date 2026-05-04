@@ -148,6 +148,55 @@ function markerActionLine(marker = {}) {
   return `${action}: ${marker.label || "route marker"}${distance}${count}`;
 }
 
+function isAliveEnemy(enemy = {}) {
+  return enemy.alive !== false;
+}
+
+export function resolveOpeningFightCue(input = {}) {
+  if (input.mode !== "playing" || input.inHouse) return null;
+  const time = Math.max(0, input.time || 0);
+  if (time > 600 || hasOpeningProgress(input)) return null;
+
+  const enemies = Array.isArray(input.enemies) ? input.enemies.filter(isAliveEnemy) : [];
+  if (!enemies.length) return null;
+  const pressure = input.pressure || resolveFirstMinutePressure(input);
+  const target = enemies
+    .map((enemy) => {
+      const marker = pressure?.marker || input.player || {};
+      const markerDistance = Math.hypot((enemy.x || 0) - (marker.x || 0), (enemy.y || 0) - (marker.y || 0));
+      const playerDistance = Math.hypot((enemy.x || 0) - (input.player?.x || 0), (enemy.y || 0) - (input.player?.y || 0));
+      const openingBias = enemy.openingPatrol || enemy.id === "opening-patrol" ? -6 : 0;
+      return { enemy, markerDistance, playerDistance, score: markerDistance + playerDistance * 0.2 + openingBias };
+    })
+    .sort((a, b) => a.score - b.score)[0];
+  if (!target || target.playerDistance > 14) return null;
+
+  const label = target.enemy.label || "Road Slime";
+  const distance = distanceLine(input.player, target.enemy);
+  const nearLabel = pressure?.marker?.label ? `near ${pressure.marker.label}` : "near the first reward";
+
+  return {
+    id: "opening-fight-cue",
+    title: "First threat",
+    targetId: target.enemy.id || "",
+    targetLabel: label,
+    actionLabel: "Fight",
+    distanceLine: distance,
+    rewardHint: "+10g, +22 XP, +1 Slime Core",
+    threatLine: `Threat: ${label} guarding the first reward.`,
+    objectiveLine: `Fight: ${label}${distance ? ` • ${distance}` : ""} • ${nearLabel}`,
+    marker: {
+      kind: "enemy-threat",
+      label,
+      x: Number((target.enemy.x || 0).toFixed(2)),
+      y: Number((target.enemy.y || 0).toFixed(2)),
+      color: target.enemy.color || "#92f0a3",
+      size: 0.78,
+      blocking: false,
+    },
+  };
+}
+
 export function resolveFirstMinutePressure(input = {}) {
   if (input.mode !== "playing" || input.inHouse) return null;
   const time = Math.max(0, input.time || 0);
@@ -220,7 +269,8 @@ export function resolveOpeningRouteGuide(input = {}) {
     });
   }
 
-  const threatLine = pressure?.threatHint || "Expect a visible patrol before the route pays out.";
+  const fightCue = input.fightCue || resolveOpeningFightCue({ ...input, pressure });
+  const threatLine = fightCue?.objectiveLine || pressure?.threatHint || "Expect a visible patrol before the route pays out.";
   if (threatLine) {
     steps.push({
       kind: "threat",

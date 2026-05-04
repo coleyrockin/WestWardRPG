@@ -4,6 +4,7 @@ import {
   resolveFirstMinuteCacheReward,
   resolveFirstMinutePressure,
   resolveHitFeedback,
+  resolveOpeningFightCue,
   resolveOpeningObjective,
   resolveOpeningRouteGuide,
 } from "../src/gameFeel.js";
@@ -214,5 +215,60 @@ describe("gameFeel", () => {
       inventory: { "Slime Core": 1 },
       quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
     })).toBeNull();
+  });
+
+  it("surfaces the opening patrol as the first fight cue near the cache route", () => {
+    const pressure = resolveFirstMinutePressure({
+      mode: "playing",
+      time: 20,
+      inHouse: false,
+      regionId: "frontier",
+      player: { x: 9.5, y: 8.5 },
+      inventory: { "Slime Core": 0 },
+      quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+    });
+    const cue = resolveOpeningFightCue({
+      mode: "playing",
+      time: 20,
+      inHouse: false,
+      player: { x: 9.5, y: 8.5 },
+      inventory: { "Slime Core": 0 },
+      quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+      pressure,
+      enemies: [
+        { id: "far", label: "Far Slime", x: 40, y: 40, alive: true },
+        { id: "opening-patrol", label: "Road Slime", x: 14.4, y: 9.4, alive: true, openingPatrol: true },
+      ],
+    });
+
+    expect(cue).toMatchObject({
+      title: "First threat",
+      targetId: "opening-patrol",
+      targetLabel: "Road Slime",
+      actionLabel: "Fight",
+      rewardHint: "+10g, +22 XP, +1 Slime Core",
+    });
+    expect(cue?.distanceLine).toBe("5m");
+    expect(cue?.objectiveLine).toContain("Road Slime");
+    expect(cue?.objectiveLine).toContain("near Smoke Cache");
+  });
+
+  it("folds first fight cue into the opening route guide", () => {
+    const fightCue = {
+      title: "First threat",
+      objectiveLine: "Fight: Road Slime • 5m • near Smoke Cache",
+      threatLine: "Threat: Road Slime guarding the first reward.",
+    };
+    const guide = resolveOpeningRouteGuide({
+      mode: "playing",
+      time: 20,
+      inHouse: false,
+      player: { x: 9.5, y: 8.5 },
+      inventory: { "Slime Core": 0 },
+      quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+      fightCue,
+    });
+
+    expect(guide?.secondaryLine).toContain("Road Slime");
   });
 });

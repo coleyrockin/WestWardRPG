@@ -122,6 +122,8 @@ import {
   getVendorServiceProfile,
 } from "./economyServices.js";
 import {
+  resolveBossPhaseVfx,
+  resolveEnemyDeathVfx,
   resolveEnemyDefeatCallout,
   resolveEnemyReadabilityCue,
 } from "./combatReadability.js";
@@ -136,6 +138,7 @@ import {
   resolveFirstMinuteCacheReward,
   resolveFirstMinutePressure,
   resolveHitFeedback,
+  resolveOpeningFightCue,
   resolveOpeningObjective,
   resolveOpeningRouteGuide,
 } from "./gameFeel.js";
@@ -2641,8 +2644,14 @@ const canvas = document.getElementById("game");
     enemy.color = stats.color || enemy.color;
     enemy.attackReach = Math.max(enemy.attackReach || 0, stats.attackReach + 0.25);
     enemy.damageVariance = Math.max(enemy.damageVariance || 0, stats.damageVariance + 2);
-    state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: "PHASE 2", life: 0.9, maxLife: 0.9, color: "#ffc490" });
-    spawnParticles(canvas.width / 2, canvas.height * 0.38, 18, "#ffc490", 4.2, 0.85, { decorative: false });
+    const vfx = resolveBossPhaseVfx({
+      bossId: enemy.miniBossId,
+      label: def?.label || enemy.label || "Mini-boss",
+      phaseLabel: transition.phaseLabel,
+    });
+    state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: vfx.floatingText, life: 1.0, maxLife: 1.0, color: vfx.ringColor });
+    spawnParticles(canvas.width / 2, canvas.height * 0.38, vfx.particleBurst, vfx.particleColor, vfx.particleSpeed, vfx.particleLife, { decorative: false });
+    state.player.screenShake = clamp(state.player.screenShake + vfx.screenShake, 0, 0.95);
     logMsg(`${def?.label || enemy.label || "Mini-boss"} enters Phase 2: ${transition.phaseLabel}.`);
     sfx.thunder();
     return true;
@@ -4155,6 +4164,20 @@ const canvas = document.getElementById("game");
           maxLife: 0.9,
           color: "#ffd77b",
         });
+        const deathVfx = resolveEnemyDeathVfx({
+          label: enemy.label || "Slime",
+          color: enemy.color || "#6be873",
+          miniBoss: false,
+        });
+        state.floatingTexts.push({
+          wx: enemy.x,
+          wy: enemy.y,
+          text: deathVfx.floatingText,
+          life: deathVfx.particleLife,
+          maxLife: deathVfx.particleLife,
+          color: deathVfx.smokeColor,
+        });
+        spawnParticles(eSx, eSy, deathVfx.particleBurst, deathVfx.particleColor, deathVfx.particleSpeed, deathVfx.particleLife);
         state.player.screenShake = clamp(state.player.screenShake + normalDefeatCallout.screenShake, 0, 0.75);
 
         if (enemy.miniBossId) {
@@ -4182,7 +4205,22 @@ const canvas = document.getElementById("game");
               maxLife: 1.15,
               color: "#ffc490",
             });
-            state.player.screenShake = clamp(state.player.screenShake + bossCallout.screenShake, 0, 0.95);
+            const bossDeathVfx = resolveEnemyDeathVfx({
+              bossId: enemy.miniBossId,
+              label: def.label,
+              color: enemy.color || "#ffc490",
+              miniBoss: true,
+            });
+            state.floatingTexts.push({
+              wx: enemy.x,
+              wy: enemy.y,
+              text: bossDeathVfx.floatingText,
+              life: 1.15,
+              maxLife: 1.15,
+              color: bossDeathVfx.smokeColor,
+            });
+            spawnParticles(eSx, eSy, bossDeathVfx.particleBurst, bossDeathVfx.particleColor, bossDeathVfx.particleSpeed, bossDeathVfx.particleLife);
+            state.player.screenShake = clamp(state.player.screenShake + bossCallout.screenShake + bossDeathVfx.screenShake, 0, 0.95);
             logMsg(`Mini-boss defeated: ${def.label}! +${def.rewardGold}g, +${def.rewardResource.count} ${def.rewardResource.item}, +1 upgrade point.`);
             grantRolledLoot("mini_boss", def.region);
             if (enemy.miniBossId === "ashfall_scrap_tyrant" && state.quests.ashfall_boss?.status === "active") {
@@ -7102,6 +7140,17 @@ const canvas = document.getElementById("game");
       inventory: state.inventory,
       quests: state.quests,
     });
+    const openingFightCue = resolveOpeningFightCue({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      regionId: state.regions.activeRegion,
+      player: state.player,
+      inventory: state.inventory,
+      quests: state.quests,
+      pressure: firstPressure,
+      enemies: state.enemies,
+    });
     const explorationLead = !state.player.inHouse && state.regions?.activeRegion
       ? resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 32 })
       : null;
@@ -7128,6 +7177,7 @@ const canvas = document.getElementById("game");
       inventory: state.inventory,
       quests: state.quests,
       pressure: firstPressure,
+      fightCue: openingFightCue,
       activeJob,
       jobMarker,
       boardProp,
@@ -8194,6 +8244,17 @@ const canvas = document.getElementById("game");
     });
     const jobRouteMarker = getJobRouteMarker();
     const boardProp = getActiveJobBoardProp();
+    const openingFightCue = resolveOpeningFightCue({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      regionId: state.regions.activeRegion,
+      player: state.player,
+      inventory: state.inventory,
+      quests: state.quests,
+      pressure: firstMinutePressure,
+      enemies: activeEnemies,
+    });
     const openingRouteGuide = resolveOpeningRouteGuide({
       mode: state.mode,
       time: state.time,
@@ -8204,6 +8265,7 @@ const canvas = document.getElementById("game");
       inventory: state.inventory,
       quests: state.quests,
       pressure: firstMinutePressure,
+      fightCue: openingFightCue,
       activeJob,
       jobMarker: jobRouteMarker,
       boardProp,
@@ -8260,6 +8322,7 @@ const canvas = document.getElementById("game");
       },
       gameplay_feel: {
         opening_objective: openingObjective,
+        opening_fight_cue: openingFightCue,
         opening_route_guide: openingRouteGuide,
         first_minute_pressure: firstMinutePressure,
         first_reward_cache: firstMinuteCache

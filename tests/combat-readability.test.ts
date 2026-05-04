@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  resolveEnemyReadabilityCue,
+  resolveBossPhaseVfx,
+  resolveEnemyDeathVfx,
   resolveEnemyDefeatCallout,
+  resolveEnemyReadabilityCue,
 } from "../src/combatReadability.js";
 
 describe("combatReadability", () => {
@@ -86,5 +88,46 @@ describe("combatReadability", () => {
       particleBurst: 24,
       screenShake: 0.18,
     });
+  });
+
+  it("builds boss-specific phase VFX profiles", () => {
+    const tyrant = resolveBossPhaseVfx({
+      bossId: "ashfall_scrap_tyrant",
+      label: "Scrap Tyrant",
+      phaseLabel: "Scrap Tyrant Overdrive",
+    });
+    const overseer = resolveBossPhaseVfx({
+      bossId: "lantern_overseer",
+      label: "Lantern Overseer",
+      phaseLabel: "Lantern Overseer Override",
+    });
+
+    expect(tyrant).toMatchObject({
+      floatingText: "PHASE 2: Scrap Tyrant Overdrive",
+      effectKind: "scrap-burst",
+      particleColor: "#ff9f5f",
+      ringColor: "#ffc490",
+    });
+    expect(tyrant.particleBurst).toBeGreaterThan(20);
+    expect(overseer.effectKind).toBe("signal-ring");
+    expect(overseer.particleColor).not.toBe(tyrant.particleColor);
+  });
+
+  it("builds death smoke VFX for normal enemies and mini-bosses", () => {
+    const slime = resolveEnemyDeathVfx({ label: "Road Slime", color: "#6be873" });
+    const boss = resolveEnemyDeathVfx({ bossId: "ashfall_scorch_engine", label: "Scorch Engine", color: "#e08a4a", miniBoss: true });
+
+    expect(slime).toMatchObject({
+      effectKind: "small-smoke",
+      floatingText: "SMOKE",
+      particleColor: "#6be873",
+    });
+    expect(boss).toMatchObject({
+      effectKind: "boss-smoke",
+      floatingText: "BOSS DOWN",
+      smokeColor: "#2b211b",
+    });
+    expect(boss.particleBurst).toBeGreaterThan(slime.particleBurst);
+    expect(boss.screenShake).toBeGreaterThan(slime.screenShake);
   });
 });

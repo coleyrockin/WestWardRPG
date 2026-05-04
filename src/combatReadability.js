@@ -29,6 +29,42 @@ function formatItemLine(items = {}) {
     .map(([name, count]) => `+${Math.floor(count)} ${name}`);
 }
 
+const BOSS_VFX = {
+  ashfall_scrap_tyrant: {
+    effectKind: "scrap-burst",
+    particleColor: "#ff9f5f",
+    ringColor: "#ffc490",
+    smokeColor: "#2b211b",
+  },
+  ashfall_scorch_engine: {
+    effectKind: "heat-lockdown",
+    particleColor: "#ff7b3a",
+    ringColor: "#ffd08a",
+    smokeColor: "#2b211b",
+  },
+  lantern_overseer: {
+    effectKind: "signal-ring",
+    particleColor: "#8fc8ff",
+    ringColor: "#c8a8ff",
+    smokeColor: "#121c2b",
+  },
+  lantern_iron_chanter: {
+    effectKind: "cipher-break",
+    particleColor: "#bca8ff",
+    ringColor: "#9bd3ff",
+    smokeColor: "#171528",
+  },
+};
+
+function bossVfxProfile(bossId) {
+  return BOSS_VFX[bossId] || {
+    effectKind: "phase-burst",
+    particleColor: "#ffc490",
+    ringColor: "#ffd77b",
+    smokeColor: "#1d1a16",
+  };
+}
+
 export function resolveEnemyReadabilityCue(enemy = {}) {
   if (enemy.alive === false) {
     return baseCue("dead", "DOWN", "low", "#ff6b6b", 0, {
@@ -122,5 +158,36 @@ export function resolveEnemyDefeatCallout(options = {}) {
     particleColor: options.color || "#6be873",
     particleBurst: options.miniBoss ? 24 : 12,
     screenShake: options.miniBoss ? 0.18 : 0.06,
+  };
+}
+
+export function resolveBossPhaseVfx(options = {}) {
+  const profile = bossVfxProfile(options.bossId);
+  const phaseLabel = options.phaseLabel || "Phase Two";
+  return {
+    effectKind: profile.effectKind,
+    floatingText: `PHASE 2: ${phaseLabel}`,
+    particleColor: profile.particleColor,
+    ringColor: profile.ringColor,
+    particleBurst: options.miniBoss === false ? 18 : 26,
+    particleSpeed: 4.6,
+    particleLife: 0.95,
+    screenShake: 0.16,
+    bloomAlpha: 0.22,
+  };
+}
+
+export function resolveEnemyDeathVfx(options = {}) {
+  const miniBoss = Boolean(options.miniBoss);
+  const profile = miniBoss ? bossVfxProfile(options.bossId) : null;
+  return {
+    effectKind: miniBoss ? "boss-smoke" : "small-smoke",
+    floatingText: miniBoss ? "BOSS DOWN" : "SMOKE",
+    particleColor: options.color || profile?.particleColor || "#6be873",
+    smokeColor: miniBoss ? (profile?.smokeColor || "#2b211b") : "#1b241c",
+    particleBurst: miniBoss ? 30 : 10,
+    particleSpeed: miniBoss ? 4.4 : 2.4,
+    particleLife: miniBoss ? 1.05 : 0.58,
+    screenShake: miniBoss ? 0.2 : 0.04,
   };
 }
