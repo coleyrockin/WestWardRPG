@@ -50,6 +50,8 @@ describe("jobBoard", () => {
     expect(frontierListings.map((job) => job.id)).toContain("frontier_courier_orders");
     expect(frontierListings.map((job) => job.id)).toContain("frontier_watch_patrol");
     expect(frontierListings.map((job) => job.id)).toContain("frontier_supply_run");
+    expect(frontierListings.map((job) => job.id)).toContain("frontier_missing_scout");
+    expect(frontierListings.map((job) => job.id)).toContain("frontier_settler_escort");
     expect(frontierListings.find((job) => job.id === "frontier_watch_patrol")?.boardNote).toContain("road posts");
     expect(frontierListings.find((job) => job.id === "frontier_supply_run")?.availabilityLine).toContain("Dustward Frontier");
 
@@ -67,13 +69,15 @@ describe("jobBoard", () => {
       npcId: "warden",
     });
 
-    expect(choices).toHaveLength(5);
+    expect(choices).toHaveLength(7);
     expect(choices.map((job) => job.id)).toEqual([
       "frontier_slime_bounty",
       "frontier_road_salvage",
       "frontier_courier_orders",
       "frontier_watch_patrol",
       "frontier_supply_run",
+      "frontier_missing_scout",
+      "frontier_settler_escort",
     ]);
     expect(choices[0]).toMatchObject({
       boardState: "available",
@@ -343,6 +347,109 @@ describe("jobBoard", () => {
     });
     expect(state.activeJobId).toBe(null);
     expect(state.progressByJobId.frontier_supply_run).toBeUndefined();
+  });
+
+  it("runs rescue jobs through find, safe-return, and Boone payout", () => {
+    const state = createInitialJobBoardState();
+    acceptJob(state, "frontier_missing_scout", { time: 4 });
+
+    const findMarker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 12, y: 8.5 },
+      resources: [],
+      enemies: [],
+      npcs: [{ id: "warden", x: 12, y: 8 }],
+    });
+
+    expect(findMarker).toMatchObject({
+      kind: "job_rescue",
+      jobId: "frontier_missing_scout",
+      label: "Find Wounded Scout",
+      action: "rescue",
+      targetId: "frontier_wounded_scout",
+      checkpointIndex: 1,
+      checkpointTotal: 2,
+    });
+
+    const found = recordJobEvent(state, { type: "rescue", targetId: "frontier_wounded_scout", time: 24 });
+    const wrongReturn = recordJobEvent(state, { type: "safe_return", targetId: "frontier_wrong_gate", time: 42 });
+    const returnMarker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 14, y: 9.8 },
+      resources: [],
+      enemies: [],
+      npcs: [{ id: "warden", x: 12, y: 8 }],
+    });
+
+    expect(found.ok).toBe(true);
+    expect(found.progress?.count).toBe(1);
+    expect(wrongReturn.ok).toBe(false);
+    expect(getActiveJobSummary(state)?.progressLine).toBe("Guide Wounded Scout to Marshal Gate");
+    expect(returnMarker).toMatchObject({
+      kind: "job_rescue_return",
+      label: "Guide to Marshal Gate",
+      action: "safe_return",
+      targetId: "frontier_marshal_gate",
+      checkpointIndex: 2,
+      checkpointTotal: 2,
+    });
+
+    const secured = recordJobEvent(state, { type: "safe_return", targetId: "frontier_marshal_gate", time: 58 });
+    const claimed = claimJobReward(state, "frontier_missing_scout");
+
+    expect(secured.completed).toBe(true);
+    expect(claimed.reward).toEqual({ gold: 42, xp: 22, items: { Tonic: 1 } });
+    expect(state.completedJobIds).toContain("frontier_missing_scout");
+  });
+
+  it("runs escort jobs through meet, escort-finish, and quick-arrival bonus", () => {
+    const state = createInitialJobBoardState();
+    acceptJob(state, "frontier_settler_escort", { time: 10 });
+
+    const meetMarker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 12, y: 8.5 },
+      resources: [],
+      enemies: [],
+      npcs: [],
+    });
+
+    expect(meetMarker).toMatchObject({
+      kind: "job_escort_start",
+      label: "Meet Settler Caravan",
+      action: "escort_start",
+      targetId: "frontier_settler_caravan",
+      checkpointIndex: 1,
+      checkpointTotal: 2,
+    });
+
+    const met = recordJobEvent(state, { type: "escort_start", targetId: "frontier_settler_caravan", time: 30 });
+    const finishMarker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 13.9, y: 10.8 },
+      resources: [],
+      enemies: [],
+      npcs: [],
+    });
+
+    expect(met.ok).toBe(true);
+    expect(getActiveJobSummary(state)?.progressLine).toBe("Escort Settler Caravan to West Gate");
+    expect(finishMarker).toMatchObject({
+      kind: "job_escort_finish",
+      label: "Escort to West Gate",
+      action: "escort_finish",
+      targetId: "frontier_west_gate",
+      checkpointIndex: 2,
+      checkpointTotal: 2,
+    });
+
+    const finished = recordJobEvent(state, { type: "escort_finish", targetId: "frontier_west_gate", time: 95 });
+    const claimed = claimJobReward(state, "frontier_settler_escort");
+
+    expect(finished.completed).toBe(true);
+    expect(finished.progress?.bonusEligible).toBe(true);
+    expect(claimed.reward).toEqual({ gold: 53, xp: 25, items: { Potion: 1 } });
+    expect(claimed.bonusAwarded).toBe(true);
   });
 
   it("claims rewards once and moves the job to completed history", () => {

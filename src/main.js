@@ -3126,13 +3126,25 @@ const canvas = document.getElementById("game");
     return result;
   }
 
+  function recordRouteActionForJobs(action, targetId) {
+    state.world.jobs = normalizeJobBoardState(state.world.jobs);
+    const result = recordJobEvent(state.world.jobs, {
+      type: action,
+      targetId,
+      regionId: state.regions.activeRegion,
+      time: state.time,
+    });
+    if (result.ok && result.message) logMsg(result.message);
+    return result;
+  }
+
   function getBooneJobChoices() {
     return getJobBoardChoices({
       regionId: state.regions.activeRegion,
       playerLevel: state.player.level,
       jobState: state.world.jobs,
       npcId: "warden",
-      limit: 5,
+      limit: 7,
     });
   }
 
@@ -3537,6 +3549,16 @@ const canvas = document.getElementById("game");
       if (dropped.ok) {
         sfx.questDone();
         spawnParticles(canvas.width / 2, canvas.height * 0.5, 12, jobMarker.color || "#ffcf7a", 3, 0.7, { decorative: false });
+        return;
+      }
+    }
+
+    if (["rescue", "safe_return", "escort_start", "escort_finish"].includes(jobMarker?.action) && dist(state.player, jobMarker) < 1.65) {
+      const routed = recordRouteActionForJobs(jobMarker.action, jobMarker.targetId);
+      if (routed.ok) {
+        if (routed.completed) sfx.questDone();
+        else sfx.pickup();
+        spawnParticles(canvas.width / 2, canvas.height * 0.5, routed.completed ? 14 : 10, jobMarker.color || "#9bd3ff", routed.completed ? 3.2 : 2.6, 0.7, { decorative: false });
         return;
       }
     }
@@ -7331,7 +7353,8 @@ const canvas = document.getElementById("game");
       const choices = getBooneJobChoices();
       if (jobBoardSelection >= choices.length) jobBoardSelection = Math.max(0, choices.length - 1);
       const sw = Math.min(540, canvas.width - margin * 2);
-      const rows = Math.max(1, Math.min(5, choices.length || 1));
+      const rows = Math.max(1, Math.min(7, choices.length || 1, Math.max(3, Math.floor((canvas.height - margin * 2 - 108) / 78))));
+      const firstJobRow = clamp(jobBoardSelection - Math.floor(rows / 2), 0, Math.max(0, choices.length - rows));
       const sh = rows * 78 + 108;
       const sx = Math.floor((canvas.width - sw) / 2);
       const sy = Math.floor((canvas.height - sh) / 2);
@@ -7343,15 +7366,16 @@ const canvas = document.getElementById("game");
       ctx.font = "bold 20px Georgia";
       drawClippedText("Marshal Boone's Job Board", sx + 16, sy + 30, sw - 32, "#ffd77b");
       ctx.font = "12px Georgia";
-      drawClippedText("↑/↓ select  Enter/E accept or claim  Esc close", sx + 16, sy + 52, sw - 32, "#c9b889");
+      drawClippedText(`↑/↓ select  Enter/E accept or claim  Esc close  ${Math.min(jobBoardSelection + 1, choices.length || 1)}/${choices.length || 0}`, sx + 16, sy + 52, sw - 32, "#c9b889");
       if (choices.length === 0) {
         fillRoundedRect(sx + 10, sy + 72, sw - 20, 54, 7, "rgba(255, 255, 255, 0.055)");
         ctx.font = "italic 13px Georgia";
         drawClippedText("No posted work in this region.", sx + 22, sy + 104, sw - 44, "#b8a792");
       } else {
-        for (let i = 0; i < Math.min(rows, choices.length); i++) {
+        for (let visible = 0; visible < Math.min(rows, choices.length); visible++) {
+          const i = firstJobRow + visible;
           const job = choices[i];
-          const iy = sy + 68 + i * 78;
+          const iy = sy + 68 + visible * 78;
           const selected = i === jobBoardSelection;
           fillRoundedRect(sx + 10, iy, sw - 20, 70, 7, selected ? "rgba(216, 188, 106, 0.24)" : "rgba(255, 255, 255, 0.055)");
           if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 69, 7, "#ffd77b", 1);

@@ -151,6 +151,63 @@ export const JOB_DEFINITIONS = {
       items: { Stone: 1 },
     },
   },
+  frontier_missing_scout: {
+    id: "frontier_missing_scout",
+    title: "Missing Scout Rescue",
+    kind: "rescue",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 60,
+    hint: "Find a wounded scout near the marsh road and guide them back to the marshal gate.",
+    boardNote: "A town scout missed check-in after marking slime tracks near the old fence.",
+    objective: {
+      type: "rescue",
+      count: 2,
+      label: "scout rescued",
+      target: { id: "frontier_wounded_scout", label: "Wounded Scout", x: 14.7, y: 9.65 },
+      safehouse: { id: "frontier_marshal_gate", label: "Marshal Gate", x: 12.05, y: 8.25 },
+    },
+    reward: {
+      gold: 42,
+      xp: 22,
+      items: { Tonic: 1 },
+    },
+  },
+  frontier_settler_escort: {
+    id: "frontier_settler_escort",
+    title: "Settler Road Escort",
+    kind: "escort",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 70,
+    hint: "Meet a settler caravan near the marsh fence and walk it to the west gate.",
+    boardNote: "The settlers will move if someone visible walks the road with them.",
+    objective: {
+      type: "escort",
+      count: 2,
+      label: "settlers escorted",
+      pickup: { id: "frontier_settler_caravan", label: "Settler Caravan", x: 13.85, y: 10.85 },
+      dropoff: { id: "frontier_west_gate", label: "West Gate", x: 11.35, y: 8.7 },
+    },
+    bonus: {
+      type: "time_limit",
+      seconds: 100,
+      line: "Quick-arrival bonus if the caravan reaches the gate within 100s.",
+      missedLine: "Quick-arrival bonus missed.",
+      reward: { gold: 8, xp: 5 },
+    },
+    reward: {
+      gold: 45,
+      xp: 20,
+      items: { Potion: 1 },
+    },
+  },
   ashfall_scrap_warrant: {
     id: "ashfall_scrap_warrant",
     title: "Scrap Warrant",
@@ -349,6 +406,8 @@ function payableReward(job, progress = {}) {
 function cloneObjective(objective = {}) {
   return {
     ...objective,
+    target: objective.target ? { ...objective.target } : undefined,
+    safehouse: objective.safehouse ? { ...objective.safehouse } : undefined,
     pickup: objective.pickup ? { ...objective.pickup } : undefined,
     dropoff: objective.dropoff ? { ...objective.dropoff } : undefined,
     checkpoints: Array.isArray(objective.checkpoints)
@@ -450,6 +509,16 @@ function buildProgressLine(job, progress = null) {
     if (count <= 0) return `Pick up ${objective.pickup?.label || "supplies"}`;
     return `Deliver to ${objective.dropoff?.label || "the dropoff"}`;
   }
+  if (objective.type === "rescue") {
+    if (progress?.status === "ready" || count >= objective.count) return `Return to ${job.npcName}`;
+    if (count <= 0) return `Find ${objective.target?.label || "the missing person"}`;
+    return `Guide ${objective.target?.label || "the rescued person"} to ${objective.safehouse?.label || "safety"}`;
+  }
+  if (objective.type === "escort") {
+    if (progress?.status === "ready" || count >= objective.count) return `Return to ${job.npcName}`;
+    if (count <= 0) return `Meet ${objective.pickup?.label || "the escort party"}`;
+    return `Escort ${objective.pickup?.label || "the escort party"} to ${objective.dropoff?.label || "safety"}`;
+  }
   return `${count}/${objective.count} ${objective.label}`;
 }
 
@@ -499,7 +568,7 @@ export function getJobDefinition(jobId) {
   return job ? decorateJob(job) : null;
 }
 
-export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState(), npcId = "warden", limit = 5 } = {}) {
+export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState(), npcId = "warden", limit = 7 } = {}) {
   const active = getActiveJobSummary(jobState);
   if (active?.npcId === npcId) {
     return [{
@@ -637,6 +706,48 @@ function recordSupplyRunEvent(job, progress, event = {}) {
   return { ok: false, completed: false };
 }
 
+function recordRescueEvent(job, progress, event = {}) {
+  const objective = job.objective || {};
+  if (event.type === "rescue" && progress.count === 0 && event.targetId === objective.target?.id) {
+    progress.count = 1;
+    return {
+      ok: true,
+      completed: false,
+      message: `Job progress: ${job.title}. ${objective.target?.label || "Rescue target"} found. Guide to ${objective.safehouse?.label || "safety"}.`,
+    };
+  }
+  if (event.type === "safe_return" && progress.count >= 1 && event.targetId === objective.safehouse?.id) {
+    progress.count = objective.count;
+    const result = completionConditionResult(job, progress, event);
+    return {
+      ok: true,
+      ...result,
+    };
+  }
+  return { ok: false, completed: false };
+}
+
+function recordEscortEvent(job, progress, event = {}) {
+  const objective = job.objective || {};
+  if (event.type === "escort_start" && progress.count === 0 && event.targetId === objective.pickup?.id) {
+    progress.count = 1;
+    return {
+      ok: true,
+      completed: false,
+      message: `Job progress: ${job.title}. Escort ${objective.pickup?.label || "the party"} to ${objective.dropoff?.label || "safety"}.`,
+    };
+  }
+  if (event.type === "escort_finish" && progress.count >= 1 && event.targetId === objective.dropoff?.id) {
+    progress.count = objective.count;
+    const result = completionConditionResult(job, progress, event);
+    return {
+      ok: true,
+      ...result,
+    };
+  }
+  return { ok: false, completed: false };
+}
+
 export function recordJobEvent(jobState, event = {}) {
   const state = syncJobState(jobState);
   const job = knownJob(state.activeJobId);
@@ -668,6 +779,24 @@ export function recordJobEvent(jobState, event = {}) {
     const supply = recordSupplyRunEvent(job, progress, event);
     return {
       ...supply,
+      job: decorateJob(job, progress),
+      progress,
+      jobState: state,
+    };
+  }
+  if (job.objective?.type === "rescue") {
+    const rescue = recordRescueEvent(job, progress, event);
+    return {
+      ...rescue,
+      job: decorateJob(job, progress),
+      progress,
+      jobState: state,
+    };
+  }
+  if (job.objective?.type === "escort") {
+    const escort = recordEscortEvent(job, progress, event);
+    return {
+      ...escort,
       job: decorateJob(job, progress),
       progress,
       jobState: state,
@@ -907,6 +1036,60 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       line: `${activeJob.regionHint}: ${activeJob.progressLine}`,
       color: "#ffcf7a",
       action: "dropoff",
+      targetId: objective.dropoff?.id,
+      checkpointIndex: 2,
+      checkpointTotal: objective.count,
+    });
+  }
+
+  if (objective.type === "rescue") {
+    if ((activeJob.progress?.count || 0) <= 0) {
+      return routeBase(activeJob, objective.target, player, {
+        kind: "job_rescue",
+        title: "Rescue target",
+        label: `Find ${objective.target?.label || "missing person"}`,
+        line: `${activeJob.regionHint}: ${activeJob.progressLine}`,
+        color: "#8fd0ff",
+        action: "rescue",
+        targetId: objective.target?.id,
+        checkpointIndex: 1,
+        checkpointTotal: objective.count,
+      });
+    }
+    return routeBase(activeJob, objective.safehouse, player, {
+      kind: "job_rescue_return",
+      title: "Guide to safety",
+      label: `Guide to ${objective.safehouse?.label || "safety"}`,
+      line: `${activeJob.regionHint}: ${activeJob.progressLine}`,
+      color: "#5fe0b5",
+      action: "safe_return",
+      targetId: objective.safehouse?.id,
+      checkpointIndex: 2,
+      checkpointTotal: objective.count,
+    });
+  }
+
+  if (objective.type === "escort") {
+    if ((activeJob.progress?.count || 0) <= 0) {
+      return routeBase(activeJob, objective.pickup, player, {
+        kind: "job_escort_start",
+        title: "Escort meet-up",
+        label: `Meet ${objective.pickup?.label || "escort party"}`,
+        line: `${activeJob.regionHint}: ${activeJob.progressLine}`,
+        color: "#ffd77b",
+        action: "escort_start",
+        targetId: objective.pickup?.id,
+        checkpointIndex: 1,
+        checkpointTotal: objective.count,
+      });
+    }
+    return routeBase(activeJob, objective.dropoff, player, {
+      kind: "job_escort_finish",
+      title: "Escort route",
+      label: `Escort to ${objective.dropoff?.label || "destination"}`,
+      line: `${activeJob.regionHint}: ${activeJob.progressLine}`,
+      color: "#ffcf7a",
+      action: "escort_finish",
       targetId: objective.dropoff?.id,
       checkpointIndex: 2,
       checkpointTotal: objective.count,
