@@ -9,6 +9,8 @@ import {
   findNearbyPOIs,
   poiUnderInteraction,
   resolvePOILead,
+  resolveExplorationRenownReward,
+  resolveExplorationRenownStatus,
 } from "../src/poiSystem.js";
 
 describe("poiSystem — definitions", () => {
@@ -113,5 +115,23 @@ describe("poiSystem — proximity", () => {
 
     expect(lead?.id).toBe("frontier_drifter_camp");
     expect(lead?.line).toContain("Drifter Camp");
+  });
+
+  it("grants exploration renown rewards at POI milestones", () => {
+    expect(resolveExplorationRenownReward(2)).toBeNull();
+
+    const reward = resolveExplorationRenownReward(3);
+    expect(reward?.title).toBe("Trail Scout");
+    expect(reward?.xp).toBeGreaterThan(0);
+    expect(reward?.upgradePoints).toBe(1);
+  });
+
+  it("summarizes exploration renown progress", () => {
+    const status = resolveExplorationRenownStatus(4, 9);
+
+    expect(status.title).toBe("Trail Scout");
+    expect(status.nextMilestone).toBe(6);
+    expect(status.progressLine).toContain("4/9");
+    expect(status.progressLine).toContain("next: 6");
   });
 });

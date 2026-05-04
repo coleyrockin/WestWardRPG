@@ -49,4 +49,39 @@ describe("npcMemory", () => {
     expect(memory.byNpc.elder.lastRegionId).toBe("frontier");
     expect(memory.recentEvents).toEqual([]);
   });
+
+  it("records POI discovery renown for NPC reactions", () => {
+    const memory = createInitialNpcMemoryState();
+    recordNpcMemoryEvent(memory, "elder", {
+      type: "poi_discovered",
+      poiId: "frontier_old_well",
+      poiLabel: "Old Well",
+      regionId: "frontier",
+    });
+    recordNpcMemoryEvent(memory, "elder", {
+      type: "poi_discovered",
+      poiId: "frontier_drifter_camp",
+      poiLabel: "Drifter Camp",
+      regionId: "frontier",
+    });
+
+    expect(memory.byNpc.elder.discoveredPoiCount).toBe(2);
+    expect(memory.byNpc.elder.recentPoiLabel).toBe("Drifter Camp");
+    expect(memory.byNpc.elder.recentPoiId).toBe("frontier_drifter_camp");
+  });
+
+  it("resolves NPC lines from POI discovery memory", () => {
+    const memory = createInitialNpcMemoryState();
+    recordNpcMemoryEvent(memory, "elder", {
+      type: "poi_discovered",
+      poiId: "frontier_old_well",
+      poiLabel: "Old Well",
+      regionId: "frontier",
+    });
+
+    const line = resolveNpcReactiveLine("elder", memory);
+
+    expect(line).toContain("Mayor Clem");
+    expect(line).toContain("Old Well");
+  });
 });

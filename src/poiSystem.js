@@ -147,3 +147,39 @@ export function resolvePOILead(regions, regionId, x, y, options = {}) {
     line: `${best.poi.label} ${kind.label.toLowerCase()} lies ${direction}, about ${distance} tiles away. Reward hint: ${rewardHint}.`,
   };
 }
+
+const EXPLORATION_RENOWN_REWARDS = {
+  3: { title: "Trail Scout", xp: 30, gold: 18, upgradePoints: 1 },
+  6: { title: "Frontier Surveyor", xp: 55, gold: 32, upgradePoints: 1 },
+  9: { title: "Open-Road Cartographer", xp: 90, gold: 55, upgradePoints: 2 },
+};
+
+export function resolveExplorationRenownReward(discoveredCount) {
+  const count = Number.isFinite(discoveredCount) ? Math.max(0, Math.floor(discoveredCount)) : 0;
+  const reward = EXPLORATION_RENOWN_REWARDS[count];
+  if (!reward) return null;
+  return {
+    discoveredCount: count,
+    ...reward,
+    summary: `${reward.title}: +${reward.xp} XP, +${reward.gold}g, +${reward.upgradePoints} upgrade point${reward.upgradePoints === 1 ? "" : "s"}`,
+  };
+}
+
+export function resolveExplorationRenownStatus(discoveredCount, totalCount = 9) {
+  const discovered = Number.isFinite(discoveredCount) ? Math.max(0, Math.floor(discoveredCount)) : 0;
+  const total = Number.isFinite(totalCount) ? Math.max(discovered, Math.floor(totalCount)) : discovered;
+  const milestones = Object.keys(EXPLORATION_RENOWN_REWARDS).map((value) => Number(value)).sort((a, b) => a - b);
+  const earned = milestones.filter((value) => discovered >= value);
+  const currentMilestone = earned.length > 0 ? earned[earned.length - 1] : 0;
+  const nextMilestone = milestones.find((value) => value > discovered) || null;
+  const title = currentMilestone > 0 ? EXPLORATION_RENOWN_REWARDS[currentMilestone].title : "Unmapped Drifter";
+  const nextLine = nextMilestone ? `next: ${nextMilestone}` : "all known POI milestones claimed";
+  return {
+    title,
+    discoveredCount: discovered,
+    totalCount: total,
+    currentMilestone,
+    nextMilestone,
+    progressLine: `${title} - POIs ${discovered}/${total}, ${nextLine}`,
+  };
+}

@@ -204,6 +204,8 @@ import {
   poiUnderInteraction,
   getPOIsForRegion,
   resolvePOILead,
+  resolveExplorationRenownReward,
+  resolveExplorationRenownStatus,
 } from "./poiSystem.js";
 import {
   CODEX_TABS,
@@ -3190,9 +3192,25 @@ const canvas = document.getElementById("game");
       ensurePoiDefaults(state.regions);
       const poi = poiUnderInteraction(state.regions, state.regions.activeRegion, state.player.x, state.player.y);
       if (poi) {
-        markPOIDiscovered(state.regions, poi.id);
+        const newlyDiscovered = markPOIDiscovered(state.regions, poi.id);
         const kind = POI_KINDS[poi.kind] || POI_KINDS.cache;
         let summary = `Discovered ${poi.label} (${kind.label})`;
+        if (newlyDiscovered) {
+          recordNpcMemoryEvent(state.narrative.npcMemory, "elder", {
+            type: "poi_discovered",
+            poiId: poi.id,
+            poiLabel: poi.label,
+            regionId: state.regions.activeRegion,
+            at: state.time,
+          });
+          const renownReward = resolveExplorationRenownReward(state.regions.poisDiscovered.length);
+          if (renownReward) {
+            grantXp(renownReward.xp);
+            state.player.gold += renownReward.gold;
+            state.progression.upgradePoints += renownReward.upgradePoints;
+            summary += `. ${renownReward.summary}`;
+          }
+        }
         const codexUnlock = resolveCodexUnlockForPOI(poi);
         if (codexUnlock && unlockCodexEntry(state, codexUnlock.tab, codexUnlock.id)) {
           summary += `. Letter unlocked: ${codexUnlock.title}`;
@@ -6667,6 +6685,7 @@ const canvas = document.getElementById("game");
       const inventorySummary = buildGearInventorySummary(state.progression.equipment);
       const workstationSummary = describeWorkstationState(state.house.workstation);
       const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
+      const explorationRenown = resolveExplorationRenownStatus(state.regions.poisDiscovered?.length || 0);
       const effects = summary.effects || {};
       const sw = Math.min(620, canvas.width - margin * 2);
       const sh = Math.min(canvas.height - margin * 2, canvas.height < 380 ? canvas.height - margin * 2 : 382);
@@ -6696,6 +6715,7 @@ const canvas = document.getElementById("game");
         { text: `Crafting: ${gearSummary.economyLine}`, color: "#d8c7a8" },
         { text: `Station: ${workstationSummary.benefitLine}`, color: "#d8c7a8" },
         { text: `Projects: ${workstationSummary.projectsLine}`, color: "#cbb6a2" },
+        { text: `Exploration: ${explorationRenown.progressLine}`, color: "#ffe16a" },
         { text: `Region: ${regionProfile.label} - ${regionProfile.mood}`, color: "#ffe16a" },
         { text: `Landmarks: ${regionProfile.landmarkHints.slice(0, 4).join(", ")}`, color: "#cbb6a2" },
         { text: `Danger: ${regionProfile.dangerIdentity}`, color: "#cbb6a2" },
@@ -7448,6 +7468,7 @@ const canvas = document.getElementById("game");
     const gearSummary = buildGearSummary(state.progression.equipment, identity);
     const gearInventorySummary = buildGearInventorySummary(state.progression.equipment);
     const workstationSummary = describeWorkstationState(state.house.workstation);
+    const explorationRenown = resolveExplorationRenownStatus(state.regions.poisDiscovered?.length || 0);
     const openingObjective = resolveOpeningObjective({
       mode: state.mode,
       time: state.time,
@@ -7584,6 +7605,7 @@ const canvas = document.getElementById("game");
       },
       inventory: state.inventory,
       loot: state.world.loot,
+      exploration_renown: explorationRenown,
       run_summary: runSummary,
       region_visual_identity: {
         ...regionProfile,

@@ -18,3 +18,5 @@ export function markPOIDiscovered(regions: any, poiId: string): boolean;
 export function findNearbyPOIs(regions: any, regionId: string, x: number, y: number, pingRadius?: number): POIDef[];
 export function poiUnderInteraction(regions: any, regionId: string, x: number, y: number): POIDef | null;
 export function resolvePOILead(regions: any, regionId: string, x: number, y: number, options?: any): any;
+export function resolveExplorationRenownReward(discoveredCount: number): any;
+export function resolveExplorationRenownStatus(discoveredCount: number, totalCount?: number): any;

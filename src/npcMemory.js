@@ -23,6 +23,9 @@ function normalizeEntry(source = {}) {
     houseUnlocked: Boolean(source?.houseUnlocked),
     recentQuestOutcome: typeof source?.recentQuestOutcome === "string" ? source.recentQuestOutcome : null,
     notableGearMilestone: typeof source?.notableGearMilestone === "string" ? source.notableGearMilestone : null,
+    discoveredPoiCount: Number.isFinite(source?.discoveredPoiCount) ? Math.max(0, Math.floor(source.discoveredPoiCount)) : 0,
+    recentPoiId: typeof source?.recentPoiId === "string" ? source.recentPoiId : null,
+    recentPoiLabel: typeof source?.recentPoiLabel === "string" ? source.recentPoiLabel : null,
   };
 }
 
@@ -52,6 +55,11 @@ export function recordNpcMemoryEvent(memory, npcId, event = {}) {
   if (typeof event.houseUnlocked === "boolean") entry.houseUnlocked = event.houseUnlocked;
   if (typeof event.recentQuestOutcome === "string") entry.recentQuestOutcome = event.recentQuestOutcome;
   if (typeof event.gearMilestone === "string") entry.notableGearMilestone = event.gearMilestone;
+  if (event.type === "poi_discovered") {
+    entry.discoveredPoiCount += 1;
+    if (typeof event.poiId === "string") entry.recentPoiId = event.poiId;
+    if (typeof event.poiLabel === "string") entry.recentPoiLabel = event.poiLabel;
+  }
   memory.recentEvents.unshift({ npcId, type: event.type || "memory", at: event.at || 0 });
   memory.recentEvents = memory.recentEvents.slice(0, 8);
   return entry;
@@ -71,6 +79,9 @@ export function resolveNpcReactiveLine(npcId, memory, context = {}) {
   }
   if (npcId === "merchant" && rep.marketCartel < -10) {
     return `${name}: Word travels. Discounts do not, at least not for enemies of the ledger.`;
+  }
+  if (npcId === "elder" && entry.recentPoiLabel) {
+    return `${name}: You found ${entry.recentPoiLabel}. Good. A town is only as alive as the places its people still remember.`;
   }
   if (npcId === "elder" && context.recentQuestOutcome) {
     return `${name}: Choices leave paperwork. Yours left ${context.recentQuestOutcome} in the margins.`;
