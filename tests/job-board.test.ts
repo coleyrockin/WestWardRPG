@@ -552,6 +552,29 @@ describe("jobBoard", () => {
     });
   });
 
+  it("exposes regional job-board props beyond Boone's town board", () => {
+    const ashfall = getJobBoardProp({ regionId: "ashfall" });
+    const lantern = getJobBoardProp({ regionId: "ironlantern" });
+
+    expect(ashfall).toMatchObject({
+      id: "ashfall_job_board",
+      kind: "job_board",
+      label: "Ashfall Warrant Board",
+      regionId: "ashfall",
+      x: 41.25,
+      y: 39.65,
+    });
+    expect(lantern).toMatchObject({
+      id: "ironlantern_job_board",
+      kind: "job_board",
+      label: "Lantern Quiet Board",
+      regionId: "ironlantern",
+      x: 15.25,
+      y: 39.35,
+    });
+    expect(ashfall.label).not.toBe(lantern.label);
+  });
+
   it("adds non-combat regional board depth beyond the Frontier", () => {
     const ashfall = getJobListings({ regionId: "ashfall", playerLevel: 3, jobState: createInitialJobBoardState() });
     const lantern = getJobListings({ regionId: "ironlantern", playerLevel: 4, jobState: createInitialJobBoardState() });

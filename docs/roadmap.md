@@ -18,7 +18,7 @@ Open-world RPG target: push the game toward a compact Skyrim/Oblivion feel withi
 
 Latest local verification:
 - `git diff --check` → clean.
-- `npm test` -> **335 passing across 35 test files**.
+- `npm test` -> **336 passing across 35 test files**.
 - `npm run typecheck:ts` → clean.
 - `npm run test:syntax` → clean.
 - `npm run dev:lint` → clean.
@@ -116,7 +116,7 @@ Build slices:
 - **Codex / lore browser** (`src/codex.js`) — KeyZ opens a tabbed lore screen (regions / enemies / items / factions / ideology). Entries unlock on first encounter (region unlock, first kill of an enemy archetype). Shows `???` + "(undiscovered)" until unlocked. Progress count in header.
 
 ## Test + Build Status
-- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 335 passing across 35 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
+- Current baseline is the "Latest local verification" block above: `git diff --check` clean, `npm test` at 336 passing across 35 files, `npm run typecheck:ts` clean, `npm run test:syntax` clean, and `npm run dev:lint` clean.
 - v1/v2/v3 save fixtures all migrate cleanly with backfilled defaults.
 
 ## Next Work — Pillar 5: Narrative depth
@@ -315,7 +315,7 @@ Build slices:
 2. **Vendor identities** — separate merchant, smith, apothecary, stablekeeper, fence, trainer, and house steward inventories. Stock refreshes by day/region, not every frame.
 3. **Gold sinks** — repairs, housing upgrades, pet care, crafting, trainers, transport, cosmetics, bounty licenses, and special job permits so gold remains meaningful.
 4. **Radiant jobs** ✅ Jobs 7 rescue/escort pass shipped — `src/jobBoard.js` defines deterministic regional job data, save-safe job state, active progress, matching kill events, collection/salvage events, courier pickup/delivery events, patrol checkpoint events, supply-run pickup/dropoff events, rescue find/safe-return events, escort meet/finish events, timed bonus eligibility, late bonus misses, deadline failure states, and one-time reward claims. The current non-kill jobs are Frontier roadside salvage, Sealed Orders Run, Town Watch Patrol, Forge Supply Run, Missing Scout Rescue, Settler Road Escort, Ashfall Cooling Well Patrol, and Iron Lantern Quiet Signal Courier. Next: regional rescue/escort variants, optional bonus objectives beyond timers, and broader job failure causes.
-5. **Bounty board** ✅ Jobs 7 rescue/escort pass shipped — Marshal Boone opens a selectable job-board modal with up to 7 choices, threat/reward/progress previews, board notes, regional availability lines, bonus/failure notes, active-job status, ready reward claiming, failed-job report-back clearing, and scroll-safe visible rows on smaller screens. Accepted jobs now resolve route markers for nearest salvage target, bounty enemy target, courier pickup/delivery, patrol checkpoints, supply pickup/dropoff, rescue find/safe-return, escort meet/finish, return-to-Boone turn-in, or failed-job report state. Boone's in-world board prop has a 3D sprite, distinct minimap dot, direct interaction, and `render_game_to_text` prop exposure. HUD/live objective text, minimap dots, 3D route pings, and debug text expose job-board choices/state/route markers for smoke automation. Next: regional board props beyond Boone and stronger first-minute reward staging.
+5. **Bounty board** ✅ Jobs 7 rescue/escort pass shipped — Marshal Boone opens a selectable job-board modal with up to 7 choices, threat/reward/progress previews, board notes, regional availability lines, bonus/failure notes, active-job status, ready reward claiming, failed-job report-back clearing, and scroll-safe visible rows on smaller screens. Accepted jobs now resolve route markers for nearest salvage target, bounty enemy target, courier pickup/delivery, patrol checkpoints, supply pickup/dropoff, rescue find/safe-return, escort meet/finish, return-to-Boone turn-in, or failed-job report state. Frontier, Ashfall, and Iron Lantern now expose distinct in-world board props with 3D sprites, minimap dots, direct interaction, and `render_game_to_text` prop exposure. HUD/live objective text, minimap dots, 3D route pings, and debug text expose job-board choices/state/route markers for smoke automation. Next: stronger first-minute reward staging and fuller regional board copy.
 6. **Trade and consequence hooks** — quest outcomes can open/close vendors, change prices, reroute supplies, add contraband risk, or unlock house visitors. Smoke JSON exposes economy state for playtest debugging.
 7. **Economy acceptance** — after a short session, the player should understand one way to earn gold, one reason to spend it, and one reason prices changed.
 
@@ -331,7 +331,7 @@ Build slices:
 
 ## Next Agent Handoff
 
-Current shipped direction: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, Boone job-board choices, salvage/courier/patrol/supply/rescue/escort jobs, timed job bonuses, failed-job report states, richer job route markers, in-world board prop, NPC memory, vendor service notes, first-pass enemy readability cues, first-pass gameplay-feel helpers, near-wall projection repair, and smoke/debug text fields are in scope. Fast verification is 335 tests across 35 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should keep pushing player-visible loops: pet/house utility, local dialogue UI, stronger visual open-world composition, and regional board props.
+Current shipped direction: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, Boone job-board choices, salvage/courier/patrol/supply/rescue/escort jobs, timed job bonuses, failed-job report states, richer job route markers, regional in-world board props, NPC memory, vendor service notes, first-pass enemy readability cues, first-pass gameplay-feel helpers, near-wall projection repair, and smoke/debug text fields are in scope. Fast verification is 336 tests across 35 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should keep pushing player-visible loops: pet/house utility, local dialogue UI, and stronger visual open-world composition.
 
 ### User signal to respect
 
