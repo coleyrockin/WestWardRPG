@@ -5,6 +5,7 @@ import {
   createInitialWorkstationState,
   describeWorkstationState,
   getAvailableCraftingActions,
+  getCraftingActionCatalog,
   normalizeWorkstationState,
   resolveCraftingAction,
 } from "../src/craftingStation.js";
@@ -12,7 +13,7 @@ import {
 function makeContext() {
   const progression = createInitialProgressionState();
   progression.identity = createInitialCharacterIdentity("ash_salvager");
-  progression.equipment.ownedArmorPieces = ["salvage_gloves"];
+  progression.equipment.ownedArmorPieces = ["salvage_gloves", "lantern_charm"];
   progression.equipment.weaponFamilyTokens = ["hammer"];
   return {
     inventory: { Wood: 4, Stone: 2, Ashglass: 3, "Scrap Coil": 2, Potion: 0, "Cipher Lens": 0, "Pressurized Ink": 0 },
@@ -25,7 +26,33 @@ describe("craftingStation", () => {
   it("lists available workstation actions from resources and owned gear", () => {
     const context = makeContext();
     const actions = getAvailableCraftingActions(context);
-    expect(actions.map((a) => a.id)).toEqual(expect.arrayContaining(["craft_potion", "fit_salvage_gloves", "prepare_refine_kit", "fit_weapon_hammer"]));
+    expect(actions.map((a) => a.id)).toEqual(expect.arrayContaining(["craft_potion", "equip_armor_salvage_gloves", "equip_armor_lantern_charm", "prepare_refine_kit", "fit_weapon_hammer"]));
+  });
+
+  it("shows blocked recipe requirements and missing resources", () => {
+    const context = makeContext();
+    context.inventory = { Wood: 1, Stone: 0, Ashglass: 0, "Scrap Coil": 0, Potion: 0, "Cipher Lens": 0, "Pressurized Ink": 0 };
+
+    const catalog = getCraftingActionCatalog(context);
+    const potion = catalog.find((action) => action.id === "craft_potion");
+    const refine = catalog.find((action) => action.id === "prepare_refine_kit");
+
+    expect(potion?.available).toBe(false);
+    expect(potion?.missing).toEqual({ Wood: 1, Stone: 1 });
+    expect(refine?.available).toBe(false);
+    expect(refine?.blockedReason).toContain("missing");
+  });
+
+  it("explains station-gated recipes before they are available", () => {
+    const context = makeContext();
+    context.house.workstation.level = 2;
+    context.inventory["Cipher Lens"] = 1;
+    context.inventory["Pressurized Ink"] = 1;
+
+    const mapProject = getCraftingActionCatalog(context).find((action) => action.id === "draft_region_map");
+
+    expect(mapProject?.available).toBe(false);
+    expect(mapProject?.blockedReason).toContain("Workbench III");
   });
 
   it("crafts potions with Craft-driven yield", () => {
@@ -41,11 +68,22 @@ describe("craftingStation", () => {
 
   it("fits owned armor pieces through the station", () => {
     const context = makeContext();
-    const result = resolveCraftingAction("fit_salvage_gloves", context);
+    const result = resolveCraftingAction("equip_armor_salvage_gloves", context);
 
     expect(result.ok).toBe(true);
     expect(result.progression.equipment.armorSlots.hands).toBe("salvage_gloves");
+    expect(result.progression.equipment.ownedArmorPieces).toContain("salvage_gloves");
     expect(result.message).toContain("Salvage Gloves");
+  });
+
+  it("equips any owned armor piece by its slot without consuming it", () => {
+    const context = makeContext();
+    const result = resolveCraftingAction("equip_armor_lantern_charm", context);
+
+    expect(result.ok).toBe(true);
+    expect(result.progression.equipment.armorSlots.trinket).toBe("lantern_charm");
+    expect(result.progression.equipment.ownedArmorPieces).toContain("lantern_charm");
+    expect(result.message).toContain("Lantern Charm");
   });
 
   it("prepares a refine kit with resource costs and blocks duplicates", () => {
@@ -59,14 +97,31 @@ describe("craftingStation", () => {
     expect(duplicate.ok).toBe(false);
   });
 
-  it("spends weapon family tokens deliberately", () => {
+  it("uses owned weapon family tokens as persistent refit unlocks", () => {
     const context = makeContext();
     const result = resolveCraftingAction("fit_weapon_hammer", context);
 
     expect(result.ok).toBe(true);
     expect(result.progression.equipment.weaponFamily).toBe("hammer");
-    expect(result.progression.equipment.weaponFamilyTokens).toEqual([]);
+    expect(result.progression.equipment.weaponFamilyTokens).toEqual(["hammer"]);
     expect(result.message).toContain("Hammer");
+  });
+
+  it("unlocks a weapon-family branch through the workbench", () => {
+    const context = makeContext();
+    context.progression.equipment.weaponFamily = "hammer";
+    context.inventory.Stone = 5;
+
+    expect(getAvailableCraftingActions(context).map((a) => a.id)).toContain("unlock_weapon_branch_hammer");
+
+    const result = resolveCraftingAction("unlock_weapon_branch_hammer", context);
+
+    expect(result.ok).toBe(true);
+    expect(result.progression.equipment.weaponBranches.hammer).toBe(true);
+    expect(result.inventory.Ashglass).toBe(1);
+    expect(result.inventory.Stone).toBe(1);
+    expect(result.inventory["Scrap Coil"]).toBe(1);
+    expect(result.message).toContain("Breaker");
   });
 
   it("normalizes missing workstation save data", () => {

@@ -47,6 +47,49 @@ export const WEAPON_FAMILIES = {
   },
 };
 
+export const WEAPON_BRANCHES = {
+  saber: {
+    familyId: "saber",
+    label: "Precision",
+    role: "Cleaner duels with less stamina bleed.",
+    costs: { "Crystal Shard": 2, Ashglass: 1 },
+    damageBonus: 0.04,
+    staminaBonus: -0.04,
+    reachBonus: 0,
+    staggerBonus: 0.01,
+  },
+  axe: {
+    familyId: "axe",
+    label: "Cleave",
+    role: "Wider pressure and harder multi-target chops.",
+    costs: { Wood: 4, Stone: 2, Ashglass: 1 },
+    damageBonus: 0.03,
+    staminaBonus: 0.01,
+    reachBonus: 0.02,
+    staggerBonus: 0.04,
+  },
+  spear: {
+    familyId: "spear",
+    label: "Control",
+    role: "More reach and steadier spacing.",
+    costs: { "Scrap Coil": 1, Wood: 2, Stone: 1 },
+    damageBonus: 0.01,
+    staminaBonus: -0.02,
+    reachBonus: 0.08,
+    staggerBonus: 0.03,
+  },
+  hammer: {
+    familyId: "hammer",
+    label: "Breaker",
+    role: "Guard-break identity with heavier stagger.",
+    costs: { Ashglass: 2, Stone: 4, "Scrap Coil": 1 },
+    damageBonus: 0.02,
+    staminaBonus: 0.02,
+    reachBonus: 0,
+    staggerBonus: 0.09,
+  },
+};
+
 export const ARMOR_SLOT_IDS = ["head", "body", "hands", "feet", "trinket"];
 
 export const ARMOR_PIECES = {
@@ -138,6 +181,15 @@ function normalizeArmorSlots(source = {}) {
   return next;
 }
 
+function normalizeWeaponBranches(source = {}) {
+  const next = {};
+  if (!source || typeof source !== "object") return next;
+  for (const familyId of Object.keys(WEAPON_BRANCHES)) {
+    if (source[familyId] === true) next[familyId] = true;
+  }
+  return next;
+}
+
 export function normalizeGearState(equipment = {}) {
   const source = equipment && typeof equipment === "object" ? equipment : {};
   const tier = WEAPON_TIERS.has(source.weaponTier) ? source.weaponTier : "Common";
@@ -151,6 +203,7 @@ export function normalizeGearState(equipment = {}) {
     affixes: cloneArray(source.affixes),
     ownedArmorPieces: uniqueStrings(source.ownedArmorPieces),
     weaponFamilyTokens: uniqueStrings(source.weaponFamilyTokens),
+    weaponBranches: normalizeWeaponBranches(source.weaponBranches),
   };
 }
 
@@ -161,6 +214,7 @@ function attributes(identity) {
 export function resolveWeaponFamilyEffects(equipment, identity) {
   const gear = normalizeGearState(equipment);
   const family = WEAPON_FAMILIES[gear.weaponFamily] || WEAPON_FAMILIES.saber;
+  const branch = resolveWeaponBranchState(gear);
   const attrs = attributes(identity);
   const heftPenalty = Math.max(0, family.weight - WEAPON_FAMILIES.saber.weight) * 0.015;
   const mightRelief = Math.min(0.18, Math.max(0, attrs.might - 2) * 0.025);
@@ -173,10 +227,30 @@ export function resolveWeaponFamilyEffects(equipment, identity) {
     weaponName: family.weaponName,
     role: family.role,
     weight: family.weight,
-    damageMult: roundHundredths(family.damageMult + mightDamage),
-    staminaMult: roundHundredths(Math.max(0.82, Math.min(1.35, family.staminaMult + heftPenalty - mightRelief - craftHandling))),
-    reachMult: roundHundredths(family.reachMult),
-    staggerBonus: roundHundredths(family.staggerBonus),
+    damageMult: roundHundredths(family.damageMult + mightDamage + (branch.unlocked ? branch.effects.damageBonus : 0)),
+    staminaMult: roundHundredths(Math.max(0.82, Math.min(1.35, family.staminaMult + heftPenalty - mightRelief - craftHandling + (branch.unlocked ? branch.effects.staminaBonus : 0)))),
+    reachMult: roundHundredths(family.reachMult + (branch.unlocked ? branch.effects.reachBonus : 0)),
+    staggerBonus: roundHundredths(family.staggerBonus + (branch.unlocked ? branch.effects.staggerBonus : 0)),
+    branch,
+  };
+}
+
+export function resolveWeaponBranchState(equipment) {
+  const gear = normalizeGearState(equipment);
+  const branch = WEAPON_BRANCHES[gear.weaponFamily] || WEAPON_BRANCHES.saber;
+  const unlocked = Boolean(gear.weaponBranches?.[branch.familyId]);
+  return {
+    ...branch,
+    unlocked,
+    effects: {
+      damageBonus: branch.damageBonus,
+      staminaBonus: branch.staminaBonus,
+      reachBonus: branch.reachBonus,
+      staggerBonus: branch.staggerBonus,
+    },
+    line: unlocked
+      ? `${branch.label} unlocked: ${branch.role}`
+      : `${branch.label} locked: ${Object.entries(branch.costs).map(([key, value]) => `${value} ${key}`).join(", ")}`,
   };
 }
 
@@ -264,6 +338,7 @@ export function buildGearSummary(equipment, identity) {
     armorLine: armorLabels.length > 0 ? armorLabels.join(" / ") : "No armor fitted",
     armorWeight: armor.totalWeight,
     handlingLine: `stamina x${roundHundredths(weapon.staminaMult * armor.staminaCostMult)} / reach x${weapon.reachMult}`,
+    branchLine: weapon.branch.line,
     economyLine: `${armor.craftingYieldPct}% yield / repair x${armor.repairCostMult} / refine x${armor.refineCostMult}`,
     weapon,
     armor,

@@ -1,0 +1,271 @@
+const JOB_STATUS = new Set(["active", "ready", "completed"]);
+
+export const JOB_DEFINITIONS = {
+  frontier_slime_bounty: {
+    id: "frontier_slime_bounty",
+    title: "Marsh Slime Bounty",
+    kind: "bounty",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    hint: "Clear the marsh slimes harassing the town road.",
+    objective: {
+      type: "kill",
+      enemyType: "slime",
+      behavior: "balanced",
+      count: 3,
+      label: "slimes defeated",
+    },
+    reward: {
+      gold: 38,
+      xp: 18,
+      items: { Potion: 1 },
+    },
+  },
+  ashfall_scrap_warrant: {
+    id: "ashfall_scrap_warrant",
+    title: "Scrap Warrant",
+    kind: "bounty",
+    regionId: "ashfall",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Medium",
+    minLevel: 2,
+    hint: "Break Ashfall brutes gathering salvage near the ribs.",
+    objective: {
+      type: "kill",
+      enemyType: "brute",
+      behavior: "tank",
+      count: 2,
+      label: "scrap brutes broken",
+    },
+    reward: {
+      gold: 66,
+      xp: 32,
+      items: { "Scrap Coil": 1 },
+    },
+  },
+  ironlantern_signal_breaker: {
+    id: "ironlantern_signal_breaker",
+    title: "Signal Breaker",
+    kind: "patrol",
+    regionId: "ironlantern",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "High",
+    minLevel: 4,
+    hint: "Silence Lantern suppressors guarding signal posts.",
+    objective: {
+      type: "kill",
+      enemyType: "suppressor",
+      behavior: "control",
+      count: 2,
+      label: "suppressors silenced",
+    },
+    reward: {
+      gold: 92,
+      xp: 46,
+      items: { "Cipher Lens": 1 },
+    },
+  },
+};
+
+function knownJob(jobId) {
+  return JOB_DEFINITIONS[jobId] || null;
+}
+
+function uniqueKnownJobIds(list) {
+  const seen = new Set();
+  const ids = [];
+  for (const jobId of Array.isArray(list) ? list : []) {
+    if (typeof jobId !== "string" || !knownJob(jobId) || seen.has(jobId)) continue;
+    seen.add(jobId);
+    ids.push(jobId);
+  }
+  return ids;
+}
+
+function cloneReward(reward = {}) {
+  return {
+    gold: Math.max(0, Math.floor(Number.isFinite(reward.gold) ? reward.gold : 0)),
+    xp: Math.max(0, Math.floor(Number.isFinite(reward.xp) ? reward.xp : 0)),
+    items: Object.fromEntries(
+      Object.entries(reward.items || {})
+        .filter(([name, count]) => typeof name === "string" && Number.isFinite(count) && count > 0)
+        .map(([name, count]) => [name, Math.floor(count)]),
+    ),
+  };
+}
+
+function normalizeProgress(jobId, source = {}) {
+  const job = knownJob(jobId);
+  if (!job || !source || typeof source !== "object") return null;
+  const status = JOB_STATUS.has(source.status) ? source.status : "active";
+  const count = Math.min(
+    job.objective.count,
+    Math.max(0, Math.floor(Number.isFinite(source.count) ? source.count : 0)),
+  );
+  return {
+    status,
+    count,
+    rewardClaimed: typeof source.rewardClaimed === "boolean" ? source.rewardClaimed : false,
+  };
+}
+
+export function createInitialJobBoardState() {
+  return {
+    activeJobId: null,
+    completedJobIds: [],
+    progressByJobId: {},
+  };
+}
+
+export function normalizeJobBoardState(source = {}) {
+  const progressByJobId = {};
+  if (source?.progressByJobId && typeof source.progressByJobId === "object") {
+    for (const [jobId, progress] of Object.entries(source.progressByJobId)) {
+      const normalized = normalizeProgress(jobId, progress);
+      if (normalized) progressByJobId[jobId] = normalized;
+    }
+  }
+
+  const completedJobIds = uniqueKnownJobIds(source?.completedJobIds);
+  const activeJobId = typeof source?.activeJobId === "string" && knownJob(source.activeJobId)
+    && !completedJobIds.includes(source.activeJobId)
+    ? source.activeJobId
+    : null;
+  if (activeJobId && !progressByJobId[activeJobId]) {
+    progressByJobId[activeJobId] = { status: "active", count: 0, rewardClaimed: false };
+  }
+
+  return {
+    activeJobId,
+    completedJobIds,
+    progressByJobId,
+  };
+}
+
+function syncJobState(jobState) {
+  const normalized = normalizeJobBoardState(jobState);
+  Object.assign(jobState, normalized);
+  return jobState;
+}
+
+function decorateJob(job, progress = null) {
+  const reward = cloneReward(job.reward);
+  return {
+    ...job,
+    objective: { ...job.objective },
+    reward,
+    status: progress?.status || "available",
+    progress: progress ? { ...progress } : { status: "available", count: 0, rewardClaimed: false },
+    progressLine: `${progress?.count || 0}/${job.objective.count} ${job.objective.label}`,
+    rewardLine: `+${reward.gold}g, +${reward.xp} XP${Object.entries(reward.items).map(([name, count]) => `, +${count} ${name}`).join("")}`,
+  };
+}
+
+export function getJobListings({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState() } = {}) {
+  const safeState = normalizeJobBoardState(jobState);
+  const safeLevel = Math.max(1, Math.floor(Number.isFinite(playerLevel) ? playerLevel : 1));
+  return Object.values(JOB_DEFINITIONS)
+    .filter((job) => job.regionId === regionId)
+    .filter((job) => job.minLevel <= safeLevel)
+    .filter((job) => !safeState.completedJobIds.includes(job.id))
+    .map((job) => decorateJob(job, safeState.progressByJobId[job.id]))
+    .sort((a, b) => a.minLevel - b.minLevel || a.id.localeCompare(b.id));
+}
+
+export function getJobDefinition(jobId) {
+  const job = knownJob(jobId);
+  return job ? decorateJob(job) : null;
+}
+
+export function acceptJob(jobState, jobId) {
+  const state = syncJobState(jobState);
+  const job = knownJob(jobId);
+  if (!job) return { ok: false, message: "Job not found.", jobState: state };
+  if (state.completedJobIds.includes(jobId)) return { ok: false, message: "Job already completed.", job: decorateJob(job), jobState: state };
+  if (state.activeJobId && state.activeJobId !== jobId) {
+    return { ok: false, message: "Finish your active job before taking another.", job: decorateJob(job), jobState: state };
+  }
+
+  state.activeJobId = jobId;
+  state.progressByJobId[jobId] = {
+    status: "active",
+    count: state.progressByJobId[jobId]?.count || 0,
+    rewardClaimed: false,
+  };
+  return {
+    ok: true,
+    job: decorateJob(job, state.progressByJobId[jobId]),
+    jobState: state,
+    message: `Job accepted: ${job.title}. ${job.objective.label} ${state.progressByJobId[jobId].count}/${job.objective.count}.`,
+  };
+}
+
+function matchesObjective(objective, event = {}) {
+  if (objective.type !== event.type) return false;
+  if (objective.enemyType && event.enemyType !== objective.enemyType) return false;
+  if (objective.behavior && event.behavior !== objective.behavior) return false;
+  return true;
+}
+
+export function recordJobEvent(jobState, event = {}) {
+  const state = syncJobState(jobState);
+  const job = knownJob(state.activeJobId);
+  if (!job) return { ok: false, completed: false, message: "No active job.", jobState: state };
+  const progress = state.progressByJobId[job.id] || { status: "active", count: 0, rewardClaimed: false };
+  state.progressByJobId[job.id] = progress;
+  if (progress.status !== "active") {
+    return { ok: false, completed: progress.status === "ready", job: decorateJob(job, progress), progress, jobState: state };
+  }
+  if (!matchesObjective(job.objective, event)) {
+    return { ok: false, completed: false, job: decorateJob(job, progress), progress, jobState: state };
+  }
+
+  progress.count = Math.min(job.objective.count, progress.count + 1);
+  const completed = progress.count >= job.objective.count;
+  if (completed) progress.status = "ready";
+  return {
+    ok: true,
+    completed,
+    job: decorateJob(job, progress),
+    progress,
+    jobState: state,
+    message: completed
+      ? `Job ready: ${job.title}. Return to ${job.npcName}.`
+      : `Job progress: ${job.title} ${progress.count}/${job.objective.count}.`,
+  };
+}
+
+export function claimJobReward(jobState, jobId = null) {
+  const state = syncJobState(jobState);
+  const targetJobId = jobId || state.activeJobId;
+  const job = knownJob(targetJobId);
+  const progress = targetJobId ? state.progressByJobId[targetJobId] : null;
+  if (!job || !progress) return { ok: false, message: "No job reward is ready.", jobState: state };
+  if (progress.status !== "ready" || progress.rewardClaimed) {
+    return { ok: false, message: "Job reward is not ready.", job: decorateJob(job, progress), jobState: state };
+  }
+
+  progress.status = "completed";
+  progress.rewardClaimed = true;
+  if (!state.completedJobIds.includes(targetJobId)) state.completedJobIds.push(targetJobId);
+  if (state.activeJobId === targetJobId) state.activeJobId = null;
+  return {
+    ok: true,
+    job: decorateJob(job, progress),
+    reward: cloneReward(job.reward),
+    jobState: state,
+    message: `Job paid: ${job.title}.`,
+  };
+}
+
+export function getActiveJobSummary(jobState) {
+  const safeState = normalizeJobBoardState(jobState);
+  const job = knownJob(safeState.activeJobId);
+  if (!job) return null;
+  return decorateJob(job, safeState.progressByJobId[job.id]);
+}

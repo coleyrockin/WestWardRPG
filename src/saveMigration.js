@@ -7,6 +7,7 @@ import { ensureRunStats } from "./runSummary.js";
 import { normalizeCharacterIdentity } from "./characterIdentity.js";
 import { normalizeGearState } from "./gearCrafting.js";
 import { normalizeLootState } from "./lootSystem.js";
+import { normalizeJobBoardState } from "./jobBoard.js";
 import { normalizeWorkstationState } from "./craftingStation.js";
 import { normalizeNpcMemoryState } from "./npcMemory.js";
 
@@ -87,6 +88,7 @@ function backfillWorldDefaults(world, now = 0) {
     : {};
   next.runStats = ensureRunStats(holder, now);
   next.loot = normalizeLootState(next.loot);
+  next.jobs = normalizeJobBoardState(next.jobs);
   return next;
 }
 

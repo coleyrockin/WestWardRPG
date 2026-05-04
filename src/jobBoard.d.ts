@@ -1,0 +1,9 @@
+export const JOB_DEFINITIONS: Record<string, any>;
+export function createInitialJobBoardState(): any;
+export function normalizeJobBoardState(source?: any): any;
+export function getJobListings(options?: any): any[];
+export function getJobDefinition(jobId: string): any;
+export function acceptJob(jobState: any, jobId: string): any;
+export function recordJobEvent(jobState: any, event?: any): any;
+export function claimJobReward(jobState: any, jobId?: string | null): any;
+export function getActiveJobSummary(jobState: any): any;

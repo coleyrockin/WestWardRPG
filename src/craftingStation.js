@@ -1,4 +1,4 @@
-import { ARMOR_PIECES, WEAPON_FAMILIES, normalizeGearState } from "./gearCrafting.js";
+import { ARMOR_PIECES, WEAPON_BRANCHES, WEAPON_FAMILIES, normalizeGearState } from "./gearCrafting.js";
 import { equipArmorPiece, equipWeaponFamily } from "./progressionSystem.js";
 import { deriveAttributeEffects, normalizeCharacterIdentity } from "./characterIdentity.js";
 
@@ -47,6 +47,21 @@ function canAfford(inventory, costs) {
   return Object.entries(costs).every(([key, value]) => count(inventory, key) >= value);
 }
 
+function missingCosts(inventory, costs) {
+  const missing = {};
+  for (const [key, value] of Object.entries(costs)) {
+    const need = Math.max(0, Math.floor(value) - count(inventory, key));
+    if (need > 0) missing[key] = need;
+  }
+  return missing;
+}
+
+function formatMissing(missing) {
+  const entries = Object.entries(missing);
+  if (entries.length === 0) return null;
+  return `missing ${entries.map(([key, value]) => `${value} ${key}`).join(", ")}`;
+}
+
 function spend(inventory, costs) {
   for (const [key, value] of Object.entries(costs)) {
     inventory[key] = Math.max(0, count(inventory, key) - value);
@@ -89,38 +104,99 @@ export function describeWorkstationState(workstation = {}) {
 }
 
 export function getAvailableCraftingActions(context = {}) {
+  return getCraftingActionCatalog(context).filter((action) => action.available);
+}
+
+export function getCraftingActionCatalog(context = {}) {
   const inventory = context.inventory || {};
   const progression = context.progression || {};
   const equipment = normalizeGearState(progression.equipment);
   const workstation = normalizeWorkstationState(context.house?.workstation);
   const actions = [];
 
-  if (canAfford(inventory, { Wood: 2, Stone: 1 })) {
-    actions.push({ id: "craft_potion", label: "Craft Potion", description: workstation.level >= 2 ? "2 Wood + 1 Stone. Workbench II yields 2." : "2 Wood + 1 Stone." });
-  }
-  if ((equipment.ownedArmorPieces || []).includes("salvage_gloves") && equipment.armorSlots?.hands !== "salvage_gloves") {
-    actions.push({ id: "fit_salvage_gloves", label: "Fit Salvage Gloves", description: "Equip owned Craft gloves." });
+  const potionCosts = { Wood: 2, Stone: 1 };
+  const potionMissing = missingCosts(inventory, potionCosts);
+  actions.push({
+    id: "craft_potion",
+    label: "Craft Potion",
+    description: workstation.level >= 2 ? "2 Wood + 1 Stone. Workbench II yields 2." : "2 Wood + 1 Stone.",
+    costs: potionCosts,
+    missing: potionMissing,
+    available: Object.keys(potionMissing).length === 0,
+    blockedReason: formatMissing(potionMissing),
+  });
+
+  for (const pieceId of equipment.ownedArmorPieces || []) {
+    const piece = ARMOR_PIECES[pieceId];
+    if (piece && equipment.armorSlots?.[piece.slot] !== pieceId) {
+      actions.push({ id: `equip_armor_${pieceId}`, label: `Equip ${piece.label}`, description: `Fit owned ${piece.label} in ${piece.slot} slot.`, available: true, missing: {}, blockedReason: null });
+    }
   }
   for (const familyId of equipment.weaponFamilyTokens || []) {
     const family = WEAPON_FAMILIES[familyId];
     if (family && equipment.weaponFamily !== familyId) {
-      actions.push({ id: `fit_weapon_${familyId}`, label: `Fit ${family.label}`, description: `Spend ${family.label} token and change weapon family.` });
+      actions.push({ id: `fit_weapon_${familyId}`, label: `Fit ${family.label}`, description: `Use owned ${family.label} token unlock to change weapon family.`, available: true, missing: {}, blockedReason: null });
     }
   }
+
+  const branch = WEAPON_BRANCHES[equipment.weaponFamily];
+  if (branch && !equipment.weaponBranches?.[branch.familyId]) {
+    const branchMissing = missingCosts(inventory, branch.costs);
+    actions.push({
+      id: `unlock_weapon_branch_${branch.familyId}`,
+      label: `Unlock ${branch.label}`,
+      description: `${branch.role} Costs ${Object.entries(branch.costs).map(([key, value]) => `${value} ${key}`).join(", ")}.`,
+      costs: branch.costs,
+      missing: branchMissing,
+      available: Object.keys(branchMissing).length === 0,
+      blockedReason: formatMissing(branchMissing),
+    });
+  }
+
   const refineCosts = refineKitCosts(workstation);
-  if (canAfford(inventory, refineCosts) && workstation.preparedUpgrade !== "refine_weapon") {
-    actions.push({ id: "prepare_refine_kit", label: "Prepare Refine Kit", description: workstation.level >= 2 ? "1 Ashglass + 1 Scrap Coil." : "2 Ashglass + 1 Scrap Coil." });
+  const refineMissing = missingCosts(inventory, refineCosts);
+  const refineBlocked = workstation.preparedUpgrade === "refine_weapon"
+    ? "A refine kit is already prepared."
+    : formatMissing(refineMissing);
+  actions.push({
+    id: "prepare_refine_kit",
+    label: "Prepare Refine Kit",
+    description: workstation.level >= 2 ? "1 Ashglass + 1 Scrap Coil." : "2 Ashglass + 1 Scrap Coil.",
+    costs: refineCosts,
+    missing: refineMissing,
+    available: !refineBlocked,
+    blockedReason: refineBlocked,
+  });
+
+  if (!workstation.stationProjects.includes("region_map")) {
+    const mapCosts = { "Cipher Lens": 1, "Pressurized Ink": 1 };
+    const mapMissing = missingCosts(inventory, mapCosts);
+    const mapBlocked = workstation.level < 3
+      ? "Workbench III map table required."
+      : formatMissing(mapMissing);
+    actions.push({
+      id: "draft_region_map",
+      label: "Draft Region Map",
+      description: "1 Cipher Lens + 1 Pressurized Ink.",
+      costs: mapCosts,
+      missing: mapMissing,
+      available: !mapBlocked,
+      blockedReason: mapBlocked,
+    });
   }
-  if (
-    workstation.level >= 3
-    && !workstation.stationProjects.includes("region_map")
-    && canAfford(inventory, { "Cipher Lens": 1, "Pressurized Ink": 1 })
-  ) {
-    actions.push({ id: "draft_region_map", label: "Draft Region Map", description: "1 Cipher Lens + 1 Pressurized Ink." });
-  }
+
   const upgrade = nextWorkstationUpgrade(context.house?.workstation);
-  if (upgrade && canAfford(inventory, upgrade.costs)) {
-    actions.push({ id: `upgrade_workstation_${upgrade.level}`, label: upgrade.label, description: upgrade.description });
+  if (upgrade) {
+    const upgradeMissing = missingCosts(inventory, upgrade.costs);
+    actions.push({
+      id: `upgrade_workstation_${upgrade.level}`,
+      label: upgrade.label,
+      description: upgrade.description,
+      costs: upgrade.costs,
+      missing: upgradeMissing,
+      available: Object.keys(upgradeMissing).length === 0,
+      blockedReason: formatMissing(upgradeMissing),
+    });
   }
   return actions;
 }
@@ -149,13 +225,15 @@ export function resolveCraftingAction(actionId, context = {}, options = {}) {
     return { ok: true, message: bonus ? "Crafted 2 Potions with a Craft yield bonus." : "Crafted 1 Potion.", inventory, progression, house };
   }
 
-  if (actionId === "fit_salvage_gloves") {
-    if (!(progression.equipment.ownedArmorPieces || []).includes("salvage_gloves")) {
-      return { ok: false, message: "No Salvage Gloves owned.", inventory, progression, house };
+  if (actionId.startsWith("equip_armor_")) {
+    const pieceId = actionId.replace("equip_armor_", "");
+    const piece = ARMOR_PIECES[pieceId];
+    if (!piece || !(progression.equipment.ownedArmorPieces || []).includes(pieceId)) {
+      return { ok: false, message: "No matching armor piece owned.", inventory, progression, house };
     }
-    equipArmorPiece(progression, "salvage_gloves");
+    equipArmorPiece(progression, pieceId);
     incrementWorkstation(house);
-    return { ok: true, message: `Fitted ${ARMOR_PIECES.salvage_gloves.label}.`, inventory, progression, house };
+    return { ok: true, message: `Equipped ${piece.label}.`, inventory, progression, house };
   }
 
   if (actionId === "prepare_refine_kit") {
@@ -195,9 +273,30 @@ export function resolveCraftingAction(actionId, context = {}, options = {}) {
       return { ok: false, message: "No matching weapon-family token owned.", inventory, progression, house };
     }
     equipWeaponFamily(progression, familyId);
-    progression.equipment.weaponFamilyTokens = tokens.filter((token) => token !== familyId);
+    progression.equipment.weaponFamilyTokens = tokens;
     incrementWorkstation(house);
     return { ok: true, message: `Fitted ${family.label} weapon family.`, inventory, progression, house };
+  }
+
+  if (actionId.startsWith("unlock_weapon_branch_")) {
+    const familyId = actionId.replace("unlock_weapon_branch_", "");
+    const branch = WEAPON_BRANCHES[familyId];
+    if (!branch || progression.equipment.weaponFamily !== familyId) {
+      return { ok: false, message: "Weapon branch does not match the fitted family.", inventory, progression, house };
+    }
+    if (progression.equipment.weaponBranches?.[familyId]) {
+      return { ok: false, message: `${branch.label} is already unlocked.`, inventory, progression, house };
+    }
+    if (!canAfford(inventory, branch.costs)) {
+      return { ok: false, message: `${branch.label} branch needs more materials.`, inventory, progression, house };
+    }
+    spend(inventory, branch.costs);
+    progression.equipment.weaponBranches = {
+      ...(progression.equipment.weaponBranches || {}),
+      [familyId]: true,
+    };
+    incrementWorkstation(house);
+    return { ok: true, message: `Unlocked ${branch.label} branch for ${WEAPON_FAMILIES[familyId].label}.`, inventory, progression, house };
   }
 
   if (actionId.startsWith("upgrade_workstation_")) {

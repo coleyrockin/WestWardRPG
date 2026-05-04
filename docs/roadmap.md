@@ -4,7 +4,7 @@
 
 ## How to use this roadmap
 
-- **Pillars are ordered.** Pillars 1–4, Pillar 5.5, Pillar 8 Items 1–5, and foundations from Pillars 21–23, 25, and 27 are shipped. Pillar 5's remaining dialogue/narrative depth items are active, and Pillars 6–7 plus the unshipped later-pillar slices remain planned. Don't skip ahead — each pillar depends on the foundations of the previous one.
+- **Pillars are ordered.** Pillars 1-4, Pillar 5.5, Pillar 8 Items 1-5, and foundations from Pillars 21-23 and 25-27 are shipped. Pillar 5's remaining dialogue/narrative depth items are active, and Pillars 6-7 plus the unshipped later-pillar slices remain planned. Don't skip ahead -- each pillar depends on the foundations of the previous one.
 - **Each pillar item is a thin, testable slice** scoped so a single agent can ship it in one session: file paths, helpers, and acceptance signals are spelled out.
 - **Save migration is non-negotiable.** New top-level state requires a `backfill*` helper in `saveMigration.js` and a fixture round-trip test.
 - **Never rewrite the renderer or move to WebGL** unless the user explicitly requests it.
@@ -12,13 +12,13 @@
 
 ## Current State
 
-`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life), the first Pillar 5 narrative/companion upgrades, **Pillar 5.5 story-to-run payoff**, **Pillar 8 Items 1-5** as combat depth round 2, **Pillar 21/22 open-world RPG foundation** (character identity, attributes, origin selection, region visual identity), **Pillar 23 gear loop foundation** (weapon families, armor slots, Craft-driven repair/refine prices, regional loot tables, POI/mini-boss gear finds, selectable workbench actions, earned gear visibility), **Pillar 25 workstation foundation** (save-safe workbench levels, level-gated benefits, map-table project), **Pillar 27 deterministic NPC memory foundation**, and a **fully redesigned Apple-grade title screen**. Narrative state already tracks axes, factions, affinity, flags, decisions, quest outcomes, companion state, endings, POIs, codex unlocks, quest progression, build identity, gear state, loot history, workstation state, station projects, and NPC memory. The next highest-value work is player-facing: stronger visual open-world feel, first-minute pressure, deeper gear/housing/economy loops, pets, and fuller living-world dialogue.
+`main` ships v3 Shattered Frontier + four full upgrade pillars (closeout, engine foundations, combat identity, world life), the first Pillar 5 narrative/companion upgrades, **Pillar 5.5 story-to-run payoff**, **Pillar 8 Items 1-5** as combat depth round 2, **Pillar 21/22 open-world RPG foundation** (character identity, attributes, origin selection, region visual identity), **Pillar 23 gear loop foundation** (weapon families, armor slots, Craft-driven repair/refine prices, regional loot tables, POI/mini-boss gear finds, selectable workbench actions, earned gear visibility), **Pillar 25 workstation foundation** (save-safe workbench levels, level-gated benefits, map-table project), **Pillar 26 bounty/job-board foundation** (deterministic regional jobs, active bounty progress, Warden acceptance/turn-in, reward payout, save-safe state, HUD/debug visibility), **Pillar 27 deterministic NPC memory foundation**, and a **fully redesigned Apple-grade title screen**. Narrative state already tracks axes, factions, affinity, flags, decisions, quest outcomes, companion state, endings, POIs, codex unlocks, quest progression, build identity, gear state, loot history, workstation state, station projects, job-board state, and NPC memory. The next highest-value work is player-facing: stronger visual open-world feel, deeper gear/housing/economy loops, pets, richer job variety, and fuller living-world dialogue.
 
 Open-world RPG target: push the game toward a compact Skyrim/Oblivion feel within the existing canvas engine. The world should have stronger visual identity, character builds, loot, pets, owned spaces, regional economy, and NPCs that remember enough context to feel alive. Keep everything local-first and deterministic by default; optional network/LLM features must have handcrafted fallback content and never block core play.
 
 Latest local verification:
 - `git diff --check` → clean.
-- `npm test` → **296 passing across 32 test files**.
+- `npm test` -> **317 passing across 33 test files**.
 - `npm run typecheck:ts` → clean.
 - `npm run test:syntax` → clean.
 - `npm run dev:lint` → clean.
@@ -61,7 +61,7 @@ Build slices:
 2. **Workbench depth** — Workbench II/III benefits should become obvious: better potion/tonic yield, cheaper repair/refine prep, forge/alchemy/map-table actions, and visible station project progress.
 3. **Armor and weapon choices** — armor slots and weapon families should change stamina, protection, movement, reach, windup, and role identity enough for the character sheet to matter.
 4. **House utility** — the house should become a hub with stash tabs, station previews, trophy display, pet bed, companion bunk, map table, and cheaper Craft-heavy upgrades.
-5. **Economy pressure** — vendors should differ by identity, stock should refresh by day/region, and gold sinks should include repair, housing, pet care, trainers, bounties, transport, and cosmetics.
+5. **Economy pressure** — bounty-board foundation is now playable through Marshal Boone: deterministic regional job listings, one active job, kill progress, reward payout, save migration, HUD prompts, and `render_game_to_text` exposure. Next: vendor identity, stock refresh, job variety, failure/bonus conditions, and gold sinks for repair, housing, pet care, trainers, transport, and cosmetics.
 6. **Acceptance** — a tester can explain why they want one attribute, one weapon family, one armor piece, one workstation level, and one resource route.
 
 ### Phase D — NPC life + local conversation
@@ -314,8 +314,8 @@ Build slices:
 1. **Regional pricing** — prices respond to faction reputation, region events, scarcity, house station level, Speech, Craft, and player quest outcomes. Keep it simple, visible, and testable.
 2. **Vendor identities** — separate merchant, smith, apothecary, stablekeeper, fence, trainer, and house steward inventories. Stock refreshes by day/region, not every frame.
 3. **Gold sinks** — repairs, housing upgrades, pet care, crafting, trainers, transport, cosmetics, bounty licenses, and special job permits so gold remains meaningful.
-4. **Radiant jobs** — small deterministic jobs: bounty, courier, salvage, rescue, escort, patrol, supply run. Each uses existing map/entity systems and has clear success/fail states.
-5. **Bounty board** — one town-facing board or NPC lists 1-3 deterministic jobs with reward, region, threat, and time/condition hints. Jobs should be save-safe and visible in `render_game_to_text`.
+4. **Radiant jobs** ✅ foundation shipped — `src/jobBoard.js` defines deterministic regional job data, save-safe job state, active progress, matching kill events, and one-time reward claims. Next: courier, salvage, rescue, escort, patrol, supply-run, timers, optional bonus conditions, and job failure states.
+5. **Bounty board** ✅ foundation shipped — Marshal Boone can issue/turn in the first active bounty after the slime quest, Warden bounty progress is visible in HUD/live objective text, and `render_game_to_text` exposes active job state/listings for smoke automation. Next: a dedicated board surface with 1-3 choices, threat previews, and regional availability notes.
 6. **Trade and consequence hooks** — quest outcomes can open/close vendors, change prices, reroute supplies, add contraband risk, or unlock house visitors. Smoke JSON exposes economy state for playtest debugging.
 7. **Economy acceptance** — after a short session, the player should understand one way to earn gold, one reason to spend it, and one reason prices changed.
 
@@ -331,7 +331,7 @@ Build slices:
 
 ## Next Agent Handoff
 
-Current shipped direction after `7132c81`: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, NPC memory, first-pass gameplay-feel helpers, near-wall projection repair, and smoke/debug text fields are in scope. Fast verification is 296 tests across 32 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should prioritize **Phase A**: first-minute pressure, visual open-world composition, enemy readability, hit/reward feel, HUD overlap cleanup, and the slow mini-boss smoke.
+Current shipped direction: open-world RPG foundation is now moving from data to playable systems. Character identity, attributes, title-screen origin selection, region visual profiles, save migration, KeyI character sheet, region tinting, shop barter from Speech, gear family refitting, armor-slot fitting, Craft repair/refine price hooks, loot tables, selectable house workbench, earned gear inventory lines, workbench levels, level-gated station benefits, Warden bounty jobs, NPC memory, first-pass gameplay-feel helpers, near-wall projection repair, and smoke/debug text fields are in scope. Fast verification is 317 tests across 33 files plus typecheck, syntax, dev lint, and focused browser smoke. Next functional slice should keep pushing player-visible loops: job-board choice surface, vendor identity, pet/house utility, and stronger visual open-world composition.
 
 ### User signal to respect
 
@@ -347,10 +347,11 @@ The user is not asking for a prettier TODO list. They want the game to start fee
 
 ### Next build target
 
-Ship **Phase A / Gameplay Feel 2: visual open-world feel + first-minute pressure + enemy readability.** The current foundation makes loot/workstations real and selectable, shows earned gear in the sheet/workbench, lets the workbench level up, improves level 2 crafting, unlocks a level 3 Region Map project, and adds first-pass hit feedback/opening-objective helpers. The next slice should make live play feel less static before adding more RPG data.
+Ship **Phase C / Economy Jobs 2 + Phase A visual pressure.** The current foundation makes loot/workstations/jobs real and selectable, shows earned gear and active bounties in player-facing surfaces, lets the workbench level up, improves level 2 crafting, unlocks a level 3 Region Map project, and adds first-pass hit feedback/opening-objective helpers. The next slice should make Boone's job board a real 1-3 choice surface while continuing to improve the starting view, enemy readability, and reward feel.
 
 Player-facing result:
 - First 60 seconds have a clear action target, visible route, landmark hint, and nearby reward/threat.
+- Marshal Boone can show multiple deterministic jobs with readable rewards, region, threat, and progress state.
 - The starting view contains roads/props/signage or a region-specific landmark, not empty-feeling space.
 - Enemy windups, hit reactions, and reward drops read better without opening debug state.
 - HUD elements do not overlap when the game is played in the in-app browser.
@@ -358,13 +359,14 @@ Player-facing result:
 - Saves preserve new gear/crafting state through v3 backfill unless a real schema bump becomes necessary.
 
 Concrete build order:
-1. Add a deterministic first-minute pressure event or nearby action marker with reward/threat text.
-2. Add a region prop/landmark layer for roads, signposts, fences, carts, lamps, ash drifts, rails, pipes, and horizon silhouettes.
-3. Make enemy hit reactions/windups more readable in the canvas, not just in logs.
-4. Fix HUD/objective/minimap overlap at narrow browser widths.
-5. Shorten/fix `test-actions/mini_boss_flow.json` so the smoke does not hang.
-6. Keep `render_game_to_text` exposing gameplay-feel and visual-world state for smoke automation.
-7. Update this roadmap and verification counts after the slice lands.
+1. Add a dedicated Boone/job-board choice surface for 1-3 jobs instead of auto-accepting the first listing.
+2. Add a second job type that is not just "kill N enemies": salvage pickup, courier delivery, patrol route, or supply run.
+3. Add a region prop/landmark layer for roads, signposts, fences, carts, lamps, ash drifts, rails, pipes, and horizon silhouettes.
+4. Make enemy hit reactions/windups more readable in the canvas, not just in logs.
+5. Fix HUD/objective/minimap overlap at narrow browser widths.
+6. Shorten/fix `test-actions/mini_boss_flow.json` so the smoke does not hang.
+7. Keep `render_game_to_text` exposing gameplay-feel, visual-world, and job-board state for smoke automation.
+8. Update this roadmap and verification counts after the slice lands.
 
 Quality bar:
 - This is not a cosmetic-only pass. Attributes must have at least small derived effects or clear future hooks surfaced in data.
@@ -375,7 +377,7 @@ Quality bar:
 
 Next after that:
 1. **Phase B narrative payoff** — quest outcome smoke, companion barks, NPC/town reactions, visible service changes.
-2. **Phase C RPG loops** — inventory-driven gear choices, deeper workbench/stations, housing utility, economy pressure.
+2. **Phase C RPG loops** — job-board choices, inventory-driven gear choices, deeper workbench/stations, housing utility, economy pressure.
 3. **Phase D NPC life** — local dialogue UI, handcrafted memory-aware lines, optional provider boundary only after fallback works.
 4. **Phase E playtest readiness** — pause/save slots/recovery, run history, daily seed, distribution packaging.
 

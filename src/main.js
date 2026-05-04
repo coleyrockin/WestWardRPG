@@ -94,6 +94,7 @@ import {
   createInitialWorkstationState,
   describeWorkstationState,
   getAvailableCraftingActions,
+  getCraftingActionCatalog,
   normalizeWorkstationState,
   resolveCraftingAction,
 } from "./craftingStation.js";
@@ -103,6 +104,15 @@ import {
   normalizeLootState,
   rollLootDrop,
 } from "./lootSystem.js";
+import {
+  acceptJob,
+  claimJobReward,
+  createInitialJobBoardState,
+  getActiveJobSummary,
+  getJobListings,
+  normalizeJobBoardState,
+  recordJobEvent,
+} from "./jobBoard.js";
 import {
   createInitialNpcMemoryState,
   normalizeNpcMemoryState,
@@ -1849,6 +1859,7 @@ const canvas = document.getElementById("game");
       companionRecoveryTimer: 0,
       runStats: createInitialRunStats(0),
       loot: createInitialLootState(),
+      jobs: createInitialJobBoardState(),
     },
     companion: createInitialCompanionRuntime(),
     codex: { unlocked: { regions: [], enemies: [], items: [], factions: [], ideology: [], letters: [] } },
@@ -2171,6 +2182,7 @@ const canvas = document.getElementById("game");
     syncQuestOutcomeCount(state.world, state.narrative);
     state.progression.identity = normalizeCharacterIdentity(state.progression.identity);
     state.progression.equipment = normalizeGearState(state.progression.equipment);
+    state.world.jobs = normalizeJobBoardState(state.world.jobs);
     return {
       version: 3,
       savedAt: Date.now(),
@@ -2253,6 +2265,7 @@ const canvas = document.getElementById("game");
         companionRecoveryTimer: Math.max(0, state.companion.recoveryTimer || 0),
         runStats: state.world.runStats,
         loot: state.world.loot,
+        jobs: state.world.jobs,
       },
       narrative: state.narrative,
       codex: state.codex,
@@ -2333,6 +2346,7 @@ const canvas = document.getElementById("game");
       companionRecoveryTimer: Math.max(0, numberOr(save.world?.companionRecoveryTimer, 0)),
       runStats: ensureRunStats({ runStats: save.world?.runStats }, state.time),
       loot: normalizeLootState(save.world?.loot),
+      jobs: normalizeJobBoardState(save.world?.jobs),
     };
     state.mode = save.mode === "victory" || state.world.runStats?.victory ? "victory" : state.mode;
     state.progression = save.progression || createInitialProgressionState();
@@ -3005,8 +3019,81 @@ const canvas = document.getElementById("game");
     logMsg(`Opening cache secured: ${reward.summary}.`);
   }
 
+  function grantJobReward(reward) {
+    const safeReward = reward || { gold: 0, xp: 0, items: {} };
+    state.player.gold += Math.max(0, Math.floor(safeReward.gold || 0));
+    if ((safeReward.xp || 0) > 0) grantXp(safeReward.xp);
+    for (const [name, count] of Object.entries(safeReward.items || {})) {
+      state.inventory[name] = Math.max(0, Math.floor(state.inventory[name] || 0)) + Math.max(0, Math.floor(count || 0));
+    }
+    updateQuestProgressFromInventory();
+  }
+
+  function rewardLine(reward) {
+    const safeReward = reward || { gold: 0, xp: 0, items: {} };
+    const itemLine = Object.entries(safeReward.items || {})
+      .filter(([, count]) => count > 0)
+      .map(([name, count]) => `+${count} ${name}`)
+      .join(", ");
+    return `+${safeReward.gold || 0} gold, +${safeReward.xp || 0} XP${itemLine ? `, ${itemLine}` : ""}`;
+  }
+
+  function recordKillForJobs(enemy) {
+    state.world.jobs = normalizeJobBoardState(state.world.jobs);
+    const result = recordJobEvent(state.world.jobs, {
+      type: "kill",
+      enemyType: enemy?.type,
+      behavior: enemy?.behavior,
+      label: enemy?.label,
+      regionId: state.regions.activeRegion,
+    });
+    if (result.ok && result.message) logMsg(result.message);
+    return result;
+  }
+
+  function handleWardenJobBoard() {
+    state.world.jobs = normalizeJobBoardState(state.world.jobs);
+    const activeJob = getActiveJobSummary(state.world.jobs);
+    if (activeJob?.npcId === "warden") {
+      if (activeJob.status === "ready") {
+        const paid = claimJobReward(state.world.jobs, activeJob.id);
+        if (paid.ok) {
+          grantJobReward(paid.reward);
+          logMsg(`Bounty paid: ${paid.job.title}. ${rewardLine(paid.reward)}.`);
+          sfx.questDone();
+          spawnParticles(canvas.width / 2, canvas.height / 2, 14, "#ffd36b", 3.4, 1.1, { decorative: true });
+          return true;
+        }
+      }
+      logMsg(`Marshal Boone: ${activeJob.title} is still open. ${activeJob.progressLine}.`);
+      sfx.npcChat();
+      return true;
+    }
+
+    const listings = getJobListings({
+      regionId: state.regions.activeRegion,
+      playerLevel: state.player.level,
+      jobState: state.world.jobs,
+    }).filter((job) => job.npcId === "warden");
+    if (listings.length === 0) return false;
+
+    const accepted = acceptJob(state.world.jobs, listings[0].id);
+    if (!accepted.ok) return false;
+    logMsg(`Marshal Boone posted a job: ${accepted.job.title}. ${accepted.job.hint} Reward ${accepted.job.rewardLine}.`);
+    sfx.npcChat();
+    return true;
+  }
+
   function getWorkbenchActions() {
     return getAvailableCraftingActions({
+      inventory: state.inventory,
+      progression: state.progression,
+      house: state.house,
+    });
+  }
+
+  function getWorkbenchActionCatalog() {
+    return getCraftingActionCatalog({
       inventory: state.inventory,
       progression: state.progression,
       house: state.house,
@@ -3350,7 +3437,7 @@ const canvas = document.getElementById("game");
           spawnParticles(canvas.width / 2, canvas.height / 2, 15, "#8fd0ff", 3, 1.2, { decorative: true });
           if (state.quests.slime.status === "locked") {
             state.quests.slime.status = "active";
-            logMsg("Elder Nira: Warden Sol needs the marsh cleared.");
+            logMsg("Elder Nira: Marshal Boone needs the marsh cleared.");
           }
           if (!openQuestOutcomeChoice("crystal")) {
             const decision = applyMajorDecision(state.narrative, "elder");
@@ -3372,17 +3459,17 @@ const canvas = document.getElementById("game");
         const q = state.quests.slime;
         if (q.status === "locked") {
           if (state.quests.crystal.status !== "turned_in") {
-            logMsg("Warden Sol: Earn the Elder's trust first.");
+            logMsg("Marshal Boone: Earn the Elder's trust first.");
             return;
           }
           q.status = "active";
           q.progress = 0;
-          logMsg("Warden Sol: Clear 3 slimes near the marsh. Frontier law says no jiggly bandits after sundown.");
+          logMsg("Marshal Boone: Clear 3 slimes near the marsh. Frontier law says no jiggly bandits after sundown.");
           sfx.npcChat();
           return;
         }
         if (q.status === "active") {
-          logMsg(`Warden Sol: Slimes defeated ${q.progress}/${q.need}. They're not happy about it.`);
+          logMsg(`Marshal Boone: Slimes defeated ${q.progress}/${q.need}. They're not happy about it.`);
           sfx.npcChat();
           return;
         }
@@ -3396,7 +3483,7 @@ const canvas = document.getElementById("game");
           spawnParticles(canvas.width / 2, canvas.height / 2, 15, "#6be873", 3, 1.2, { decorative: true });
           if (state.quests.wood.status === "locked") {
             state.quests.wood.status = "active";
-            logMsg("Warden Sol: Smith Varo can now build your house.");
+            logMsg("Marshal Boone: Smith Varo can now build your house.");
           }
           const decision = applyMajorDecision(state.narrative, "warden");
           if (decision) {
@@ -3406,6 +3493,7 @@ const canvas = document.getElementById("game");
           }
           return;
         }
+        if (handleWardenJobBoard()) return;
         logMsg(storyReactiveQuip("warden") || choice(npcDialogue.warden.idle));
         if (Math.random() < 0.35) describeNpcBackground("warden");
         sfx.npcChat();
@@ -3416,7 +3504,7 @@ const canvas = document.getElementById("game");
         const q = state.quests.wood;
         if (q.status === "locked") {
           if (state.quests.slime.status !== "turned_in") {
-            logMsg("Smith Varo: Help Warden Sol first.");
+            logMsg("Smith Varo: Help Marshal Boone first.");
             return;
           }
           q.status = "active";
@@ -3815,6 +3903,7 @@ const canvas = document.getElementById("game");
       if (isKill) {
         enemy.alive = false;
         recordRunKill(state.world, enemy);
+        recordKillForJobs(enemy);
         unlockCodexEntry(state, "enemies", enemy.behavior === "balanced" ? "slime" : enemy.behavior);
         unlockCodexEntry(state, "regions", "frontier");
         const spawnMods = getActiveRegionEventModifiers();
@@ -4530,6 +4619,7 @@ const canvas = document.getElementById("game");
             if (ent.hp <= 0 && ent.alive) {
               ent.alive = false;
               recordRunKill(state.world, ent);
+              recordKillForJobs(ent);
               ent.respawn = 22 + Math.random() * 8;
             }
           },
@@ -6428,10 +6518,15 @@ const canvas = document.getElementById("game");
     const q6 = state.quests.ashfall_boss;
     const q7 = state.quests.lantern_probe;
     const q8 = state.quests.lantern_revolt;
+    const activeJob = getActiveJobSummary(state.world.jobs);
+    const jobLine = activeJob
+      ? `Job: ${activeJob.title}: ${activeJob.status === "ready" ? `Return to ${activeJob.npcName}` : activeJob.progressLine}`
+      : "";
     const questLines = [
       `${q1.title}: ${q1.status === "locked" ? t("labels.locked") : q1.status === "turned_in" ? t("labels.done") : `${q1.progress}/${q1.need}${q1.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
       `${q2.title}: ${q2.status === "locked" ? t("labels.locked") : q2.status === "turned_in" ? t("labels.done") : `${q2.progress}/${q2.need}${q2.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
       `${q3.title}: ${q3.status === "locked" ? t("labels.locked") : q3.status === "turned_in" ? t("labels.done") : `${Math.min(q3.needWood, state.inventory.Wood)}/${q3.needWood}W ${Math.min(q3.needStone, state.inventory.Stone)}/${q3.needStone}S${q3.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
+      jobLine,
       q4
         ? `${q4.title}: ${q4.status === "locked" ? t("labels.locked") : q4.status === "turned_in" ? t("labels.done") : `${q4.progress}/${q4.need}${q4.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`
         : "",
@@ -6543,7 +6638,14 @@ const canvas = document.getElementById("game");
     const explorationLead = !state.player.inHouse && state.regions?.activeRegion
       ? resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 32 })
       : null;
-    const liveObjective = firstPressure || openingObjective || explorationLead;
+    const jobObjective = activeJob
+      ? {
+        title: activeJob.status === "ready" ? "Bounty ready" : "Bounty",
+        line: activeJob.status === "ready" ? `Return to ${activeJob.npcName} for ${activeJob.rewardLine}` : `${activeJob.title}: ${activeJob.progressLine}`,
+        urgency: activeJob.status === "ready" ? "high" : "medium",
+      }
+      : null;
+    const liveObjective = firstPressure || jobObjective || openingObjective || explorationLead;
     if (liveObjective && msgY <= topY + topH - 10) {
       ctx.font = "bold 11px Georgia";
       drawClippedText(`→ ${liveObjective.line}`, topX + 10, msgY, topW - 20, liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "#ffd77b" : "#f3e8cf");
@@ -6709,6 +6811,7 @@ const canvas = document.getElementById("game");
         { text: `Attributes: ${summary.attributeLine}`, color: "#e6d8bd" },
         { text: `Hooks: HP +${effects.maxHpBonus || 0}, Stamina +${effects.staminaReserveBonus || 0}, Barter +${effects.barterBonusPct || 0}%, Craft +${effects.craftingYieldPct || 0}%`, color: "#d8c7a8" },
         { text: `Weapon: ${gearSummary.weaponLine} - ${gearSummary.handlingLine}`, color: "#e6d8bd" },
+        { text: `Weapon branch: ${gearSummary.branchLine}`, color: "#d8c7a8" },
         { text: `Armor: ${gearSummary.armorLine} - weight ${gearSummary.armorWeight}`, color: "#d8c7a8" },
         { text: `Earned gear: ${inventorySummary.ownedArmorLine}`, color: "#d8c7a8" },
         { text: `Weapon tokens: ${inventorySummary.weaponTokenLine}`, color: "#d8c7a8" },
@@ -6914,6 +7017,8 @@ const canvas = document.getElementById("game");
     /* Workbench overlay */
     if (workbenchOpen && state.mode === "playing") {
       const actions = getWorkbenchActions();
+      const catalog = getWorkbenchActionCatalog();
+      const blocked = catalog.filter((action) => !action.available);
       if (workbenchSelection >= actions.length) workbenchSelection = Math.max(0, actions.length - 1);
       const sw = Math.min(500, canvas.width - margin * 2);
       const rows = Math.max(3, Math.min(6, actions.length || 1));
@@ -6953,7 +7058,8 @@ const canvas = document.getElementById("game");
         }
       }
       ctx.font = "italic 11px Georgia";
-      drawClippedText(`Benefits: ${workstationSummary.benefitLine} | Projects: ${workstationSummary.projectsLine}`, sx + 16, sy + sh - 30, sw - 32, "#9d927d");
+      const blockedLine = blocked.length ? `Blocked: ${blocked[0].label} (${blocked[0].blockedReason})` : `Benefits: ${workstationSummary.benefitLine}`;
+      drawClippedText(blockedLine, sx + 16, sy + sh - 30, sw - 32, "#9d927d");
       drawClippedText(`Crafts completed: ${state.house.workstation?.craftsCompleted || 0}  Prepared: ${state.house.workstation?.preparedUpgrade || "none"}`, sx + 16, sy + sh - 16, sw - 32, "#9d927d");
     }
 
@@ -7500,6 +7606,12 @@ const canvas = document.getElementById("game");
       : null;
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const worldPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
+    const activeJob = getActiveJobSummary(state.world.jobs);
+    const jobListings = getJobListings({
+      regionId: state.regions.activeRegion,
+      playerLevel: state.player.level,
+      jobState: state.world.jobs,
+    });
     const quests = {
       crystal: {
         title: state.quests.crystal.title,
@@ -7542,6 +7654,7 @@ const canvas = document.getElementById("game");
       workbench_open: workbenchOpen,
       workbench_selection: workbenchSelection,
       workbench_actions: getWorkbenchActions(),
+      workbench_action_catalog: getWorkbenchActionCatalog(),
       save: {
         has_save: hasSaveData,
         last_saved_at: lastSaveAt,
@@ -7605,6 +7718,11 @@ const canvas = document.getElementById("game");
       },
       inventory: state.inventory,
       loot: state.world.loot,
+      job_board: {
+        state: normalizeJobBoardState(state.world.jobs),
+        active_job: activeJob,
+        listings: jobListings,
+      },
       exploration_renown: explorationRenown,
       run_summary: runSummary,
       region_visual_identity: {

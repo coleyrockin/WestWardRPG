@@ -146,10 +146,12 @@ describe("saveMigration", () => {
     expect(out?.progression?.equipment?.armorSlots?.feet).toBe("trail_boots");
   });
 
-  it("backfills loot, workstation, and npc memory on v3 saves", () => {
+  it("backfills loot, job board, workstation, and npc memory on v3 saves", () => {
     const save = { version: 3, savedAt: 99, house: { unlocked: true }, world: {}, narrative: {} };
     const out = migrateSaveToV3(save);
     expect(out?.world?.loot?.recentDrops).toEqual([]);
+    expect(out?.world?.jobs?.activeJobId).toBeNull();
+    expect(out?.world?.jobs?.completedJobIds).toEqual([]);
     expect(out?.house?.workstation?.craftsCompleted).toBe(0);
     expect(out?.house?.workstation?.stationProjects).toEqual([]);
     expect(out?.narrative?.npcMemory?.recentEvents).toEqual([]);

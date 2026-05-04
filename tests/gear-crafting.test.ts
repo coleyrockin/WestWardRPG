@@ -3,12 +3,14 @@ import { createInitialCharacterIdentity, normalizeCharacterIdentity } from "../s
 import {
   ARMOR_PIECES,
   DEFAULT_ARMOR_SLOTS,
+  WEAPON_BRANCHES,
   WEAPON_FAMILIES,
   buildGearInventorySummary,
   buildGearSummary,
   normalizeGearState,
   resolveArmorSlotEffects,
   resolveCraftingEconomy,
+  resolveWeaponBranchState,
   resolveWeaponFamilyEffects,
 } from "../src/gearCrafting.js";
 
@@ -81,6 +83,22 @@ describe("gearCrafting", () => {
     expect(summary.armorLine).toContain("Iron Duster");
     expect(summary.armorWeight).toBeGreaterThan(0);
     expect(summary.economyLine).toContain("yield");
+  });
+
+  it("applies unlocked weapon-family branch effects", () => {
+    const base = normalizeGearState({ weaponFamily: "hammer" });
+    const branched = normalizeGearState({ weaponFamily: "hammer", weaponBranches: { hammer: true } });
+    const identity = createInitialCharacterIdentity("ash_salvager");
+
+    const branch = resolveWeaponBranchState(branched);
+    const baseEffects = resolveWeaponFamilyEffects(base, identity);
+    const branchedEffects = resolveWeaponFamilyEffects(branched, identity);
+    const summary = buildGearSummary(branched, identity);
+
+    expect(WEAPON_BRANCHES.hammer.label).toBe("Breaker");
+    expect(branch.unlocked).toBe(true);
+    expect(branchedEffects.staggerBonus).toBeGreaterThan(baseEffects.staggerBonus);
+    expect(summary.branchLine).toContain("Breaker unlocked");
   });
 
   it("builds a readable owned gear inventory summary", () => {
