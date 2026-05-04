@@ -4,6 +4,7 @@ import {
   claimJobReward,
   createInitialJobBoardState,
   getActiveJobSummary,
+  getJobBoardProp,
   getJobBoardChoices,
   getJobListings,
   normalizeJobBoardState,
@@ -42,12 +43,13 @@ describe("jobBoard", () => {
     expect(frontierListings.find((job) => job.id === "frontier_slime_bounty")?.reward.gold).toBe(38);
     expect(ashfallListings.map((job) => job.id)).toContain("ashfall_scrap_warrant");
     expect(frontierListings.map((job) => job.id)).toContain("frontier_road_salvage");
+    expect(frontierListings.map((job) => job.id)).toContain("frontier_courier_orders");
 
     state.completedJobIds.push("frontier_slime_bounty");
     expect(getJobListings({ regionId: "frontier", playerLevel: 1, jobState: state }).map((job) => job.id)).not.toContain("frontier_slime_bounty");
   });
 
-  it("builds selectable Warden board choices with reward and threat previews", () => {
+  it("builds selectable Boone board choices with reward and threat previews", () => {
     const state = createInitialJobBoardState();
 
     const choices = getJobBoardChoices({
@@ -57,8 +59,8 @@ describe("jobBoard", () => {
       npcId: "warden",
     });
 
-    expect(choices).toHaveLength(2);
-    expect(choices.map((job) => job.id)).toEqual(["frontier_slime_bounty", "frontier_road_salvage"]);
+    expect(choices).toHaveLength(3);
+    expect(choices.map((job) => job.id)).toEqual(["frontier_slime_bounty", "frontier_road_salvage", "frontier_courier_orders"]);
     expect(choices[0]).toMatchObject({
       boardState: "available",
       selectable: true,
@@ -122,6 +124,57 @@ describe("jobBoard", () => {
     expect(second.completed).toBe(true);
     expect(getActiveJobSummary(state)?.progressLine).toBe("2/2 road salvage recovered");
     expect(getActiveJobSummary(state)?.status).toBe("ready");
+  });
+
+  it("runs courier jobs through pickup, delivery, and return route markers", () => {
+    const state = createInitialJobBoardState();
+    acceptJob(state, "frontier_courier_orders");
+
+    const pickupMarker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 10, y: 8 },
+      resources: [],
+      enemies: [],
+      npcs: [{ id: "elder", x: 9, y: 8 }],
+    });
+
+    expect(pickupMarker).toMatchObject({
+      kind: "job_pickup",
+      jobId: "frontier_courier_orders",
+      label: "Pick up Sealed Orders",
+      regionId: "frontier",
+    });
+    expect(getActiveJobSummary(state)?.progressLine).toBe("Pick up Sealed Orders");
+
+    const pickedUp = recordJobEvent(state, { type: "pickup", targetId: "frontier_orders_cache" });
+    const wrongDelivery = recordJobEvent(state, { type: "deliver", npcId: "merchant" });
+
+    expect(pickedUp.ok).toBe(true);
+    expect(pickedUp.progress?.count).toBe(1);
+    expect(wrongDelivery.ok).toBe(false);
+    expect(getActiveJobSummary(state)?.progressLine).toBe("Deliver to Elder Nira");
+
+    const deliveryMarker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 10, y: 8 },
+      resources: [],
+      enemies: [],
+      npcs: [{ id: "elder", x: 9, y: 8 }],
+    });
+
+    expect(deliveryMarker).toMatchObject({
+      kind: "job_delivery",
+      label: "Deliver to Elder Nira",
+      x: 9,
+      y: 8,
+      distanceLine: "1m",
+    });
+
+    const delivered = recordJobEvent(state, { type: "deliver", npcId: "elder" });
+
+    expect(delivered.completed).toBe(true);
+    expect(getActiveJobSummary(state)?.status).toBe("ready");
+    expect(getActiveJobSummary(state)?.progressLine).toBe("Return to Marshal Boone");
   });
 
   it("claims rewards once and moves the job to completed history", () => {
@@ -204,6 +257,21 @@ describe("jobBoard", () => {
       label: "Return to Marshal Boone",
       x: 10,
       y: 10,
+      action: "turn_in",
+    });
+  });
+
+  it("exposes a deterministic in-world job-board prop near Boone", () => {
+    const board = getJobBoardProp({ regionId: "frontier" });
+
+    expect(board).toMatchObject({
+      id: "frontier_job_board",
+      kind: "job_board",
+      label: "Boone's Job Board",
+      npcId: "warden",
+      regionId: "frontier",
+      x: 12.35,
+      y: 8.55,
     });
   });
 });

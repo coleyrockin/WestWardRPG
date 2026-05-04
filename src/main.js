@@ -109,6 +109,7 @@ import {
   claimJobReward,
   createInitialJobBoardState,
   getActiveJobSummary,
+  getJobBoardProp,
   getJobBoardChoices,
   getJobListings,
   normalizeJobBoardState,
@@ -3070,7 +3071,29 @@ const canvas = document.getElementById("game");
     return result;
   }
 
-  function getWardenJobChoices() {
+  function recordPickupForJobs(targetId) {
+    state.world.jobs = normalizeJobBoardState(state.world.jobs);
+    const result = recordJobEvent(state.world.jobs, {
+      type: "pickup",
+      targetId,
+      regionId: state.regions.activeRegion,
+    });
+    if (result.ok && result.message) logMsg(result.message);
+    return result;
+  }
+
+  function recordDeliveryForJobs(npcId) {
+    state.world.jobs = normalizeJobBoardState(state.world.jobs);
+    const result = recordJobEvent(state.world.jobs, {
+      type: "deliver",
+      npcId,
+      regionId: state.regions.activeRegion,
+    });
+    if (result.ok && result.message) logMsg(result.message);
+    return result;
+  }
+
+  function getBooneJobChoices() {
     return getJobBoardChoices({
       regionId: state.regions.activeRegion,
       playerLevel: state.player.level,
@@ -3091,8 +3114,13 @@ const canvas = document.getElementById("game");
     });
   }
 
+  function getActiveJobBoardProp() {
+    if (state.player.inHouse) return null;
+    return getJobBoardProp({ regionId: state.regions.activeRegion });
+  }
+
   function openJobBoard() {
-    const choices = getWardenJobChoices();
+    const choices = getBooneJobChoices();
     if (choices.length === 0) return false;
     jobBoardOpen = true;
     jobBoardSelection = 0;
@@ -3108,7 +3136,7 @@ const canvas = document.getElementById("game");
   }
 
   function confirmJobBoardChoice() {
-    const choices = getWardenJobChoices();
+    const choices = getBooneJobChoices();
     if (choices.length === 0) {
       jobBoardOpen = false;
       return;
@@ -3142,7 +3170,7 @@ const canvas = document.getElementById("game");
     jobBoardOpen = false;
   }
 
-  function handleWardenJobBoard() {
+  function handleBooneJobBoard() {
     state.world.jobs = normalizeJobBoardState(state.world.jobs);
     return openJobBoard();
   }
@@ -3422,6 +3450,22 @@ const canvas = document.getElementById("game");
       return;
     }
 
+    const boardProp = getActiveJobBoardProp();
+    if (boardProp && dist(state.player, boardProp) < 1.85) {
+      openJobBoard();
+      return;
+    }
+
+    const jobMarker = getJobRouteMarker();
+    if (jobMarker?.kind === "job_pickup" && dist(state.player, jobMarker) < 1.55) {
+      const pickedUp = recordPickupForJobs(jobMarker.targetId);
+      if (pickedUp.ok) {
+        sfx.pickup();
+        spawnParticles(canvas.width / 2, canvas.height * 0.5, 12, "#9bd3ff", 3, 0.6, { decorative: false });
+        return;
+      }
+    }
+
     const pig = nearestEntity(state.pigs, () => true, 1.7);
     if (pig) {
       if (Math.random() < 0.2) {
@@ -3440,6 +3484,11 @@ const canvas = document.getElementById("game");
     const npc = nearestEntity(state.npcs, () => true, 1.95);
     if (npc) {
       recordNpcInteraction(npc.id);
+      const delivered = recordDeliveryForJobs(npc.id);
+      if (delivered.ok) {
+        sfx.questDone();
+        return;
+      }
       if (npc.id === "elder") {
         if (turnInQuestWithOutcome("ashfall_intro", {
           afterTurnIn() {
@@ -3557,7 +3606,7 @@ const canvas = document.getElementById("game");
           }
           return;
         }
-        if (handleWardenJobBoard()) return;
+        if (handleBooneJobBoard()) return;
         logMsg(storyReactiveQuip("warden") || choice(npcDialogue.warden.idle));
         if (Math.random() < 0.35) describeNpcBackground("warden");
         sfx.npcChat();
@@ -5652,6 +5701,23 @@ const canvas = document.getElementById("game");
       ctx.fill();
       ctx.fillStyle = "rgba(32, 22, 10, 0.45)";
       ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.32, spriteWidth * 0.08, spriteHeight * 0.18);
+    } else if (sprite.kind === "job-board") {
+      const color = sprite.color || "#d8a84f";
+      ctx.fillStyle = "#5b402b";
+      ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.34, spriteWidth * 0.07, spriteHeight * 0.56);
+      ctx.fillStyle = shadeHex(color, 0.74);
+      ctx.fillRect(spriteWidth * 0.16, spriteHeight * 0.22, spriteWidth * 0.68, spriteHeight * 0.34);
+      ctx.strokeStyle = "rgba(31, 22, 12, 0.55)";
+      ctx.lineWidth = Math.max(1, spriteWidth * 0.03);
+      ctx.strokeRect(spriteWidth * 0.16, spriteHeight * 0.22, spriteWidth * 0.68, spriteHeight * 0.34);
+      ctx.fillStyle = color;
+      ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.29, spriteWidth * 0.56, spriteHeight * 0.06);
+      ctx.fillStyle = "rgba(255, 245, 200, 0.38)";
+      ctx.fillRect(spriteWidth * 0.26, spriteHeight * 0.41, spriteWidth * 0.48, spriteHeight * 0.04);
+      ctx.fillStyle = "rgba(255, 215, 123, 0.18)";
+      ctx.beginPath();
+      ctx.arc(spriteWidth * 0.5, spriteHeight * 0.4, spriteWidth * 0.42, 0, TAU);
+      ctx.fill();
     } else if (sprite.kind === "house-door") {
       ctx.fillStyle = state.house.unlocked ? "#7f694a" : "#5f4f3a";
       ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.22, spriteWidth * 0.4, spriteHeight * 0.72);
@@ -5971,6 +6037,15 @@ const canvas = document.getElementById("game");
           size: prop.size || 0.58,
         });
       }
+      const boardProp = getActiveJobBoardProp();
+      if (boardProp) {
+        sprites.push({
+          ...boardProp,
+          kind: "job-board",
+          label: boardProp.label,
+          size: 0.86,
+        });
+      }
 
       const pressure = resolveFirstMinutePressure({
         mode: state.mode,
@@ -6162,7 +6237,8 @@ const canvas = document.getElementById("game");
         || sprite.kind === "chest"
         || sprite.kind === "house-door"
         || sprite.kind === "pressure"
-        || sprite.kind === "job-route";
+        || sprite.kind === "job-route"
+        || sprite.kind === "job-board";
       if (state.mode === "playing" && sprite.label && centeredLabel && sprite.distToPlayer < 5.8 && labelImportant) {
         ctx.font = "bold 11px Georgia";
         drawPillLabel(fitText(sprite.label, 116), left + spriteWidth / 2, top - 10);
@@ -6489,6 +6565,10 @@ const canvas = document.getElementById("game");
       }
       drawDot(state.house.outsideDoor.x, state.house.outsideDoor.y,
         state.house.unlocked ? "#d8bc6a" : "#9b7b56", 3.5);
+      const boardProp = getActiveJobBoardProp();
+      if (boardProp) {
+        drawDot(boardProp.x, boardProp.y, boardProp.color || "#d8a84f", 3.4);
+      }
       const presentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
       drawDot(presentation.landmark.x, presentation.landmark.y, presentation.landmark.color || "#ffd77b", 3.2);
       for (const prop of presentation.props) {
@@ -6749,8 +6829,8 @@ const canvas = document.getElementById("game");
       ? {
         title: activeJob.status === "ready" ? "Job ready" : "Job route",
         line: activeJob.status === "ready"
-          ? `Return to ${activeJob.npcName} for ${activeJob.rewardLine}${jobMarker ? ` (${jobMarker.distance}m)` : ""}`
-          : `${activeJob.title}: ${activeJob.progressLine}${jobMarker ? ` (${jobMarker.distance}m)` : ""}`,
+          ? `Return to ${activeJob.npcName} for ${activeJob.rewardLine}${jobMarker?.distanceLine ? ` (${jobMarker.distanceLine})` : ""}`
+          : `${activeJob.title}: ${activeJob.progressLine}${jobMarker?.distanceLine ? ` (${jobMarker.distanceLine})` : ""}`,
         urgency: activeJob.status === "ready" ? "high" : "medium",
       }
       : null;
@@ -7125,7 +7205,7 @@ const canvas = document.getElementById("game");
 
     /* Job board overlay */
     if (jobBoardOpen && state.mode === "playing") {
-      const choices = getWardenJobChoices();
+      const choices = getBooneJobChoices();
       if (jobBoardSelection >= choices.length) jobBoardSelection = Math.max(0, choices.length - 1);
       const sw = Math.min(540, canvas.width - margin * 2);
       const rows = Math.max(1, Math.min(3, choices.length || 1));
@@ -7307,7 +7387,7 @@ const canvas = document.getElementById("game");
 
     /* Job board controls */
     if (jobBoardOpen) {
-      const choices = getWardenJobChoices();
+      const choices = getBooneJobChoices();
       const len = choices.length || 1;
       if (event.code === "ArrowUp" || event.code === "KeyW") {
         jobBoardSelection = (jobBoardSelection - 1 + len) % len;
@@ -7794,6 +7874,7 @@ const canvas = document.getElementById("game");
       jobState: state.world.jobs,
     });
     const jobRouteMarker = getJobRouteMarker();
+    const boardProp = getActiveJobBoardProp();
     const quests = {
       crystal: {
         title: state.quests.crystal.title,
@@ -7839,7 +7920,7 @@ const canvas = document.getElementById("game");
       workbench_action_catalog: getWorkbenchActionCatalog(),
       job_board_open: jobBoardOpen,
       job_board_selection: jobBoardSelection,
-      job_board_choices: getWardenJobChoices(),
+      job_board_choices: getBooneJobChoices(),
       save: {
         has_save: hasSaveData,
         last_saved_at: lastSaveAt,
@@ -7908,6 +7989,12 @@ const canvas = document.getElementById("game");
         active_job: activeJob,
         listings: jobListings,
         route_marker: jobRouteMarker,
+        prop: boardProp
+          ? {
+            ...boardProp,
+            distance: state.player.inHouse ? null : Number(dist(state.player, boardProp).toFixed(2)),
+          }
+          : null,
       },
       exploration_renown: explorationRenown,
       run_summary: runSummary,

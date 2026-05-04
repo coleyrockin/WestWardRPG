@@ -10,7 +10,7 @@
 Story-first open-world frontier RPG built on a custom Canvas raycasting stack.
 No engine. No framework lock-in. Just readable systems code, deterministic helpers, and a growing RPG loop.
 
-The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction: origins, attributes, regional identity, gear, armor, loot, workbench upgrades, housing utility, deterministic NPC memory, combat payoff, and first-pass visual open-world pressure.
+The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction: origins, attributes, regional identity, gear, armor, loot, workbench upgrades, housing utility, Boone's job board, deterministic NPC memory, combat payoff, and first-pass visual open-world pressure.
 
 ## Preview
 
@@ -51,10 +51,11 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - **Character identity**: title-screen origin selection, Might/Grit/Cunning/Craft/Speech/Lore, character sheet, role summary, and attribute hooks for pricing/gear/crafting.
 - **Gear loop foundation**: weapon families, armor slots, deterministic loot tables, POI/mini-boss gear finds, earned gear visibility, and crafting-relevant resources.
 - **Housing/workbench**: save-safe house workstation state, workbench levels, Workbench II potion/refine benefits, Workbench III map-table project, and selectable workbench actions.
+- **Jobs/economy foundation**: Marshal Boone offers deterministic bounty, salvage, and courier work through an in-world job board with route markers, minimap/HUD/debug visibility, progress tracking, and reward payout.
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, and early Phase A open-world pressure/dressing work.
 
-Latest local fast gate: `npm test` reports **296 passing tests across 32 files**. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **323 passing tests across 33 files**. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
@@ -62,7 +63,7 @@ The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the
 
 1. **Phase A: Visual open-world feel + first-minute pressure** — landmarks, roads, props, readable enemy intent, HUD clarity, nearby early reward/threat.
 2. **Phase B: Narrative payoff + visible consequence** — quest outcome smoke, companion barks, NPC/town reactions, visible service changes.
-3. **Phase C: RPG loops** — deeper gear choices, crafting stations, housing utility, economy/jobs/bounties.
+3. **Phase C: RPG loops** — deeper gear choices, crafting stations, housing utility, economy jobs, bounties, and route-marker polish.
 4. **Phase D: NPC life + local conversation** — handcrafted memory-aware dialogue first; optional LLM boundary later with offline fallback.
 5. **Phase E: Playtest readiness** — pause/save slots/recovery, replay hooks, local metrics, and distribution packaging.
 
@@ -144,6 +145,7 @@ WestWardRPG/
 │   ├── gearCrafting.js      # weapon families, armor, crafting economy hooks
 │   ├── craftingStation.js   # house/workbench action resolution
 │   ├── lootSystem.js        # deterministic loot tables and application
+│   ├── jobBoard.js          # deterministic Boone jobs, route markers, rewards
 │   ├── npcMemory.js         # deterministic NPC memory and reactive lines
 │   ├── runSummary.js        # kill/resource/victory summary helpers
 │   ├── progressionSystem.js # skill branches, weapon tiers, armor mods, traits
@@ -186,7 +188,7 @@ Saves live in `localStorage` under the `westward-save-v3` key. Legacy keys (`wes
 | ------- | ------------------------------------------------------------------------ |
 | `1`     | Original flagship payload (player, inventory, quests, house, world).     |
 | `2`     | Narrative state (chapters, axes, decisions, NPC reactions).              |
-| `3`     | Progression, regions, graphics, quick utility, four expansion quests.    |
+| `3`     | Progression, regions, graphics, quick utility, expansion quests, gear, workstations, jobs, and NPC memory backfills. |
 
 `migrateSaveToV3` upgrades v1/v2 payloads on load — old saves remain playable. Unknown or malformed payloads currently fall back to a fresh world; the roadmap tracks future corruption-recovery UI, backup rotation, and export/import work.
 

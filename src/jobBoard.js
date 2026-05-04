@@ -49,6 +49,31 @@ export const JOB_DEFINITIONS = {
       items: { Ashglass: 1 },
     },
   },
+  frontier_courier_orders: {
+    id: "frontier_courier_orders",
+    title: "Sealed Orders Run",
+    kind: "courier",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 30,
+    hint: "Pick up sealed orders near Boone's board and deliver them to Elder Nira.",
+    objective: {
+      type: "delivery",
+      count: 2,
+      label: "sealed orders delivered",
+      pickup: { id: "frontier_orders_cache", label: "Sealed Orders", x: 12.85, y: 8.25 },
+      deliveryNpcId: "elder",
+      deliveryLabel: "Elder Nira",
+    },
+    reward: {
+      gold: 30,
+      xp: 16,
+      items: { Potion: 1 },
+    },
+  },
   ashfall_scrap_warrant: {
     id: "ashfall_scrap_warrant",
     title: "Scrap Warrant",
@@ -98,6 +123,24 @@ export const JOB_DEFINITIONS = {
     },
   },
 };
+
+const JOB_BOARD_PROPS = {
+  frontier: {
+    id: "frontier_job_board",
+    kind: "job_board",
+    label: "Boone's Job Board",
+    npcId: "warden",
+    regionId: "frontier",
+    x: 12.35,
+    y: 8.55,
+    color: "#d8a84f",
+  },
+};
+
+export function getJobBoardProp({ regionId = "frontier" } = {}) {
+  const prop = JOB_BOARD_PROPS[regionId] || JOB_BOARD_PROPS.frontier;
+  return { ...prop };
+}
 
 function knownJob(jobId) {
   return JOB_DEFINITIONS[jobId] || null;
@@ -180,6 +223,17 @@ function syncJobState(jobState) {
   return jobState;
 }
 
+function buildProgressLine(job, progress = null) {
+  const objective = job.objective || {};
+  const count = progress?.count || 0;
+  if (objective.type === "delivery") {
+    if (progress?.status === "ready" || count >= objective.count) return `Return to ${job.npcName}`;
+    if (count <= 0) return `Pick up ${objective.pickup?.label || "orders"}`;
+    return `Deliver to ${objective.deliveryLabel || "the destination"}`;
+  }
+  return `${count}/${objective.count} ${objective.label}`;
+}
+
 function decorateJob(job, progress = null) {
   const reward = cloneReward(job.reward);
   return {
@@ -188,7 +242,7 @@ function decorateJob(job, progress = null) {
     reward,
     status: progress?.status || "available",
     progress: progress ? { ...progress } : { status: "available", count: 0, rewardClaimed: false },
-    progressLine: `${progress?.count || 0}/${job.objective.count} ${job.objective.label}`,
+    progressLine: buildProgressLine(job, progress),
     rewardLine: `+${reward.gold}g, +${reward.xp} XP${Object.entries(reward.items).map(([name, count]) => `, +${count} ${name}`).join("")}`,
   };
 }
@@ -260,6 +314,28 @@ function matchesObjective(objective, event = {}) {
   return true;
 }
 
+function recordDeliveryEvent(job, progress, event = {}) {
+  const objective = job.objective || {};
+  if (event.type === "pickup" && progress.count === 0 && event.targetId === objective.pickup?.id) {
+    progress.count = 1;
+    return {
+      ok: true,
+      completed: false,
+      message: `Job progress: ${job.title} picked up. Deliver to ${objective.deliveryLabel}.`,
+    };
+  }
+  if (event.type === "deliver" && progress.count >= 1 && event.npcId === objective.deliveryNpcId) {
+    progress.count = objective.count;
+    progress.status = "ready";
+    return {
+      ok: true,
+      completed: true,
+      message: `Job ready: ${job.title}. Return to ${job.npcName}.`,
+    };
+  }
+  return { ok: false, completed: false };
+}
+
 export function recordJobEvent(jobState, event = {}) {
   const state = syncJobState(jobState);
   const job = knownJob(state.activeJobId);
@@ -268,6 +344,15 @@ export function recordJobEvent(jobState, event = {}) {
   state.progressByJobId[job.id] = progress;
   if (progress.status !== "active") {
     return { ok: false, completed: progress.status === "ready", job: decorateJob(job, progress), progress, jobState: state };
+  }
+  if (job.objective?.type === "delivery") {
+    const delivery = recordDeliveryEvent(job, progress, event);
+    return {
+      ...delivery,
+      job: decorateJob(job, progress),
+      progress,
+      jobState: state,
+    };
   }
   if (!matchesObjective(job.objective, event)) {
     return { ok: false, completed: false, job: decorateJob(job, progress), progress, jobState: state };
@@ -338,6 +423,17 @@ function nearestMatching(list, player, predicate) {
   return best ? { target: best, distance: Number(bestDistance.toFixed(2)) } : null;
 }
 
+function markerDistanceLine(distance) {
+  if (!Number.isFinite(distance)) return "";
+  return `${Math.max(1, Math.round(distance))}m`;
+}
+
+function staticTarget(target, player) {
+  if (!target || typeof target.x !== "number" || typeof target.y !== "number") return null;
+  const distance = Number(distanceFrom(player, target).toFixed(2));
+  return { target, distance };
+}
+
 export function resolveJobRouteMarker({ jobState, player = {}, resources = [], enemies = [], npcs = [] } = {}) {
   const activeJob = getActiveJobSummary(jobState);
   if (!activeJob) return null;
@@ -356,6 +452,48 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       y: npc.target.y,
       color: "#5fe0b5",
       distance: npc.distance,
+      distanceLine: markerDistanceLine(npc.distance),
+      regionId: activeJob.regionId,
+      action: "turn_in",
+    };
+  }
+
+  if (objective.type === "delivery") {
+    if ((activeJob.progress?.count || 0) <= 0) {
+      const pickup = staticTarget(objective.pickup, player);
+      if (!pickup) return null;
+      return {
+        kind: "job_pickup",
+        jobId: activeJob.id,
+        title: "Courier pickup",
+        label: `Pick up ${objective.pickup?.label || "orders"}`,
+        line: `${activeJob.regionId}: ${activeJob.progressLine}`,
+        x: pickup.target.x,
+        y: pickup.target.y,
+        color: "#9bd3ff",
+        distance: pickup.distance,
+        distanceLine: markerDistanceLine(pickup.distance),
+        regionId: activeJob.regionId,
+        action: "pickup",
+        targetId: objective.pickup?.id,
+      };
+    }
+    const npc = nearestMatching(npcs, player, (entry) => entry.id === objective.deliveryNpcId);
+    if (!npc) return null;
+    return {
+      kind: "job_delivery",
+      jobId: activeJob.id,
+      title: "Courier delivery",
+      label: `Deliver to ${objective.deliveryLabel || "destination"}`,
+      line: `${activeJob.regionId}: ${activeJob.progressLine}`,
+      x: npc.target.x,
+      y: npc.target.y,
+      color: "#9bd3ff",
+      distance: npc.distance,
+      distanceLine: markerDistanceLine(npc.distance),
+      regionId: activeJob.regionId,
+      action: "deliver",
+      npcId: objective.deliveryNpcId,
     };
   }
 
@@ -376,6 +514,9 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       y: resource.target.y,
       color: "#ffd77b",
       distance: resource.distance,
+      distanceLine: markerDistanceLine(resource.distance),
+      regionId: activeJob.regionId,
+      action: "collect",
     };
   }
 
@@ -396,6 +537,9 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       y: enemy.target.y,
       color: "#ffb46d",
       distance: enemy.distance,
+      distanceLine: markerDistanceLine(enemy.distance),
+      regionId: activeJob.regionId,
+      action: "hunt",
     };
   }
 
