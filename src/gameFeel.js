@@ -136,6 +136,18 @@ function distanceLine(player = {}, marker = {}) {
   return `${Math.max(1, Math.round(distance))}m`;
 }
 
+function markerActionLine(marker = {}) {
+  if (!marker) return "";
+  const action = marker.action === "checkpoint" ? "Reach"
+    : marker.action === "pickup" ? "Pick up"
+      : marker.action === "dropoff" || marker.action === "deliver" ? "Deliver"
+        : marker.returnTarget ? "Return"
+          : "Follow";
+  const distance = marker.distanceLine ? ` • ${marker.distanceLine}` : "";
+  const count = marker.checkpointIndex && marker.checkpointTotal ? ` • ${marker.checkpointIndex}/${marker.checkpointTotal}` : "";
+  return `${action}: ${marker.label || "route marker"}${distance}${count}`;
+}
+
 export function resolveFirstMinutePressure(input = {}) {
   if (input.mode !== "playing" || input.inHouse) return null;
   const time = Math.max(0, input.time || 0);
@@ -172,6 +184,70 @@ export function resolveFirstMinutePressure(input = {}) {
     threatHint: config.threatHint,
     urgency: time < 18 ? "soft" : time < 55 ? "high" : "urgent",
     marker,
+  };
+}
+
+export function resolveOpeningRouteGuide(input = {}) {
+  if (input.mode !== "playing" || input.inHouse) return null;
+  const time = Math.max(0, input.time || 0);
+  if (time > 600 || hasOpeningProgress(input)) return null;
+
+  const pressure = input.pressure || resolveFirstMinutePressure(input);
+  const activeJob = input.activeJob || null;
+  const jobMarker = input.jobMarker || null;
+  const boardProp = input.boardProp || null;
+  const regionHint = input.regionLabel || input.regionId || "";
+  const steps = [];
+
+  if (pressure) {
+    steps.push({
+      kind: "cache",
+      line: pressure.objectiveLine,
+    });
+  }
+
+  if (activeJob && jobMarker) {
+    const markerLine = markerActionLine(jobMarker);
+    steps.push({
+      kind: "job",
+      line: `${activeJob.title}: ${markerLine}${activeJob.rewardLine ? ` • ${activeJob.rewardLine}` : ""}`,
+    });
+  } else if (boardProp) {
+    const boardDistance = distanceLine(input.player, boardProp);
+    steps.push({
+      kind: "board",
+      line: `${boardProp.label || "Boone Job Board"}${boardDistance ? ` • ${boardDistance}` : ""}`,
+    });
+  }
+
+  const threatLine = pressure?.threatHint || "Expect a visible patrol before the route pays out.";
+  if (threatLine) {
+    steps.push({
+      kind: "threat",
+      line: `Threat: ${threatLine}`,
+    });
+  }
+
+  if (steps.length === 0) return null;
+
+  const primaryLine = activeJob && jobMarker
+    ? steps.find((step) => step.kind === "job")?.line
+    : pressure?.objectiveLine || steps[0].line;
+  const secondaryParts = steps
+    .filter((step) => step.line !== primaryLine)
+    .slice(0, 2)
+    .map((step) => step.line);
+
+  return {
+    id: "opening-route-guide",
+    title: "Opening route",
+    line: primaryLine,
+    objectiveLine: primaryLine,
+    secondaryLine: secondaryParts.join("  |  "),
+    urgency: pressure?.urgency === "urgent" ? "urgent" : "high",
+    stepCount: steps.length,
+    steps,
+    regionHint,
   };
 }
 

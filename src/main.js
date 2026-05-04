@@ -137,6 +137,7 @@ import {
   resolveFirstMinutePressure,
   resolveHitFeedback,
   resolveOpeningObjective,
+  resolveOpeningRouteGuide,
 } from "./gameFeel.js";
 import {
   buildRegionIdentityLine,
@@ -194,6 +195,7 @@ import {
   createGradientCache,
   createRenderHelpers,
   resolveNearWallVisualTreatment,
+  resolveObjectiveStripLayout,
   resolveWallProjection,
 } from "./render.js";
 import {
@@ -7038,6 +7040,7 @@ const canvas = document.getElementById("game");
       ? resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 32 })
       : null;
     const jobMarker = getJobRouteMarker();
+    const boardProp = getActiveJobBoardProp();
     const jobObjective = activeJob
       ? {
         title: activeJob.status === "ready" ? "Job ready" : (activeJob.status === "failed" ? "Job failed" : "Job route"),
@@ -7049,16 +7052,39 @@ const canvas = document.getElementById("game");
         urgency: activeJob.status === "ready" || activeJob.status === "failed" ? "high" : "medium",
       }
       : null;
-    const liveObjective = firstPressure || jobObjective || openingObjective || explorationLead;
+    const openingRouteGuide = resolveOpeningRouteGuide({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      regionId: state.regions.activeRegion,
+      regionLabel: regionProfile.label,
+      player: state.player,
+      inventory: state.inventory,
+      quests: state.quests,
+      pressure: firstPressure,
+      activeJob,
+      jobMarker,
+      boardProp,
+    });
+    const liveObjective = openingRouteGuide || firstPressure || jobObjective || openingObjective || explorationLead;
     const liveObjectiveLine = liveObjective?.objectiveLine || liveObjective?.line;
     if (liveObjective && msgY <= topY + topH - 10) {
       ctx.font = "bold 11px Georgia";
       drawClippedText(`→ ${liveObjectiveLine}`, topX + 10, msgY, topW - 20, liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "#ffd77b" : "#f3e8cf");
     }
     if (liveObjective) {
-      const stripY = topY + topH + 8;
-      const stripH = 28;
-      drawSoftPanel(topX, stripY, topW, stripH, {
+      const strip = resolveObjectiveStripLayout({
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height,
+        margin,
+        topX,
+        topY,
+        topW,
+        topH,
+        bottomHudY: hudY,
+        hasSecondaryLine: Boolean(liveObjective.secondaryLine),
+      });
+      drawSoftPanel(strip.x, strip.y, strip.w, strip.h, {
         top: liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "rgba(70, 44, 17, 0.82)" : "rgba(25, 32, 25, 0.76)",
         bottom: liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "rgba(30, 19, 9, 0.78)" : "rgba(9, 15, 11, 0.7)",
         border: "rgba(255, 215, 123, 0.45)",
@@ -7066,7 +7092,11 @@ const canvas = document.getElementById("game");
         shadowOffsetY: 3,
       });
       ctx.font = "bold 11px Georgia";
-      drawClippedText(`${liveObjective.title}: ${liveObjectiveLine}`, topX + 10, stripY + 18, topW - 20, "#ffd77b");
+      drawClippedText(`${liveObjective.title}: ${liveObjectiveLine}`, strip.x + 10, strip.primaryY, strip.w - 20, "#ffd77b");
+      if (liveObjective.secondaryLine && strip.secondaryY) {
+        ctx.font = "10px Georgia";
+        drawClippedText(liveObjective.secondaryLine, strip.x + 10, strip.secondaryY, strip.w - 20, "#f1e5c8");
+      }
     }
 
     if (state.mode === "gameover") {
@@ -8098,6 +8128,20 @@ const canvas = document.getElementById("game");
     });
     const jobRouteMarker = getJobRouteMarker();
     const boardProp = getActiveJobBoardProp();
+    const openingRouteGuide = resolveOpeningRouteGuide({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      regionId: state.regions.activeRegion,
+      regionLabel: regionProfile.label,
+      player: state.player,
+      inventory: state.inventory,
+      quests: state.quests,
+      pressure: firstMinutePressure,
+      activeJob,
+      jobMarker: jobRouteMarker,
+      boardProp,
+    });
     const quests = {
       crystal: {
         title: state.quests.crystal.title,
@@ -8150,6 +8194,7 @@ const canvas = document.getElementById("game");
       },
       gameplay_feel: {
         opening_objective: openingObjective,
+        opening_route_guide: openingRouteGuide,
         first_minute_pressure: firstMinutePressure,
         first_reward_cache: firstMinuteCache
           ? {

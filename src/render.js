@@ -83,6 +83,30 @@ export function resolveNearWallVisualTreatment(options = {}) {
   };
 }
 
+export function resolveObjectiveStripLayout(options = {}) {
+  const margin = Math.max(0, options.margin || 0);
+  const topX = Math.max(margin, options.topX || margin);
+  const topY = Math.max(margin, options.topY || margin);
+  const topW = Math.max(180, options.topW || 320);
+  const topH = Math.max(24, options.topH || 72);
+  const hasSecondaryLine = Boolean(options.hasSecondaryLine);
+  const h = hasSecondaryLine ? 44 : 28;
+  const preferredY = topY + topH + 8;
+  const canvasHeight = Math.max(1, options.canvasHeight || 1);
+  const bottomHudY = Number.isFinite(options.bottomHudY) ? options.bottomHudY : canvasHeight - margin;
+  const maxY = Math.max(preferredY, bottomHudY - margin - h);
+  const y = Math.min(preferredY, maxY);
+
+  return {
+    x: topX,
+    y,
+    w: topW,
+    h,
+    primaryY: y + (hasSecondaryLine ? 17 : 18),
+    secondaryY: hasSecondaryLine ? y + 34 : null,
+  };
+}
+
 // Returns ctx-bound drawing helpers. Each helper closes over ctx so it
 // matches the inline-version semantics callers in main.js expect.
 export function createRenderHelpers(ctx) {

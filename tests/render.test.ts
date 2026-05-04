@@ -5,6 +5,7 @@ import {
   createGradientCache,
   createRenderHelpers,
   resolveNearWallVisualTreatment,
+  resolveObjectiveStripLayout,
   resolveWallProjection,
 } from "../src/render.js";
 
@@ -129,6 +130,45 @@ describe("render — resolveNearWallVisualTreatment", () => {
       active: false,
       alpha: 0,
       edgeAlpha: 0,
+    });
+  });
+});
+
+describe("render — resolveObjectiveStripLayout", () => {
+  it("gives two-line opening guidance enough height without crossing the canvas", () => {
+    const layout = resolveObjectiveStripLayout({
+      canvasWidth: 480,
+      canvasHeight: 320,
+      margin: 8,
+      topX: 8,
+      topY: 8,
+      topW: 464,
+      topH: 78,
+      bottomHudY: 218,
+      hasSecondaryLine: true,
+    });
+
+    expect(layout.h).toBeGreaterThan(36);
+    expect(layout.y + layout.h).toBeLessThan(218);
+    expect(layout.primaryY).toBeLessThan(layout.secondaryY);
+  });
+
+  it("keeps single-line objective strips compact", () => {
+    expect(resolveObjectiveStripLayout({
+      canvasWidth: 900,
+      canvasHeight: 640,
+      margin: 12,
+      topX: 12,
+      topY: 12,
+      topW: 600,
+      topH: 92,
+      bottomHudY: 516,
+      hasSecondaryLine: false,
+    })).toMatchObject({
+      x: 12,
+      y: 112,
+      h: 28,
+      primaryY: 130,
     });
   });
 });

@@ -5,6 +5,7 @@ import {
   resolveFirstMinutePressure,
   resolveHitFeedback,
   resolveOpeningObjective,
+  resolveOpeningRouteGuide,
 } from "../src/gameFeel.js";
 
 describe("gameFeel", () => {
@@ -143,5 +144,75 @@ describe("gameFeel", () => {
     expect(reward.items).toMatchObject({ Potion: 1, "Slime Core": 1 });
     expect(resolveFirstMinuteCacheReward({ regionId: "frontier", opened: true }).ok).toBe(false);
     expect(resolveFirstMinuteCacheReward({ regionId: "frontier", claimed: true }).ok).toBe(false);
+  });
+
+  it("builds an opening route guide with cache, board, reward, and threat context", () => {
+    const pressure = resolveFirstMinutePressure({
+      mode: "playing",
+      time: 20,
+      inHouse: false,
+      regionId: "frontier",
+      player: { x: 9.5, y: 8.5 },
+      inventory: { "Slime Core": 0 },
+      quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+    });
+    const guide = resolveOpeningRouteGuide({
+      mode: "playing",
+      time: 20,
+      inHouse: false,
+      regionId: "frontier",
+      player: { x: 9.5, y: 8.5 },
+      inventory: { "Slime Core": 0 },
+      quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+      pressure,
+      boardProp: { label: "Boone Job Board", x: 10.5, y: 8.5 },
+      regionLabel: "Dustward Frontier",
+    });
+
+    expect(guide).toMatchObject({
+      title: "Opening route",
+      urgency: "high",
+      stepCount: 3,
+    });
+    expect(guide?.objectiveLine).toContain("Open cache");
+    expect(guide?.objectiveLine).toContain("+12g");
+    expect(guide?.secondaryLine).toContain("Boone Job Board");
+    expect(guide?.secondaryLine).toContain("Threat");
+    expect(guide?.regionHint).toBe("Dustward Frontier");
+  });
+
+  it("uses active job route markers in the opening route guide", () => {
+    const guide = resolveOpeningRouteGuide({
+      mode: "playing",
+      time: 40,
+      inHouse: false,
+      regionId: "frontier",
+      player: { x: 9.5, y: 8.5 },
+      inventory: { "Slime Core": 0 },
+      quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+      activeJob: { title: "Town Watch Patrol", rewardLine: "+28g, +14 XP", progressLine: "Checkpoint 1/3" },
+      jobMarker: { label: "Checkpoint 1", action: "checkpoint", distanceLine: "18m", regionHint: "Frontier road", checkpointIndex: 1, checkpointTotal: 3 },
+    });
+
+    expect(guide?.objectiveLine).toContain("Town Watch Patrol");
+    expect(guide?.objectiveLine).toContain("Checkpoint 1");
+    expect(guide?.objectiveLine).toContain("18m");
+  });
+
+  it("hides the opening route guide after the first-minute window or early progress", () => {
+    expect(resolveOpeningRouteGuide({
+      mode: "playing",
+      time: 610,
+      inHouse: false,
+      inventory: { "Slime Core": 0 },
+      quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+    })).toBeNull();
+    expect(resolveOpeningRouteGuide({
+      mode: "playing",
+      time: 20,
+      inHouse: false,
+      inventory: { "Slime Core": 1 },
+      quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+    })).toBeNull();
   });
 });
