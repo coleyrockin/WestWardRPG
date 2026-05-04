@@ -117,6 +117,11 @@ import {
   resolveJobRouteMarker,
 } from "./jobBoard.js";
 import {
+  buildEconomySnapshot,
+  getVendorServiceProfile,
+} from "./economyServices.js";
+import { resolveEnemyReadabilityCue } from "./combatReadability.js";
+import {
   createInitialNpcMemoryState,
   normalizeNpcMemoryState,
   recordNpcMemoryEvent,
@@ -3093,13 +3098,35 @@ const canvas = document.getElementById("game");
     return result;
   }
 
+  function recordCheckpointForJobs(targetId) {
+    state.world.jobs = normalizeJobBoardState(state.world.jobs);
+    const result = recordJobEvent(state.world.jobs, {
+      type: "checkpoint",
+      targetId,
+      regionId: state.regions.activeRegion,
+    });
+    if (result.ok && result.message) logMsg(result.message);
+    return result;
+  }
+
+  function recordDropoffForJobs(targetId) {
+    state.world.jobs = normalizeJobBoardState(state.world.jobs);
+    const result = recordJobEvent(state.world.jobs, {
+      type: "dropoff",
+      targetId,
+      regionId: state.regions.activeRegion,
+    });
+    if (result.ok && result.message) logMsg(result.message);
+    return result;
+  }
+
   function getBooneJobChoices() {
     return getJobBoardChoices({
       regionId: state.regions.activeRegion,
       playerLevel: state.player.level,
       jobState: state.world.jobs,
       npcId: "warden",
-      limit: 3,
+      limit: 5,
     });
   }
 
@@ -3117,6 +3144,23 @@ const canvas = document.getElementById("game");
   function getActiveJobBoardProp() {
     if (state.player.inHouse) return null;
     return getJobBoardProp({ regionId: state.regions.activeRegion });
+  }
+
+  function vendorServiceProfile(vendorId) {
+    return getVendorServiceProfile(vendorId, {
+      regionId: state.regions.activeRegion,
+      identity: normalizeCharacterIdentity(state.progression.identity),
+      house: state.house,
+    });
+  }
+
+  function economySnapshot() {
+    return buildEconomySnapshot({
+      regionId: state.regions.activeRegion,
+      identity: normalizeCharacterIdentity(state.progression.identity),
+      house: state.house,
+      activeJob: getActiveJobSummary(state.world.jobs),
+    });
   }
 
   function openJobBoard() {
@@ -3457,11 +3501,29 @@ const canvas = document.getElementById("game");
     }
 
     const jobMarker = getJobRouteMarker();
-    if (jobMarker?.kind === "job_pickup" && dist(state.player, jobMarker) < 1.55) {
+    if (jobMarker?.action === "pickup" && dist(state.player, jobMarker) < 1.55) {
       const pickedUp = recordPickupForJobs(jobMarker.targetId);
       if (pickedUp.ok) {
         sfx.pickup();
-        spawnParticles(canvas.width / 2, canvas.height * 0.5, 12, "#9bd3ff", 3, 0.6, { decorative: false });
+        spawnParticles(canvas.width / 2, canvas.height * 0.5, 12, jobMarker.color || "#9bd3ff", 3, 0.6, { decorative: false });
+        return;
+      }
+    }
+
+    if (jobMarker?.action === "checkpoint" && dist(state.player, jobMarker) < 1.6) {
+      const checked = recordCheckpointForJobs(jobMarker.targetId);
+      if (checked.ok) {
+        sfx.pickup();
+        spawnParticles(canvas.width / 2, canvas.height * 0.5, 10, jobMarker.color || "#8fd0ff", 2.6, 0.55, { decorative: false });
+        return;
+      }
+    }
+
+    if (jobMarker?.action === "dropoff" && dist(state.player, jobMarker) < 1.6) {
+      const dropped = recordDropoffForJobs(jobMarker.targetId);
+      if (dropped.ok) {
+        sfx.questDone();
+        spawnParticles(canvas.width / 2, canvas.height * 0.5, 12, jobMarker.color || "#ffcf7a", 3, 0.7, { decorative: false });
         return;
       }
     }
@@ -3660,6 +3722,7 @@ const canvas = document.getElementById("game");
           return;
         }
         logMsg(storyReactiveQuip("smith") || choice(npcDialogue.smith.idle));
+        logMsg(vendorServiceProfile("smith").priceNote);
         if (Math.random() < 0.35) describeNpcBackground("smith");
         sfx.npcChat();
         return;
@@ -3672,6 +3735,7 @@ const canvas = document.getElementById("game");
         if (shopOpen) {
           sfx.npcChat();
           logMsg(storyReactiveQuip("merchant") || choice(npcDialogue.merchant.idle));
+          logMsg(vendorServiceProfile("merchant").serviceLine);
           if (Math.random() < 0.35) describeNpcBackground("merchant");
         } else {
           logMsg("Trader Nyx: Come back when you have more gold... or desperation.");
@@ -5673,6 +5737,19 @@ const canvas = document.getElementById("game");
         ctx.moveTo(spriteWidth * 0.16, spriteHeight * 0.72);
         ctx.lineTo(spriteWidth * 0.84, spriteHeight * 0.62);
         ctx.stroke();
+      } else if (sprite.propKind === "road") {
+        ctx.fillStyle = shadeHex(color, 0.52);
+        ctx.fillRect(spriteWidth * 0.45, spriteHeight * 0.42, spriteWidth * 0.1, spriteHeight * 0.44);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.5, spriteHeight * 0.18);
+        ctx.lineTo(spriteWidth * 0.76, spriteHeight * 0.36);
+        ctx.lineTo(spriteWidth * 0.5, spriteHeight * 0.54);
+        ctx.lineTo(spriteWidth * 0.24, spriteHeight * 0.36);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 246, 205, 0.34)";
+        ctx.fillRect(spriteWidth * 0.36, spriteHeight * 0.34, spriteWidth * 0.28, spriteHeight * 0.04);
       } else {
         ctx.fillStyle = color;
         ctx.fillRect(spriteWidth * 0.25, spriteHeight * 0.48, spriteWidth * 0.5, spriteHeight * 0.34);
@@ -6028,6 +6105,15 @@ const canvas = document.getElementById("game");
         label: regionPresentation.landmark.label,
         size: regionPresentation.landmark.size || 1.2,
       });
+      for (const road of regionPresentation.roads || []) {
+        sprites.push({
+          ...road,
+          kind: "world-prop",
+          propKind: road.kind,
+          label: road.label,
+          size: road.size || 0.44,
+        });
+      }
       for (const prop of regionPresentation.props) {
         sprites.push({
           ...prop,
@@ -6132,7 +6218,11 @@ const canvas = document.getElementById("game");
           flashTimer: enemy.flashTimer,
           windupTimer: enemy.windupTimer || 0,
           windupMax: enemy.windupMax || 0,
+          stagger: enemy.stagger || 0,
+          phase: enemy.phase || 1,
+          phaseLabel: enemy.phaseLabel,
           statuses: enemy.statuses,
+          readabilityCue: resolveEnemyReadabilityCue(enemy),
         });
       }
 
@@ -6229,6 +6319,18 @@ const canvas = document.getElementById("game");
         const barY = top - 6;
         fillRoundedRect(left, barY, barW, 5, 2, "rgba(22, 8, 8, 0.82)");
         fillRoundedRect(left, barY, barW * hpRatio, 5, 2, "#92f0a3");
+        const cue = sprite.readabilityCue;
+        if (cue && cue.state !== "aggro") {
+          const cueY = barY - 11;
+          ctx.font = "bold 9px Georgia";
+          const cueW = clamp(spriteWidth * 0.72, 34, 76);
+          fillRoundedRect(left + (spriteWidth - cueW) / 2, cueY, cueW, 9, 4, "rgba(20, 10, 8, 0.78)");
+          drawClippedText(cue.label, left + (spriteWidth - cueW) / 2 + 4, cueY + 7, cueW - 8, cue.color || "#ffd77b");
+          if (cue.meter > 0) {
+            fillRoundedRect(left + (spriteWidth - cueW) / 2, cueY + 10, cueW, 3, 2, "rgba(0,0,0,0.35)");
+            fillRoundedRect(left + (spriteWidth - cueW) / 2, cueY + 10, cueW * cue.meter, 3, 2, cue.color || "#ffd77b");
+          }
+        }
       }
 
       const centeredLabel = Math.abs(sprite.sx - width / 2) < width * 0.24;
@@ -6571,6 +6673,9 @@ const canvas = document.getElementById("game");
       }
       const presentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
       drawDot(presentation.landmark.x, presentation.landmark.y, presentation.landmark.color || "#ffd77b", 3.2);
+      for (const road of presentation.roads || []) {
+        drawDot(road.x, road.y, road.color || "#d7b06d", 1.7);
+      }
       for (const prop of presentation.props) {
         if (prop.kind === "sign" || prop.kind === "lamp" || prop.kind === "smoke") {
           drawDot(prop.x, prop.y, prop.color || "#d7b06d", 1.8);
@@ -6830,7 +6935,7 @@ const canvas = document.getElementById("game");
         title: activeJob.status === "ready" ? "Job ready" : "Job route",
         line: activeJob.status === "ready"
           ? `Return to ${activeJob.npcName} for ${activeJob.rewardLine}${jobMarker?.distanceLine ? ` (${jobMarker.distanceLine})` : ""}`
-          : `${activeJob.title}: ${activeJob.progressLine}${jobMarker?.distanceLine ? ` (${jobMarker.distanceLine})` : ""}`,
+          : `${activeJob.title}: ${jobMarker?.regionHint ? `${jobMarker.regionHint} • ` : ""}${activeJob.progressLine}${jobMarker?.checkpointIndex ? ` • ${jobMarker.checkpointIndex}/${jobMarker.checkpointTotal}` : ""}${jobMarker?.distanceLine ? ` • ${jobMarker.distanceLine}` : ""}`,
         urgency: activeJob.status === "ready" ? "high" : "medium",
       }
       : null;
@@ -7157,10 +7262,11 @@ const canvas = document.getElementById("game");
 
     /* Shop overlay */
     if (shopOpen && state.mode === "playing") {
+      const merchantService = vendorServiceProfile("merchant");
       const sw = Math.min(420, canvas.width - margin * 2);
       const visibleShopRows = Math.min(shopItems.length, Math.max(5, Math.floor((canvas.height - margin * 2 - 92) / 52)));
       const firstShopRow = clamp(shopSelection - Math.floor(visibleShopRows / 2), 0, Math.max(0, shopItems.length - visibleShopRows));
-      const sh = visibleShopRows * 52 + 92;
+      const sh = visibleShopRows * 52 + 110;
       const sx = Math.floor((canvas.width - sw) / 2);
       const sy = Math.floor((canvas.height - sh) / 2);
 
@@ -7175,11 +7281,13 @@ const canvas = document.getElementById("game");
       drawClippedText(t("labels.shopTitle"), sx + 16, sy + 30, sw - 32, "#ffd77b");
       ctx.font = "12px Georgia";
       drawClippedText(`${t("labels.shopHeader", { gold: state.player.gold })}  ${shopSelection + 1}/${shopItems.length}`, sx + 16, sy + 50, sw - 32, "#c9b889");
+      ctx.font = "11px Georgia";
+      drawClippedText(merchantService.priceNote, sx + 16, sy + 68, sw - 32, "#aebfa5");
 
       for (let visible = 0; visible < visibleShopRows; visible++) {
         const i = firstShopRow + visible;
         const item = shopItems[i];
-        const iy = sy + 62 + visible * 52;
+        const iy = sy + 80 + visible * 52;
         const selected = i === shopSelection;
 
         fillRoundedRect(sx + 8, iy, sw - 16, 46, 7, selected ? "rgba(216, 188, 106, 0.24)" : "rgba(255, 255, 255, 0.05)");
@@ -7208,8 +7316,8 @@ const canvas = document.getElementById("game");
       const choices = getBooneJobChoices();
       if (jobBoardSelection >= choices.length) jobBoardSelection = Math.max(0, choices.length - 1);
       const sw = Math.min(540, canvas.width - margin * 2);
-      const rows = Math.max(1, Math.min(3, choices.length || 1));
-      const sh = rows * 72 + 102;
+      const rows = Math.max(1, Math.min(5, choices.length || 1));
+      const sh = rows * 78 + 108;
       const sx = Math.floor((canvas.width - sw) / 2);
       const sy = Math.floor((canvas.height - sh) / 2);
       drawSoftPanel(sx, sy, sw, sh, {
@@ -7228,10 +7336,10 @@ const canvas = document.getElementById("game");
       } else {
         for (let i = 0; i < Math.min(rows, choices.length); i++) {
           const job = choices[i];
-          const iy = sy + 68 + i * 72;
+          const iy = sy + 68 + i * 78;
           const selected = i === jobBoardSelection;
-          fillRoundedRect(sx + 10, iy, sw - 20, 64, 7, selected ? "rgba(216, 188, 106, 0.24)" : "rgba(255, 255, 255, 0.055)");
-          if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 63, 7, "#ffd77b", 1);
+          fillRoundedRect(sx + 10, iy, sw - 20, 70, 7, selected ? "rgba(216, 188, 106, 0.24)" : "rgba(255, 255, 255, 0.055)");
+          if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 69, 7, "#ffd77b", 1);
           ctx.font = "bold 14px Georgia";
           drawClippedText(`${job.title}  [${job.threat}]`, sx + 22, iy + 19, sw - 168, selected ? "#ffd77b" : "#f3ecd8");
           ctx.font = "12px Georgia";
@@ -7240,9 +7348,9 @@ const canvas = document.getElementById("game");
           ctx.fillText(job.status === "ready" ? "CLAIM" : job.kind.toUpperCase(), sx + sw - 22, iy + 19);
           ctx.textAlign = "left";
           ctx.font = "italic 12px Georgia";
-          drawClippedText(job.status === "ready" ? `Ready: ${job.rewardLine}` : job.hint, sx + 22, iy + 39, sw - 44, "#a09880");
+          drawClippedText(job.status === "ready" ? `Ready: ${job.rewardLine}` : job.boardNote || job.hint, sx + 22, iy + 38, sw - 44, "#a09880");
           ctx.font = "11px Georgia";
-          drawClippedText(`${job.progressLine}  ${job.rewardLine}`, sx + 22, iy + 56, sw - 44, "#c9b889");
+          drawClippedText(`${job.availabilityLine || job.regionHint}  ${job.progressLine}  ${job.rewardLine}`, sx + 22, iy + 58, sw - 44, "#c9b889");
         }
       }
     }
@@ -7996,6 +8104,7 @@ const canvas = document.getElementById("game");
           }
           : null,
       },
+      economy: economySnapshot(),
       exploration_renown: explorationRenown,
       run_summary: runSummary,
       region_visual_identity: {
@@ -8085,6 +8194,7 @@ const canvas = document.getElementById("game");
             mini_boss_id: e.miniBossId || null,
             phase: e.phase || 1,
             invuln_timer: Number((e.invulnTimer || 0).toFixed(2)),
+            readability_cue: resolveEnemyReadabilityCue(e),
             x: Number(e.x.toFixed(2)),
             y: Number(e.y.toFixed(2)),
             hp: e.hp,

@@ -44,6 +44,10 @@ describe("jobBoard", () => {
     expect(ashfallListings.map((job) => job.id)).toContain("ashfall_scrap_warrant");
     expect(frontierListings.map((job) => job.id)).toContain("frontier_road_salvage");
     expect(frontierListings.map((job) => job.id)).toContain("frontier_courier_orders");
+    expect(frontierListings.map((job) => job.id)).toContain("frontier_watch_patrol");
+    expect(frontierListings.map((job) => job.id)).toContain("frontier_supply_run");
+    expect(frontierListings.find((job) => job.id === "frontier_watch_patrol")?.boardNote).toContain("road posts");
+    expect(frontierListings.find((job) => job.id === "frontier_supply_run")?.availabilityLine).toContain("Dustward Frontier");
 
     state.completedJobIds.push("frontier_slime_bounty");
     expect(getJobListings({ regionId: "frontier", playerLevel: 1, jobState: state }).map((job) => job.id)).not.toContain("frontier_slime_bounty");
@@ -59,13 +63,20 @@ describe("jobBoard", () => {
       npcId: "warden",
     });
 
-    expect(choices).toHaveLength(3);
-    expect(choices.map((job) => job.id)).toEqual(["frontier_slime_bounty", "frontier_road_salvage", "frontier_courier_orders"]);
+    expect(choices).toHaveLength(5);
+    expect(choices.map((job) => job.id)).toEqual([
+      "frontier_slime_bounty",
+      "frontier_road_salvage",
+      "frontier_courier_orders",
+      "frontier_watch_patrol",
+      "frontier_supply_run",
+    ]);
     expect(choices[0]).toMatchObject({
       boardState: "available",
       selectable: true,
       threat: "Low",
       rewardLine: "+38g, +18 XP, +1 Potion",
+      regionHint: "Dustward Frontier",
     });
   });
 
@@ -143,7 +154,12 @@ describe("jobBoard", () => {
       jobId: "frontier_courier_orders",
       label: "Pick up Sealed Orders",
       regionId: "frontier",
+      regionHint: "Dustward Frontier",
+      action: "pickup",
+      checkpointIndex: 1,
+      checkpointTotal: 2,
     });
+    expect(pickupMarker?.line).toContain("Dustward Frontier");
     expect(getActiveJobSummary(state)?.progressLine).toBe("Pick up Sealed Orders");
 
     const pickedUp = recordJobEvent(state, { type: "pickup", targetId: "frontier_orders_cache" });
@@ -168,13 +184,105 @@ describe("jobBoard", () => {
       x: 9,
       y: 8,
       distanceLine: "1m",
+      checkpointIndex: 2,
+      checkpointTotal: 2,
     });
+    expect(deliveryMarker?.line).toContain("Dustward Frontier");
 
     const delivered = recordJobEvent(state, { type: "deliver", npcId: "elder" });
 
     expect(delivered.completed).toBe(true);
     expect(getActiveJobSummary(state)?.status).toBe("ready");
     expect(getActiveJobSummary(state)?.progressLine).toBe("Return to Marshal Boone");
+  });
+
+  it("runs patrol jobs through ordered checkpoints before return", () => {
+    const state = createInitialJobBoardState();
+    acceptJob(state, "frontier_watch_patrol");
+
+    const firstMarker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 12, y: 8.5 },
+      resources: [],
+      enemies: [],
+      npcs: [],
+    });
+
+    expect(firstMarker).toMatchObject({
+      kind: "job_patrol",
+      jobId: "frontier_watch_patrol",
+      label: "Patrol: East Road Post",
+      action: "checkpoint",
+      targetId: "frontier_patrol_east_post",
+      checkpointIndex: 1,
+      checkpointTotal: 3,
+      regionHint: "Dustward Frontier",
+    });
+    expect(firstMarker?.line).toContain("Checkpoint 1/3");
+
+    const wrongCheckpoint = recordJobEvent(state, { type: "checkpoint", targetId: "frontier_patrol_watchtower" });
+    const firstCheckpoint = recordJobEvent(state, { type: "checkpoint", targetId: "frontier_patrol_east_post" });
+
+    expect(wrongCheckpoint.ok).toBe(false);
+    expect(firstCheckpoint.ok).toBe(true);
+    expect(firstCheckpoint.progress?.count).toBe(1);
+    expect(getActiveJobSummary(state)?.progressLine).toBe("Checkpoint 2/3: Marsh Fence");
+
+    const secondCheckpoint = recordJobEvent(state, { type: "checkpoint", targetId: "frontier_patrol_marsh_fence" });
+    const thirdCheckpoint = recordJobEvent(state, { type: "checkpoint", targetId: "frontier_patrol_watchtower" });
+
+    expect(secondCheckpoint.progress?.count).toBe(2);
+    expect(thirdCheckpoint.completed).toBe(true);
+    expect(getActiveJobSummary(state)?.status).toBe("ready");
+    expect(getActiveJobSummary(state)?.progressLine).toBe("Return to Marshal Boone");
+  });
+
+  it("runs supply jobs through pickup, dropoff, and return route markers", () => {
+    const state = createInitialJobBoardState();
+    acceptJob(state, "frontier_supply_run");
+
+    const pickup = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 12, y: 8.5 },
+      resources: [],
+      enemies: [],
+      npcs: [],
+    });
+
+    expect(pickup).toMatchObject({
+      kind: "job_supply_pickup",
+      jobId: "frontier_supply_run",
+      label: "Pick up Barricade Crate",
+      action: "pickup",
+      targetId: "frontier_supply_crate",
+      checkpointIndex: 1,
+      checkpointTotal: 2,
+    });
+
+    const pickedUp = recordJobEvent(state, { type: "pickup", targetId: "frontier_supply_crate" });
+    const wrongDropoff = recordJobEvent(state, { type: "dropoff", targetId: "frontier_wrong_stall" });
+    const dropoffMarker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 15, y: 10.5 },
+      resources: [],
+      enemies: [],
+      npcs: [],
+    });
+
+    expect(pickedUp.ok).toBe(true);
+    expect(wrongDropoff.ok).toBe(false);
+    expect(dropoffMarker).toMatchObject({
+      kind: "job_supply_dropoff",
+      label: "Deliver to Smith Varo's Forge",
+      action: "dropoff",
+      targetId: "frontier_smith_supply_drop",
+      checkpointIndex: 2,
+      checkpointTotal: 2,
+    });
+
+    const delivered = recordJobEvent(state, { type: "dropoff", targetId: "frontier_smith_supply_drop" });
+    expect(delivered.completed).toBe(true);
+    expect(getActiveJobSummary(state)?.status).toBe("ready");
   });
 
   it("claims rewards once and moves the job to completed history", () => {
@@ -258,6 +366,8 @@ describe("jobBoard", () => {
       x: 10,
       y: 10,
       action: "turn_in",
+      regionHint: "Dustward Frontier",
+      returnTarget: "warden",
     });
   });
 

@@ -1,3 +1,5 @@
+import { getRegionVisualIdentity } from "./regionVisualIdentity.js";
+
 const JOB_STATUS = new Set(["active", "ready", "completed"]);
 
 export const JOB_DEFINITIONS = {
@@ -12,6 +14,7 @@ export const JOB_DEFINITIONS = {
     minLevel: 1,
     priority: 10,
     hint: "Clear the marsh slimes harassing the town road.",
+    boardNote: "Boone needs the marsh road cleared before traders will risk the town circle.",
     objective: {
       type: "kill",
       enemyType: "slime",
@@ -36,6 +39,7 @@ export const JOB_DEFINITIONS = {
     minLevel: 1,
     priority: 20,
     hint: "Recover sturdy stone from the road edges for town barricades.",
+    boardNote: "Road posts and barricades need stone before the next dust squall rolls through.",
     objective: {
       type: "collect",
       item: "Stone",
@@ -60,6 +64,7 @@ export const JOB_DEFINITIONS = {
     minLevel: 1,
     priority: 30,
     hint: "Pick up sealed orders near Boone's board and deliver them to Elder Nira.",
+    boardNote: "The Elder wants sealed orders carried by hand, not shouted across the street.",
     objective: {
       type: "delivery",
       count: 2,
@@ -74,6 +79,59 @@ export const JOB_DEFINITIONS = {
       items: { Potion: 1 },
     },
   },
+  frontier_watch_patrol: {
+    id: "frontier_watch_patrol",
+    title: "Town Watch Patrol",
+    kind: "patrol",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 40,
+    hint: "Walk Boone's road posts, check the marsh fence, and mark the watchtower approach.",
+    boardNote: "Boone wants eyes on the road posts before slimes learn the town schedule.",
+    objective: {
+      type: "patrol",
+      count: 3,
+      label: "patrol posts checked",
+      checkpoints: [
+        { id: "frontier_patrol_east_post", label: "East Road Post", x: 13.45, y: 8.95 },
+        { id: "frontier_patrol_marsh_fence", label: "Marsh Fence", x: 15.1, y: 10.35 },
+        { id: "frontier_patrol_watchtower", label: "Watchtower Approach", x: 14.15, y: 7.15 },
+      ],
+    },
+    reward: {
+      gold: 28,
+      xp: 14,
+      items: { Tonic: 1 },
+    },
+  },
+  frontier_supply_run: {
+    id: "frontier_supply_run",
+    title: "Forge Supply Run",
+    kind: "supply",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 50,
+    hint: "Pick up a barricade crate near the board and deliver it to Smith Varo's forge.",
+    boardNote: "Varo is short on barricade fittings; a fast supply run keeps repairs cheap.",
+    objective: {
+      type: "supply_run",
+      count: 2,
+      label: "supply run completed",
+      pickup: { id: "frontier_supply_crate", label: "Barricade Crate", x: 12.65, y: 9.05 },
+      dropoff: { id: "frontier_smith_supply_drop", label: "Smith Varo's Forge", x: 17.35, y: 10.65 },
+    },
+    reward: {
+      gold: 34,
+      xp: 15,
+      items: { Stone: 1 },
+    },
+  },
   ashfall_scrap_warrant: {
     id: "ashfall_scrap_warrant",
     title: "Scrap Warrant",
@@ -85,6 +143,7 @@ export const JOB_DEFINITIONS = {
     minLevel: 2,
     priority: 10,
     hint: "Break Ashfall brutes gathering salvage near the ribs.",
+    boardNote: "Ashfall salvage crews pay for proof that the scrap brutes backed off.",
     objective: {
       type: "kill",
       enemyType: "brute",
@@ -109,6 +168,7 @@ export const JOB_DEFINITIONS = {
     minLevel: 4,
     priority: 10,
     hint: "Silence Lantern suppressors guarding signal posts.",
+    boardNote: "Iron Lantern work is scarce, watched, and paid through Boone's quiet contacts.",
     objective: {
       type: "kill",
       enemyType: "suppressor",
@@ -167,6 +227,21 @@ function cloneReward(reward = {}) {
         .map(([name, count]) => [name, Math.floor(count)]),
     ),
   };
+}
+
+function cloneObjective(objective = {}) {
+  return {
+    ...objective,
+    pickup: objective.pickup ? { ...objective.pickup } : undefined,
+    dropoff: objective.dropoff ? { ...objective.dropoff } : undefined,
+    checkpoints: Array.isArray(objective.checkpoints)
+      ? objective.checkpoints.map((checkpoint) => ({ ...checkpoint }))
+      : undefined,
+  };
+}
+
+function regionHint(regionId) {
+  return getRegionVisualIdentity(regionId).label;
 }
 
 function normalizeProgress(jobId, source = {}) {
@@ -231,6 +306,17 @@ function buildProgressLine(job, progress = null) {
     if (count <= 0) return `Pick up ${objective.pickup?.label || "orders"}`;
     return `Deliver to ${objective.deliveryLabel || "the destination"}`;
   }
+  if (objective.type === "patrol") {
+    const checkpoints = Array.isArray(objective.checkpoints) ? objective.checkpoints : [];
+    if (progress?.status === "ready" || count >= objective.count || count >= checkpoints.length) return `Return to ${job.npcName}`;
+    const checkpoint = checkpoints[count];
+    return `Checkpoint ${count + 1}/${checkpoints.length || objective.count}: ${checkpoint?.label || objective.label}`;
+  }
+  if (objective.type === "supply_run") {
+    if (progress?.status === "ready" || count >= objective.count) return `Return to ${job.npcName}`;
+    if (count <= 0) return `Pick up ${objective.pickup?.label || "supplies"}`;
+    return `Deliver to ${objective.dropoff?.label || "the dropoff"}`;
+  }
   return `${count}/${objective.count} ${objective.label}`;
 }
 
@@ -238,8 +324,11 @@ function decorateJob(job, progress = null) {
   const reward = cloneReward(job.reward);
   return {
     ...job,
-    objective: { ...job.objective },
+    objective: cloneObjective(job.objective),
     reward,
+    regionHint: regionHint(job.regionId),
+    boardNote: job.boardNote || job.hint,
+    availabilityLine: `${regionHint(job.regionId)} • ${job.threat} threat • ${job.kind}`,
     status: progress?.status || "available",
     progress: progress ? { ...progress } : { status: "available", count: 0, rewardClaimed: false },
     progressLine: buildProgressLine(job, progress),
@@ -263,7 +352,7 @@ export function getJobDefinition(jobId) {
   return job ? decorateJob(job) : null;
 }
 
-export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState(), npcId = "warden", limit = 3 } = {}) {
+export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState(), npcId = "warden", limit = 5 } = {}) {
   const active = getActiveJobSummary(jobState);
   if (active?.npcId === npcId) {
     return [{
@@ -336,6 +425,47 @@ function recordDeliveryEvent(job, progress, event = {}) {
   return { ok: false, completed: false };
 }
 
+function recordPatrolEvent(job, progress, event = {}) {
+  const objective = job.objective || {};
+  const checkpoints = Array.isArray(objective.checkpoints) ? objective.checkpoints : [];
+  const next = checkpoints[progress.count];
+  if (event.type !== "checkpoint" || !next || event.targetId !== next.id) {
+    return { ok: false, completed: false };
+  }
+  progress.count = Math.min(objective.count, progress.count + 1);
+  const completed = progress.count >= objective.count || progress.count >= checkpoints.length;
+  if (completed) progress.status = "ready";
+  return {
+    ok: true,
+    completed,
+    message: completed
+      ? `Job ready: ${job.title}. Return to ${job.npcName}.`
+      : `Job progress: ${job.title} checkpoint ${progress.count}/${checkpoints.length}.`,
+  };
+}
+
+function recordSupplyRunEvent(job, progress, event = {}) {
+  const objective = job.objective || {};
+  if (event.type === "pickup" && progress.count === 0 && event.targetId === objective.pickup?.id) {
+    progress.count = 1;
+    return {
+      ok: true,
+      completed: false,
+      message: `Job progress: ${job.title} picked up. Deliver to ${objective.dropoff?.label}.`,
+    };
+  }
+  if (event.type === "dropoff" && progress.count >= 1 && event.targetId === objective.dropoff?.id) {
+    progress.count = objective.count;
+    progress.status = "ready";
+    return {
+      ok: true,
+      completed: true,
+      message: `Job ready: ${job.title}. Return to ${job.npcName}.`,
+    };
+  }
+  return { ok: false, completed: false };
+}
+
 export function recordJobEvent(jobState, event = {}) {
   const state = syncJobState(jobState);
   const job = knownJob(state.activeJobId);
@@ -349,6 +479,24 @@ export function recordJobEvent(jobState, event = {}) {
     const delivery = recordDeliveryEvent(job, progress, event);
     return {
       ...delivery,
+      job: decorateJob(job, progress),
+      progress,
+      jobState: state,
+    };
+  }
+  if (job.objective?.type === "patrol") {
+    const patrol = recordPatrolEvent(job, progress, event);
+    return {
+      ...patrol,
+      job: decorateJob(job, progress),
+      progress,
+      jobState: state,
+    };
+  }
+  if (job.objective?.type === "supply_run") {
+    const supply = recordSupplyRunEvent(job, progress, event);
+    return {
+      ...supply,
       job: decorateJob(job, progress),
       progress,
       jobState: state,
@@ -434,6 +582,21 @@ function staticTarget(target, player) {
   return { target, distance };
 }
 
+function routeBase(activeJob, target, player, extra = {}) {
+  const resolved = staticTarget(target, player);
+  if (!resolved) return null;
+  return {
+    jobId: activeJob.id,
+    x: resolved.target.x,
+    y: resolved.target.y,
+    distance: resolved.distance,
+    distanceLine: markerDistanceLine(resolved.distance),
+    regionId: activeJob.regionId,
+    regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
+    ...extra,
+  };
+}
+
 export function resolveJobRouteMarker({ jobState, player = {}, resources = [], enemies = [], npcs = [] } = {}) {
   const activeJob = getActiveJobSummary(jobState);
   if (!activeJob) return null;
@@ -454,29 +617,27 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       distance: npc.distance,
       distanceLine: markerDistanceLine(npc.distance),
       regionId: activeJob.regionId,
+      regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
       action: "turn_in",
+      returnTarget: activeJob.npcId,
     };
   }
 
   if (objective.type === "delivery") {
     if ((activeJob.progress?.count || 0) <= 0) {
-      const pickup = staticTarget(objective.pickup, player);
-      if (!pickup) return null;
-      return {
+      const pickup = routeBase(activeJob, objective.pickup, player, {
         kind: "job_pickup",
-        jobId: activeJob.id,
         title: "Courier pickup",
         label: `Pick up ${objective.pickup?.label || "orders"}`,
-        line: `${activeJob.regionId}: ${activeJob.progressLine}`,
-        x: pickup.target.x,
-        y: pickup.target.y,
+        line: `${activeJob.regionHint}: ${activeJob.progressLine}`,
         color: "#9bd3ff",
-        distance: pickup.distance,
-        distanceLine: markerDistanceLine(pickup.distance),
-        regionId: activeJob.regionId,
         action: "pickup",
         targetId: objective.pickup?.id,
-      };
+        checkpointIndex: 1,
+        checkpointTotal: objective.count,
+      });
+      if (!pickup) return null;
+      return pickup;
     }
     const npc = nearestMatching(npcs, player, (entry) => entry.id === objective.deliveryNpcId);
     if (!npc) return null;
@@ -485,16 +646,64 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       jobId: activeJob.id,
       title: "Courier delivery",
       label: `Deliver to ${objective.deliveryLabel || "destination"}`,
-      line: `${activeJob.regionId}: ${activeJob.progressLine}`,
+      line: `${activeJob.regionHint}: ${activeJob.progressLine}`,
       x: npc.target.x,
       y: npc.target.y,
       color: "#9bd3ff",
       distance: npc.distance,
       distanceLine: markerDistanceLine(npc.distance),
       regionId: activeJob.regionId,
+      regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
       action: "deliver",
       npcId: objective.deliveryNpcId,
+      checkpointIndex: 2,
+      checkpointTotal: objective.count,
     };
+  }
+
+  if (objective.type === "patrol") {
+    const checkpoints = Array.isArray(objective.checkpoints) ? objective.checkpoints : [];
+    const index = activeJob.progress?.count || 0;
+    const checkpoint = checkpoints[index];
+    if (!checkpoint) return null;
+    return routeBase(activeJob, checkpoint, player, {
+      kind: "job_patrol",
+      title: "Patrol checkpoint",
+      label: `Patrol: ${checkpoint.label}`,
+      line: `${activeJob.regionHint}: Checkpoint ${index + 1}/${checkpoints.length} • ${checkpoint.label}`,
+      color: "#8fd0ff",
+      action: "checkpoint",
+      targetId: checkpoint.id,
+      checkpointIndex: index + 1,
+      checkpointTotal: checkpoints.length,
+    });
+  }
+
+  if (objective.type === "supply_run") {
+    if ((activeJob.progress?.count || 0) <= 0) {
+      return routeBase(activeJob, objective.pickup, player, {
+        kind: "job_supply_pickup",
+        title: "Supply pickup",
+        label: `Pick up ${objective.pickup?.label || "supplies"}`,
+        line: `${activeJob.regionHint}: ${activeJob.progressLine}`,
+        color: "#ffd77b",
+        action: "pickup",
+        targetId: objective.pickup?.id,
+        checkpointIndex: 1,
+        checkpointTotal: objective.count,
+      });
+    }
+    return routeBase(activeJob, objective.dropoff, player, {
+      kind: "job_supply_dropoff",
+      title: "Supply dropoff",
+      label: `Deliver to ${objective.dropoff?.label || "dropoff"}`,
+      line: `${activeJob.regionHint}: ${activeJob.progressLine}`,
+      color: "#ffcf7a",
+      action: "dropoff",
+      targetId: objective.dropoff?.id,
+      checkpointIndex: 2,
+      checkpointTotal: objective.count,
+    });
   }
 
   if (objective.type === "collect") {
@@ -516,7 +725,10 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       distance: resource.distance,
       distanceLine: markerDistanceLine(resource.distance),
       regionId: activeJob.regionId,
+      regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
       action: "collect",
+      checkpointIndex: Math.min((activeJob.progress?.count || 0) + 1, objective.count),
+      checkpointTotal: objective.count,
     };
   }
 
@@ -539,7 +751,10 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       distance: enemy.distance,
       distanceLine: markerDistanceLine(enemy.distance),
       regionId: activeJob.regionId,
+      regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
       action: "hunt",
+      checkpointIndex: Math.min((activeJob.progress?.count || 0) + 1, objective.count),
+      checkpointTotal: objective.count,
     };
   }
 

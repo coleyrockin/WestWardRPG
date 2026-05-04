@@ -51,11 +51,11 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - **Character identity**: title-screen origin selection, Might/Grit/Cunning/Craft/Speech/Lore, character sheet, role summary, and attribute hooks for pricing/gear/crafting.
 - **Gear loop foundation**: weapon families, armor slots, deterministic loot tables, POI/mini-boss gear finds, earned gear visibility, and crafting-relevant resources.
 - **Housing/workbench**: save-safe house workstation state, workbench levels, Workbench II potion/refine benefits, Workbench III map-table project, and selectable workbench actions.
-- **Jobs/economy foundation**: Marshal Boone offers deterministic bounty, salvage, and courier work through an in-world job board with route markers, minimap/HUD/debug visibility, progress tracking, and reward payout.
+- **Jobs/economy foundation**: Marshal Boone offers deterministic bounty, salvage, courier, patrol, and supply-run work through an in-world job board with route markers, minimap/HUD/debug visibility, progress tracking, and reward payout.
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, and early Phase A open-world pressure/dressing work.
 
-Latest local fast gate: `npm test` reports **323 passing tests across 33 files**. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **329 passing tests across 35 files**. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 

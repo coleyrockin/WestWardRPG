@@ -37,8 +37,11 @@ describe("regionVisualIdentity", () => {
     expect(presentation.landmark.label).toContain("Watchtower");
     expect(presentation.routeLine).toContain("road");
     expect(presentation.props.length).toBeGreaterThanOrEqual(5);
+    expect(presentation.roads.length).toBeGreaterThanOrEqual(3);
     expect(presentation.props.every((prop: any) => prop.blocking === false)).toBe(true);
+    expect(presentation.roads.every((road: any) => road.blocking === false)).toBe(true);
     expect(presentation.props.some((prop: any) => prop.kind === "sign")).toBe(true);
+    expect(presentation.roads.some((road: any) => road.label.includes("Marshal"))).toBe(true);
   });
 
   it("moves props to map-valid visible tiles when a generated coordinate is blocked", () => {
@@ -52,7 +55,7 @@ describe("regionVisualIdentity", () => {
       isVisible,
     });
 
-    const placements = [presentation.landmark, ...presentation.props];
+    const placements = [presentation.landmark, ...presentation.props, ...presentation.roads];
     expect(placements.every((item: any) => isPassable(item.x, item.y) && isVisible(item.x, item.y))).toBe(true);
     expect(presentation.props.find((prop: any) => prop.kind === "sign")).toMatchObject({
       placement: "adjusted",
@@ -66,5 +69,6 @@ describe("regionVisualIdentity", () => {
     expect(ashfall.landmark.label).toContain("Slag");
     expect(lantern.landmark.label).toContain("Signal");
     expect(ashfall.props.map((prop: any) => prop.label)).not.toEqual(lantern.props.map((prop: any) => prop.label));
+    expect(ashfall.roads.map((road: any) => road.label)).not.toEqual(lantern.roads.map((road: any) => road.label));
   });
 });
