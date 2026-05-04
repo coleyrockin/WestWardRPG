@@ -17,3 +17,4 @@ export function isPOIDiscovered(regions: any, poiId: string): boolean;
 export function markPOIDiscovered(regions: any, poiId: string): boolean;
 export function findNearbyPOIs(regions: any, regionId: string, x: number, y: number, pingRadius?: number): POIDef[];
 export function poiUnderInteraction(regions: any, regionId: string, x: number, y: number): POIDef | null;
+export function resolvePOILead(regions: any, regionId: string, x: number, y: number, options?: any): any;

@@ -8,6 +8,7 @@ import {
   markPOIDiscovered,
   findNearbyPOIs,
   poiUnderInteraction,
+  resolvePOILead,
 } from "../src/poiSystem.js";
 
 describe("poiSystem — definitions", () => {
@@ -93,5 +94,24 @@ describe("poiSystem — proximity", () => {
   it("poiUnderInteraction skips already-discovered POIs", () => {
     const r: any = { poisDiscovered: ["frontier_old_well"] };
     expect(poiUnderInteraction(r, "frontier", 12.5, 22.5)).toBeNull();
+  });
+
+  it("points the player toward the nearest undiscovered POI", () => {
+    const r: any = {};
+    const lead = resolvePOILead(r, "frontier", 9.5, 8.5);
+
+    expect(lead?.id).toBe("frontier_old_well");
+    expect(lead?.direction).toBe("south");
+    expect(lead?.distance).toBeGreaterThan(13);
+    expect(lead?.line).toContain("Old Well");
+    expect(lead?.rewardHint).toContain("Potion");
+  });
+
+  it("skips discovered POIs when resolving the next exploration lead", () => {
+    const r: any = { poisDiscovered: ["frontier_old_well"] };
+    const lead = resolvePOILead(r, "frontier", 9.5, 8.5);
+
+    expect(lead?.id).toBe("frontier_drifter_camp");
+    expect(lead?.line).toContain("Drifter Camp");
   });
 });

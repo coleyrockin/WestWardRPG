@@ -85,3 +85,65 @@ export function poiUnderInteraction(regions, regionId, x, y) {
   }
   return null;
 }
+
+function directionLabel(dx, dy) {
+  const ax = Math.abs(dx);
+  const ay = Math.abs(dy);
+  if (ax < ay * 0.45) return dy >= 0 ? "south" : "north";
+  if (ay < ax * 0.45) return dx >= 0 ? "east" : "west";
+  if (dx >= 0 && dy >= 0) return "southeast";
+  if (dx < 0 && dy >= 0) return "southwest";
+  if (dx >= 0 && dy < 0) return "northeast";
+  return "northwest";
+}
+
+function rewardHintForPOI(poi) {
+  const pieces = [];
+  if (poi.loot?.gold) pieces.push(`${poi.loot.gold}g`);
+  if (poi.loot?.items) {
+    for (const [name, count] of Object.entries(poi.loot.items)) {
+      pieces.push(`${count} ${name}`);
+    }
+  }
+  if (poi.buff?.hp) pieces.push(`${poi.buff.hp} HP`);
+  if (poi.buff?.stamina) pieces.push(`${poi.buff.stamina} stamina`);
+  return pieces.length > 0 ? pieces.join(", ") : "regional clue";
+}
+
+export function resolvePOILead(regions, regionId, x, y, options = {}) {
+  const maxDistance = Number.isFinite(options.maxDistance) ? Math.max(0, options.maxDistance) : Infinity;
+  const list = getPOIsForRegion(regionId);
+  let best = null;
+  let bestDistance = Infinity;
+
+  for (const poi of list) {
+    if (isPOIDiscovered(regions, poi.id)) continue;
+    const dx = poi.x - x;
+    const dy = poi.y - y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > maxDistance || distance >= bestDistance) continue;
+    best = { poi, dx, dy };
+    bestDistance = distance;
+  }
+
+  if (!best) return null;
+  const kind = POI_KINDS[best.poi.kind] || POI_KINDS.cache;
+  const direction = directionLabel(best.dx, best.dy);
+  const distance = Number(bestDistance.toFixed(1));
+  const rewardHint = rewardHintForPOI(best.poi);
+  return {
+    id: best.poi.id,
+    title: "Explore",
+    kind: best.poi.kind,
+    kindLabel: kind.label,
+    label: best.poi.label,
+    x: best.poi.x,
+    y: best.poi.y,
+    direction,
+    distance,
+    color: kind.color,
+    urgency: distance <= 8 ? "high" : "soft",
+    rewardHint,
+    line: `${best.poi.label} ${kind.label.toLowerCase()} lies ${direction}, about ${distance} tiles away. Reward hint: ${rewardHint}.`,
+  };
+}

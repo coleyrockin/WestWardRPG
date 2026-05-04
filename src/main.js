@@ -203,6 +203,7 @@ import {
   findNearbyPOIs,
   poiUnderInteraction,
   getPOIsForRegion,
+  resolvePOILead,
 } from "./poiSystem.js";
 import {
   CODEX_TABS,
@@ -5364,6 +5365,41 @@ const canvas = document.getElementById("game");
         ctx.ellipse(spriteWidth * (0.4 + i * 0.08), spriteHeight * (0.36 - i * 0.08), spriteWidth * 0.12, spriteHeight * 0.1, 0, 0, TAU);
         ctx.fill();
       }
+    } else if (sprite.kind === "poi") {
+      const color = sprite.color || "#d8bc6a";
+      const pulse = 0.5 + Math.sin(state.time * 4.2) * 0.5;
+      ctx.fillStyle = `rgba(255, 236, 176, ${0.14 + pulse * 0.08})`;
+      ctx.beginPath();
+      ctx.arc(spriteWidth * 0.5, spriteHeight * 0.58, spriteWidth * (0.34 + pulse * 0.08), 0, TAU);
+      ctx.fill();
+      if (sprite.poiKind === "shrine") {
+        ctx.fillStyle = shadeHex(color, 0.42);
+        ctx.fillRect(spriteWidth * 0.42, spriteHeight * 0.34, spriteWidth * 0.16, spriteHeight * 0.52);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.5, spriteHeight * 0.12);
+        ctx.lineTo(spriteWidth * 0.74, spriteHeight * 0.42);
+        ctx.lineTo(spriteWidth * 0.26, spriteHeight * 0.42);
+        ctx.closePath();
+        ctx.fill();
+      } else if (sprite.poiKind === "camp") {
+        ctx.fillStyle = "#5b402b";
+        ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.52, spriteWidth * 0.4, spriteHeight * 0.34);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.18, spriteHeight * 0.58);
+        ctx.lineTo(spriteWidth * 0.5, spriteHeight * 0.2);
+        ctx.lineTo(spriteWidth * 0.82, spriteHeight * 0.58);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.fillStyle = "#6c4b30";
+        ctx.fillRect(spriteWidth * 0.25, spriteHeight * 0.52, spriteWidth * 0.5, spriteHeight * 0.34);
+        ctx.fillStyle = color;
+        ctx.fillRect(spriteWidth * 0.31, spriteHeight * 0.44, spriteWidth * 0.38, spriteHeight * 0.12);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+        ctx.fillRect(spriteWidth * 0.45, spriteHeight * 0.58, spriteWidth * 0.1, spriteHeight * 0.16);
+      }
     } else if (sprite.kind === "landmark") {
       ctx.fillStyle = shadeHex(sprite.color || "#d9b66d", 0.52);
       ctx.fillRect(spriteWidth * 0.44, spriteHeight * 0.2, spriteWidth * 0.12, spriteHeight * 0.72);
@@ -5744,6 +5780,18 @@ const canvas = document.getElementById("game");
           kind: "pressure",
           label: pressure.marker.label,
           size: pressure.marker.size || 0.82,
+        });
+      }
+      const poiLead = resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: MAX_RAY_DIST });
+      if (poiLead) {
+        sprites.push({
+          x: poiLead.x,
+          y: poiLead.y,
+          color: poiLead.color,
+          label: poiLead.label,
+          poiKind: poiLead.kind,
+          kind: "poi",
+          size: poiLead.kind === "camp" ? 1.02 : 0.9,
         });
       }
 
@@ -6466,7 +6514,10 @@ const canvas = document.getElementById("game");
       inventory: state.inventory,
       quests: state.quests,
     });
-    const liveObjective = firstPressure || openingObjective;
+    const explorationLead = !state.player.inHouse && state.regions?.activeRegion
+      ? resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 32 })
+      : null;
+    const liveObjective = firstPressure || openingObjective || explorationLead;
     if (liveObjective && msgY <= topY + topH - 10) {
       ctx.font = "bold 11px Georgia";
       drawClippedText(`→ ${liveObjective.line}`, topX + 10, msgY, topW - 20, liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "#ffd77b" : "#f3e8cf");
@@ -7415,6 +7466,9 @@ const canvas = document.getElementById("game");
       opened: state.chest.opened,
       claimed: state.chest.firstRewardClaimed,
     });
+    const explorationLead = !state.player.inHouse && state.regions?.activeRegion
+      ? resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 32 })
+      : null;
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const worldPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
     const quests = {
@@ -7481,6 +7535,7 @@ const canvas = document.getElementById("game");
             distance: state.player.inHouse ? null : Number(dist(state.player, state.chest).toFixed(2)),
             last_reward: state.chest.lastReward,
           },
+        exploration_lead: explorationLead,
         time_scale: Number((state.player.timeScale || 1).toFixed(2)),
         hit_pulse: Number((state.player.hitPulse || 0).toFixed(2)),
         screen_shake: Number((state.player.screenShake || 0).toFixed(2)),
@@ -7630,6 +7685,19 @@ const canvas = document.getElementById("game");
           .filter((r) => r.distance < 9)
           .sort((a, b) => a.distance - b.distance)
           .slice(0, 12),
+      nearby_pois: state.player.inHouse
+        ? []
+        : findNearbyPOIs(state.regions, state.regions.activeRegion, state.player.x, state.player.y, 9)
+          .map((poi) => ({
+            id: poi.id,
+            kind: poi.kind,
+            label: poi.label,
+            x: Number(poi.x.toFixed(2)),
+            y: Number(poi.y.toFixed(2)),
+            distance: Number(dist(state.player, poi).toFixed(2)),
+          }))
+          .sort((a, b) => a.distance - b.distance),
+      discovered_pois: Array.isArray(state.regions.poisDiscovered) ? state.regions.poisDiscovered.slice() : [],
       messages: state.msg.slice(0, 4).map((m) => m.text),
     };
 
