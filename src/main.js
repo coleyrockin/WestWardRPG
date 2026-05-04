@@ -110,6 +110,8 @@ import {
   resolveNpcReactiveLine,
 } from "./npcMemory.js";
 import {
+  resolveFirstMinuteCache,
+  resolveFirstMinuteCacheReward,
   resolveFirstMinutePressure,
   resolveHitFeedback,
   resolveOpeningObjective,
@@ -227,6 +229,16 @@ import {
   applyCompanionThreat,
   tickCompanionRecovery,
 } from "./companion.js";
+
+const OPENING_CACHE_SEED = resolveFirstMinuteCache({
+  mode: "playing",
+  time: 0,
+  inHouse: false,
+  regionId: "frontier",
+  inventory: {},
+  quests: {},
+});
+const OPENING_CACHE_START = OPENING_CACHE_SEED?.marker || { x: 12.6, y: 8.85 };
 
 const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -1929,7 +1941,14 @@ const canvas = document.getElementById("game");
     pigStampedeTimer: 0,
     narrativePulseTimer: 7,
     floatingTexts: [],
-    chest: { x: 13.4, y: 7.2, opened: false, respawn: 0 },
+    chest: {
+      x: OPENING_CACHE_START.x,
+      y: OPENING_CACHE_START.y,
+      opened: false,
+      respawn: 0,
+      firstRewardClaimed: false,
+      lastReward: null,
+    },
     house: {
       unlocked: false,
       built: false,
@@ -1985,6 +2004,31 @@ const canvas = document.getElementById("game");
         flashTimer: 0,
       });
     }
+    const patrolStats = createEnemyStats("slime", state.player.level);
+    const patrolPos = !isBlocking(14.4, 9.4) && !isInHouseLot(14.4, 9.4)
+      ? { x: 14.4, y: 9.4 }
+      : findEmptyCell(worldMap, 12, 7, 17, 12, (x, y) => !isInHouseLot(x, y) && Math.hypot(x - 9.5, y - 8.5) > 3.2);
+    state.enemies.push({
+      id: "opening-patrol",
+      type: patrolStats.type,
+      label: "Road Slime",
+      color: patrolStats.color,
+      behavior: patrolStats.behavior,
+      x: patrolPos.x,
+      y: patrolPos.y,
+      hp: Math.max(24, Math.round(patrolStats.hp * 0.72)),
+      maxHp: Math.max(24, Math.round(patrolStats.maxHp * 0.72)),
+      speed: patrolStats.speed,
+      attackReach: patrolStats.attackReach,
+      baseDamage: Math.max(4, patrolStats.baseDamage - 2),
+      damageVariance: patrolStats.damageVariance,
+      attackCooldown: 0.35,
+      alive: true,
+      respawn: 0,
+      stagger: 0,
+      flashTimer: 0,
+      openingPatrol: true,
+    });
   }
 
   function spawnResources() {
@@ -2193,6 +2237,8 @@ const canvas = document.getElementById("game");
           y: state.chest.y,
           opened: state.chest.opened,
           respawn: state.chest.respawn,
+          firstRewardClaimed: Boolean(state.chest.firstRewardClaimed),
+          lastReward: state.chest.lastReward,
         },
         harvestedResourceIds: state.resources.filter((resource) => resource.harvested).map((resource) => resource.id),
         defeatedEnemyIds: state.enemies.filter((enemy) => !enemy.alive).map((enemy) => enemy.id),
@@ -2330,6 +2376,8 @@ const canvas = document.getElementById("game");
       const chest = save.world.chest;
       state.chest.opened = Boolean(chest.opened);
       state.chest.respawn = state.chest.opened ? clamp(numberOr(chest.respawn, 24), 1, 80) : 0;
+      state.chest.firstRewardClaimed = Boolean(chest.firstRewardClaimed);
+      state.chest.lastReward = typeof chest.lastReward === "string" ? chest.lastReward : null;
       const chestX = clamp(numberOr(chest.x, state.chest.x), 1.2, worldMap[0].length - 1.2);
       const chestY = clamp(numberOr(chest.y, state.chest.y), 1.2, worldMap.length - 1.2);
       if (!isInHouseLot(chestX, chestY)) {
@@ -2925,6 +2973,31 @@ const canvas = document.getElementById("game");
     return drop;
   }
 
+  function grantOpeningCacheReward(reward) {
+    state.world.loot = normalizeLootState(state.world.loot);
+    const drop = {
+      source: "opening_cache",
+      regionId: reward.regionId || state.regions.activeRegion,
+      gold: reward.gold,
+      items: reward.items,
+      gear: { armorPieces: [], weaponFamilyTokens: [] },
+      summary: reward.summary,
+    };
+    const applied = applyLootDropToState({
+      lootState: state.world.loot,
+      inventory: state.inventory,
+      progression: state.progression,
+      drop,
+    });
+    state.player.gold += applied.gold;
+    if (reward.xp > 0) grantXp(reward.xp);
+    state.progression.equipment = normalizeGearState(state.progression.equipment);
+    applyProgressionEffects();
+    updateQuestProgressFromInventory();
+    state.chest.lastReward = reward.summary;
+    logMsg(`Opening cache secured: ${reward.summary}.`);
+  }
+
   function getWorkbenchActions() {
     return getAvailableCraftingActions({
       inventory: state.inventory,
@@ -3510,19 +3583,33 @@ const canvas = document.getElementById("game");
       state.chest.respawn = 38;
       sfx.pickup();
       spawnParticles(canvas.width / 2, canvas.height * 0.4, 12, "#d8bc6a", 3, 1, { decorative: true });
+      const openingReward = resolveFirstMinuteCacheReward({
+        regionId: state.regions.activeRegion,
+        opened: false,
+        claimed: state.chest.firstRewardClaimed,
+      });
+      if (openingReward.ok) {
+        state.chest.firstRewardClaimed = true;
+        grantOpeningCacheReward(openingReward);
+        return;
+      }
       const loot = choice(["Potion", "Gold", "Gold", "Stone", "Crystal"]);
       if (loot === "Potion") {
         state.inventory.Potion += 1;
+        state.chest.lastReward = "+1 Potion";
         logMsg("Supply cache: found 1 Potion! Someone left this here. Score!");
       } else if (loot === "Stone") {
         state.inventory.Stone += 1;
+        state.chest.lastReward = "+1 Stone";
         logMsg("Supply cache: found 1 Stone. Not gold, but we'll take it.");
       } else if (loot === "Crystal") {
         state.inventory["Crystal Shard"] += 1;
+        state.chest.lastReward = "+1 Crystal Shard";
         logMsg("Supply cache: found 1 Crystal Shard! Jackpot!");
       } else {
         const coins = 10 + Math.floor(Math.random() * 14);
         state.player.gold += coins;
+        state.chest.lastReward = `+${coins}g`;
         logMsg(`Supply cache: found ${coins} gold. Ka-ching!`);
       }
       updateQuestProgressFromInventory();
@@ -3804,6 +3891,10 @@ const canvas = document.getElementById("game");
 
   function resetWorld(options = {}) {
     const { countDeath = true, silent = false } = options;
+    const preservedOpeningCache = {
+      claimed: countDeath ? Boolean(state.chest.firstRewardClaimed) : false,
+      lastReward: countDeath ? state.chest.lastReward : null,
+    };
     state.player.x = 9.5;
     state.player.y = 8.5;
     state.player.angle = 0;
@@ -3836,6 +3927,10 @@ const canvas = document.getElementById("game");
 
     state.chest.opened = false;
     state.chest.respawn = 0;
+    state.chest.x = OPENING_CACHE_START.x;
+    state.chest.y = OPENING_CACHE_START.y;
+    state.chest.firstRewardClaimed = preservedOpeningCache.claimed;
+    state.chest.lastReward = preservedOpeningCache.lastReward;
     state.pigJokeCooldown = 0;
     state.narrativePulseTimer = 7;
     if (!silent) logMsg("You recover at camp. The valley reshapes itself. The slimes reset. It's like nothing happened... except your pride.");
@@ -5728,7 +5823,14 @@ const canvas = document.getElementById("game");
       }
 
       if (!state.chest.opened) {
-        sprites.push({ x: state.chest.x, y: state.chest.y, color: "#bf8a4f", label: "Cache", size: 0.82, kind: "chest" });
+        sprites.push({
+          x: state.chest.x,
+          y: state.chest.y,
+          color: state.chest.firstRewardClaimed ? "#bf8a4f" : "#ffd77b",
+          label: state.chest.firstRewardClaimed ? "Cache" : "Smoke Cache",
+          size: state.chest.firstRewardClaimed ? 0.82 : 0.94,
+          kind: "chest",
+        });
       }
 
       sprites.push({ x: state.house.outsideDoor.x, y: state.house.outsideDoor.y, color: "#7f664b", label: "House", size: 1.03, kind: "house-door" });
@@ -7303,6 +7405,16 @@ const canvas = document.getElementById("game");
       inventory: state.inventory,
       quests: state.quests,
     });
+    const firstMinuteCache = resolveFirstMinuteCache({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      regionId: state.regions.activeRegion,
+      inventory: state.inventory,
+      quests: state.quests,
+      opened: state.chest.opened,
+      claimed: state.chest.firstRewardClaimed,
+    });
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const worldPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
     const quests = {
@@ -7354,6 +7466,21 @@ const canvas = document.getElementById("game");
       gameplay_feel: {
         opening_objective: openingObjective,
         first_minute_pressure: firstMinutePressure,
+        first_reward_cache: firstMinuteCache
+          ? {
+            ...firstMinuteCache,
+            chest_opened: state.chest.opened,
+            claimed: Boolean(state.chest.firstRewardClaimed),
+            distance: state.player.inHouse ? null : Number(dist(state.player, state.chest).toFixed(2)),
+            last_reward: state.chest.lastReward,
+          }
+          : {
+            available: false,
+            chest_opened: state.chest.opened,
+            claimed: Boolean(state.chest.firstRewardClaimed),
+            distance: state.player.inHouse ? null : Number(dist(state.player, state.chest).toFixed(2)),
+            last_reward: state.chest.lastReward,
+          },
         time_scale: Number((state.player.timeScale || 1).toFixed(2)),
         hit_pulse: Number((state.player.hitPulse || 0).toFixed(2)),
         screen_shake: Number((state.player.screenShake || 0).toFixed(2)),

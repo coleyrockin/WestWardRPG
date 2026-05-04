@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { resolveFirstMinutePressure, resolveHitFeedback, resolveOpeningObjective } from "../src/gameFeel.js";
+import {
+  resolveFirstMinuteCache,
+  resolveFirstMinuteCacheReward,
+  resolveFirstMinutePressure,
+  resolveHitFeedback,
+  resolveOpeningObjective,
+} from "../src/gameFeel.js";
 
 describe("gameFeel", () => {
   it("scales hit feedback for heavy kills and cleaves", () => {
@@ -85,5 +91,39 @@ describe("gameFeel", () => {
       inventory: { "Slime Core": 1 },
       quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
     })).toBeNull();
+  });
+
+  it("turns first-minute pressure into a reachable cache target", () => {
+    const cache = resolveFirstMinuteCache({
+      mode: "playing",
+      time: 24,
+      inHouse: false,
+      regionId: "frontier",
+      inventory: { "Slime Core": 0 },
+      quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+    });
+    const pressure = resolveFirstMinutePressure({
+      mode: "playing",
+      time: 24,
+      inHouse: false,
+      regionId: "frontier",
+      inventory: { "Slime Core": 0 },
+      quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+    });
+
+    expect(cache?.id).toBe("frontier-opening-cache");
+    expect(cache?.marker).toEqual(pressure?.marker);
+    expect(cache?.interactionRadius).toBeGreaterThan(1);
+    expect(cache?.reward.items["Slime Core"]).toBe(1);
+  });
+
+  it("resolves deterministic first cache rewards once", () => {
+    const reward = resolveFirstMinuteCacheReward({ regionId: "frontier", opened: false });
+
+    expect(reward.ok).toBe(true);
+    expect(reward.gold).toBeGreaterThan(0);
+    expect(reward.items).toMatchObject({ Potion: 1, "Slime Core": 1 });
+    expect(resolveFirstMinuteCacheReward({ regionId: "frontier", opened: true }).ok).toBe(false);
+    expect(resolveFirstMinuteCacheReward({ regionId: "frontier", claimed: true }).ok).toBe(false);
   });
 });

@@ -101,6 +101,27 @@ const FIRST_PRESSURE_BY_REGION = {
   },
 };
 
+const FIRST_CACHE_REWARD_BY_REGION = {
+  frontier: {
+    gold: 12,
+    xp: 6,
+    items: { Potion: 1, "Slime Core": 1 },
+    summary: "Smoke Cache: +12g, +1 Potion, +1 Slime Core",
+  },
+  ashfall: {
+    gold: 16,
+    xp: 8,
+    items: { Potion: 1, Ashglass: 1 },
+    summary: "Heat Flag Cache: +16g, +1 Potion, +1 Ashglass",
+  },
+  ironlantern: {
+    gold: 18,
+    xp: 8,
+    items: { Potion: 1, "Lantern Filament": 1 },
+    summary: "Signal Flare Cache: +18g, +1 Potion, +1 Lantern Filament",
+  },
+};
+
 export function resolveFirstMinutePressure(input = {}) {
   if (input.mode !== "playing" || input.inHouse) return null;
   const time = Math.max(0, input.time || 0);
@@ -128,5 +149,49 @@ export function resolveFirstMinutePressure(input = {}) {
       size: 0.82,
       blocking: false,
     },
+  };
+}
+
+export function resolveFirstMinuteCacheReward(input = {}) {
+  if (input.opened || input.claimed) {
+    return {
+      ok: false,
+      reason: "already_claimed",
+      gold: 0,
+      xp: 0,
+      items: {},
+      summary: "Opening cache already claimed",
+    };
+  }
+
+  const regionId = input.regionId || "frontier";
+  const reward = FIRST_CACHE_REWARD_BY_REGION[regionId] || FIRST_CACHE_REWARD_BY_REGION.frontier;
+  return {
+    ok: true,
+    regionId,
+    gold: reward.gold,
+    xp: reward.xp,
+    items: { ...reward.items },
+    summary: reward.summary,
+  };
+}
+
+export function resolveFirstMinuteCache(input = {}) {
+  if (input.opened || input.claimed) return null;
+  const pressure = resolveFirstMinutePressure(input);
+  if (!pressure) return null;
+
+  const regionId = input.regionId || "frontier";
+  return {
+    id: `${regionId}-opening-cache`,
+    title: pressure.title,
+    line: pressure.line,
+    marker: pressure.marker,
+    interactionRadius: 1.75,
+    reward: resolveFirstMinuteCacheReward({
+      regionId,
+      opened: false,
+      claimed: false,
+    }),
   };
 }
