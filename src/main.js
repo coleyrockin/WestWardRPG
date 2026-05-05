@@ -6198,6 +6198,33 @@ const canvas = document.getElementById("game");
     ctx.shadowBlur = sprite.kind === "enemy" || sprite.label === "Crystal" || sprite.label === "Archive" ? 14 : 6;
     ctx.shadowOffsetY = 2;
 
+    function drawSpriteGlow(cx, cy, radius, color, alpha, innerRatio = 0.18) {
+      if (radius <= 0 || alpha <= 0) return;
+      const glow = ctx.createRadialGradient(cx, cy, radius * innerRatio, cx, cy, radius);
+      glow.addColorStop(0, hexToRgbaUtil(color, alpha));
+      glow.addColorStop(0.55, hexToRgbaUtil(color, alpha * 0.45));
+      glow.addColorStop(1, hexToRgbaUtil(color, 0));
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawSpritePulseRing(cx, cy, radius, color, alpha, lineWidth = 2) {
+      if (radius <= 0 || alpha <= 0) return;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = hexToRgbaUtil(color, alpha);
+      ctx.lineWidth = Math.max(1, lineWidth);
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, TAU);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     ctx.fillStyle = `rgba(0, 0, 0, ${0.24 * lightFactor})`;
     ctx.beginPath();
     ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.94, spriteWidth * 0.42, spriteHeight * 0.1, 0, 0, TAU);
@@ -6238,6 +6265,12 @@ const canvas = document.getElementById("game");
       const enemyTypeKey = sprite.enemyType || "slime";
       const cue = sprite.readabilityCue || resolveEnemyReadabilityCue(sprite);
       const bodyScale = clamp(cue.bodyScale || 1, 0.9, 1.14);
+      if ((sprite.windupTimer || 0) > 0) {
+        const windupPulse = 0.5 + Math.sin(state.time * 18) * 0.5;
+        const windupRatio = clamp(sprite.windupTimer / Math.max(0.01, sprite.windupMax || sprite.windupTimer), 0, 1);
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.5, spriteWidth * (0.66 + windupPulse * 0.18), "#ff4438", 0.18 + windupPulse * 0.15);
+        drawSpritePulseRing(spriteWidth * 0.5, spriteHeight * 0.52, spriteWidth * (0.46 + (1 - windupRatio) * 0.2), "#ffcf65", 0.44 + windupPulse * 0.28, spriteWidth * 0.035);
+      }
       if (cue.fillAlpha > 0) {
         const pulse = cue.pulseRate ? (Math.sin(state.time * cue.pulseRate) * 0.5 + 0.5) : 0.5;
         ctx.fillStyle = hexToRgbaUtil(cue.color || "#ffd77b", clamp(cue.fillAlpha + pulse * 0.08, 0, 0.32));
@@ -6441,6 +6474,8 @@ const canvas = document.getElementById("game");
       ctx.fillRect(spriteWidth * 0.18, spriteHeight * 0.42, spriteWidth * 0.64, spriteHeight * 0.08);
     } else if (sprite.kind === "pressure") {
       const pulse = 0.5 + Math.sin(state.time * 5) * 0.5;
+      drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.5, spriteWidth * (0.5 + pulse * 0.12), "#ffd77b", 0.17 + pulse * 0.14);
+      drawSpritePulseRing(spriteWidth * 0.5, spriteHeight * 0.56, spriteWidth * (0.32 + pulse * 0.08), "#fff0b8", 0.24 + pulse * 0.24, spriteWidth * 0.025);
       ctx.fillStyle = "rgba(255, 215, 123, 0.18)";
       ctx.beginPath();
       ctx.arc(spriteWidth * 0.5, spriteHeight * 0.52, spriteWidth * (0.34 + pulse * 0.08), 0, TAU);
@@ -6458,6 +6493,7 @@ const canvas = document.getElementById("game");
     } else if (sprite.kind === "roadside-discovery") {
       const color = sprite.color || "#d8bc6a";
       const pulse = 0.5 + Math.sin(state.time * 4.6) * 0.5;
+      drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.58, spriteWidth * (0.42 + pulse * 0.08), color, 0.1 + pulse * 0.08);
       ctx.fillStyle = `rgba(255, 232, 168, ${0.16 + pulse * 0.12})`;
       ctx.beginPath();
       ctx.arc(spriteWidth * 0.5, spriteHeight * 0.6, spriteWidth * (0.32 + pulse * 0.06), 0, TAU);
@@ -6474,7 +6510,11 @@ const canvas = document.getElementById("game");
         ctx.stroke();
         ctx.fillStyle = color;
         ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.32, spriteWidth * 0.08, spriteHeight * 0.18);
+        drawSpriteGlow(spriteWidth * 0.26, spriteHeight * 0.34, spriteWidth * 0.18, "#ffd27a", 0.28 + pulse * 0.14);
+        ctx.fillStyle = "#fff0b8";
+        ctx.fillRect(spriteWidth * 0.24, spriteHeight * 0.34, spriteWidth * 0.04, spriteHeight * 0.06);
       } else if (sprite.poiKind === "shrine") {
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.26, spriteWidth * (0.32 + pulse * 0.08), "#d9a8ff", 0.16 + pulse * 0.13);
         ctx.fillStyle = shadeHex(color, 0.42);
         ctx.fillRect(spriteWidth * 0.42, spriteHeight * 0.34, spriteWidth * 0.16, spriteHeight * 0.52);
         ctx.fillStyle = color;
@@ -6487,6 +6527,7 @@ const canvas = document.getElementById("game");
         ctx.fillStyle = "rgba(255, 246, 205, 0.34)";
         ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.16, spriteWidth * 0.06, spriteHeight * 0.12);
       } else {
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.64, spriteWidth * (0.24 + pulse * 0.08), "#ff9f46", 0.22 + pulse * 0.16);
         ctx.fillStyle = "#5b402b";
         ctx.fillRect(spriteWidth * 0.28, spriteHeight * 0.54, spriteWidth * 0.44, spriteHeight * 0.3);
         ctx.fillStyle = color;
@@ -6504,11 +6545,13 @@ const canvas = document.getElementById("game");
     } else if (sprite.kind === "poi") {
       const color = sprite.color || "#d8bc6a";
       const pulse = 0.5 + Math.sin(state.time * 4.2) * 0.5;
+      drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.58, spriteWidth * (0.42 + pulse * 0.08), color, 0.09 + pulse * 0.07);
       ctx.fillStyle = `rgba(255, 236, 176, ${0.14 + pulse * 0.08})`;
       ctx.beginPath();
       ctx.arc(spriteWidth * 0.5, spriteHeight * 0.58, spriteWidth * (0.34 + pulse * 0.08), 0, TAU);
       ctx.fill();
       if (sprite.poiKind === "shrine") {
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.28, spriteWidth * (0.3 + pulse * 0.08), "#d9a8ff", 0.14 + pulse * 0.11);
         ctx.fillStyle = shadeHex(color, 0.42);
         ctx.fillRect(spriteWidth * 0.42, spriteHeight * 0.34, spriteWidth * 0.16, spriteHeight * 0.52);
         ctx.fillStyle = color;
@@ -6519,6 +6562,7 @@ const canvas = document.getElementById("game");
         ctx.closePath();
         ctx.fill();
       } else if (sprite.poiKind === "camp") {
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.66, spriteWidth * (0.22 + pulse * 0.08), "#ff9f46", 0.2 + pulse * 0.14);
         ctx.fillStyle = "#5b402b";
         ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.52, spriteWidth * 0.4, spriteHeight * 0.34);
         ctx.fillStyle = color;
@@ -6526,6 +6570,13 @@ const canvas = document.getElementById("game");
         ctx.moveTo(spriteWidth * 0.18, spriteHeight * 0.58);
         ctx.lineTo(spriteWidth * 0.5, spriteHeight * 0.2);
         ctx.lineTo(spriteWidth * 0.82, spriteHeight * 0.58);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#ffd77b";
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.5, spriteHeight * 0.56);
+        ctx.lineTo(spriteWidth * 0.57, spriteHeight * 0.7);
+        ctx.lineTo(spriteWidth * 0.43, spriteHeight * 0.7);
         ctx.closePath();
         ctx.fill();
       } else if (sprite.poiKind === "mine") {
@@ -6540,6 +6591,7 @@ const canvas = document.getElementById("game");
         ctx.fill();
         ctx.fillStyle = "rgba(20, 16, 12, 0.7)";
         ctx.fillRect(spriteWidth * 0.42, spriteHeight * 0.58, spriteWidth * 0.16, spriteHeight * 0.24);
+        drawSpriteGlow(spriteWidth * 0.62, spriteHeight * 0.58, spriteWidth * 0.18, "#ffd27a", 0.22 + pulse * 0.12);
       } else if (sprite.poiKind === "ruin") {
         ctx.fillStyle = shadeHex(color, 0.5);
         ctx.fillRect(spriteWidth * 0.24, spriteHeight * 0.44, spriteWidth * 0.16, spriteHeight * 0.42);
@@ -6581,12 +6633,16 @@ const canvas = document.getElementById("game");
       }
     } else if (sprite.kind === "landmark") {
       const color = sprite.color || "#d9b66d";
+      const beaconPulse = 0.5 + Math.sin(state.time * 3.8) * 0.5;
       if (sprite.landmarkVariant === "slag_tower") {
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.58, spriteWidth * (0.36 + beaconPulse * 0.12), "#ff8f3d", 0.16 + beaconPulse * 0.12);
         ctx.fillStyle = shadeHex(color, 0.34);
         ctx.fillRect(spriteWidth * 0.34, spriteHeight * 0.2, spriteWidth * 0.32, spriteHeight * 0.66);
         ctx.fillStyle = color;
         ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.14, spriteWidth * 0.4, spriteHeight * 0.12);
         ctx.fillRect(spriteWidth * 0.4, spriteHeight * 0.08, spriteWidth * 0.2, spriteHeight * 0.1);
+        ctx.fillStyle = `rgba(255, 136, 54, ${0.45 + beaconPulse * 0.28})`;
+        ctx.fillRect(spriteWidth * 0.42, spriteHeight * 0.55, spriteWidth * 0.16, spriteHeight * 0.14);
         for (let i = 0; i < 3; i++) {
           ctx.fillStyle = `rgba(236, 174, 110, ${0.14 + i * 0.08})`;
           ctx.beginPath();
@@ -6594,6 +6650,8 @@ const canvas = document.getElementById("game");
           ctx.fill();
         }
       } else if (sprite.landmarkVariant === "signal_mast") {
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.1, spriteWidth * (0.34 + beaconPulse * 0.18), "#9bd3ff", 0.22 + beaconPulse * 0.18);
+        drawSpritePulseRing(spriteWidth * 0.5, spriteHeight * 0.1, spriteWidth * (0.18 + beaconPulse * 0.18), "#9bd3ff", 0.2 + beaconPulse * 0.22, spriteWidth * 0.025);
         ctx.strokeStyle = shadeHex(color, 0.58);
         ctx.lineWidth = Math.max(2, spriteWidth * 0.05);
         ctx.beginPath();
@@ -6613,6 +6671,7 @@ const canvas = document.getElementById("game");
         ctx.fillRect(spriteWidth * 0.32, spriteHeight * 0.22, spriteWidth * 0.08, spriteHeight * 0.06);
         ctx.fillRect(spriteWidth * 0.6, spriteHeight * 0.22, spriteWidth * 0.08, spriteHeight * 0.06);
       } else {
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.12, spriteWidth * (0.24 + beaconPulse * 0.08), "#ffe8a8", 0.15 + beaconPulse * 0.1);
         ctx.fillStyle = shadeHex(color, 0.52);
         ctx.fillRect(spriteWidth * 0.44, spriteHeight * 0.2, spriteWidth * 0.12, spriteHeight * 0.72);
         ctx.fillStyle = color;
@@ -6626,6 +6685,10 @@ const canvas = document.getElementById("game");
     } else if (sprite.kind === "world-prop") {
       const color = sprite.color || "#b9824d";
       if (sprite.propKind === "lamp" || sprite.propKind === "seam" || sprite.propKind === "relay") {
+        const pulse = 0.5 + Math.sin(state.time * (sprite.propKind === "lamp" ? 5.2 : 3.2)) * 0.5;
+        const lightColor = sprite.propKind === "relay" ? "#9bd3ff" : sprite.propKind === "seam" ? "#ff9f46" : "#ffe8a8";
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.28, spriteWidth * (0.34 + pulse * 0.08), lightColor, 0.24 + pulse * 0.17);
+        drawSpritePulseRing(spriteWidth * 0.5, spriteHeight * 0.28, spriteWidth * (0.2 + pulse * 0.08), lightColor, 0.12 + pulse * 0.2, spriteWidth * 0.018);
         ctx.fillStyle = shadeHex(color, 0.45);
         ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.34, spriteWidth * 0.06, spriteHeight * 0.54);
         ctx.fillStyle = color;
@@ -6635,6 +6698,10 @@ const canvas = document.getElementById("game");
         ctx.fillStyle = "rgba(255, 248, 200, 0.35)";
         ctx.beginPath();
         ctx.arc(spriteWidth * 0.5, spriteHeight * 0.28, spriteWidth * 0.28, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = hexToRgbaUtil(lightColor, 0.82);
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.5, spriteHeight * 0.28, spriteWidth * 0.09, 0, TAU);
         ctx.fill();
       } else if (sprite.propKind === "road-sign") {
         ctx.fillStyle = "#4a3323";
@@ -6702,6 +6769,8 @@ const canvas = document.getElementById("game");
           ctx.ellipse(spriteWidth * (0.42 + i * 0.08), spriteHeight * (0.64 - i * 0.12), spriteWidth * (0.16 - i * 0.01), spriteHeight * (0.12 - i * 0.01), 0, 0, TAU);
           ctx.fill();
         }
+        const emberPulse = 0.5 + Math.sin(state.time * 7.5) * 0.5;
+        drawSpriteGlow(spriteWidth * 0.45, spriteHeight * 0.82, spriteWidth * (0.18 + emberPulse * 0.06), "#ff9f46", 0.12 + emberPulse * 0.12);
       } else if (sprite.propKind === "fence" || sprite.propKind === "rail" || sprite.propKind === "cable") {
         ctx.strokeStyle = color;
         ctx.lineWidth = Math.max(2, spriteWidth * 0.08);
@@ -6731,7 +6800,11 @@ const canvas = document.getElementById("game");
         ctx.fill();
         ctx.fillStyle = "rgba(255, 235, 175, 0.22)";
         ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.58, spriteWidth * 0.1, spriteHeight * 0.12);
+        drawSpriteGlow(spriteWidth * 0.51, spriteHeight * 0.64, spriteWidth * 0.18, "#ffe8a8", 0.18);
       } else if (sprite.propKind === "watchtower" || sprite.propKind === "tower" || sprite.propKind === "signal") {
+        const pulse = 0.5 + Math.sin(state.time * 4.3) * 0.5;
+        const towerLight = sprite.propKind === "signal" ? "#9bd3ff" : "#ffe8a8";
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.12, spriteWidth * (0.24 + pulse * 0.08), towerLight, 0.18 + pulse * 0.12);
         ctx.fillStyle = shadeHex(color, 0.42);
         ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.24, spriteWidth * 0.08, spriteHeight * 0.64);
         ctx.fillStyle = color;
@@ -6747,6 +6820,8 @@ const canvas = document.getElementById("game");
         ctx.fillStyle = "rgba(255, 248, 205, 0.38)";
         ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.08, spriteWidth * 0.06, spriteHeight * 0.12);
       } else if (sprite.propKind === "gate") {
+        drawSpriteGlow(spriteWidth * 0.31, spriteHeight * 0.42, spriteWidth * 0.16, "#ffe8a8", 0.16);
+        drawSpriteGlow(spriteWidth * 0.69, spriteHeight * 0.42, spriteWidth * 0.16, "#ffe8a8", 0.16);
         ctx.fillStyle = shadeHex(color, 0.48);
         ctx.fillRect(spriteWidth * 0.24, spriteHeight * 0.28, spriteWidth * 0.1, spriteHeight * 0.6);
         ctx.fillRect(spriteWidth * 0.66, spriteHeight * 0.28, spriteWidth * 0.1, spriteHeight * 0.6);
@@ -6756,6 +6831,7 @@ const canvas = document.getElementById("game");
         ctx.fillRect(spriteWidth * 0.28, spriteHeight * 0.36, spriteWidth * 0.06, spriteHeight * 0.1);
         ctx.fillRect(spriteWidth * 0.66, spriteHeight * 0.36, spriteWidth * 0.06, spriteHeight * 0.1);
       } else if (sprite.propKind === "mine") {
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.65, spriteWidth * 0.2, "#ff9f46", 0.12);
         ctx.strokeStyle = color;
         ctx.lineWidth = Math.max(2, spriteWidth * 0.07);
         ctx.beginPath();
@@ -6766,6 +6842,7 @@ const canvas = document.getElementById("game");
         ctx.lineTo(spriteWidth * 0.7, spriteHeight * 0.64);
         ctx.stroke();
       } else if (sprite.propKind === "road") {
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.36, spriteWidth * 0.18, "#ffe8a8", 0.1);
         ctx.fillStyle = shadeHex(color, 0.52);
         ctx.fillRect(spriteWidth * 0.45, spriteHeight * 0.42, spriteWidth * 0.1, spriteHeight * 0.44);
         ctx.fillStyle = color;
@@ -6787,6 +6864,8 @@ const canvas = document.getElementById("game");
     } else if (sprite.kind === "job-route") {
       const color = sprite.color || "#ffd77b";
       const pulse = 0.5 + Math.sin(state.time * 5.5) * 0.5;
+      drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.48, spriteWidth * (0.46 + pulse * 0.12), color, 0.16 + pulse * 0.16);
+      drawSpritePulseRing(spriteWidth * 0.5, spriteHeight * 0.5, spriteWidth * (0.34 + pulse * 0.1), "#fff0b8", 0.18 + pulse * 0.24, spriteWidth * 0.024);
       ctx.fillStyle = `rgba(255, 235, 155, ${0.16 + pulse * 0.12})`;
       ctx.beginPath();
       ctx.arc(spriteWidth * 0.5, spriteHeight * 0.52, spriteWidth * (0.36 + pulse * 0.1), 0, TAU);
@@ -6808,6 +6887,8 @@ const canvas = document.getElementById("game");
       ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.32, spriteWidth * 0.08, spriteHeight * 0.18);
     } else if (sprite.kind === "job-board") {
       const color = sprite.color || "#d8a84f";
+      const pulse = 0.5 + Math.sin(state.time * 4.8) * 0.5;
+      drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.38, spriteWidth * (0.46 + pulse * 0.1), "#ffd77b", 0.14 + pulse * 0.12);
       ctx.fillStyle = "#5b402b";
       ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.34, spriteWidth * 0.07, spriteHeight * 0.56);
       ctx.fillStyle = shadeHex(color, 0.74);
@@ -6853,7 +6934,14 @@ const canvas = document.getElementById("game");
 
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;
-    ctx.fillStyle = `rgba(0, 0, 0, ${0.18 * (1 - lightFactor + 0.24)})`;
+    const selfLitSprite = sprite.kind === "pressure"
+      || sprite.kind === "job-route"
+      || sprite.kind === "job-board"
+      || (sprite.kind === "roadside-discovery" && (sprite.poiKind === "camp" || sprite.poiKind === "shrine"))
+      || (sprite.kind === "poi" && (sprite.poiKind === "camp" || sprite.poiKind === "shrine" || sprite.poiKind === "mine"))
+      || (sprite.kind === "landmark" && (sprite.landmarkVariant === "signal_mast" || sprite.landmarkVariant === "slag_tower"))
+      || (sprite.kind === "world-prop" && ["lamp", "seam", "relay", "smoke", "gate", "watchtower", "tower", "signal", "road"].includes(sprite.propKind));
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.18 * (1 - lightFactor + 0.24) * (selfLitSprite ? 0.56 : 1)})`;
     ctx.fillRect(0, 0, spriteWidth, spriteHeight);
     if (sprite.flashTimer > 0) {
       ctx.fillStyle = `rgba(255, 255, 255, ${clamp(sprite.flashTimer / 0.1, 0, 1) * 0.72})`;
@@ -7959,6 +8047,7 @@ const canvas = document.getElementById("game");
     const py = Math.floor(state.player.y);
     const originX = cx - mapRadius;
     const originY = cy - mapRadius;
+    const minimapNightStrength = state.player.inHouse ? 0 : resolveWorldNightStrength();
 
     const regionMiniMapPalette = {
       frontier: {
@@ -8035,14 +8124,15 @@ const canvas = document.getElementById("game");
       const distFromCenter = Math.sqrt((dotX - cx) ** 2 + (dotY - cy) ** 2);
       if (distFromCenter > mapRadius - 2) return;
       // Glow
-      ctx.fillStyle = withAlpha(color, 0.35);
+      const glowSize = size + 2 + minimapNightStrength * 1.6;
+      ctx.fillStyle = withAlpha(color, 0.35 + minimapNightStrength * 0.16);
       ctx.beginPath();
-      ctx.arc(dotX, dotY, size + 2, 0, TAU);
+      ctx.arc(dotX, dotY, glowSize, 0, TAU);
       ctx.fill();
       // Core
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(dotX, dotY, size, 0, TAU);
+      ctx.arc(dotX, dotY, size + minimapNightStrength * 0.25, 0, TAU);
       ctx.fill();
     }
 
@@ -8059,10 +8149,18 @@ const canvas = document.getElementById("game");
       const point = worldToMap(wx, wy);
       const distFromCenter = Math.sqrt((point.x - cx) ** 2 + (point.y - cy) ** 2);
       if (distFromCenter > mapRadius - 2) return;
-      ctx.fillStyle = withAlpha(color, 0.28);
+      const markerGlow = size + 2.2 + minimapNightStrength * 2.6;
+      ctx.fillStyle = withAlpha(color, 0.28 + minimapNightStrength * 0.2);
       ctx.beginPath();
-      ctx.arc(point.x, point.y, size + 2.2, 0, TAU);
+      ctx.arc(point.x, point.y, markerGlow, 0, TAU);
       ctx.fill();
+      if (minimapNightStrength > 0.18) {
+        ctx.strokeStyle = withAlpha(color, 0.18 + minimapNightStrength * 0.2);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, markerGlow + 1.8, 0, TAU);
+        ctx.stroke();
+      }
       ctx.fillStyle = color;
       ctx.beginPath();
       if (shape === "triangle") {
@@ -8086,14 +8184,18 @@ const canvas = document.getElementById("game");
         .filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y))
         .map((point) => worldToMap(point.x, point.y));
       if (route.length < 2) return;
-      ctx.strokeStyle = withAlpha(color, alpha);
-      ctx.lineWidth = lineWidth;
+      ctx.strokeStyle = withAlpha(color, clamp(alpha + minimapNightStrength * 0.18, 0, 0.82));
+      ctx.lineWidth = lineWidth + minimapNightStrength * 0.55;
+      ctx.shadowColor = withAlpha(color, 0.24 + minimapNightStrength * 0.22);
+      ctx.shadowBlur = minimapNightStrength * 5;
       ctx.beginPath();
       ctx.moveTo(route[0].x, route[0].y);
       for (let i = 1; i < route.length; i++) {
         ctx.lineTo(route[i].x, route[i].y);
       }
       ctx.stroke();
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
     }
 
     if (!state.player.inHouse) {
