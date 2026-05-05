@@ -166,6 +166,24 @@ import {
   updateQuestProgressFromInventoryDataDriven,
 } from "./questDefinitions.js";
 import { NPC_DIALOGUE, DEATH_MESSAGES } from "./storyContent.js";
+import {
+  getAvailableDialogueChoices,
+  applyDialogueChoice,
+  ensureDialogueChoiceState,
+} from "./dialogueChoices.js";
+import {
+  DIFFICULTY_LEVELS,
+  resolveDifficultyProfile,
+  ensureDifficultyDefaults,
+  cycleDifficulty,
+  getEnemyHpMultiplier,
+  getEnemyDamageMultiplier,
+  getRewardMultiplier,
+} from "./difficultyTuning.js";
+import {
+  trySpeakBark,
+  resetBarkState,
+} from "./companionBarks.js";
 import { migrateSaveToV3 } from "./saveMigration.js";
 import {
   createInitialProgressionState,
@@ -1246,6 +1264,117 @@ const canvas = document.getElementById("game");
   let questOutcomeOpen = false;
   let questOutcomeSelection = 0;
   let pendingQuestOutcome = null;
+  let dialogueOpen = false;
+  let dialogueSelection = 0;
+  let pendingDialogue = null; // { npcId, npcName, choices: DialogueChoice[] }
+
+  function openDialogueChoiceFor(npcId, npcName) {
+    if (!state.narrative) return false;
+    ensureDialogueChoiceState(state.narrative);
+    const choices = getAvailableDialogueChoices(state.narrative, npcId);
+    if (!choices || choices.length === 0) return false;
+    pendingDialogue = { npcId, npcName: npcName || npcId, choices };
+    dialogueSelection = 0;
+    dialogueOpen = true;
+    shopOpen = false;
+    skillScreenOpen = false;
+    settingsOpen = false;
+    codexOpen = false;
+    characterSheetOpen = false;
+    jobBoardOpen = false;
+    questOutcomeOpen = false;
+    return true;
+  }
+
+  function confirmDialogueChoice() {
+    if (!pendingDialogue) return;
+    const choice = pendingDialogue.choices[dialogueSelection];
+    if (!choice) {
+      dialogueOpen = false;
+      pendingDialogue = null;
+      return;
+    }
+    const applied = applyDialogueChoice(state.narrative, pendingDialogue.npcId, choice.id);
+    if (applied) {
+      logMsg(applied.response);
+      logMsg(createDecisionRecap(state.narrative));
+    }
+    dialogueOpen = false;
+    pendingDialogue = null;
+  }
+
+  function closeDialogueChoice() {
+    dialogueOpen = false;
+    pendingDialogue = null;
+  }
+
+  const DIFFICULTY_SETTING_ROW = {
+    id: "difficulty",
+    label: "Difficulty",
+    kind: "enum",
+    options: DIFFICULTY_LEVELS,
+    target: "world",
+  };
+
+  function getCombinedSettingsRows() {
+    return [...SETTINGS_ROWS, DIFFICULTY_SETTING_ROW];
+  }
+
+  function readSettingsRowValue(row) {
+    if (row.target === "world") {
+      if (row.id === "difficulty") {
+        ensureDifficultyDefaults(state.world);
+        return resolveDifficultyProfile(state.world.difficulty).label;
+      }
+      return null;
+    }
+    return readSettingValue(state.graphics, row.id);
+  }
+
+  function stepSettingsRow(row, dir) {
+    if (row.target === "world") {
+      if (row.id === "difficulty") {
+        cycleDifficulty(state.world, dir);
+        const profile = resolveDifficultyProfile(state.world.difficulty);
+        logMsg(`Difficulty: ${profile.label} — ${profile.description}`);
+        return profile.label;
+      }
+      return null;
+    }
+    const next = stepSetting(state.graphics, row.id, dir);
+    if (row.id === "gradientCache") clearGradientCache();
+    if (row.id === "preset") {
+      state.weather.quality = state.graphics.preset === "high" ? "cinematic" : state.graphics.preset === "low" ? "performance" : "balanced";
+    }
+    logMsg(`${row.label}: ${typeof next === "boolean" ? (next ? "ON" : "OFF") : next}`);
+    return next;
+  }
+
+  function describeChoiceEffectTags(choice) {
+    const eff = choice?.effects || {};
+    const parts = [];
+    if (eff.axes) {
+      for (const [axis, delta] of Object.entries(eff.axes)) {
+        const sign = delta > 0 ? "+" : "";
+        const short = axis === "controlVsFreedom" ? "Control" : axis === "truthVsComfort" ? "Truth" : "Solidarity";
+        parts.push(`${short} ${sign}${delta}`);
+      }
+    }
+    if (eff.factionRep) {
+      for (const [f, delta] of Object.entries(eff.factionRep)) {
+        const sign = delta > 0 ? "+" : "";
+        const short = f === "civicCouncil" ? "Council" : f === "workersGuild" ? "Guild" : f === "marketCartel" ? "Cartel" : f;
+        parts.push(`${short} ${sign}${delta}`);
+      }
+    }
+    if (eff.npcAffinity) {
+      for (const [n, delta] of Object.entries(eff.npcAffinity)) {
+        const sign = delta > 0 ? "+" : "";
+        parts.push(`${n} ${sign}${delta}`);
+      }
+    }
+    return parts.join("  ·  ");
+  }
   const SKILL_BRANCH_LABELS = [
     { id: "survival", label: "Survival", desc: "Stamina pool, harvest yield, weather grit." },
     { id: "combat", label: "Combat", desc: "Damage, block window, crit chance." },
@@ -1876,6 +2005,7 @@ const canvas = document.getElementById("game");
     combat: { statusEffectsEnabled: true },
     world: {
       timeOfDay: 0.25,
+      difficulty: "standard",
       companionId: null,
       companionHp: null,
       companionDowned: false,
@@ -2018,10 +2148,13 @@ const canvas = document.getElementById("game");
 
   function spawnEnemies() {
     state.enemies = [];
+    const hpMult = getEnemyHpMultiplier(state.world);
+    const dmgMult = getEnemyDamageMultiplier(state.world);
     for (let i = 0; i < 16; i++) {
       const pos = findEmptyCell(worldMap, 10, 10, 53, 53, (x, y) => !isInHouseLot(x, y) && Math.hypot(x - 10, y - 8) > 6);
       const type = chooseEnemyType(state.player.level, state.weather.kind);
       const stats = createEnemyStats(type, state.player.level);
+      const scaledMax = Math.max(1, Math.round(stats.maxHp * hpMult));
       state.enemies.push({
         id: `slime-${i}`,
         type: stats.type,
@@ -2030,11 +2163,11 @@ const canvas = document.getElementById("game");
         behavior: stats.behavior,
         x: pos.x,
         y: pos.y,
-        hp: stats.hp,
-        maxHp: stats.maxHp,
+        hp: scaledMax,
+        maxHp: scaledMax,
         speed: stats.speed + Math.random() * 0.3,
         attackReach: stats.attackReach,
-        baseDamage: stats.baseDamage,
+        baseDamage: Math.max(1, Math.round(stats.baseDamage * dmgMult)),
         damageVariance: stats.damageVariance,
         attackCooldown: Math.random() * 0.75,
         alive: true,
@@ -2433,6 +2566,7 @@ const canvas = document.getElementById("game");
     if (state.world.companionId) {
       const def = chooseEligibleCompanion({ [state.world.companionId]: 100 }, 0);
       activateCompanion(state.companion, def, state.player, state.world.companionHp);
+      resetBarkState(state.companion);
       if (state.world.companionDowned) {
         state.companion.active = false;
         state.companion.downed = true;
@@ -2526,6 +2660,13 @@ const canvas = document.getElementById("game");
     if (state.msg.length > 8) state.msg.length = 8;
   }
 
+  function emitCompanionBark(eventType) {
+    if (!state.companion?.active) return null;
+    const line = trySpeakBark(state.companion, eventType, state.time || 0);
+    if (line) logMsg(line);
+    return line;
+  }
+
   function applyProgressionEffects() {
     state.progression.identity = normalizeCharacterIdentity(state.progression.identity);
     state.progression.equipment = normalizeGearState(state.progression.equipment);
@@ -2605,6 +2746,7 @@ const canvas = document.getElementById("game");
       sfx.levelUp();
       spawnParticles(canvas.width / 2, canvas.height / 2, 20, "#ffd700", 4, 1.5, { decorative: true });
       syncCombatProfileState({ announce: true });
+      emitCompanionBark("level_up");
     }
     syncChapterFromProgress(state.narrative, state.player.level);
     if (state.narrative.chapter !== previousChapter) {
@@ -2674,6 +2816,7 @@ const canvas = document.getElementById("game");
       flashTimer: 0,
     });
     logMsg(`Mini-boss prowling ${REGIONS[def.region]?.name || def.region}: ${def.label}.`);
+    emitCompanionBark("mini_boss");
   }
 
   function ensureRegionMiniBosses(regionId) {
@@ -2692,6 +2835,7 @@ const canvas = document.getElementById("game");
       logMsg("Region unlocked: Ashfall Basin. Heat haze now distorts the horizon.");
       ensureRegionMiniBosses("ashfall");
       unlockCodexEntry(state, "regions", "ashfall");
+      emitCompanionBark("region_entry");
     }
     if (state.player.level >= 7 && !state.regions.discovered.includes("ironlantern")) {
       unlockRegion(state.regions, "ironlantern");
@@ -2701,6 +2845,7 @@ const canvas = document.getElementById("game");
       logMsg("Region unlocked: Iron Lantern District. Surveillance pressure is rising.");
       ensureRegionMiniBosses("ironlantern");
       unlockCodexEntry(state, "regions", "ironlantern");
+      emitCompanionBark("region_entry");
     }
   }
 
@@ -2717,6 +2862,7 @@ const canvas = document.getElementById("game");
     const name = REGIONS[next]?.name || next;
     logMsg(`Travelled to region: ${name}.`);
     syncAmbientForRegion(next);
+    emitCompanionBark("region_entry");
   }
 
   function applySmokeBlind() {
@@ -2809,6 +2955,7 @@ const canvas = document.getElementById("game");
       spawnParticles(canvas.width / 2, canvas.height * 0.45, 14, "#cce4ff", 4, 0.55, { decorative: false });
       state.floatingTexts.push({ wx: state.player.x, wy: state.player.y, text: "PERFECT", life: 0.7, maxLife: 0.7, color: "#cce4ff" });
       logMsg("Perfect dodge!");
+      emitCompanionBark("perfect_dodge");
     } else {
       logMsg("Dodge step executed.");
     }
@@ -3708,6 +3855,7 @@ const canvas = document.getElementById("game");
           }
           return;
         }
+        if (openDialogueChoiceFor("elder", npc.name)) { sfx.npcChat(); return; }
         logMsg(storyReactiveQuip("elder") || choice(npcDialogue.elder.idle));
         if (Math.random() < 0.35) describeNpcBackground("elder");
         sfx.npcChat();
@@ -3753,6 +3901,7 @@ const canvas = document.getElementById("game");
           return;
         }
         if (handleBooneJobBoard()) return;
+        if (openDialogueChoiceFor("warden", npc.name)) { sfx.npcChat(); return; }
         logMsg(storyReactiveQuip("warden") || choice(npcDialogue.warden.idle));
         if (Math.random() < 0.35) describeNpcBackground("warden");
         sfx.npcChat();
@@ -3790,6 +3939,7 @@ const canvas = document.getElementById("game");
           state.player.hp = Math.min(state.player.maxHp, state.player.hp + 24);
           logMsg(`Quest done: ${q.title}. You now own the house! It even has a roof. Probably.`);
           sfx.questDone();
+          emitCompanionBark("house_unlock");
           spawnParticles(canvas.width / 2, canvas.height / 2, 25, "#d8bc6a", 4, 1.5, { decorative: true });
           if (!openQuestOutcomeChoice("wood")) {
             const decision = applyMajorDecision(state.narrative, "smith");
@@ -3805,6 +3955,7 @@ const canvas = document.getElementById("game");
           }
           return;
         }
+        if (openDialogueChoiceFor("smith", npc.name)) { sfx.npcChat(); return; }
         logMsg(storyReactiveQuip("smith") || choice(npcDialogue.smith.idle));
         logMsg(vendorServiceProfile("smith").priceNote);
         if (Math.random() < 0.35) describeNpcBackground("smith");
@@ -3813,6 +3964,7 @@ const canvas = document.getElementById("game");
       }
 
       if (npc.id === "merchant") {
+        if (!shopOpen && openDialogueChoiceFor("merchant", npc.name)) { sfx.npcChat(); return; }
         shopOpen = !shopOpen;
         shopSelection = 0;
         if (shopOpen) jobBoardOpen = false;
@@ -3834,6 +3986,7 @@ const canvas = document.getElementById("game");
           sfx.potionUse();
           logMsg("Innkeeper Mora patched your wounds for 8 gold. 'You owe me a tip.'");
         } else if (state.player.hp >= state.player.maxHp) {
+          if (openDialogueChoiceFor("innkeeper", "Innkeeper Mora")) { sfx.npcChat(); return; }
           logMsg(choice(npcDialogue.innkeeper.idle));
           if (Math.random() < 0.35) describeNpcBackground("innkeeper");
           sfx.npcChat();
@@ -4179,8 +4332,10 @@ const canvas = document.getElementById("game");
         state.inventory["Slime Core"] += 1;
         const civicBounty = state.narrative.globalFlags.curfewNormalized ? 3 : 0;
         const truthBonusXp = state.narrative.globalFlags.ledgerPublished ? 4 : 0;
-        state.player.gold += 10 + civicBounty;
-        grantXp(22 + truthBonusXp);
+        const rewardMult = getRewardMultiplier(state.world);
+        state.player.gold += Math.max(1, Math.round((10 + civicBounty) * rewardMult));
+        grantXp(Math.max(1, Math.round((22 + truthBonusXp) * rewardMult)));
+        emitCompanionBark("first_kill");
         const normalDefeatCallout = resolveEnemyDefeatCallout({
           label: enemy.label || "Slime",
           gold: 10 + civicBounty,
@@ -4713,6 +4868,7 @@ const canvas = document.getElementById("game");
     if (!state.companion.active) {
       const def = chooseEligibleCompanion(state.narrative?.npcAffinity);
       if (def && activateCompanion(state.companion, def, state.player, state.world?.companionHp)) {
+        resetBarkState(state.companion);
         state.world.companionId = def.id;
         state.world.companionHp = state.companion.hp;
         state.world.companionDowned = false;
@@ -4917,11 +5073,14 @@ const canvas = document.getElementById("game");
           enemy.label = stats.label;
           enemy.color = stats.color;
           enemy.behavior = stats.behavior;
-          enemy.maxHp = stats.maxHp;
-          enemy.hp = stats.maxHp;
+          const _hpMult = getEnemyHpMultiplier(state.world);
+          const _dmgMult = getEnemyDamageMultiplier(state.world);
+          const _scaledHp = Math.max(1, Math.round(stats.maxHp * _hpMult));
+          enemy.maxHp = _scaledHp;
+          enemy.hp = _scaledHp;
           enemy.speed = stats.speed;
           enemy.attackReach = stats.attackReach;
-          enemy.baseDamage = stats.baseDamage;
+          enemy.baseDamage = Math.max(1, Math.round(stats.baseDamage * _dmgMult));
           enemy.damageVariance = stats.damageVariance;
           enemy.alive = true;
           enemy.attackCooldown = 0.7;
@@ -5038,6 +5197,7 @@ const canvas = document.getElementById("game");
                 spawnParticles(canvas.width / 2, canvas.height * 0.45, 12, "#cce4ff", 4, 0.45, { decorative: false });
                 logMsg(parry.chained ? "Parry chain! Enemy interrupted." : "Perfect parry! Riposte primed.");
                 sfx.blockHit();
+                emitCompanionBark("perfect_parry");
               } else if (facingDiff < 1.12 && player.stamina > 10) {
                 damage = Math.max(mitigated.chip, Math.floor(mitigated.blocked * stance.blockPenalty * (1 - blockBonus)));
                 player.stamina = Math.max(0, player.stamina - 11 * (1 - blockBonus * 0.5));
@@ -5064,6 +5224,9 @@ const canvas = document.getElementById("game");
             player.screenShake = clamp(player.screenShake + 0.6, 0, 1);
             logMsg(`A slime strikes for ${damage}. ${choice(["Ow!", "That stings!", "Gross AND painful!", "It's so slimy!"])}`);
             sfx.playerHurt();
+            if (player.hp > 0 && player.hp / Math.max(1, player.maxHp) <= 0.25) {
+              emitCompanionBark("low_hp");
+            }
 
             if (player.hp <= 0) {
               player.hp = 0;
@@ -7390,13 +7553,14 @@ const canvas = document.getElementById("game");
         [`Mini-bosses`, String(summary.miniBossKills)],
         [`Resources`, String(summary.resourcesHarvested)],
         [`Quest outcomes`, String(summary.questOutcomesCount)],
+        [`Dialogue picks`, String(summary.dialogueChoicesCount || 0)],
         [`Gold`, String(summary.gold)],
         [`Level`, String(summary.level)],
         [`Companion`, summary.companion],
       ];
       for (let i = 0; i < rows.length; i++) {
-        const x = i < 4 ? leftX : rightX;
-        const y = py + 135 + (i % 4) * 23;
+        const x = i < 5 ? leftX : rightX;
+        const y = py + 135 + (i % 5) * 23;
         drawClippedText(`${rows[i][0]}: ${rows[i][1]}`, x, y, panelW * 0.44, "#e6d8bd");
       }
 
@@ -7418,6 +7582,36 @@ const canvas = document.getElementById("game");
       }
       ctx.font = "italic 11px Georgia";
       drawClippedText("Progress is saved. Load this ending from the title screen later.", px + 22, py + panelH - 20, panelW - 44, "#b8a792");
+    }
+
+    /* Dialogue choice overlay (lite) */
+    if (dialogueOpen && pendingDialogue && state.mode === "playing") {
+      const choices = pendingDialogue.choices;
+      const sw = Math.min(520, canvas.width - margin * 2);
+      const sh = 122 + choices.length * 64;
+      const sx = Math.floor((canvas.width - sw) / 2);
+      const sy = Math.floor((canvas.height - sh) / 2);
+      drawSoftPanel(sx, sy, sw, sh, {
+        top: "rgba(18, 24, 32, 0.95)",
+        bottom: "rgba(8, 12, 18, 0.94)",
+        border: "rgba(168, 215, 255, 0.56)",
+      });
+      ctx.font = "bold 18px Georgia";
+      drawClippedText(`Speaking with ${pendingDialogue.npcName}`, sx + 18, sy + 30, sw - 36, "#cce4ff");
+      ctx.font = "12px Georgia";
+      drawClippedText("↑/↓ select  Enter say it  Esc back", sx + 18, sy + 50, sw - 36, "#a9b8d0");
+      for (let i = 0; i < choices.length; i++) {
+        const c = choices[i];
+        const iy = sy + 68 + i * 64;
+        const selected = i === dialogueSelection;
+        fillRoundedRect(sx + 10, iy, sw - 20, 56, 7, selected ? "rgba(168, 215, 255, 0.22)" : "rgba(255,255,255,0.06)");
+        if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 55, 7, "#cce4ff", 1);
+        ctx.font = "bold 13px Georgia";
+        drawClippedText(`> ${c.prompt}`, sx + 22, iy + 20, sw - 44, selected ? "#cce4ff" : "#f3ecd8");
+        ctx.font = "italic 11px Georgia";
+        const tags = describeChoiceEffectTags(c);
+        drawClippedText(tags || `Chapter ${c.chapter || 1}`, sx + 22, iy + 40, sw - 44, "#9aa6bf");
+      }
     }
 
     /* Quest outcome overlay */
@@ -7542,8 +7736,9 @@ const canvas = document.getElementById("game");
 
     /* Settings overlay */
     if (settingsOpen && state.mode === "playing") {
+      const rows = getCombinedSettingsRows();
       const sw = Math.min(440, canvas.width - margin * 2);
-      const sh = SETTINGS_ROWS.length * 44 + 110;
+      const sh = rows.length * 44 + 110;
       const sx = Math.floor((canvas.width - sw) / 2);
       const sy = Math.floor((canvas.height - sh) / 2);
       drawSoftPanel(sx, sy, sw, sh, {
@@ -7555,15 +7750,15 @@ const canvas = document.getElementById("game");
       drawClippedText("Settings", sx + 16, sy + 30, sw - 32, "#cce4ff");
       ctx.font = "12px Georgia";
       drawClippedText("↑/↓ select  ←/→ change  Esc close", sx + 16, sy + 50, sw - 32, "#a9b8d0");
-      for (let i = 0; i < SETTINGS_ROWS.length; i++) {
-        const row = SETTINGS_ROWS[i];
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
         const iy = sy + 70 + i * 44;
         const selected = i === settingsSelection;
         fillRoundedRect(sx + 8, iy, sw - 16, 38, 7, selected ? "rgba(168, 215, 255, 0.22)" : "rgba(255, 255, 255, 0.05)");
         if (selected) strokeRoundedRect(sx + 8.5, iy + 0.5, sw - 17, 37, 7, "#cce4ff", 1);
         ctx.font = "bold 14px Georgia";
         drawClippedText(row.label, sx + 20, iy + 16, sw * 0.55, selected ? "#cce4ff" : "#f3ecd8");
-        const value = readSettingValue(state.graphics, row.id);
+        const value = readSettingsRowValue(row);
         let valueText;
         if (row.kind === "bool") valueText = value ? "ON" : "OFF";
         else if (row.kind === "range") valueText = row.format ? row.format(value) : String(value);
@@ -7851,6 +8046,33 @@ const canvas = document.getElementById("game");
   document.addEventListener("keydown", (event) => {
     state.keys[event.code] = true;
 
+    /* Dialogue choice modal controls */
+    if (dialogueOpen && pendingDialogue) {
+      const len = pendingDialogue.choices.length || 1;
+      if (event.code === "ArrowUp" || event.code === "KeyW") {
+        dialogueSelection = (dialogueSelection - 1 + len) % len;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "ArrowDown" || event.code === "KeyS") {
+        dialogueSelection = (dialogueSelection + 1) % len;
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "Enter" || event.code === "Space") {
+        confirmDialogueChoice();
+        event.preventDefault();
+        return;
+      }
+      if (event.code === "Escape") {
+        closeDialogueChoice();
+        event.preventDefault();
+        return;
+      }
+      event.preventDefault();
+      return;
+    }
+
     /* Quest outcome modal controls */
     if (questOutcomeOpen && pendingQuestOutcome) {
       const len = pendingQuestOutcome.outcomes.length || 1;
@@ -7972,25 +8194,21 @@ const canvas = document.getElementById("game");
 
     /* Settings modal controls */
     if (settingsOpen) {
+      const rows = getCombinedSettingsRows();
       if (event.code === "ArrowUp" || event.code === "KeyW") {
-        settingsSelection = (settingsSelection - 1 + SETTINGS_ROWS.length) % SETTINGS_ROWS.length;
+        settingsSelection = (settingsSelection - 1 + rows.length) % rows.length;
         event.preventDefault();
         return;
       }
       if (event.code === "ArrowDown" || event.code === "KeyS") {
-        settingsSelection = (settingsSelection + 1) % SETTINGS_ROWS.length;
+        settingsSelection = (settingsSelection + 1) % rows.length;
         event.preventDefault();
         return;
       }
       if (event.code === "ArrowLeft" || event.code === "ArrowRight" || event.code === "Enter" || event.code === "Space" || event.code === "KeyA" || event.code === "KeyD") {
-        const row = SETTINGS_ROWS[settingsSelection];
+        const row = rows[settingsSelection];
         const dir = (event.code === "ArrowLeft" || event.code === "KeyA") ? -1 : 1;
-        const next = stepSetting(state.graphics, row.id, dir);
-        if (row.id === "gradientCache") clearGradientCache();
-        if (row.id === "preset") {
-          state.weather.quality = state.graphics.preset === "high" ? "cinematic" : state.graphics.preset === "low" ? "performance" : "balanced";
-        }
-        logMsg(`${row.label}: ${typeof next === "boolean" ? (next ? "ON" : "OFF") : next}`);
+        stepSettingsRow(row, dir);
         event.preventDefault();
         return;
       }

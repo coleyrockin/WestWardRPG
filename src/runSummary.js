@@ -77,6 +77,7 @@ export function buildRunSummary(world, narrative, player, companion, now = 0) {
     miniBossKills: stats.miniBossKills,
     resourcesHarvested: stats.resourcesHarvested,
     questOutcomesCount: stats.questOutcomesCount,
+    dialogueChoicesCount: Object.keys(narrative?.dialogueChoicesTaken || {}).length,
     deaths: Math.max(0, Math.floor(player?.deaths || 0)),
     level: Math.max(1, Math.floor(player?.level || 1)),
     gold: Math.max(0, Math.floor(player?.gold || 0)),

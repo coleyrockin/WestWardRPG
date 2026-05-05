@@ -75,6 +75,10 @@ function backfillWorldDefaults(world, now = 0) {
   if (typeof next.timeOfDay !== "number" || !isFinite(next.timeOfDay)) {
     next.timeOfDay = 0.25;
   }
+  const difficultyIds = ["beginner", "standard", "hard"];
+  if (!difficultyIds.includes(next.difficulty)) {
+    next.difficulty = "standard";
+  }
   if (typeof next.companionId !== "string") {
     next.companionId = null;
   }
@@ -147,6 +151,9 @@ function backfillNarrativeDefaults(narrative) {
     questOutcomes: source.questOutcomes && typeof source.questOutcomes === "object"
       ? source.questOutcomes
       : defaults.questOutcomes,
+    dialogueChoicesTaken: source.dialogueChoicesTaken && typeof source.dialogueChoicesTaken === "object"
+      ? source.dialogueChoicesTaken
+      : {},
   };
   next.npcMemory = normalizeNpcMemoryState(next.npcMemory);
   return next;

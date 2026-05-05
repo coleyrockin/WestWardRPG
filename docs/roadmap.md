@@ -260,7 +260,12 @@ It needs the existing systems to feel connected in the player's first short sess
 
 ## Shipped Foundations (audit)
 
-Latest audit: `npm test` → 380 passing across 38 test files; 39 source modules (~15.7k LOC); 14 Playwright scenarios. Commit `1b64cf4` is the current head on `main`.
+Latest audit: `npm test` → 427 passing across 41 test files; 42 source modules; 14 Playwright scenarios. Commit `dcda2a8+` is the current head on `main`.
+
+### Phase 4 + Phase 5 partial closeouts (latest)
+- **Lite dialogue choices** (`src/dialogueChoices.js`) — chapter-gated 2–3 choice modal for Elder, Warden, Smith, Trader, Innkeeper. Each choice applies axis / faction-rep / NPC-affinity deltas, records a `narrative.dialogueChoicesTaken` flag, and feeds run summary. Modal hooked into existing E-key NPC interact path.
+- **Difficulty selector** (`src/difficultyTuning.js`) — Beginner / Standard / Hard scales enemy HP × 0.7/1.0/1.5, enemy damage × 0.7/1.0/1.35, reward × 1.1/1.0/1.2. Surfaced as a settings-modal row driven by `state.world.difficulty`. Save migration backfills.
+- **Companion barks** (`src/companionBarks.js`) — per-companion personality lines (Cogwheel / Nora / Boone) for low-HP, first-kill, mini-boss, region-entry, house-unlock, perfect-dodge, perfect-parry, level-up, boss-phase. Global cooldown + per-event cooldown keep them rare. `Infinity` cd marks once-per-run events.
 
 ### Engine and rendering
 - `src/render.js` — pure helpers (`hexToRgba`, `gradientBucket`, `createGradientCache`) plus ctx-bound factory `createRenderHelpers(ctx)`; raycaster math helpers `resolveWallProjection`, `resolveNearWallVisualTreatment`, and `resolveObjectiveStripLayout` so the wall renderer stays testable.
