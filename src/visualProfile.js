@@ -20,16 +20,20 @@ export function buildVisualMood({ weather, chapterIndex, day, qualitySetting, bi
   const stormBoost = weather.kind === "storm" ? 0.22 : weather.kind === "rain" ? 0.12 : 0;
   const sandstormBoost = weather.kind === "sandstorm" ? 0.2 : 0;
   const duskFactor = 1 - Math.abs(day - 0.5) * 2;
+  const nightStrength = Math.max(0, Math.min(1, (0.34 - day) / 0.34));
+  const duskStrength = Math.max(0, Math.min(1, duskFactor));
   const biomeGrade = BIOME_GRADE_PROFILES[biome] || BIOME_GRADE_PROFILES.frontier;
   return {
     fogStrength: (weather.fog * (0.75 + chapterBoost) + stormBoost + sandstormBoost) * quality.fogWeight,
-    vignetteStrength: (0.25 + stormBoost + (1 - day) * 0.2) * quality.vignetteWeight,
+    vignetteStrength: (0.25 + stormBoost + (1 - day) * 0.2 + nightStrength * 0.18) * quality.vignetteWeight,
     particleMultiplier: (0.7 + weather.rain * 0.9 + chapterBoost) * quality.particlesWeight,
     shimmerStrength: (weather.rain * 0.28 + weather.wind * 0.22) * quality.shimmerWeight,
-    bloomStrength: (0.15 + stormBoost * 0.5 + duskFactor * 0.2 + chapterBoost * 0.3) * quality.shimmerWeight,
+    bloomStrength: (0.15 + stormBoost * 0.5 + duskFactor * 0.2 + nightStrength * 0.16 + chapterBoost * 0.3) * quality.shimmerWeight,
     gradeStrength: 0.12 + chapterBoost * 0.26 + stormBoost * 0.15,
     rainDepthStrength: (weather.rain * 0.8 + stormBoost + sandstormBoost * 0.4) * quality.rainDepthWeight,
-    dynamicLightStrength: (0.35 + weather.lightning * 0.4 + stormBoost * 0.4) * quality.lightWeight,
+    dynamicLightStrength: (0.35 + nightStrength * 0.42 + duskStrength * 0.12 + weather.lightning * 0.4 + stormBoost * 0.4) * quality.lightWeight,
+    nightStrength,
+    duskStrength,
     silhouetteStrength: 0.16 + chapterBoost * 0.12 + stormBoost * 0.08,
     factionCueStrength: 0.22 + chapterBoost * 0.08,
     weatherHazardTint: sandstormBoost > 0 ? { r: 190, g: 126, b: 78, a: 0.22 + sandstormBoost * 0.2 } : null,

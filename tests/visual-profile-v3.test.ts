@@ -35,4 +35,25 @@ describe("visualProfile v3", () => {
     expect(mood.contrastBoost).toBeGreaterThanOrEqual(1);
     expect(mood.rainDepthStrength).toBeGreaterThan(0);
   });
+
+  it("raises light emphasis and darkness at night", () => {
+    const day = buildVisualMood({
+      weather,
+      chapterIndex: 0,
+      day: 0.8,
+      qualitySetting: "balanced",
+      biome: "frontier",
+    });
+    const night = buildVisualMood({
+      weather,
+      chapterIndex: 0,
+      day: 0.1,
+      qualitySetting: "balanced",
+      biome: "frontier",
+    });
+
+    expect(night.nightStrength).toBeGreaterThan(day.nightStrength);
+    expect(night.dynamicLightStrength).toBeGreaterThan(day.dynamicLightStrength);
+    expect(night.vignetteStrength).toBeGreaterThan(day.vignetteStrength);
+  });
 });

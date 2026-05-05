@@ -7203,6 +7203,51 @@ const canvas = document.getElementById("game");
     }
   }
 
+  function resolveWorldNightStrength() {
+    const t = state.world?.timeOfDay;
+    if (!Number.isFinite(t)) return 0;
+    if (t < 0.22) return clamp(1 - t / 0.22, 0, 1);
+    if (t > 0.72) return clamp((t - 0.72) / 0.28, 0, 1);
+    return 0;
+  }
+
+  function drawNightContrastOverlay(width, height, horizon, visualMood) {
+    if (state.player.inHouse) return;
+    const night = clamp(numberOr(visualMood?.nightStrength, 0), 0, 1);
+    const dusk = clamp(numberOr(visualMood?.duskStrength, 0), 0, 1);
+    const alpha = clamp(night * 0.34 + dusk * 0.07, 0, 0.42);
+    if (alpha <= 0.01) return;
+    const regionId = visualMood?.regionProfile?.id || state.regions.activeRegion;
+    const tint = regionId === "ironlantern"
+      ? { r: 4, g: 12, b: 28 }
+      : regionId === "ashfall"
+        ? { r: 30, g: 13, b: 8 }
+        : { r: 6, g: 13, b: 21 };
+    const veil = ctx.createLinearGradient(0, 0, 0, height);
+    veil.addColorStop(0, `rgba(${tint.r}, ${tint.g}, ${tint.b + 10}, ${alpha * 0.8})`);
+    veil.addColorStop(0.55, `rgba(${tint.r}, ${tint.g}, ${tint.b}, ${alpha})`);
+    veil.addColorStop(1, `rgba(${tint.r}, ${tint.g}, ${tint.b}, ${alpha * 1.15})`);
+    ctx.fillStyle = veil;
+    ctx.fillRect(0, 0, width, height);
+
+    const horizonGlow = ctx.createLinearGradient(0, horizon - 44, 0, horizon + 68);
+    if (regionId === "ironlantern") {
+      horizonGlow.addColorStop(0, "rgba(105, 171, 255, 0)");
+      horizonGlow.addColorStop(0.58, `rgba(105, 171, 255, ${0.05 + night * 0.08})`);
+      horizonGlow.addColorStop(1, "rgba(105, 171, 255, 0)");
+    } else if (regionId === "ashfall") {
+      horizonGlow.addColorStop(0, "rgba(255, 138, 76, 0)");
+      horizonGlow.addColorStop(0.58, `rgba(255, 138, 76, ${0.05 + night * 0.08})`);
+      horizonGlow.addColorStop(1, "rgba(255, 138, 76, 0)");
+    } else {
+      horizonGlow.addColorStop(0, "rgba(255, 215, 123, 0)");
+      horizonGlow.addColorStop(0.58, `rgba(255, 215, 123, ${0.04 + night * 0.06})`);
+      horizonGlow.addColorStop(1, "rgba(255, 215, 123, 0)");
+    }
+    ctx.fillStyle = horizonGlow;
+    ctx.fillRect(0, horizon - 44, width, 112);
+  }
+
   function render3D() {
     const width = canvas.width;
     const height = canvas.height;
@@ -7216,6 +7261,9 @@ const canvas = document.getElementById("game");
     });
     visualMoodBase.regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const visualMood = applyGraphicsAccessibility(visualMoodBase, state.graphics.accessibility);
+    const worldNightStrength = resolveWorldNightStrength();
+    visualMood.nightStrength = Math.max(numberOr(visualMood.nightStrength, 0), worldNightStrength);
+    visualMood.dynamicLightStrength = numberOr(visualMood.dynamicLightStrength, 0.35) + worldNightStrength * 0.24;
     latestParticleMultiplier = clamp(numberOr(visualMood.particleMultiplier, 1), 0, 1);
     latestColorblindPalette = getColorblindPalette(visualMood.colorblindMode);
     const gradientCacheEnabled = isGradientCacheEnabled();
@@ -7326,6 +7374,7 @@ const canvas = document.getElementById("game");
       }
     }
     ctx.imageSmoothingEnabled = true;
+    drawNightContrastOverlay(width, height, horizon, visualMood);
     drawDynamicLightPools(sceneLights, horizon, width, height, shakeX, visualMood);
 
     const sprites = [];
@@ -7603,6 +7652,17 @@ const canvas = document.getElementById("game");
         { time: state.time, strength: visualMood.dynamicLightStrength },
       );
       const light = clamp(1 - sprite.distToPlayer / MAX_RAY_DIST + visualMood.dynamicLightStrength * 0.08 + spriteLight.alpha * 0.36, 0.25, 1.24);
+      if (spriteLight.active && spriteLight.alpha > 0.08) {
+        const haloRadius = clamp(spriteWidth * (0.58 + spriteLight.alpha * 0.9), 8, width * 0.18);
+        const halo = ctx.createRadialGradient(left + spriteWidth * 0.5, top + spriteHeight * 0.48, 0, left + spriteWidth * 0.5, top + spriteHeight * 0.48, haloRadius);
+        halo.addColorStop(0, `rgba(${spriteLight.r}, ${spriteLight.g}, ${spriteLight.b}, ${clamp(spriteLight.alpha * 0.18, 0, 0.28)})`);
+        halo.addColorStop(1, `rgba(${spriteLight.r}, ${spriteLight.g}, ${spriteLight.b}, 0)`);
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = halo;
+        ctx.fillRect(left + spriteWidth * 0.5 - haloRadius, top + spriteHeight * 0.48 - haloRadius, haloRadius * 2, haloRadius * 2);
+        ctx.restore();
+      }
       drawBillboardSprite(sprite, left, top, spriteWidth, spriteHeight, light);
 
       if (sprite.kind === "enemy") {
@@ -9622,6 +9682,9 @@ const canvas = document.getElementById("game");
     });
     textVisualMoodBase.regionProfile = regionProfile;
     const textVisualMood = applyGraphicsAccessibility(textVisualMoodBase, state.graphics.accessibility);
+    const textWorldNightStrength = resolveWorldNightStrength();
+    textVisualMood.nightStrength = Math.max(numberOr(textVisualMood.nightStrength, 0), textWorldNightStrength);
+    textVisualMood.dynamicLightStrength = numberOr(textVisualMood.dynamicLightStrength, 0.35) + textWorldNightStrength * 0.24;
     const dynamicLightSnapshot = collectSceneDynamicLights(worldPresentation, textVisualMood)
       .map((light) => ({
         id: light.id,
@@ -9831,6 +9894,8 @@ const canvas = document.getElementById("game");
         active_count: dynamicLightSnapshot.length,
         max_active: 8,
         strength: Number((textVisualMood.dynamicLightStrength || 0).toFixed(2)),
+        night_strength: Number((textVisualMood.nightStrength || 0).toFixed(2)),
+        dusk_strength: Number((textVisualMood.duskStrength || 0).toFixed(2)),
         lights: dynamicLightSnapshot,
       },
       house: {
