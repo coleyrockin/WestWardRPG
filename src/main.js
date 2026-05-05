@@ -176,6 +176,12 @@ import {
   createFactionRepNotice,
 } from "./hudNotice.js";
 import {
+  buildJobObjective,
+  buildQuestHudLines,
+  resolveLiveObjectiveLine,
+  selectLiveObjective,
+} from "./hudObjectives.js";
+import {
   resolveMinimapDotStyle,
   resolveMinimapMarkerStyle,
   resolveMinimapPolylineStyle,
@@ -266,6 +272,7 @@ import {
   createRenderHelpers,
   resolveNearWallVisualTreatment,
   resolveObjectiveStripLayout,
+  resolveScrollableRowWindow,
   resolveWallProjection,
 } from "./render.js";
 import {
@@ -8433,39 +8440,17 @@ const canvas = document.getElementById("game");
   }
 
   function drawHud() {
-    const q1 = state.quests.crystal;
-    const q2 = state.quests.slime;
-    const q3 = state.quests.wood;
-    const q4 = state.quests.archive;
-    const q5 = state.quests.ashfall_intro;
-    const q6 = state.quests.ashfall_boss;
-    const q7 = state.quests.lantern_probe;
-    const q8 = state.quests.lantern_revolt;
     const activeJob = getActiveJobSummary(state.world.jobs);
-    const jobLine = activeJob
-      ? `Job: ${activeJob.title}: ${activeJob.status === "ready" ? `Return to ${activeJob.npcName}` : activeJob.progressLine}`
-      : "";
-    const questLines = [
-      `${q1.title}: ${q1.status === "locked" ? t("labels.locked") : q1.status === "turned_in" ? t("labels.done") : `${q1.progress}/${q1.need}${q1.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
-      `${q2.title}: ${q2.status === "locked" ? t("labels.locked") : q2.status === "turned_in" ? t("labels.done") : `${q2.progress}/${q2.need}${q2.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
-      `${q3.title}: ${q3.status === "locked" ? t("labels.locked") : q3.status === "turned_in" ? t("labels.done") : `${Math.min(q3.needWood, state.inventory.Wood)}/${q3.needWood}W ${Math.min(q3.needStone, state.inventory.Stone)}/${q3.needStone}S${q3.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`,
-      jobLine,
-      q4
-        ? `${q4.title}: ${q4.status === "locked" ? t("labels.locked") : q4.status === "turned_in" ? t("labels.done") : `${q4.progress}/${q4.need}${q4.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`
-        : "",
-      q5
-        ? `${q5.title}: ${q5.status === "locked" ? t("labels.locked") : q5.status === "turned_in" ? t("labels.done") : `${q5.progress}/${q5.need}${q5.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`
-        : "",
-      q6
-        ? `${q6.title}: ${q6.status === "locked" ? t("labels.locked") : q6.status === "turned_in" ? t("labels.done") : `${q6.progress}/${q6.need}${q6.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`
-        : "",
-      q7
-        ? `${q7.title}: ${q7.status === "locked" ? t("labels.locked") : q7.status === "turned_in" ? t("labels.done") : `${q7.progress}/${q7.need}${q7.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`
-        : "",
-      q8
-        ? `${q8.title}: ${q8.status === "locked" ? t("labels.locked") : q8.status === "turned_in" ? t("labels.done") : `${q8.progress}/${q8.need}${q8.status === "complete" ? ` ${t("labels.turnIn")}` : ""}`}`
-        : "",
-    ];
+    const questLines = buildQuestHudLines({
+      quests: state.quests,
+      inventory: state.inventory,
+      activeJob,
+      labels: {
+        locked: t("labels.locked"),
+        done: t("labels.done"),
+        turnIn: t("labels.turnIn"),
+      },
+    });
 
     const margin = canvas.width < 620 ? 8 : 12;
     const compact = canvas.width < 560;
@@ -8582,17 +8567,7 @@ const canvas = document.getElementById("game");
     const roadRouteObjective = getRoadRouteObjective();
     const jobMarker = getJobRouteMarker();
     const boardProp = getActiveJobBoardProp();
-    const jobObjective = activeJob
-      ? {
-        title: activeJob.status === "ready" ? "Job ready" : (activeJob.status === "failed" ? "Job failed" : "Job route"),
-        line: activeJob.status === "ready"
-          ? `Return to ${activeJob.npcName} for ${activeJob.rewardLine}${jobMarker?.distanceLine ? ` (${jobMarker.distanceLine})` : ""}`
-          : activeJob.status === "failed"
-            ? `Report to ${activeJob.npcName}: ${activeJob.progressLine}${jobMarker?.distanceLine ? ` (${jobMarker.distanceLine})` : ""}`
-            : `${activeJob.title}: ${jobMarker?.objectiveLine || `${jobMarker?.regionHint ? `${jobMarker.regionHint} • ` : ""}${activeJob.progressLine}${jobMarker?.checkpointIndex ? ` • ${jobMarker.checkpointIndex}/${jobMarker.checkpointTotal}` : ""}${jobMarker?.distanceLine ? ` • ${jobMarker.distanceLine}` : ""}`}`,
-        urgency: activeJob.status === "ready" || activeJob.status === "failed" ? "high" : "medium",
-      }
-      : null;
+    const jobObjective = buildJobObjective({ activeJob, jobMarker });
     const openingRouteGuide = resolveOpeningRouteGuide({
       mode: state.mode,
       time: state.time,
@@ -8608,8 +8583,8 @@ const canvas = document.getElementById("game");
       jobMarker,
       boardProp,
     });
-    const liveObjective = openingRouteGuide || firstPressure || jobObjective || roadSignPrompt || roadRouteObjective || openingObjective || roadDiscoveryLead || explorationLead;
-    const liveObjectiveLine = liveObjective?.objectiveLine || liveObjective?.line;
+    const liveObjective = selectLiveObjective([openingRouteGuide, firstPressure, jobObjective, roadSignPrompt, roadRouteObjective, openingObjective, roadDiscoveryLead, explorationLead]);
+    const liveObjectiveLine = resolveLiveObjectiveLine(liveObjective);
     if (liveObjective && msgY <= topY + topH - 10) {
       ctx.font = "bold 11px Georgia";
       drawClippedText(`→ ${liveObjectiveLine}`, topX + 10, msgY, topW - 20, liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "#ffd77b" : "#f3e8cf");
@@ -8992,9 +8967,20 @@ const canvas = document.getElementById("game");
     if (shopOpen && state.mode === "playing") {
       const merchantService = vendorServiceProfile("merchant");
       const sw = Math.min(420, canvas.width - margin * 2);
-      const visibleShopRows = Math.min(shopItems.length, Math.max(5, Math.floor((canvas.height - margin * 2 - 92) / 52)));
-      const firstShopRow = clamp(shopSelection - Math.floor(visibleShopRows / 2), 0, Math.max(0, shopItems.length - visibleShopRows));
-      const sh = visibleShopRows * 52 + 110;
+      const shopWindow = resolveScrollableRowWindow({
+        itemCount: shopItems.length,
+        selectedIndex: shopSelection,
+        canvasHeight: canvas.height,
+        margin,
+        rowHeight: 52,
+        headerHeight: 110,
+        minRows: 5,
+        maxRows: shopItems.length || 1,
+        emptyRows: 0,
+      });
+      const visibleShopRows = shopWindow.visibleRows;
+      const firstShopRow = shopWindow.firstIndex;
+      const sh = shopWindow.height;
       const sx = Math.floor((canvas.width - sw) / 2);
       const sy = Math.floor((canvas.height - sh) / 2);
 
@@ -9045,9 +9031,20 @@ const canvas = document.getElementById("game");
       const boardCopy = getJobBoardPresentation({ regionId: state.regions.activeRegion });
       if (jobBoardSelection >= choices.length) jobBoardSelection = Math.max(0, choices.length - 1);
       const sw = Math.min(540, canvas.width - margin * 2);
-      const rows = Math.max(1, Math.min(7, choices.length || 1, Math.max(3, Math.floor((canvas.height - margin * 2 - 108) / 78))));
-      const firstJobRow = clamp(jobBoardSelection - Math.floor(rows / 2), 0, Math.max(0, choices.length - rows));
-      const sh = rows * 78 + 108;
+      const jobWindow = resolveScrollableRowWindow({
+        itemCount: choices.length,
+        selectedIndex: jobBoardSelection,
+        canvasHeight: canvas.height,
+        margin,
+        rowHeight: 78,
+        headerHeight: 108,
+        minRows: 3,
+        maxRows: 7,
+        emptyRows: 1,
+      });
+      const rows = jobWindow.visibleRows;
+      const firstJobRow = jobWindow.firstIndex;
+      const sh = jobWindow.height;
       const sx = Math.floor((canvas.width - sw) / 2);
       const sy = Math.floor((canvas.height - sh) / 2);
       drawSoftPanel(sx, sy, sw, sh, {

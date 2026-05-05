@@ -6,6 +6,7 @@ import {
   createRenderHelpers,
   resolveNearWallVisualTreatment,
   resolveObjectiveStripLayout,
+  resolveScrollableRowWindow,
   resolveWallProjection,
 } from "../src/render.js";
 
@@ -169,6 +170,42 @@ describe("render — resolveObjectiveStripLayout", () => {
       y: 112,
       h: 28,
       primaryY: 130,
+    });
+  });
+});
+
+describe("render — resolveScrollableRowWindow", () => {
+  it("centers the selected row while clamping to the available item range", () => {
+    expect(resolveScrollableRowWindow({
+      itemCount: 12,
+      selectedIndex: 6,
+      canvasHeight: 520,
+      margin: 12,
+      rowHeight: 52,
+      headerHeight: 110,
+      minRows: 5,
+      maxRows: 7,
+    })).toMatchObject({
+      visibleRows: 7,
+      firstIndex: 3,
+      height: 474,
+    });
+  });
+
+  it("preserves empty overlay rows for empty lists", () => {
+    expect(resolveScrollableRowWindow({
+      itemCount: 0,
+      selectedIndex: 0,
+      canvasHeight: 320,
+      rowHeight: 78,
+      headerHeight: 108,
+      minRows: 3,
+      maxRows: 7,
+      emptyRows: 1,
+    })).toMatchObject({
+      visibleRows: 1,
+      firstIndex: 0,
+      height: 186,
     });
   });
 });

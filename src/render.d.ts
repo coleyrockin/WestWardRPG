@@ -12,6 +12,7 @@ export function createGradientCache(): GradientCache;
 export function resolveWallProjection(options?: any): any;
 export function resolveNearWallVisualTreatment(options?: any): any;
 export function resolveObjectiveStripLayout(options?: any): any;
+export function resolveScrollableRowWindow(options?: any): any;
 
 export interface RenderHelpers {
   roundedRectPath(x: number, y: number, w: number, h: number, radius?: number): void;

@@ -107,6 +107,27 @@ export function resolveObjectiveStripLayout(options = {}) {
   };
 }
 
+export function resolveScrollableRowWindow(options = {}) {
+  const itemCount = Math.max(0, Math.floor(options.itemCount || 0));
+  const selectedIndex = Math.max(0, Math.floor(options.selectedIndex || 0));
+  const rowHeight = Math.max(1, options.rowHeight || 1);
+  const headerHeight = Math.max(0, options.headerHeight || 0);
+  const maxRows = Math.max(1, Math.floor(options.maxRows || itemCount || 1));
+  const minRows = Math.max(1, Math.floor(options.minRows || 1));
+  const emptyRows = Math.max(0, Math.floor(options.emptyRows ?? 1));
+  const availableRows = Math.max(minRows, Math.floor(((options.canvasHeight || 0) - (options.margin || 0) * 2 - headerHeight) / rowHeight));
+  const visibleRows = Math.min(itemCount || emptyRows, maxRows, availableRows);
+  const firstIndex = Math.max(0, Math.min(
+    Math.max(0, itemCount - visibleRows),
+    selectedIndex - Math.floor(visibleRows / 2),
+  ));
+  return {
+    visibleRows,
+    firstIndex,
+    height: visibleRows * rowHeight + headerHeight,
+  };
+}
+
 // Returns ctx-bound drawing helpers. Each helper closes over ctx so it
 // matches the inline-version semantics callers in main.js expect.
 export function createRenderHelpers(ctx) {
