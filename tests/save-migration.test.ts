@@ -151,10 +151,34 @@ describe("saveMigration", () => {
     const out = migrateSaveToV3(save);
     expect(out?.world?.loot?.recentDrops).toEqual([]);
     expect(out?.world?.jobs?.activeJobId).toBeNull();
+    expect(out?.world?.roadRoute).toBeNull();
     expect(out?.world?.jobs?.completedJobIds).toEqual([]);
     expect(out?.house?.workstation?.craftsCompleted).toBe(0);
     expect(out?.house?.workstation?.stationProjects).toEqual([]);
     expect(out?.narrative?.npcMemory?.recentEvents).toEqual([]);
+  });
+
+  it("preserves a valid pinned road route on v3 saves", () => {
+    const save = {
+      version: 3,
+      savedAt: 99,
+      world: {
+        roadRoute: {
+          active: true,
+          source: "road_sign",
+          targetId: "frontier_sunken_coach",
+          targetLabel: "Sunken Coach Ruins",
+          targetKind: "ruin",
+          targetX: 24.5,
+          targetY: 20.5,
+          regionId: "frontier",
+          startedAt: 12,
+        },
+      },
+    };
+    const out = migrateSaveToV3(save);
+
+    expect(out?.world?.roadRoute).toMatchObject(save.world.roadRoute);
   });
 
   it("preserves house workstation station projects on v3 saves", () => {

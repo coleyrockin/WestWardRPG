@@ -148,6 +148,11 @@ import {
   getRegionVisualIdentity,
   resolveRoadSignPrompt,
 } from "./regionVisualIdentity.js";
+import {
+  createRoadRouteFromSignPrompt,
+  normalizeRoadRouteState,
+  resolveRoadRouteObjective,
+} from "./roadRoutes.js";
 import { buildVisualMood } from "./visualProfile.js";
 import {
   QUEST_DEFINITIONS,
@@ -1884,6 +1889,7 @@ const canvas = document.getElementById("game");
       runStats: createInitialRunStats(0),
       loot: createInitialLootState(),
       jobs: createInitialJobBoardState(),
+      roadRoute: null,
     },
     companion: createInitialCompanionRuntime(),
     codex: { unlocked: { regions: [], enemies: [], items: [], factions: [], ideology: [], letters: [] } },
@@ -2207,6 +2213,7 @@ const canvas = document.getElementById("game");
     state.progression.identity = normalizeCharacterIdentity(state.progression.identity);
     state.progression.equipment = normalizeGearState(state.progression.equipment);
     state.world.jobs = normalizeJobBoardState(state.world.jobs);
+    state.world.roadRoute = normalizeRoadRouteState(state.world.roadRoute);
     return {
       version: 3,
       savedAt: Date.now(),
@@ -2290,6 +2297,7 @@ const canvas = document.getElementById("game");
         runStats: state.world.runStats,
         loot: state.world.loot,
         jobs: state.world.jobs,
+        roadRoute: state.world.roadRoute,
       },
       narrative: state.narrative,
       codex: state.codex,
@@ -2371,6 +2379,7 @@ const canvas = document.getElementById("game");
       runStats: ensureRunStats({ runStats: save.world?.runStats }, state.time),
       loot: normalizeLootState(save.world?.loot),
       jobs: normalizeJobBoardState(save.world?.jobs),
+      roadRoute: normalizeRoadRouteState(save.world?.roadRoute),
     };
     state.mode = save.mode === "victory" || state.world.runStats?.victory ? "victory" : state.mode;
     state.progression = save.progression || createInitialProgressionState();
@@ -2887,6 +2896,16 @@ const canvas = document.getElementById("game");
     if (state.player.inHouse || !state.regions?.activeRegion) return null;
     const presentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
     return resolveRoadSignPrompt(presentation.roadSigns, state.player.x, state.player.y);
+  }
+
+  function getRoadRouteObjective() {
+    if (state.player.inHouse || !state.regions?.activeRegion) return null;
+    return resolveRoadRouteObjective(
+      state.world?.roadRoute,
+      state.player.x,
+      state.player.y,
+      state.regions.activeRegion,
+    );
   }
 
   function canOccupy(x, y, radius = PLAYER_COLLISION_RADIUS) {
@@ -3464,6 +3483,15 @@ const canvas = document.getElementById("game");
     if (roadSignPrompt) {
       logMsg(roadSignPrompt.line);
       if (roadSignPrompt.mysteryLine) logMsg(roadSignPrompt.mysteryLine);
+      const pinnedRoute = createRoadRouteFromSignPrompt(roadSignPrompt, {
+        regionId: state.regions.activeRegion,
+        time: state.time,
+      });
+      if (pinnedRoute) {
+        state.world.roadRoute = pinnedRoute;
+        const routeDistance = pinnedRoute.distanceLine ? ` ${pinnedRoute.distanceLine}.` : "";
+        logMsg(`Pinned road route: ${pinnedRoute.targetLabel}.${routeDistance}`);
+      }
       sfx.pickup();
       return;
     }
@@ -3473,6 +3501,7 @@ const canvas = document.getElementById("game");
       ensurePoiDefaults(state.regions);
       const poi = poiUnderInteraction(state.regions, state.regions.activeRegion, state.player.x, state.player.y);
       if (poi) {
+        const completesPinnedRoadRoute = state.world?.roadRoute?.targetId === poi.id;
         const newlyDiscovered = markPOIDiscovered(state.regions, poi.id);
         const kind = POI_KINDS[poi.kind] || POI_KINDS.cache;
         let summary = `Discovered ${poi.label} (${kind.label})`;
@@ -3516,6 +3545,10 @@ const canvas = document.getElementById("game");
         if (poi.buff?.stamina) {
           state.player.stamina = Math.min(100, state.player.stamina + poi.buff.stamina);
           summary += `. +${poi.buff.stamina} stamina`;
+        }
+        if (completesPinnedRoadRoute) {
+          state.world.roadRoute = null;
+          summary += ". Road route complete";
         }
         logMsg(summary + ".");
         grantRolledLoot(poi.kind === "camp" || poi.kind === "hideout" ? "poi_camp" : "poi_cache", state.regions.activeRegion);
@@ -7003,6 +7036,11 @@ const canvas = document.getElementById("game");
         const blink = 0.5 + (Math.sin(state.time * 5.5) + 1) * 0.5;
         drawDot(jobMarker.x, jobMarker.y, jobMarker.color || "#ffd77b", 2.8 + blink);
       }
+      const roadRoute = getRoadRouteObjective();
+      if (roadRoute && Number.isFinite(roadRoute.x) && Number.isFinite(roadRoute.y)) {
+        const blink = 0.45 + (Math.sin(state.time * 4.9) + 1) * 0.45;
+        drawDot(roadRoute.x, roadRoute.y, "#ffde91", 2.6 + blink);
+      }
       const roadDiscoveryLead = resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 28 });
       if (roadDiscoveryLead) {
         const blink = 0.5 + (Math.sin(state.time * 4.6) + 1) * 0.5;
@@ -7253,6 +7291,7 @@ const canvas = document.getElementById("game");
       ? resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 34 })
       : null;
     const roadSignPrompt = getRoadSignPrompt();
+    const roadRouteObjective = getRoadRouteObjective();
     const jobMarker = getJobRouteMarker();
     const boardProp = getActiveJobBoardProp();
     const jobObjective = activeJob
@@ -7281,7 +7320,7 @@ const canvas = document.getElementById("game");
       jobMarker,
       boardProp,
     });
-    const liveObjective = openingRouteGuide || firstPressure || jobObjective || roadSignPrompt || openingObjective || roadDiscoveryLead || explorationLead;
+    const liveObjective = openingRouteGuide || firstPressure || jobObjective || roadSignPrompt || roadRouteObjective || openingObjective || roadDiscoveryLead || explorationLead;
     const liveObjectiveLine = liveObjective?.objectiveLine || liveObjective?.line;
     if (liveObjective && msgY <= topY + topH - 10) {
       ctx.font = "bold 11px Georgia";
@@ -8341,6 +8380,7 @@ const canvas = document.getElementById("game");
     const roadSignPrompt = !state.player.inHouse && state.regions?.activeRegion
       ? resolveRoadSignPrompt(worldPresentation.roadSigns, state.player.x, state.player.y)
       : null;
+    const roadRouteObjective = getRoadRouteObjective();
     const activeJob = getActiveJobSummary(state.world.jobs);
     const jobListings = getJobListings({
       regionId: state.regions.activeRegion,
@@ -8431,6 +8471,7 @@ const canvas = document.getElementById("game");
         opening_route_guide: openingRouteGuide,
         road_discovery_lead: roadDiscoveryLead,
         road_sign_prompt: roadSignPrompt,
+        road_route_objective: roadRouteObjective,
         first_minute_pressure: firstMinutePressure,
         first_reward_cache: firstMinuteCache
           ? {

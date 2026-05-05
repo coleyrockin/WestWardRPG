@@ -82,6 +82,8 @@ describe("regionVisualIdentity", () => {
     expect(prompt?.title).toBe("Road sign");
     expect(prompt?.action).toBe("read");
     expect(prompt?.targetId).toBe(firstSign.targetId);
+    expect(prompt?.targetX).toBe(firstSign.targetX);
+    expect(prompt?.targetY).toBe(firstSign.targetY);
     expect(prompt?.objectiveLine).toContain(firstSign.targetLabel);
     expect(prompt?.secondaryLine).toContain(firstSign.dangerHint);
     expect(prompt?.distanceToSign).toBeLessThan(0.4);

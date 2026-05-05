@@ -10,6 +10,7 @@ import { normalizeLootState } from "./lootSystem.js";
 import { normalizeJobBoardState } from "./jobBoard.js";
 import { normalizeWorkstationState } from "./craftingStation.js";
 import { normalizeNpcMemoryState } from "./npcMemory.js";
+import { normalizeRoadRouteState } from "./roadRoutes.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -89,6 +90,7 @@ function backfillWorldDefaults(world, now = 0) {
   next.runStats = ensureRunStats(holder, now);
   next.loot = normalizeLootState(next.loot);
   next.jobs = normalizeJobBoardState(next.jobs);
+  next.roadRoute = normalizeRoadRouteState(next.roadRoute);
   return next;
 }
 
