@@ -87,11 +87,31 @@ describe("jobBoard", () => {
       jobState: state,
       inventory: { "Worn Badge": 1 },
     });
+    const withMapScrap = getJobListings({
+      regionId: "frontier",
+      playerLevel: 1,
+      jobState: state,
+      inventory: { "Map Scrap": 1 },
+    });
+    const withSealedNote = getJobListings({
+      regionId: "frontier",
+      playerLevel: 1,
+      jobState: state,
+      inventory: { "Sealed Note": 1 },
+    });
 
     expect(beforeLoot.map((job) => job.id)).not.toContain("frontier_badge_return");
+    expect(beforeLoot.map((job) => job.id)).not.toContain("frontier_map_survey");
+    expect(beforeLoot.map((job) => job.id)).not.toContain("frontier_quiet_note_trace");
     expect(withLoot.map((job) => job.id)).toContain("frontier_badge_return");
     expect(withLoot.find((job) => job.id === "frontier_badge_return")?.availabilityLine).toContain("Requires Worn Badge");
     expect(withLoot.find((job) => job.id === "frontier_badge_return")?.boardNote).toContain("old doors");
+    expect(withMapScrap.map((job) => job.id)).toContain("frontier_map_survey");
+    expect(withMapScrap.find((job) => job.id === "frontier_map_survey")?.availabilityLine).toContain("Requires Map Scrap");
+    expect(withMapScrap.find((job) => job.id === "frontier_map_survey")?.boardNote).toContain("roads the town stopped trusting");
+    expect(withSealedNote.map((job) => job.id)).toContain("frontier_quiet_note_trace");
+    expect(withSealedNote.find((job) => job.id === "frontier_quiet_note_trace")?.availabilityLine).toContain("Requires Sealed Note");
+    expect(withSealedNote.find((job) => job.id === "frontier_quiet_note_trace")?.boardNote).toContain("walked quietly");
   });
 
   it("builds selectable Boone board choices with reward and threat previews", () => {
@@ -167,6 +187,99 @@ describe("jobBoard", () => {
     expect(blocked.message).toContain("Worn Badge");
     expect(accepted.ok).toBe(true);
     expect(state.activeJobId).toBe("frontier_badge_return");
+  });
+
+  it("runs map-scrap road surveys with clearer marker detail", () => {
+    const state = createInitialJobBoardState();
+
+    const blocked = acceptJob(state, "frontier_map_survey", { time: 10, inventory: {} });
+    const accepted = acceptJob(state, "frontier_map_survey", { time: 10, inventory: { "Map Scrap": 1 } });
+    const firstMarker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 12, y: 8.5 },
+      resources: [],
+      enemies: [],
+      npcs: [],
+    });
+
+    expect(blocked.ok).toBe(false);
+    expect(blocked.message).toContain("Map Scrap");
+    expect(accepted.ok).toBe(true);
+    expect(firstMarker).toMatchObject({
+      kind: "job_patrol",
+      jobId: "frontier_map_survey",
+      label: "Patrol: Split-Road Sign",
+      action: "checkpoint",
+      actionLine: "Checkpoint",
+      checkpointLine: "Step 1/3",
+      checkpointIndex: 1,
+      checkpointTotal: 3,
+      regionHint: "Dustward Frontier",
+    });
+    expect(firstMarker?.detailLine).toContain("Dustward Frontier");
+    expect(firstMarker?.detailLine).toContain("Step 1/3");
+    expect(firstMarker?.objectiveLine).toContain("Patrol: Split-Road Sign");
+
+    recordJobEvent(state, { type: "checkpoint", targetId: "frontier_survey_split_sign", time: 30 });
+    recordJobEvent(state, { type: "checkpoint", targetId: "frontier_survey_wagon_ruts", time: 65 });
+    const completed = recordJobEvent(state, { type: "checkpoint", targetId: "frontier_survey_cairn", time: 110 });
+    const claimed = claimJobReward(state, "frontier_map_survey");
+
+    expect(completed.completed).toBe(true);
+    expect(claimed.reward).toEqual({ gold: 44, xp: 22, items: { Ashglass: 1 } });
+  });
+
+  it("runs sealed-note trace jobs through Quill and marks board consequences", () => {
+    const state = createInitialJobBoardState();
+
+    const blocked = acceptJob(state, "frontier_quiet_note_trace", { time: 12, inventory: {} });
+    const accepted = acceptJob(state, "frontier_quiet_note_trace", { time: 12, inventory: { "Sealed Note": 1 } });
+    const pickupMarker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 12, y: 8.5 },
+      resources: [],
+      enemies: [],
+      npcs: [{ id: "merchant", x: 16, y: 9 }],
+    });
+
+    expect(blocked.ok).toBe(false);
+    expect(blocked.message).toContain("Sealed Note");
+    expect(accepted.ok).toBe(true);
+    expect(pickupMarker).toMatchObject({
+      kind: "job_pickup",
+      jobId: "frontier_quiet_note_trace",
+      label: "Pick up Copied Note",
+      actionLine: "Pickup",
+      checkpointLine: "Step 1/2",
+    });
+
+    recordJobEvent(state, { type: "pickup", targetId: "frontier_note_copy", time: 24 });
+    const deliveryMarker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 12, y: 8.5 },
+      resources: [],
+      enemies: [],
+      npcs: [{ id: "merchant", x: 16, y: 9 }],
+    });
+    const delivered = recordJobEvent(state, { type: "deliver", npcId: "merchant", time: 92 });
+    const claimed = claimJobReward(state, "frontier_quiet_note_trace");
+    const listings = getJobListings({
+      regionId: "frontier",
+      playerLevel: 1,
+      jobState: state,
+      inventory: { "Sealed Note": 1 },
+    });
+
+    expect(deliveryMarker).toMatchObject({
+      kind: "job_delivery",
+      label: "Deliver to Reverend Quill",
+      actionLine: "Delivery",
+      checkpointLine: "Step 2/2",
+    });
+    expect(delivered.completed).toBe(true);
+    expect(claimed.reward).toEqual({ gold: 52, xp: 26, items: { Potion: 1 } });
+    expect(listings[0].completedJobLine).toContain("traced note");
+    expect(listings[0].boardNote).toContain("traced note");
   });
 
   it("backfills missing active job progress from partial saves", () => {
@@ -650,5 +763,69 @@ describe("jobBoard", () => {
     expect(ashfall.find((job) => job.id === "ashfall_cooling_patrol")?.objective.type).toBe("patrol");
     expect(lantern.map((job) => job.id)).toContain("ironlantern_signal_courier");
     expect(lantern.find((job) => job.id === "ironlantern_signal_courier")?.objective.type).toBe("delivery");
+  });
+
+  it("unlocks Ashfall helmet-lamp salvage from Miner Helmet story loot", () => {
+    const state = createInitialJobBoardState();
+
+    const withoutHelmet = getJobListings({
+      regionId: "ashfall",
+      playerLevel: 3,
+      jobState: state,
+      inventory: {},
+    });
+    const withHelmet = getJobListings({
+      regionId: "ashfall",
+      playerLevel: 3,
+      jobState: state,
+      inventory: { "Miner Helmet": 1 },
+    });
+
+    expect(withoutHelmet.map((job) => job.id)).not.toContain("ashfall_miner_helmet_salvage");
+    expect(withHelmet.map((job) => job.id)).toContain("ashfall_miner_helmet_salvage");
+    expect(withHelmet.find((job) => job.id === "ashfall_miner_helmet_salvage")?.availabilityLine).toContain("Requires Miner Helmet");
+    expect(withHelmet.find((job) => job.id === "ashfall_miner_helmet_salvage")?.boardNote).toContain("helmet lamp");
+  });
+
+  it("runs Ashfall helmet-lamp salvage through mine checkpoints", () => {
+    const state = createInitialJobBoardState();
+
+    const blocked = acceptJob(state, "ashfall_miner_helmet_salvage", { time: 10, inventory: {} });
+    const accepted = acceptJob(state, "ashfall_miner_helmet_salvage", { time: 10, inventory: { "Miner Helmet": 1 } });
+    const firstMarker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 40, y: 39 },
+      resources: [],
+      enemies: [],
+      npcs: [],
+    });
+
+    expect(blocked.ok).toBe(false);
+    expect(blocked.message).toContain("Miner Helmet");
+    expect(accepted.ok).toBe(true);
+    expect(firstMarker).toMatchObject({
+      kind: "job_patrol",
+      jobId: "ashfall_miner_helmet_salvage",
+      label: "Patrol: Lamp Entry Brace",
+      actionLine: "Checkpoint",
+      checkpointLine: "Step 1/3",
+      regionHint: "Ashfall Basin",
+    });
+
+    recordJobEvent(state, { type: "checkpoint", targetId: "ashfall_helmet_lamp_entry", time: 32 });
+    recordJobEvent(state, { type: "checkpoint", targetId: "ashfall_helmet_ore_cart", time: 74 });
+    const completed = recordJobEvent(state, { type: "checkpoint", targetId: "ashfall_helmet_slag_shaft", time: 132 });
+    const claimed = claimJobReward(state, "ashfall_miner_helmet_salvage");
+    const listings = getJobListings({
+      regionId: "ashfall",
+      playerLevel: 3,
+      jobState: state,
+      inventory: { "Miner Helmet": 1 },
+    });
+
+    expect(completed.completed).toBe(true);
+    expect(claimed.reward).toEqual({ gold: 74, xp: 36, items: { "Scrap Coil": 1, "Heat Resin": 1 } });
+    expect(listings[0].completedJobLine).toContain("helmet-lamp salvage");
+    expect(listings[0].boardNote).toContain("workable again");
   });
 });

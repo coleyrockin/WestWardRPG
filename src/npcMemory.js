@@ -10,6 +10,49 @@ const NPC_NAMES = {
   cat: "Whiskers the Cat",
 };
 
+const COMPLETED_JOB_REACTIONS = {
+  warden: [
+    {
+      jobId: "ashfall_miner_helmet_salvage",
+      line: "Marshal Boone: Ashfall crews heard that helmet lamp made it back lit. That is the kind of rumor that gets people paid.",
+    },
+    {
+      jobId: "frontier_quiet_note_trace",
+      line: "Marshal Boone: Quill smiled when that note came through, which means either we learned something or he charged us for it. Maybe both.",
+    },
+    {
+      jobId: "frontier_map_survey",
+      line: "Marshal Boone: That road survey helps. A marked road keeps families from learning geography by panic.",
+    },
+    {
+      jobId: "frontier_badge_return",
+      line: "Marshal Boone: Returning that badge did more than tidy a drawer. People saw the town remember its own.",
+    },
+  ],
+  merchant: [
+    {
+      jobId: "frontier_quiet_note_trace",
+      line: "Reverend Quill: A copied note is still a note, friend. Ink doubles faster than guilt.",
+    },
+  ],
+  smith: [
+    {
+      jobId: "ashfall_miner_helmet_salvage",
+      line: "Professor Cogwheel: A miner helmet with fresh slag dust is a contract written in dents. Bring me the parts before they become folklore.",
+    },
+  ],
+  elder: [
+    {
+      jobId: "frontier_map_survey",
+      line: "Mayor Clem: A surveyed road is a promise with coordinates. That is better than most promises we get.",
+    },
+    {
+      jobId: "frontier_badge_return",
+      line: "Mayor Clem: The returned badge gives the town one clean story to tell. We are short on those.",
+    },
+  ],
+};
+
 export function createInitialNpcMemoryState() {
   return {
     byNpc: {},
@@ -72,6 +115,11 @@ export function resolveNpcReactiveLine(npcId, memory, context = {}) {
   const entry = normalizeEntry(safe.byNpc[npcId]);
   const name = NPC_NAMES[npcId] || "NPC";
   const rep = context.factionRep || {};
+  const completedJobIds = Array.isArray(context.completedJobIds) ? context.completedJobIds : [];
+  const completedJobReaction = (COMPLETED_JOB_REACTIONS[npcId] || [])
+    .find((reaction) => completedJobIds.includes(reaction.jobId));
+  if (completedJobReaction) return completedJobReaction.line;
+
   const storyLootReaction = resolveStoryLootNpcReaction(npcId, context.inventory);
   if (storyLootReaction) return storyLootReaction.line;
 

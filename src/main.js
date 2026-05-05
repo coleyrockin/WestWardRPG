@@ -159,6 +159,10 @@ import {
   getNotableInventorySummary,
   normalizeInventoryState,
 } from "./inventoryState.js";
+import {
+  resolveHouseProgressDisplay,
+  resolveHouseTrophyInspection,
+} from "./houseProgress.js";
 import { buildVisualMood } from "./visualProfile.js";
 import {
   QUEST_DEFINITIONS,
@@ -3481,6 +3485,7 @@ const canvas = document.getElementById("game");
       factionRep: state.narrative.factionRep,
       recentQuestOutcome: Object.values(state.narrative.questOutcomes || {}).slice(-1)[0] || null,
       inventory: state.inventory,
+      completedJobIds: state.world.jobs?.completedJobIds || [],
     });
     if (memoryLine) return memoryLine;
 
@@ -3703,6 +3708,18 @@ const canvas = document.getElementById("game");
 
       if (dist(state.player, state.house.stash) < 1.7) {
         openWorkbench();
+        return;
+      }
+
+      const trophy = resolveHouseTrophyInspection({
+        player: state.player,
+        inventory: state.inventory,
+        jobState: state.world.jobs,
+        house: state.house,
+      });
+      if (trophy) {
+        logMsg(trophy.message);
+        sfx.npcChat();
         return;
       }
 
@@ -6550,9 +6567,25 @@ const canvas = document.getElementById("game");
     const sprites = [];
 
     if (state.player.inHouse) {
+      const houseProgress = resolveHouseProgressDisplay({
+        inventory: state.inventory,
+        jobState: state.world.jobs,
+        house: state.house,
+      });
       sprites.push({ x: state.house.bed.x, y: state.house.bed.y, color: "#7f4a43", label: "Bed", size: 0.95, kind: "bed" });
       sprites.push({ x: state.house.stash.x, y: state.house.stash.y, color: "#896748", label: "Stash", size: 0.9, kind: "stash" });
       sprites.push({ x: state.house.interiorDoor.x, y: state.house.interiorDoor.y, color: "#6d5a45", label: "Exit", size: 0.95, kind: "exit-door" });
+      for (const trophy of houseProgress.trophies) {
+        sprites.push({
+          x: trophy.x,
+          y: trophy.y,
+          color: trophy.color,
+          label: trophy.label,
+          size: 0.58,
+          kind: "house-trophy",
+          trophyId: trophy.id,
+        });
+      }
     } else {
       const regionPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
       sprites.push({
@@ -7445,7 +7478,7 @@ const canvas = document.getElementById("game");
           ? `Return to ${activeJob.npcName} for ${activeJob.rewardLine}${jobMarker?.distanceLine ? ` (${jobMarker.distanceLine})` : ""}`
           : activeJob.status === "failed"
             ? `Report to ${activeJob.npcName}: ${activeJob.progressLine}${jobMarker?.distanceLine ? ` (${jobMarker.distanceLine})` : ""}`
-            : `${activeJob.title}: ${jobMarker?.regionHint ? `${jobMarker.regionHint} • ` : ""}${activeJob.progressLine}${jobMarker?.checkpointIndex ? ` • ${jobMarker.checkpointIndex}/${jobMarker.checkpointTotal}` : ""}${jobMarker?.distanceLine ? ` • ${jobMarker.distanceLine}` : ""}`,
+            : `${activeJob.title}: ${jobMarker?.objectiveLine || `${jobMarker?.regionHint ? `${jobMarker.regionHint} • ` : ""}${activeJob.progressLine}${jobMarker?.checkpointIndex ? ` • ${jobMarker.checkpointIndex}/${jobMarker.checkpointTotal}` : ""}${jobMarker?.distanceLine ? ` • ${jobMarker.distanceLine}` : ""}`}`,
         urgency: activeJob.status === "ready" || activeJob.status === "failed" ? "high" : "medium",
       }
       : null;
@@ -7650,6 +7683,11 @@ const canvas = document.getElementById("game");
       const gearSummary = buildGearSummary(state.progression.equipment, identity);
       const inventorySummary = buildGearInventorySummary(state.progression.equipment);
       const workstationSummary = describeWorkstationState(state.house.workstation);
+      const houseProgress = resolveHouseProgressDisplay({
+        inventory: state.inventory,
+        jobState: state.world.jobs,
+        house: state.house,
+      });
       const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
       const explorationRenown = resolveExplorationRenownStatus(state.regions.poisDiscovered?.length || 0);
       const effects = summary.effects || {};
@@ -7682,6 +7720,7 @@ const canvas = document.getElementById("game");
         { text: `Crafting: ${gearSummary.economyLine}`, color: "#d8c7a8" },
         { text: `Station: ${workstationSummary.benefitLine}`, color: "#d8c7a8" },
         { text: `Projects: ${workstationSummary.projectsLine}`, color: "#cbb6a2" },
+        { text: `Home proof: ${houseProgress.trophyLine}`, color: "#ffe16a" },
         { text: `Exploration: ${explorationRenown.progressLine}`, color: "#ffe16a" },
         { text: `Region: ${regionProfile.label} - ${regionProfile.mood}`, color: "#ffe16a" },
         { text: `Landmarks: ${regionProfile.landmarkHints.slice(0, 4).join(", ")}`, color: "#cbb6a2" },
@@ -7944,6 +7983,11 @@ const canvas = document.getElementById("game");
       const gear = normalizeGearState(state.progression.equipment);
       const inventorySummary = buildGearInventorySummary(gear);
       const workstationSummary = describeWorkstationState(state.house.workstation);
+      const houseProgress = resolveHouseProgressDisplay({
+        inventory: state.inventory,
+        jobState: state.world.jobs,
+        house: state.house,
+      });
       drawSoftPanel(sx, sy, sw, sh, {
         top: "rgba(24, 23, 17, 0.96)",
         bottom: "rgba(10, 12, 10, 0.94)",
@@ -7954,7 +7998,7 @@ const canvas = document.getElementById("game");
       ctx.font = "12px Georgia";
       drawClippedText(`${workstationSummary.stationLine}  Enter/E craft  ↑/↓ select  Esc close`, sx + 16, sy + 52, sw - 32, "#c9b889");
       ctx.font = "11px Georgia";
-      drawClippedText(`Gear: ${inventorySummary.ownedArmorLine} | Tokens: ${inventorySummary.weaponTokenLine}`, sx + 16, sy + 68, sw - 32, "#b8a792");
+      drawClippedText(`Gear: ${inventorySummary.ownedArmorLine} | Home: ${houseProgress.planningLine}`, sx + 16, sy + 68, sw - 32, "#b8a792");
 
       if (actions.length === 0) {
         fillRoundedRect(sx + 10, sy + 86, sw - 20, 54, 7, "rgba(255, 255, 255, 0.055)");
@@ -8541,6 +8585,11 @@ const canvas = document.getElementById("game");
     const gearSummary = buildGearSummary(state.progression.equipment, identity);
     const gearInventorySummary = buildGearInventorySummary(state.progression.equipment);
     const workstationSummary = describeWorkstationState(state.house.workstation);
+    const houseProgressSummary = resolveHouseProgressDisplay({
+      inventory: state.inventory,
+      jobState: state.world.jobs,
+      house: state.house,
+    });
     const explorationRenown = resolveExplorationRenownStatus(state.regions.poisDiscovered?.length || 0);
     const openingObjective = resolveOpeningObjective({
       mode: state.mode,
@@ -8755,6 +8804,7 @@ const canvas = document.getElementById("game");
         visited: state.house.visits,
         workstation: state.house.workstation,
         workstation_summary: workstationSummary,
+        progress_display: houseProgressSummary,
         outside_door: {
           x: Number(state.house.outsideDoor.x.toFixed(2)),
           y: Number(state.house.outsideDoor.y.toFixed(2)),
@@ -8846,6 +8896,16 @@ const canvas = document.getElementById("game");
           { id: "bed", type: "bed", x: state.house.bed.x, y: state.house.bed.y, distance: Number(dist(state.player, state.house.bed).toFixed(2)) },
           { id: "stash", type: "stash", x: state.house.stash.x, y: state.house.stash.y, distance: Number(dist(state.player, state.house.stash).toFixed(2)) },
           { id: "exit", type: "exit-door", x: state.house.interiorDoor.x, y: state.house.interiorDoor.y, distance: Number(dist(state.player, state.house.interiorDoor).toFixed(2)) },
+          ...houseProgressSummary.trophies.map((trophy) => ({
+            id: trophy.id,
+            type: "house-trophy",
+            label: trophy.label,
+            status: trophy.status,
+            line: trophy.line,
+            x: trophy.x,
+            y: trophy.y,
+            distance: Number(dist(state.player, trophy).toFixed(2)),
+          })),
         ]
         : activeResources
           .map((r) => ({

@@ -120,6 +120,76 @@ export const JOB_DEFINITIONS = {
       items: { Tonic: 1 },
     },
   },
+  frontier_map_survey: {
+    id: "frontier_map_survey",
+    title: "Old Road Survey",
+    kind: "survey",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 18,
+    hint: "Use the map scrap to verify three road marks before Boone sends travelers that way.",
+    boardNote: "That torn map scrap marks roads the town stopped trusting.",
+    requiresStoryLoot: "Map Scrap",
+    objective: {
+      type: "patrol",
+      count: 3,
+      label: "old road marks surveyed",
+      checkpoints: [
+        { id: "frontier_survey_split_sign", label: "Split-Road Sign", x: 13.05, y: 7.82 },
+        { id: "frontier_survey_wagon_ruts", label: "Old Wagon Ruts", x: 14.72, y: 8.28 },
+        { id: "frontier_survey_cairn", label: "Dust Cairn", x: 15.55, y: 9.42 },
+      ],
+    },
+    bonus: {
+      type: "time_limit",
+      seconds: 130,
+      line: "Clean survey bonus if all road marks are checked within 130s.",
+      missedLine: "Clean survey timing missed.",
+      reward: { gold: 8, xp: 4 },
+    },
+    reward: {
+      gold: 36,
+      xp: 18,
+      items: { Ashglass: 1 },
+    },
+  },
+  frontier_quiet_note_trace: {
+    id: "frontier_quiet_note_trace",
+    title: "Quiet Note Trace",
+    kind: "courier",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 22,
+    hint: "Use the sealed note to draw out who keeps passing orders through town.",
+    boardNote: "Boone wants the note copied by hand and walked quietly to Quill's stall.",
+    requiresStoryLoot: "Sealed Note",
+    objective: {
+      type: "delivery",
+      count: 2,
+      label: "quiet note traced",
+      pickup: { id: "frontier_note_copy", label: "Copied Note", x: 12.76, y: 8.48 },
+      deliveryNpcId: "merchant",
+      deliveryLabel: "Reverend Quill",
+    },
+    bonus: {
+      type: "time_limit",
+      seconds: 110,
+      line: "Quiet handling bonus if Quill gets the copy within 110s.",
+      missedLine: "Quiet handling bonus missed.",
+      reward: { gold: 10, xp: 5 },
+    },
+    reward: {
+      gold: 42,
+      xp: 21,
+      items: { Potion: 1 },
+    },
+  },
   frontier_watch_patrol: {
     id: "frontier_watch_patrol",
     title: "Town Watch Patrol",
@@ -302,6 +372,42 @@ export const JOB_DEFINITIONS = {
       items: { "Heat Resin": 1 },
     },
   },
+  ashfall_miner_helmet_salvage: {
+    id: "ashfall_miner_helmet_salvage",
+    title: "Helmet-Lamp Salvage",
+    kind: "salvage",
+    regionId: "ashfall",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Medium",
+    minLevel: 2,
+    priority: 25,
+    hint: "Use the miner helmet lamp to check three old mine marks before the slag wind turns.",
+    boardNote: "Ashfall crews trust a helmet lamp more than a promise in the dark.",
+    requiresStoryLoot: "Miner Helmet",
+    objective: {
+      type: "patrol",
+      count: 3,
+      label: "mine salvage marks checked",
+      checkpoints: [
+        { id: "ashfall_helmet_lamp_entry", label: "Lamp Entry Brace", x: 40.65, y: 39.05 },
+        { id: "ashfall_helmet_ore_cart", label: "Buried Ore Cart", x: 42.45, y: 38.7 },
+        { id: "ashfall_helmet_slag_shaft", label: "Slag-Shaft Warning", x: 43.55, y: 40.15 },
+      ],
+    },
+    bonus: {
+      type: "time_limit",
+      seconds: 150,
+      line: "Clean-lamp bonus if all marks are checked within 150s.",
+      missedLine: "Clean-lamp timing missed.",
+      reward: { gold: 12, xp: 6 },
+    },
+    reward: {
+      gold: 62,
+      xp: 30,
+      items: { "Scrap Coil": 1, "Heat Resin": 1 },
+    },
+  },
   ironlantern_signal_breaker: {
     id: "ironlantern_signal_breaker",
     title: "Signal Breaker",
@@ -455,6 +561,25 @@ function cloneReward(reward = {}) {
 
 const EMPTY_REWARD = { gold: 0, xp: 0, items: {} };
 
+const COMPLETED_JOB_BOARD_LINES = {
+  frontier_badge_return: {
+    regionId: "frontier",
+    line: "The returned badge has Boone posting deputy work with fewer whispers around it.",
+  },
+  frontier_map_survey: {
+    regionId: "frontier",
+    line: "Your old-road survey has Boone marking one route as trusted again.",
+  },
+  frontier_quiet_note_trace: {
+    regionId: "frontier",
+    line: "The traced note has Quill's quiet routes showing up in Boone's margins.",
+  },
+  ashfall_miner_helmet_salvage: {
+    regionId: "ashfall",
+    line: "Your helmet-lamp salvage check has Ashfall crews marking one shaft as workable again.",
+  },
+};
+
 function combineRewards(...rewards) {
   const combined = { gold: 0, xp: 0, items: {} };
   for (const reward of rewards) {
@@ -489,6 +614,14 @@ function requiredStoryLootLabel(job) {
   const required = job.requiresStoryLoot;
   if (!required) return "";
   return Array.isArray(required) ? required.join(", ") : String(required);
+}
+
+function resolveCompletedJobBoardLine(completedJobIds = [], regionId = "frontier") {
+  const ids = Array.isArray(completedJobIds) ? completedJobIds.slice().reverse() : [];
+  const match = ids
+    .map((jobId) => COMPLETED_JOB_BOARD_LINES[jobId])
+    .find((entry) => entry && entry.regionId === regionId);
+  return match?.line || "";
 }
 
 function payableReward(job, progress = {}) {
@@ -626,7 +759,9 @@ function decorateJob(job, progress = null, context = {}) {
   ].filter(Boolean);
   const visibleReward = progress?.status === "ready" ? payableReward(job, progress) : reward;
   const storyLoot = resolveStoryLootBoardReaction(context.inventory, job.regionId);
+  const completedJobLine = resolveCompletedJobBoardLine(context.completedJobIds, job.regionId);
   const baseBoardNote = job.boardNote || job.hint;
+  const boardNote = [baseBoardNote, storyLoot?.line, completedJobLine].filter(Boolean).join(" ");
   return {
     ...job,
     objective: cloneObjective(job.objective),
@@ -634,8 +769,9 @@ function decorateJob(job, progress = null, context = {}) {
     bonus: job.bonus ? { ...job.bonus, reward: cloneReward(job.bonus.reward) } : null,
     failure: job.failure ? { ...job.failure } : null,
     regionHint: regionHint(job.regionId),
-    boardNote: storyLoot ? `${baseBoardNote} ${storyLoot.line}` : baseBoardNote,
+    boardNote,
     storyLootLine: storyLoot?.line || "",
+    completedJobLine,
     availabilityLine: availabilityBits.join(" • "),
     status: progress?.status || "available",
     progress: progress ? { ...progress } : {
@@ -663,7 +799,10 @@ export function getJobListings({ regionId = "frontier", playerLevel = 1, jobStat
     .filter((job) => job.minLevel <= safeLevel)
     .filter((job) => hasRequiredStoryLoot(job, inventory))
     .filter((job) => !safeState.completedJobIds.includes(job.id))
-    .map((job) => decorateJob(job, safeState.progressByJobId[job.id], { inventory }))
+    .map((job) => decorateJob(job, safeState.progressByJobId[job.id], {
+      inventory,
+      completedJobIds: safeState.completedJobIds,
+    }))
     .sort((a, b) => a.minLevel - b.minLevel || (a.priority || 50) - (b.priority || 50) || a.id.localeCompare(b.id));
 }
 
@@ -1003,6 +1142,37 @@ function markerDistanceLine(distance) {
   return `${Math.max(1, Math.round(distance))}m`;
 }
 
+const ROUTE_ACTION_LABELS = {
+  pickup: "Pickup",
+  deliver: "Delivery",
+  checkpoint: "Checkpoint",
+  dropoff: "Dropoff",
+  rescue: "Rescue",
+  safe_return: "Safe return",
+  escort_start: "Meet",
+  escort_finish: "Escort",
+  collect: "Collect",
+  hunt: "Hunt",
+  turn_in: "Return",
+  fail_turn_in: "Report",
+};
+
+function enrichRouteMarker(marker) {
+  if (!marker) return null;
+  const actionLine = ROUTE_ACTION_LABELS[marker.action] || marker.action || "";
+  const checkpointLine = marker.checkpointIndex && marker.checkpointTotal
+    ? `Step ${marker.checkpointIndex}/${marker.checkpointTotal}`
+    : "";
+  const detailLine = [marker.regionHint, checkpointLine, actionLine, marker.distanceLine].filter(Boolean).join(" - ");
+  return {
+    ...marker,
+    actionLine,
+    checkpointLine,
+    detailLine,
+    objectiveLine: detailLine ? `${marker.label} (${detailLine})` : marker.label,
+  };
+}
+
 function staticTarget(target, player) {
   if (!target || typeof target.x !== "number" || typeof target.y !== "number") return null;
   const distance = Number(distanceFrom(player, target).toFixed(2));
@@ -1012,7 +1182,7 @@ function staticTarget(target, player) {
 function routeBase(activeJob, target, player, extra = {}) {
   const resolved = staticTarget(target, player);
   if (!resolved) return null;
-  return {
+  return enrichRouteMarker({
     jobId: activeJob.id,
     x: resolved.target.x,
     y: resolved.target.y,
@@ -1021,7 +1191,7 @@ function routeBase(activeJob, target, player, extra = {}) {
     regionId: activeJob.regionId,
     regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
     ...extra,
-  };
+  });
 }
 
 export function resolveJobRouteMarker({ jobState, player = {}, resources = [], enemies = [], npcs = [] } = {}) {
@@ -1032,7 +1202,7 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
   if (activeJob.status === "failed") {
     const npc = nearestMatching(npcs, player, (entry) => entry.id === activeJob.npcId);
     if (!npc) return null;
-    return {
+    return enrichRouteMarker({
       kind: "job_failed",
       jobId: activeJob.id,
       title: "Job failed",
@@ -1047,13 +1217,13 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
       action: "fail_turn_in",
       returnTarget: activeJob.npcId,
-    };
+    });
   }
 
   if (activeJob.status === "ready") {
     const npc = nearestMatching(npcs, player, (entry) => entry.id === activeJob.npcId);
     if (!npc) return null;
-    return {
+    return enrichRouteMarker({
       kind: "job_turn_in",
       jobId: activeJob.id,
       title: "Job ready",
@@ -1068,7 +1238,7 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
       action: "turn_in",
       returnTarget: activeJob.npcId,
-    };
+    });
   }
 
   if (objective.type === "delivery") {
@@ -1089,7 +1259,7 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
     }
     const npc = nearestMatching(npcs, player, (entry) => entry.id === objective.deliveryNpcId);
     if (!npc) return null;
-    return {
+    return enrichRouteMarker({
       kind: "job_delivery",
       jobId: activeJob.id,
       title: "Courier delivery",
@@ -1106,7 +1276,7 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       npcId: objective.deliveryNpcId,
       checkpointIndex: 2,
       checkpointTotal: objective.count,
-    };
+    });
   }
 
   if (objective.type === "patrol") {
@@ -1215,7 +1385,7 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       && (!objective.item || entry.item === objective.item || entry.label === objective.item || objective.item === "Stone" && entry.type === "rock")
     ));
     if (!resource) return null;
-    return {
+    return enrichRouteMarker({
       kind: "job_resource",
       jobId: activeJob.id,
       title: "Job target",
@@ -1231,7 +1401,7 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       action: "collect",
       checkpointIndex: Math.min((activeJob.progress?.count || 0) + 1, objective.count),
       checkpointTotal: objective.count,
-    };
+    });
   }
 
   if (objective.type === "kill") {
@@ -1241,7 +1411,7 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       && (!objective.behavior || entry.behavior === objective.behavior)
     ));
     if (!enemy) return null;
-    return {
+    return enrichRouteMarker({
       kind: "job_bounty",
       jobId: activeJob.id,
       title: "Bounty target",
@@ -1257,7 +1427,7 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       action: "hunt",
       checkpointIndex: Math.min((activeJob.progress?.count || 0) + 1, objective.count),
       checkpointTotal: objective.count,
-    };
+    });
   }
 
   return null;

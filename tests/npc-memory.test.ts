@@ -94,4 +94,34 @@ describe("npcMemory", () => {
     expect(line).toContain("Marshal Boone");
     expect(line).toContain("badge");
   });
+
+  it("lets completed special jobs override carried story loot", () => {
+    const memory = createInitialNpcMemoryState();
+
+    const boone = resolveNpcReactiveLine("warden", memory, {
+      inventory: { "Map Scrap": 1 },
+      completedJobIds: ["frontier_map_survey"],
+    });
+    const quill = resolveNpcReactiveLine("merchant", memory, {
+      inventory: { "Sealed Note": 1 },
+      completedJobIds: ["frontier_quiet_note_trace"],
+    });
+
+    expect(boone).toContain("road survey");
+    expect(boone).toContain("Marshal Boone");
+    expect(quill).toContain("copied note");
+    expect(quill).toContain("Reverend Quill");
+  });
+
+  it("reacts to completed Ashfall helmet salvage work", () => {
+    const memory = createInitialNpcMemoryState();
+
+    const smith = resolveNpcReactiveLine("smith", memory, {
+      inventory: { "Miner Helmet": 1 },
+      completedJobIds: ["ashfall_miner_helmet_salvage"],
+    });
+
+    expect(smith).toContain("Professor Cogwheel");
+    expect(smith).toContain("slag dust");
+  });
 });
