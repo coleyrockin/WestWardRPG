@@ -146,6 +146,24 @@ describe("saveMigration", () => {
     expect(out?.progression?.equipment?.armorSlots?.feet).toBe("trail_boots");
   });
 
+  it("preserves authored story loot inventory on v3 saves", () => {
+    const save = {
+      version: 3,
+      savedAt: 99,
+      inventory: {
+        Potion: 1,
+        "Map Scrap": 2,
+        "Worn Badge": 1,
+        "Sealed Note": 1,
+      },
+    };
+    const out = migrateSaveToV3(save);
+
+    expect(out?.inventory?.["Map Scrap"]).toBe(2);
+    expect(out?.inventory?.["Worn Badge"]).toBe(1);
+    expect(out?.inventory?.["Sealed Note"]).toBe(1);
+  });
+
   it("backfills loot, job board, workstation, and npc memory on v3 saves", () => {
     const save = { version: 3, savedAt: 99, house: { unlocked: true }, world: {}, narrative: {} };
     const out = migrateSaveToV3(save);

@@ -11,6 +11,7 @@ import { normalizeJobBoardState } from "./jobBoard.js";
 import { normalizeWorkstationState } from "./craftingStation.js";
 import { normalizeNpcMemoryState } from "./npcMemory.js";
 import { normalizeRoadRouteState } from "./roadRoutes.js";
+import { normalizeInventoryState } from "./inventoryState.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -158,6 +159,7 @@ export function migrateSaveToV3(save) {
     save.world = backfillWorldDefaults(save.world, Number.isFinite(save.time) ? save.time : 0);
     save.house = backfillHouseDefaults(save.house);
     save.narrative = backfillNarrativeDefaults(save.narrative);
+    save.inventory = normalizeInventoryState(save.inventory);
     if (!save.player) save.player = {};
     save.player.quickUtility = backfillQuickUtilityDefaults(save.player.quickUtility);
     save.player.equipment = backfillEquipmentDefaults(save.player.equipment);
@@ -179,7 +181,7 @@ export function migrateSaveToV3(save) {
       traits: clone(save.player?.traits || []),
       quickUtility: backfillQuickUtilityDefaults(save.player?.quickUtility),
     },
-    inventory: clone(save.inventory || {}),
+    inventory: normalizeInventoryState(save.inventory),
     quests: {
       crystal: normalizeQuest(save.quests?.crystal, questDefaults.crystal),
       slime: normalizeQuest(save.quests?.slime, questDefaults.slime),

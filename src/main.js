@@ -153,6 +153,11 @@ import {
   normalizeRoadRouteState,
   resolveRoadRouteObjective,
 } from "./roadRoutes.js";
+import {
+  createInitialInventoryState,
+  getNotableInventorySummary,
+  normalizeInventoryState,
+} from "./inventoryState.js";
 import { buildVisualMood } from "./visualProfile.js";
 import {
   QUEST_DEFINITIONS,
@@ -1858,19 +1863,7 @@ const canvas = document.getElementById("game");
       perks: [],
       combatProfile: resolveCombatProgression(createInitialNarrativeState(), 1),
     },
-    inventory: {
-      "Crystal Shard": 0,
-      Wood: 0,
-      Stone: 0,
-      Potion: 2,
-      "Slime Core": 0,
-      Ashglass: 0,
-      "Scrap Coil": 0,
-      "Heat Resin": 0,
-      "Lantern Filament": 0,
-      "Cipher Lens": 0,
-      "Pressurized Ink": 0,
-    },
+    inventory: createInitialInventoryState(),
     quests: createInitialQuestState(),
     narrative: {
       ...createInitialNarrativeState(),
@@ -2239,19 +2232,7 @@ const canvas = document.getElementById("game");
         traits: state.progression.traits,
         quickUtility: state.player.quickUtility,
       },
-      inventory: {
-        "Crystal Shard": state.inventory["Crystal Shard"],
-        Wood: state.inventory.Wood,
-        Stone: state.inventory.Stone,
-        Potion: state.inventory.Potion,
-        "Slime Core": state.inventory["Slime Core"],
-        Ashglass: state.inventory.Ashglass || 0,
-        "Scrap Coil": state.inventory["Scrap Coil"] || 0,
-        "Heat Resin": state.inventory["Heat Resin"] || 0,
-        "Lantern Filament": state.inventory["Lantern Filament"] || 0,
-        "Cipher Lens": state.inventory["Cipher Lens"] || 0,
-        "Pressurized Ink": state.inventory["Pressurized Ink"] || 0,
-      },
+      inventory: normalizeInventoryState(state.inventory),
       quests: {
         crystal: { status: state.quests.crystal.status, progress: state.quests.crystal.progress },
         slime: { status: state.quests.slime.status, progress: state.quests.slime.progress },
@@ -2341,15 +2322,7 @@ const canvas = document.getElementById("game");
     state.player.loadout.weapon = typeof player?.loadout?.weapon === "string" ? player.loadout.weapon : state.player.loadout.weapon;
     state.player.perks = Array.isArray(player?.perks) ? player.perks.filter((perk) => typeof perk === "string").slice(0, 12) : state.player.perks;
 
-    const inventory = save.inventory || {};
-    state.inventory["Crystal Shard"] = Math.max(0, Math.floor(numberOr(inventory["Crystal Shard"], 0)));
-    state.inventory.Wood = Math.max(0, Math.floor(numberOr(inventory.Wood, 0)));
-    state.inventory.Stone = Math.max(0, Math.floor(numberOr(inventory.Stone, 0)));
-    state.inventory.Potion = Math.max(0, Math.floor(numberOr(inventory.Potion, 0)));
-    state.inventory["Slime Core"] = Math.max(0, Math.floor(numberOr(inventory["Slime Core"], 0)));
-    for (const key of ["Ashglass", "Scrap Coil", "Heat Resin", "Lantern Filament", "Cipher Lens", "Pressurized Ink"]) {
-      state.inventory[key] = Math.max(0, Math.floor(numberOr(inventory[key], 0)));
-    }
+    state.inventory = normalizeInventoryState(save.inventory);
 
     applyQuestState("crystal", save.quests?.crystal);
     applyQuestState("slime", save.quests?.slime);
@@ -8528,6 +8501,7 @@ const canvas = document.getElementById("game");
         identity_shop_price_multiplier: resolveIdentityShopPriceMultiplier(identity),
       },
       inventory: state.inventory,
+      notable_inventory: getNotableInventorySummary(state.inventory),
       loot: state.world.loot,
       job_board: {
         state: normalizeJobBoardState(state.world.jobs),
