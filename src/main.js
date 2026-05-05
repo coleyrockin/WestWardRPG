@@ -117,6 +117,7 @@ import {
   recordJobEvent,
   resolveJobRouteMarker,
 } from "./jobBoard.js";
+import { resolveJobRewardFeedback } from "./jobRewardFeedback.js";
 import {
   buildEconomySnapshot,
   getVendorServiceProfile,
@@ -3209,15 +3210,6 @@ const canvas = document.getElementById("game");
     updateQuestProgressFromInventory();
   }
 
-  function rewardLine(reward) {
-    const safeReward = reward || { gold: 0, xp: 0, items: {} };
-    const itemLine = Object.entries(safeReward.items || {})
-      .filter(([, count]) => count > 0)
-      .map(([name, count]) => `+${count} ${name}`)
-      .join(", ");
-    return `+${safeReward.gold || 0} gold, +${safeReward.xp || 0} XP${itemLine ? `, ${itemLine}` : ""}`;
-  }
-
   function recordKillForJobs(enemy) {
     state.world.jobs = normalizeJobBoardState(state.world.jobs);
     const result = recordJobEvent(state.world.jobs, {
@@ -3385,7 +3377,16 @@ const canvas = document.getElementById("game");
           spawnParticles(canvas.width / 2, canvas.height / 2, 10, "#ff8f6d", 2.4, 0.8, { decorative: true });
         } else {
           grantJobReward(paid.reward);
-          logMsg(`Bounty paid: ${paid.job.title}. ${rewardLine(paid.reward)}${paid.bonusAwarded ? " Bonus paid." : ""}`);
+          const feedback = resolveJobRewardFeedback({
+            job: paid.job,
+            reward: paid.reward,
+            bonusAwarded: paid.bonusAwarded,
+            house: state.house,
+            inventory: state.inventory,
+            jobState: state.world.jobs,
+          });
+          logMsg(feedback.logLine);
+          if (feedback.housePromptLine) logMsg(feedback.housePromptLine);
           sfx.questDone();
           spawnParticles(canvas.width / 2, canvas.height / 2, 14, "#ffd36b", 3.4, 1.1, { decorative: true });
         }

@@ -260,7 +260,10 @@ It needs the existing systems to feel connected in the player's first short sess
 
 ## Shipped Foundations (audit)
 
-Latest audit: `npm test` → 427 passing across 41 test files; 42 source modules; 14 Playwright scenarios. Commit `dcda2a8+` is the current head on `main`.
+Latest audit: `npm test` → 448 passing across 43 test files; 44 source modules; 14 Playwright scenarios. Commit `5768957+` plus the local job reward feedback slice is the current verified state.
+
+### Phase 2 + Phase 3 payoff slice (latest local)
+- **Job reward feedback** (`src/jobRewardFeedback.js`) — job payouts now use a pure feedback helper, story-loot jobs point back to house trophy proof, bonus pay is surfaced consistently, and generic jobs no longer say "bounty" when they are patrols, deliveries, or surveys.
 
 ### Phase 4 + Phase 5 partial closeouts (latest)
 - **Lite dialogue choices** (`src/dialogueChoices.js`) — chapter-gated 2–3 choice modal for Elder, Warden, Smith, Trader, Innkeeper. Each choice applies axis / faction-rep / NPC-affinity deltas, records a `narrative.dialogueChoicesTaken` flag, and feeds run summary. Modal hooked into existing E-key NPC interact path.
