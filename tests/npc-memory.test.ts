@@ -84,4 +84,14 @@ describe("npcMemory", () => {
     expect(line).toContain("Mayor Clem");
     expect(line).toContain("Old Well");
   });
+
+  it("lets notable story loot override generic NPC reactions", () => {
+    const memory = createInitialNpcMemoryState();
+    const line = resolveNpcReactiveLine("warden", memory, {
+      inventory: { "Worn Badge": 1 },
+    });
+
+    expect(line).toContain("Marshal Boone");
+    expect(line).toContain("badge");
+  });
 });

@@ -3161,6 +3161,7 @@ const canvas = document.getElementById("game");
       playerLevel: state.player.level,
       jobState: state.world.jobs,
       npcId: "warden",
+      inventory: state.inventory,
       limit: 7,
     });
   }
@@ -3332,6 +3333,7 @@ const canvas = document.getElementById("game");
     const memoryLine = resolveNpcReactiveLine(npcId, state.narrative.npcMemory, {
       factionRep: state.narrative.factionRep,
       recentQuestOutcome: Object.values(state.narrative.questOutcomes || {}).slice(-1)[0] || null,
+      inventory: state.inventory,
     });
     if (memoryLine) return memoryLine;
 
@@ -8365,6 +8367,7 @@ const canvas = document.getElementById("game");
       regionId: state.regions.activeRegion,
       playerLevel: state.player.level,
       jobState: state.world.jobs,
+      inventory: state.inventory,
     });
     const jobRouteMarker = getJobRouteMarker();
     const boardProp = getActiveJobBoardProp();

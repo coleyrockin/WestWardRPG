@@ -1,3 +1,5 @@
+import { resolveStoryLootNpcReaction } from "./storyLootReactions.js";
+
 const NPC_NAMES = {
   elder: "Mayor Clem",
   warden: "Marshal Boone",
@@ -70,6 +72,8 @@ export function resolveNpcReactiveLine(npcId, memory, context = {}) {
   const entry = normalizeEntry(safe.byNpc[npcId]);
   const name = NPC_NAMES[npcId] || "NPC";
   const rep = context.factionRep || {};
+  const storyLootReaction = resolveStoryLootNpcReaction(npcId, context.inventory);
+  if (storyLootReaction) return storyLootReaction.line;
 
   if (npcId === "smith" && entry.houseUnlocked) {
     return `${name}: Your workbench is more than furniture now. Bring me salvage and we turn it into leverage.`;

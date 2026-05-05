@@ -60,6 +60,18 @@ describe("jobBoard", () => {
     expect(getJobListings({ regionId: "frontier", playerLevel: 1, jobState: state }).map((job) => job.id)).not.toContain("frontier_slime_bounty");
   });
 
+  it("adds story-loot context to board copy when the player carries notable finds", () => {
+    const listings = getJobListings({
+      regionId: "frontier",
+      playerLevel: 1,
+      jobState: createInitialJobBoardState(),
+      inventory: { "Map Scrap": 1 },
+    });
+
+    expect(listings[0].boardNote).toContain("map scrap");
+    expect(listings[0].storyLootLine).toContain("map scrap");
+  });
+
   it("builds selectable Boone board choices with reward and threat previews", () => {
     const state = createInitialJobBoardState();
 

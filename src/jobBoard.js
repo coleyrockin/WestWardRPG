@@ -1,4 +1,5 @@
 import { getRegionVisualIdentity } from "./regionVisualIdentity.js";
+import { resolveStoryLootBoardReaction } from "./storyLootReactions.js";
 
 const JOB_STATUS = new Set(["active", "ready", "completed", "failed"]);
 
@@ -568,9 +569,11 @@ function buildProgressLine(job, progress = null) {
   return `${count}/${objective.count} ${objective.label}`;
 }
 
-function decorateJob(job, progress = null) {
+function decorateJob(job, progress = null, context = {}) {
   const reward = cloneReward(job.reward);
   const visibleReward = progress?.status === "ready" ? payableReward(job, progress) : reward;
+  const storyLoot = resolveStoryLootBoardReaction(context.inventory, job.regionId);
+  const baseBoardNote = job.boardNote || job.hint;
   return {
     ...job,
     objective: cloneObjective(job.objective),
@@ -578,7 +581,8 @@ function decorateJob(job, progress = null) {
     bonus: job.bonus ? { ...job.bonus, reward: cloneReward(job.bonus.reward) } : null,
     failure: job.failure ? { ...job.failure } : null,
     regionHint: regionHint(job.regionId),
-    boardNote: job.boardNote || job.hint,
+    boardNote: storyLoot ? `${baseBoardNote} ${storyLoot.line}` : baseBoardNote,
+    storyLootLine: storyLoot?.line || "",
     availabilityLine: `${regionHint(job.regionId)} • ${job.threat} threat • ${job.kind}`,
     status: progress?.status || "available",
     progress: progress ? { ...progress } : {
@@ -598,14 +602,14 @@ function decorateJob(job, progress = null) {
   };
 }
 
-export function getJobListings({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState() } = {}) {
+export function getJobListings({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState(), inventory = {} } = {}) {
   const safeState = normalizeJobBoardState(jobState);
   const safeLevel = Math.max(1, Math.floor(Number.isFinite(playerLevel) ? playerLevel : 1));
   return Object.values(JOB_DEFINITIONS)
     .filter((job) => job.regionId === regionId)
     .filter((job) => job.minLevel <= safeLevel)
     .filter((job) => !safeState.completedJobIds.includes(job.id))
-    .map((job) => decorateJob(job, safeState.progressByJobId[job.id]))
+    .map((job) => decorateJob(job, safeState.progressByJobId[job.id], { inventory }))
     .sort((a, b) => a.minLevel - b.minLevel || (a.priority || 50) - (b.priority || 50) || a.id.localeCompare(b.id));
 }
 
@@ -614,7 +618,7 @@ export function getJobDefinition(jobId) {
   return job ? decorateJob(job) : null;
 }
 
-export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState(), npcId = "warden", limit = 7 } = {}) {
+export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState(), npcId = "warden", limit = 7, inventory = {} } = {}) {
   const active = getActiveJobSummary(jobState);
   if (active?.npcId === npcId) {
     return [{
@@ -623,7 +627,7 @@ export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, job
       selectable: active.status === "ready" || active.status === "failed",
     }];
   }
-  return getJobListings({ regionId, playerLevel, jobState })
+  return getJobListings({ regionId, playerLevel, jobState, inventory })
     .filter((job) => job.npcId === npcId)
     .slice(0, Math.max(1, Math.floor(limit)))
     .map((job) => ({
