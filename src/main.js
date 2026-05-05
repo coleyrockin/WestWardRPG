@@ -3390,7 +3390,7 @@ const canvas = document.getElementById("game");
       return;
     }
     if (choiceJob.boardState === "available") {
-      const accepted = acceptJob(state.world.jobs, choiceJob.id, { time: state.time });
+      const accepted = acceptJob(state.world.jobs, choiceJob.id, { time: state.time, inventory: state.inventory });
       if (accepted.ok) {
         const condition = [accepted.job.bonusLine, accepted.job.failureLine].filter(Boolean).join(" ");
         logMsg(`Job accepted: ${accepted.job.title}. ${accepted.job.hint} Reward ${accepted.job.rewardLine}.${condition ? ` ${condition}` : ""}`);

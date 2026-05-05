@@ -72,6 +72,28 @@ describe("jobBoard", () => {
     expect(listings[0].storyLootLine).toContain("map scrap");
   });
 
+  it("hides story-loot-gated jobs until requirements are met", () => {
+    const state = createInitialJobBoardState();
+
+    const beforeLoot = getJobListings({
+      regionId: "frontier",
+      playerLevel: 1,
+      jobState: state,
+      inventory: {},
+    });
+    const withLoot = getJobListings({
+      regionId: "frontier",
+      playerLevel: 1,
+      jobState: state,
+      inventory: { "Worn Badge": 1 },
+    });
+
+    expect(beforeLoot.map((job) => job.id)).not.toContain("frontier_badge_return");
+    expect(withLoot.map((job) => job.id)).toContain("frontier_badge_return");
+    expect(withLoot.find((job) => job.id === "frontier_badge_return")?.availabilityLine).toContain("Requires Worn Badge");
+    expect(withLoot.find((job) => job.id === "frontier_badge_return")?.boardNote).toContain("old doors");
+  });
+
   it("builds selectable Boone board choices with reward and threat previews", () => {
     const state = createInitialJobBoardState();
 
@@ -133,6 +155,18 @@ describe("jobBoard", () => {
     expect(state.progressByJobId.frontier_slime_bounty.startedAt).toBe(12.5);
     expect(duplicate.ok).toBe(false);
     expect(getActiveJobSummary(state)?.progressLine).toBe("0/3 slimes defeated");
+  });
+
+  it("requires badge inventory when accepting badge-return work", () => {
+    const state = createInitialJobBoardState();
+
+    const blocked = acceptJob(state, "frontier_badge_return", { time: 5, inventory: {} });
+    const accepted = acceptJob(state, "frontier_badge_return", { time: 5, inventory: { "Worn Badge": 1 } });
+
+    expect(blocked.ok).toBe(false);
+    expect(blocked.message).toContain("Worn Badge");
+    expect(accepted.ok).toBe(true);
+    expect(state.activeJobId).toBe("frontier_badge_return");
   });
 
   it("backfills missing active job progress from partial saves", () => {

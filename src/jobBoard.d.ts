@@ -6,7 +6,7 @@ export function normalizeJobBoardState(source?: any): any;
 export function getJobListings(options?: any): any[];
 export function getJobDefinition(jobId: string): any;
 export function getJobBoardChoices(options?: any): any[];
-export function acceptJob(jobState: any, jobId: string, options?: { time?: number }): any;
+export function acceptJob(jobState: any, jobId: string, options?: { time?: number; inventory?: Record<string, number> }): any;
 export function recordJobEvent(jobState: any, event?: any): any;
 export function claimJobReward(jobState: any, jobId?: string | null): any;
 export function getActiveJobSummary(jobState: any): any;

@@ -1,5 +1,6 @@
 import { getRegionVisualIdentity } from "./regionVisualIdentity.js";
 import { resolveStoryLootBoardReaction } from "./storyLootReactions.js";
+import { normalizeInventoryState } from "./inventoryState.js";
 
 const JOB_STATUS = new Set(["active", "ready", "completed", "failed"]);
 
@@ -85,6 +86,38 @@ export const JOB_DEFINITIONS = {
       gold: 30,
       xp: 16,
       items: { Potion: 1 },
+    },
+  },
+  frontier_badge_return: {
+    id: "frontier_badge_return",
+    title: "Deputy Badge Return",
+    kind: "delivery",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 15,
+    hint: "Carry a recovered deputy badge back to Boone before rumor turns it into trouble.",
+    boardNote: "When trust is thin, a real badge can reopen old doors.",
+    requiresStoryLoot: "Worn Badge",
+    objective: {
+      type: "delivery",
+      count: 2,
+      label: "badge returned",
+      pickup: {
+        id: "frontier_badge_return_cache",
+        label: "Recovered Badge",
+        x: 12.58,
+        y: 8.62,
+      },
+      deliveryNpcId: "warden",
+      deliveryLabel: "Marshal Boone",
+    },
+    reward: {
+      gold: 45,
+      xp: 20,
+      items: { Tonic: 1 },
     },
   },
   frontier_watch_patrol: {
@@ -444,6 +477,20 @@ function safeTime(value, fallback = 0) {
   return Math.max(0, Number.isFinite(value) ? Number(value) : fallback);
 }
 
+function hasRequiredStoryLoot(job, inventory = {}) {
+  const required = job.requiresStoryLoot;
+  if (!required) return true;
+  const normalizedInventory = normalizeInventoryState(inventory);
+  const requiredItems = Array.isArray(required) ? required : [required];
+  return requiredItems.every((itemName) => (normalizedInventory[itemName] || 0) > 0);
+}
+
+function requiredStoryLootLabel(job) {
+  const required = job.requiresStoryLoot;
+  if (!required) return "";
+  return Array.isArray(required) ? required.join(", ") : String(required);
+}
+
 function payableReward(job, progress = {}) {
   const base = cloneReward(job.reward);
   if (job.bonus && progress.bonusEligible === true) return combineRewards(base, job.bonus.reward);
@@ -571,6 +618,12 @@ function buildProgressLine(job, progress = null) {
 
 function decorateJob(job, progress = null, context = {}) {
   const reward = cloneReward(job.reward);
+  const availabilityBits = [
+    regionHint(job.regionId),
+    `${job.threat} threat`,
+    job.kind,
+    job.requiresStoryLoot ? `Requires ${Array.isArray(job.requiresStoryLoot) ? job.requiresStoryLoot.join(", ") : job.requiresStoryLoot}` : null,
+  ].filter(Boolean);
   const visibleReward = progress?.status === "ready" ? payableReward(job, progress) : reward;
   const storyLoot = resolveStoryLootBoardReaction(context.inventory, job.regionId);
   const baseBoardNote = job.boardNote || job.hint;
@@ -583,7 +636,7 @@ function decorateJob(job, progress = null, context = {}) {
     regionHint: regionHint(job.regionId),
     boardNote: storyLoot ? `${baseBoardNote} ${storyLoot.line}` : baseBoardNote,
     storyLootLine: storyLoot?.line || "",
-    availabilityLine: `${regionHint(job.regionId)} • ${job.threat} threat • ${job.kind}`,
+    availabilityLine: availabilityBits.join(" • "),
     status: progress?.status || "available",
     progress: progress ? { ...progress } : {
       status: "available",
@@ -608,6 +661,7 @@ export function getJobListings({ regionId = "frontier", playerLevel = 1, jobStat
   return Object.values(JOB_DEFINITIONS)
     .filter((job) => job.regionId === regionId)
     .filter((job) => job.minLevel <= safeLevel)
+    .filter((job) => hasRequiredStoryLoot(job, inventory))
     .filter((job) => !safeState.completedJobIds.includes(job.id))
     .map((job) => decorateJob(job, safeState.progressByJobId[job.id], { inventory }))
     .sort((a, b) => a.minLevel - b.minLevel || (a.priority || 50) - (b.priority || 50) || a.id.localeCompare(b.id));
@@ -637,10 +691,18 @@ export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, job
     }));
 }
 
-export function acceptJob(jobState, jobId, { time = 0 } = {}) {
+export function acceptJob(jobState, jobId, { time = 0, inventory = {} } = {}) {
   const state = syncJobState(jobState);
   const job = knownJob(jobId);
   if (!job) return { ok: false, message: "Job not found.", jobState: state };
+  if (!hasRequiredStoryLoot(job, inventory)) {
+    return {
+      ok: false,
+      message: `Job requires ${requiredStoryLootLabel(job)} to be in your inventory.`,
+      job: decorateJob(job),
+      jobState: state,
+    };
+  }
   if (state.completedJobIds.includes(jobId)) return { ok: false, message: "Job already completed.", job: decorateJob(job), jobState: state };
   if (state.activeJobId && state.activeJobId !== jobId) {
     return { ok: false, message: "Finish your active job before taking another.", job: decorateJob(job), jobState: state };
