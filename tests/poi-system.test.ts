@@ -3,16 +3,29 @@ import {
   POI_KINDS,
   POI_DEFINITIONS,
   getPOIsForRegion,
+  getTotalPOICount,
   ensurePoiDefaults,
   isPOIDiscovered,
   markPOIDiscovered,
   findNearbyPOIs,
+  findNearbyRoadsideDiscoveries,
+  getRoadsideDiscoveriesForRegion,
   poiUnderInteraction,
   resolvePOILead,
   resolveRoadDiscoveryLead,
   resolveExplorationRenownReward,
   resolveExplorationRenownStatus,
 } from "../src/poiSystem.js";
+
+function isKnownFrontierOpenTile(x: number, y: number) {
+  const tx = Math.floor(x);
+  const ty = Math.floor(y);
+  if (tx >= 16 && tx <= 22 && ty >= 6 && ty <= 12) return false;
+  if (ty >= 5 && ty <= 14 && (tx === 14 || tx === 24)) return false;
+  if (tx >= 14 && tx <= 24 && (ty === 5 || ty === 14)) return false;
+  return (tx >= 5 && tx <= 15 && ty >= 5 && ty <= 13)
+    || (tx >= 11 && tx <= 27 && ty >= 8 && ty <= 14);
+}
 
 describe("poiSystem — definitions", () => {
   it("each region has at least 3 POIs", () => {
@@ -45,6 +58,13 @@ describe("poiSystem — definitions", () => {
 
   it("getPOIsForRegion returns empty for unknown region", () => {
     expect(getPOIsForRegion("nowhere")).toEqual([]);
+  });
+
+  it("counts authored POIs from the single POI definition table", () => {
+    const authoredCount = Object.values(POI_DEFINITIONS).flat().length;
+
+    expect(getTotalPOICount()).toBe(authoredCount);
+    expect(resolveExplorationRenownStatus(0).totalCount).toBe(authoredCount);
   });
 });
 
@@ -115,11 +135,11 @@ describe("poiSystem — proximity", () => {
     const r: any = {};
     const lead = resolvePOILead(r, "frontier", 9.5, 8.5);
 
-    expect(lead?.id).toBe("frontier_old_well");
-    expect(lead?.direction).toBe("south");
-    expect(lead?.distance).toBeGreaterThan(13);
-    expect(lead?.line).toContain("Old Well");
-    expect(lead?.rewardHint).toContain("Potion");
+    expect(lead?.id).toBe("frontier_broken_wagon");
+    expect(lead?.direction).toBe("southeast");
+    expect(lead?.distance).toBeLessThan(5);
+    expect(lead?.line).toContain("Broken Wagon");
+    expect(lead?.rewardHint).toContain("Map Scrap");
   });
 
   it("skips discovered POIs when resolving the next exploration lead", () => {
@@ -150,9 +170,52 @@ describe("poiSystem — proximity", () => {
 });
 
 describe("poiSystem — road discovery lead", () => {
+  it("defines early roadside discoveries near Boone's first roads", () => {
+    const roadside = getRoadsideDiscoveriesForRegion("frontier");
+
+    expect(roadside.map((poi) => poi.id)).toEqual(expect.arrayContaining([
+      "frontier_broken_wagon",
+      "frontier_wayside_shrine",
+      "frontier_abandoned_lunchfire",
+    ]));
+    expect(roadside.every((poi) => poi.roadside === true)).toBe(true);
+    expect(roadside.every((poi) => poi.rollLoot === false)).toBe(true);
+    expect(roadside.every((poi) => isKnownFrontierOpenTile(poi.x, poi.y))).toBe(true);
+  });
+
+  it("lists nearby roadside finds in deterministic distance order", () => {
+    const nearby = findNearbyRoadsideDiscoveries({}, "frontier", 9.5, 8.5, 14);
+
+    expect(nearby.map((poi) => poi.id)).toEqual([
+      "frontier_broken_wagon",
+      "frontier_abandoned_lunchfire",
+      "frontier_wayside_shrine",
+    ]);
+    expect(nearby[0]).toMatchObject({
+      label: "Broken Wagon",
+      distance: 4.5,
+      direction: "southeast",
+    });
+  });
+
+  it("prioritizes a roadside find as the first open-road hook from town", () => {
+    const lead = resolveRoadDiscoveryLead({}, "frontier", 9.5, 8.5, { maxDistance: 40 });
+
+    expect(lead).toMatchObject({
+      id: "frontier_broken_wagon",
+      title: "Roadside find",
+      roadside: true,
+      action: "inspect",
+      actionLabel: "Inspect",
+    });
+    expect(lead?.objectiveLine).toContain("inspect");
+    expect(lead?.rewardHint).toContain("Map Scrap");
+    expect(lead?.returnReason).toContain("Boone");
+  });
+
   it("turns a nearby undiscovered POI into an open-road hook", () => {
     const r: any = {};
-    const lead = resolveRoadDiscoveryLead(r, "frontier", 9.5, 8.5, { maxDistance: 40 });
+    const lead = resolveRoadDiscoveryLead(r, "ashfall", 38.5, 26.5, { maxDistance: 40 });
 
     expect(lead?.title).toBe("Road hook");
     expect(lead?.line).toContain("heading toward");

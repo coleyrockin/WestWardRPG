@@ -6,6 +6,8 @@ export interface POIDef {
   label: string;
   loot?: { gold?: number; items?: Record<string, number> };
   buff?: { hp?: number; stamina?: number };
+  roadside?: boolean;
+  rollLoot?: boolean;
   regionHint?: string;
   roadHook?: string;
   dangerHint?: string;
@@ -17,6 +19,10 @@ export const POI_KINDS: Record<string, { label: string; radius: number; color: s
 export const POI_DEFINITIONS: Record<string, POIDef[]>;
 
 export function getPOIsForRegion(regionId: string): POIDef[];
+export function getTotalPOICount(): number;
+export function isRoadsideDiscovery(poi: any): boolean;
+export function getRoadsideDiscoveriesForRegion(regionId: string): POIDef[];
+export function findNearbyRoadsideDiscoveries(regions: any, regionId: string, x: number, y: number, maxDistance?: number): any[];
 export function ensurePoiDefaults(regions: any): void;
 export function isPOIDiscovered(regions: any, poiId: string): boolean;
 export function markPOIDiscovered(regions: any, poiId: string): boolean;

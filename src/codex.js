@@ -41,6 +41,9 @@ export const CODEX_ENTRIES = {
     { id: "commons_guard", title: "Commons Guard", body: "Multi-target sweep limit increases when the toolCommonsCreated flag is set." },
   ],
   letters: [
+    { id: "frontier_broken_wagon", title: "Broken Wagon", body: "The wagon ledger lists a harmless delivery, then three lines of coordinates written in a different hand. Someone was not hauling goods; they were hauling a route." },
+    { id: "frontier_wayside_shrine", title: "Wayside Shrine", body: "The tiny lantern burns in a wind that should have killed it. A scratched prayer underneath asks the road to remember who walked it last." },
+    { id: "frontier_abandoned_lunchfire", title: "Abandoned Lunchfire", body: "The lunchfire has three cups, two spoons, and no tracks leaving together. Whatever interrupted supper knew how to step between prints." },
     { id: "frontier_old_well", title: "Old Well", body: "A wet ledger page is pinned inside the well stones: water still moves beneath the frontier, but every bucket is counted twice before the thirsty see it." },
     { id: "frontier_drifter_camp", title: "Drifter Camp", body: "A campfire note lists trade routes, unpaid favors, and one warning: never sleep where the road can see both your boots." },
     { id: "frontier_chapel_shrine", title: "Frontier Chapel", body: "A chapel broadside asks whether law can survive without mercy. Someone underlined mercy, then crossed out the name of the judge." },

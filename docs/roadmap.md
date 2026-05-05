@@ -260,9 +260,12 @@ It needs the existing systems to feel connected in the player's first short sess
 
 ## Shipped Foundations (audit)
 
-Latest audit: `npm test` → 448 passing across 43 test files; 44 source modules; 14 Playwright scenarios. Commit `5768957+` plus the local job reward feedback slice is the current verified state.
+Latest audit: `npm test` → 452 passing across 43 test files; 44 source modules; 14 Playwright scenarios. Commit `d989d1f+` plus the local Roadside Discovery 1 slice is the current verified state.
 
-### Phase 2 + Phase 3 payoff slice (latest local)
+### Phase 1 open-road slice (latest local)
+- **Roadside Discovery 1** (`src/poiSystem.js`) — the first Dustward roads now include a broken wagon, wayside shrine, and abandoned lunchfire near Boone. They are deterministic, one-shot, codex-backed, minimap-visible, render-text-visible, and small enough to stumble into before the bigger POI loop.
+
+### Phase 2 + Phase 3 payoff slice
 - **Job reward feedback** (`src/jobRewardFeedback.js`) — job payouts now use a pure feedback helper, story-loot jobs point back to house trophy proof, bonus pay is surfaced consistently, and generic jobs no longer say "bounty" when they are patrols, deliveries, or surveys.
 
 ### Phase 4 + Phase 5 partial closeouts (latest)

@@ -8,6 +8,7 @@ export const POI_KINDS = {
   cache: { label: "Cache", radius: 1.6, color: "#d8bc6a" },
   shrine: { label: "Shrine", radius: 1.4, color: "#cdb8ff" },
   camp: { label: "Camp", radius: 1.8, color: "#f0adb4" },
+  wagon: { label: "Wagon", radius: 1.55, color: "#d89f62" },
   mine: { label: "Mine", radius: 1.7, color: "#b8a77a" },
   ruin: { label: "Ruin", radius: 1.6, color: "#aeb7c4" },
   hideout: { label: "Hideout", radius: 1.8, color: "#d88f62" },
@@ -17,6 +18,52 @@ export const POI_KINDS = {
 // Hand-placed POI definitions. Coordinates assume the existing 60×60 world.
 export const POI_DEFINITIONS = {
   frontier: [
+    {
+      id: "frontier_broken_wagon",
+      kind: "wagon",
+      roadside: true,
+      x: 13.5,
+      y: 10.5,
+      label: "Broken Wagon",
+      loot: { gold: 8, items: { Wood: 1, "Map Scrap": 1 } },
+      rollLoot: false,
+      regionHint: "Dustward Frontier marshal road",
+      roadHook: "a snapped wagon axle in the wheel ruts east of Boone",
+      dangerHint: "Low danger: close to town, but the tracks leave in a hurry.",
+      mysteryLine: "The cargo straps were cut from the inside.",
+      returnReason: "The map scrap can open Boone's road survey work.",
+    },
+    {
+      id: "frontier_wayside_shrine",
+      kind: "shrine",
+      roadside: true,
+      x: 15.5,
+      y: 12.5,
+      label: "Wayside Shrine",
+      buff: { stamina: 10 },
+      loot: { gold: 5 },
+      rollLoot: false,
+      regionHint: "Dustward Frontier south fork",
+      roadHook: "a thumb-high lantern shrine tucked under a fence rail",
+      dangerHint: "Low danger: a safe breath before the south road opens up.",
+      mysteryLine: "The candle is fresh, but the wax runs uphill.",
+      returnReason: "A quick stamina blessing makes early patrol and courier work less punishing.",
+    },
+    {
+      id: "frontier_abandoned_lunchfire",
+      kind: "camp",
+      roadside: true,
+      x: 8.5,
+      y: 13.5,
+      label: "Abandoned Lunchfire",
+      loot: { gold: 4, items: { Potion: 1, Wood: 1 } },
+      rollLoot: false,
+      regionHint: "Dustward Frontier ranch road",
+      roadHook: "a lunchfire still smoking beside a ranch-side trail",
+      dangerHint: "Medium danger: whoever left ran before finishing supper.",
+      mysteryLine: "Three cups sit out. One is still warm.",
+      returnReason: "A free potion is the first hint that roads can fund survival.",
+    },
     {
       id: "frontier_old_well",
       kind: "cache",
@@ -239,6 +286,10 @@ export function getPOIsForRegion(regionId) {
   return POI_DEFINITIONS[regionId] || [];
 }
 
+export function getTotalPOICount() {
+  return Object.values(POI_DEFINITIONS).reduce((sum, pois) => sum + pois.length, 0);
+}
+
 export function ensurePoiDefaults(regions) {
   if (!regions || typeof regions !== "object") return;
   if (!Array.isArray(regions.poisDiscovered)) {
@@ -316,7 +367,29 @@ function rewardHintForPOI(poi) {
   return pieces.length > 0 ? pieces.join(", ") : "regional clue";
 }
 
-const ROAD_DISCOVERY_KINDS = new Set(["cache", "camp", "shrine", "mine", "ruin", "hideout", "stranger"]);
+const ROAD_DISCOVERY_KINDS = new Set(["cache", "camp", "shrine", "wagon", "mine", "ruin", "hideout", "stranger"]);
+
+export function isRoadsideDiscovery(poi) {
+  return Boolean(poi?.roadside);
+}
+
+export function getRoadsideDiscoveriesForRegion(regionId) {
+  return getPOIsForRegion(regionId).filter(isRoadsideDiscovery);
+}
+
+export function findNearbyRoadsideDiscoveries(regions, regionId, x, y, maxDistance = 12) {
+  const limit = Number.isFinite(maxDistance) ? Math.max(0, maxDistance) : 12;
+  return getRoadsideDiscoveriesForRegion(regionId)
+    .filter((poi) => !isPOIDiscovered(regions, poi.id))
+    .map((poi) => ({
+      ...poi,
+      distance: Number(Math.hypot(poi.x - x, poi.y - y).toFixed(1)),
+      direction: directionLabel(poi.x - x, poi.y - y),
+      color: (POI_KINDS[poi.kind] || POI_KINDS.cache).color,
+    }))
+    .filter((poi) => poi.distance <= limit)
+    .sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id));
+}
 
 function fallbackRegionHint(regionId) {
   if (regionId === "ashfall") return "Ashfall Basin road";
@@ -399,8 +472,9 @@ export function resolveRoadDiscoveryLead(regions, regionId, x, y, options = {}) 
     const distance = Math.hypot(dx, dy);
     if (distance > maxDistance) continue;
     const authoredWeight = poi.roadHook ? -3 : 0;
+    const roadsideWeight = poi.roadside ? -4 : 0;
     const storyWeight = poi.kind === "mine" || poi.kind === "ruin" || poi.kind === "hideout" || poi.kind === "stranger" ? -1.25 : 0;
-    const score = distance + authoredWeight + storyWeight;
+    const score = distance + authoredWeight + storyWeight + roadsideWeight;
     if (score >= bestScore) continue;
     best = { poi, dx, dy };
     bestScore = score;
@@ -421,10 +495,11 @@ export function resolveRoadDiscoveryLead(regions, regionId, x, y, options = {}) 
   const urgentKinds = new Set(["hideout", "mine"]);
   return {
     id: best.poi.id,
-    title: "Road hook",
+    title: best.poi.roadside ? "Roadside find" : "Road hook",
     kind: best.poi.kind,
     kindLabel: kind.label,
     label: best.poi.label,
+    roadside: Boolean(best.poi.roadside),
     x: best.poi.x,
     y: best.poi.y,
     direction,
@@ -432,14 +507,15 @@ export function resolveRoadDiscoveryLead(regions, regionId, x, y, options = {}) 
     distanceLine,
     color: kind.color,
     urgency: urgentKinds.has(best.poi.kind) || distance <= 8 ? "high" : "medium",
-    action: "investigate",
+    action: best.poi.roadside ? "inspect" : "investigate",
+    actionLabel: best.poi.roadside ? "Inspect" : "Investigate",
     regionHint,
     hookLine,
     dangerHint,
     mysteryLine,
     returnReason,
     rewardHint,
-    objectiveLine: `${best.poi.label}: investigate ${distanceLine} on the ${regionHint}.`,
+    objectiveLine: `${best.poi.label}: ${best.poi.roadside ? "inspect" : "investigate"} ${distanceLine} on the ${regionHint}.`,
     secondaryLine: `${dangerHint} ${returnReason}`,
     line: `You were heading toward the ${regionHint}, then saw ${hookLine} ${direction}. ${distanceLine}. ${dangerHint}`,
   };
@@ -462,7 +538,7 @@ export function resolveExplorationRenownReward(discoveredCount) {
   };
 }
 
-export function resolveExplorationRenownStatus(discoveredCount, totalCount = 9) {
+export function resolveExplorationRenownStatus(discoveredCount, totalCount = getTotalPOICount()) {
   const discovered = Number.isFinite(discoveredCount) ? Math.max(0, Math.floor(discoveredCount)) : 0;
   const total = Number.isFinite(totalCount) ? Math.max(discovered, Math.floor(totalCount)) : discovered;
   const milestones = Object.keys(EXPLORATION_RENOWN_REWARDS).map((value) => Number(value)).sort((a, b) => a - b);

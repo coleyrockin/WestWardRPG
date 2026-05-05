@@ -264,6 +264,7 @@ import {
   markPOIDiscovered,
   isPOIDiscovered,
   findNearbyPOIs,
+  findNearbyRoadsideDiscoveries,
   poiUnderInteraction,
   getPOIsForRegion,
   resolvePOILead,
@@ -3685,7 +3686,9 @@ const canvas = document.getElementById("game");
           state.world.roadRoute = null;
         }
         logMsg(summary + ".");
-        grantRolledLoot(poi.kind === "camp" || poi.kind === "hideout" ? "poi_camp" : "poi_cache", state.regions.activeRegion);
+        if (poi.rollLoot !== false) {
+          grantRolledLoot(poi.kind === "camp" || poi.kind === "hideout" ? "poi_camp" : "poi_cache", state.regions.activeRegion);
+        }
         sfx.pickup();
         spawnParticles(canvas.width / 2, canvas.height * 0.5, 12, kind.color, 3, 0.6, { decorative: false });
         return;
@@ -6658,9 +6661,28 @@ const canvas = document.getElementById("game");
           size: pressure.marker.size || 0.82,
         });
       }
+      const roadsideDiscoveries = findNearbyRoadsideDiscoveries(
+        state.regions,
+        state.regions.activeRegion,
+        state.player.x,
+        state.player.y,
+        MAX_RAY_DIST,
+      ).slice(0, 3);
+      const roadsideIds = new Set(roadsideDiscoveries.map((poi) => poi.id));
+      for (const discovery of roadsideDiscoveries) {
+        sprites.push({
+          x: discovery.x,
+          y: discovery.y,
+          color: discovery.color,
+          label: discovery.label,
+          poiKind: discovery.kind,
+          kind: "roadside-discovery",
+          size: discovery.kind === "camp" || discovery.kind === "wagon" ? 0.98 : 0.86,
+        });
+      }
       const poiLead = resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: MAX_RAY_DIST })
         || resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: MAX_RAY_DIST });
-      if (poiLead) {
+      if (poiLead && !roadsideIds.has(poiLead.id)) {
         sprites.push({
           x: poiLead.x,
           y: poiLead.y,
@@ -7224,6 +7246,12 @@ const canvas = document.getElementById("game");
         const blink = 0.5 + (Math.sin(state.time * 4.6) + 1) * 0.5;
         drawDot(roadDiscoveryLead.x, roadDiscoveryLead.y, roadDiscoveryLead.color || "#d8bc6a", 2.4 + blink);
       }
+      const roadsideDiscoveries = findNearbyRoadsideDiscoveries(state.regions, state.regions.activeRegion, state.player.x, state.player.y, 12).slice(0, 3);
+      const roadsideIds = new Set(roadsideDiscoveries.map((poi) => poi.id));
+      for (const discovery of roadsideDiscoveries) {
+        const pulse = 0.45 + (Math.sin(state.time * 5.1 + discovery.distance) + 1) * 0.45;
+        drawDot(discovery.x, discovery.y, discovery.color || "#d89f62", 2.1 + pulse);
+      }
 
       // POI pings: blink nearby undiscovered POIs.
       if (state.regions?.activeRegion) {
@@ -7231,6 +7259,7 @@ const canvas = document.getElementById("game");
         const blink = (Math.sin(state.time * 4) + 1) * 0.5;
         for (let i = 0; i < nearbyPOIs.length; i++) {
           const poi = nearbyPOIs[i];
+          if (roadsideIds.has(poi.id)) continue;
           const kind = POI_KINDS[poi.kind] || { color: "#fff" };
           drawDot(poi.x, poi.y, kind.color, 2.2 + blink * 1.3);
         }
@@ -8624,6 +8653,9 @@ const canvas = document.getElementById("game");
     const roadDiscoveryLead = !state.player.inHouse && state.regions?.activeRegion
       ? resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 34 })
       : null;
+    const nearbyRoadsideDiscoveries = !state.player.inHouse && state.regions?.activeRegion
+      ? findNearbyRoadsideDiscoveries(state.regions, state.regions.activeRegion, state.player.x, state.player.y, 14).slice(0, 3)
+      : [];
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const worldPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
     const roadSignPrompt = !state.player.inHouse && state.regions?.activeRegion
@@ -8720,6 +8752,7 @@ const canvas = document.getElementById("game");
         opening_fight_cue: openingFightCue,
         opening_route_guide: openingRouteGuide,
         road_discovery_lead: roadDiscoveryLead,
+        roadside_discoveries_nearby: nearbyRoadsideDiscoveries,
         road_sign_prompt: roadSignPrompt,
         road_route_objective: roadRouteObjective,
         first_minute_pressure: firstMinutePressure,
