@@ -176,6 +176,15 @@ import {
   createFactionRepNotice,
 } from "./hudNotice.js";
 import {
+  resolveMinimapDotStyle,
+  resolveMinimapMarkerStyle,
+  resolveMinimapPolylineStyle,
+} from "./minimapVisuals.js";
+import {
+  createSpriteLightHelpers,
+  resolveSpriteLightOverlayAlpha,
+} from "./spriteVisuals.js";
+import {
   QUEST_DEFINITIONS,
   createInitialQuestState,
   updateQuestProgressFromInventoryDataDriven,
@@ -5529,6 +5538,9 @@ const canvas = document.getElementById("game");
   const fitText = _renderHelpers.fitText;
   const drawClippedText = _renderHelpers.drawClippedText;
   const drawPillLabel = _renderHelpers.drawPillLabel;
+  const _spriteLightHelpers = createSpriteLightHelpers(ctx, { hexToRgba: hexToRgbaUtil });
+  const drawSpriteGlow = _spriteLightHelpers.drawSpriteGlow;
+  const drawSpritePulseRing = _spriteLightHelpers.drawSpritePulseRing;
 
   function drawInteriorBackdrop(width, height) {
     const horizon = Math.floor(height * 0.57);
@@ -6197,33 +6209,6 @@ const canvas = document.getElementById("game");
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = sprite.kind === "enemy" || sprite.label === "Crystal" || sprite.label === "Archive" ? 14 : 6;
     ctx.shadowOffsetY = 2;
-
-    function drawSpriteGlow(cx, cy, radius, color, alpha, innerRatio = 0.18) {
-      if (radius <= 0 || alpha <= 0) return;
-      const glow = ctx.createRadialGradient(cx, cy, radius * innerRatio, cx, cy, radius);
-      glow.addColorStop(0, hexToRgbaUtil(color, alpha));
-      glow.addColorStop(0.55, hexToRgbaUtil(color, alpha * 0.45));
-      glow.addColorStop(1, hexToRgbaUtil(color, 0));
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, TAU);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    function drawSpritePulseRing(cx, cy, radius, color, alpha, lineWidth = 2) {
-      if (radius <= 0 || alpha <= 0) return;
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = hexToRgbaUtil(color, alpha);
-      ctx.lineWidth = Math.max(1, lineWidth);
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, TAU);
-      ctx.stroke();
-      ctx.restore();
-    }
 
     ctx.fillStyle = `rgba(0, 0, 0, ${0.24 * lightFactor})`;
     ctx.beginPath();
@@ -6934,14 +6919,7 @@ const canvas = document.getElementById("game");
 
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;
-    const selfLitSprite = sprite.kind === "pressure"
-      || sprite.kind === "job-route"
-      || sprite.kind === "job-board"
-      || (sprite.kind === "roadside-discovery" && (sprite.poiKind === "camp" || sprite.poiKind === "shrine"))
-      || (sprite.kind === "poi" && (sprite.poiKind === "camp" || sprite.poiKind === "shrine" || sprite.poiKind === "mine"))
-      || (sprite.kind === "landmark" && (sprite.landmarkVariant === "signal_mast" || sprite.landmarkVariant === "slag_tower"))
-      || (sprite.kind === "world-prop" && ["lamp", "seam", "relay", "smoke", "gate", "watchtower", "tower", "signal", "road"].includes(sprite.propKind));
-    ctx.fillStyle = `rgba(0, 0, 0, ${0.18 * (1 - lightFactor + 0.24) * (selfLitSprite ? 0.56 : 1)})`;
+    ctx.fillStyle = `rgba(0, 0, 0, ${resolveSpriteLightOverlayAlpha(sprite, lightFactor)})`;
     ctx.fillRect(0, 0, spriteWidth, spriteHeight);
     if (sprite.flashTimer > 0) {
       ctx.fillStyle = `rgba(255, 255, 255, ${clamp(sprite.flashTimer / 0.1, 0, 1) * 0.72})`;
@@ -8123,16 +8101,16 @@ const canvas = document.getElementById("game");
       const dotY = originY + dy * cell;
       const distFromCenter = Math.sqrt((dotX - cx) ** 2 + (dotY - cy) ** 2);
       if (distFromCenter > mapRadius - 2) return;
+      const dotStyle = resolveMinimapDotStyle(size, minimapNightStrength);
       // Glow
-      const glowSize = size + 2 + minimapNightStrength * 1.6;
-      ctx.fillStyle = withAlpha(color, 0.35 + minimapNightStrength * 0.16);
+      ctx.fillStyle = withAlpha(color, dotStyle.glowAlpha);
       ctx.beginPath();
-      ctx.arc(dotX, dotY, glowSize, 0, TAU);
+      ctx.arc(dotX, dotY, dotStyle.glowSize, 0, TAU);
       ctx.fill();
       // Core
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(dotX, dotY, size + minimapNightStrength * 0.25, 0, TAU);
+      ctx.arc(dotX, dotY, dotStyle.coreSize, 0, TAU);
       ctx.fill();
     }
 
@@ -8149,16 +8127,16 @@ const canvas = document.getElementById("game");
       const point = worldToMap(wx, wy);
       const distFromCenter = Math.sqrt((point.x - cx) ** 2 + (point.y - cy) ** 2);
       if (distFromCenter > mapRadius - 2) return;
-      const markerGlow = size + 2.2 + minimapNightStrength * 2.6;
-      ctx.fillStyle = withAlpha(color, 0.28 + minimapNightStrength * 0.2);
+      const markerStyle = resolveMinimapMarkerStyle(size, minimapNightStrength);
+      ctx.fillStyle = withAlpha(color, markerStyle.glowAlpha);
       ctx.beginPath();
-      ctx.arc(point.x, point.y, markerGlow, 0, TAU);
+      ctx.arc(point.x, point.y, markerStyle.glowSize, 0, TAU);
       ctx.fill();
-      if (minimapNightStrength > 0.18) {
-        ctx.strokeStyle = withAlpha(color, 0.18 + minimapNightStrength * 0.2);
+      if (markerStyle.ringVisible) {
+        ctx.strokeStyle = withAlpha(color, markerStyle.ringAlpha);
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(point.x, point.y, markerGlow + 1.8, 0, TAU);
+        ctx.arc(point.x, point.y, markerStyle.ringSize, 0, TAU);
         ctx.stroke();
       }
       ctx.fillStyle = color;
@@ -8184,10 +8162,11 @@ const canvas = document.getElementById("game");
         .filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y))
         .map((point) => worldToMap(point.x, point.y));
       if (route.length < 2) return;
-      ctx.strokeStyle = withAlpha(color, clamp(alpha + minimapNightStrength * 0.18, 0, 0.82));
-      ctx.lineWidth = lineWidth + minimapNightStrength * 0.55;
-      ctx.shadowColor = withAlpha(color, 0.24 + minimapNightStrength * 0.22);
-      ctx.shadowBlur = minimapNightStrength * 5;
+      const routeStyle = resolveMinimapPolylineStyle({ alpha, lineWidth, nightStrength: minimapNightStrength });
+      ctx.strokeStyle = withAlpha(color, routeStyle.alpha);
+      ctx.lineWidth = routeStyle.lineWidth;
+      ctx.shadowColor = withAlpha(color, routeStyle.shadowAlpha);
+      ctx.shadowBlur = routeStyle.shadowBlur;
       ctx.beginPath();
       ctx.moveTo(route[0].x, route[0].y);
       for (let i = 1; i < route.length; i++) {
