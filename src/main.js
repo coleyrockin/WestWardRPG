@@ -5898,6 +5898,22 @@ const canvas = document.getElementById("game");
         ctx.beginPath();
         ctx.arc(spriteWidth * 0.5, spriteHeight * 0.28, spriteWidth * 0.28, 0, TAU);
         ctx.fill();
+      } else if (sprite.propKind === "road-sign") {
+        ctx.fillStyle = "#4a3323";
+        ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.34, spriteWidth * 0.06, spriteHeight * 0.54);
+        ctx.fillStyle = shadeHex(color, 0.62);
+        ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.22, spriteWidth * 0.56, spriteHeight * 0.16);
+        ctx.fillRect(spriteWidth * 0.28, spriteHeight * 0.42, spriteWidth * 0.44, spriteHeight * 0.14);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.74, spriteHeight * 0.2);
+        ctx.lineTo(spriteWidth * 0.88, spriteHeight * 0.3);
+        ctx.lineTo(spriteWidth * 0.74, spriteHeight * 0.4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(32, 22, 10, 0.42)";
+        ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.28, spriteWidth * 0.28, spriteHeight * 0.03);
+        ctx.fillRect(spriteWidth * 0.34, spriteHeight * 0.48, spriteWidth * 0.24, spriteHeight * 0.03);
       } else if (sprite.propKind === "sign") {
         ctx.fillStyle = "#5b402b";
         ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.36, spriteWidth * 0.06, spriteHeight * 0.52);
@@ -6369,6 +6385,15 @@ const canvas = document.getElementById("game");
           propKind: road.kind,
           label: road.label,
           size: road.size || 0.44,
+        });
+      }
+      for (const roadSign of regionPresentation.roadSigns || []) {
+        sprites.push({
+          ...roadSign,
+          kind: "world-prop",
+          propKind: roadSign.kind,
+          label: roadSign.targetLabel || roadSign.label,
+          size: roadSign.size || 0.6,
         });
       }
       for (const prop of regionPresentation.props) {
@@ -6936,6 +6961,9 @@ const canvas = document.getElementById("game");
       }
       for (const road of presentation.roads || []) {
         drawDot(road.x, road.y, road.color || "#d7b06d", 1.7);
+      }
+      for (const roadSign of presentation.roadSigns || []) {
+        drawDot(roadSign.x, roadSign.y, roadSign.color || "#d7b06d", 2.1);
       }
       for (const prop of presentation.props) {
         if (prop.kind === "sign" || prop.kind === "lamp" || prop.kind === "smoke") {

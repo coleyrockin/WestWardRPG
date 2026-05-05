@@ -1,3 +1,5 @@
+import { getPOIsForRegion, POI_KINDS } from "./poiSystem.js";
+
 export const REGION_VISUAL_IDENTITIES = {
   frontier: {
     id: "frontier",
@@ -143,6 +145,37 @@ const PLACEMENT_NUDGES = [
   [0, -1],
 ];
 
+const ROAD_SIGN_OFFSETS = {
+  frontier: [
+    { dx: 1.5, dy: 0.48 },
+    { dx: 2.65, dy: 0.22 },
+    { dx: 3.8, dy: -0.06 },
+    { dx: 4.9, dy: -0.34 },
+  ],
+  ashfall: [
+    { dx: 1.35, dy: 0.42 },
+    { dx: 2.55, dy: 0.12 },
+    { dx: 3.7, dy: -0.2 },
+    { dx: 4.75, dy: -0.52 },
+  ],
+  ironlantern: [
+    { dx: 1.4, dy: 0.36 },
+    { dx: 2.55, dy: 0.08 },
+    { dx: 3.65, dy: -0.22 },
+    { dx: 4.75, dy: -0.48 },
+  ],
+};
+
+const ROAD_SIGN_KIND_PRIORITY = {
+  mine: 0,
+  ruin: 1,
+  hideout: 2,
+  stranger: 3,
+  camp: 4,
+  shrine: 5,
+  cache: 6,
+};
+
 function pointAt(anchor, spec, nudge = [0, 0]) {
   return {
     x: Number((anchor.x + spec.dx + nudge[0]).toFixed(2)),
@@ -175,6 +208,66 @@ function placeSpec(spec, anchor, context = {}) {
   };
 }
 
+function directionLabel(dx, dy) {
+  const ax = Math.abs(dx);
+  const ay = Math.abs(dy);
+  if (ax < ay * 0.45) return dy >= 0 ? "south" : "north";
+  if (ay < ax * 0.45) return dx >= 0 ? "east" : "west";
+  if (dx >= 0 && dy >= 0) return "southeast";
+  if (dx < 0 && dy >= 0) return "southwest";
+  if (dx >= 0 && dy < 0) return "northeast";
+  return "northwest";
+}
+
+function roadSignSort(anchor) {
+  return (a, b) => {
+    const priorityA = ROAD_SIGN_KIND_PRIORITY[a.kind] ?? 20;
+    const priorityB = ROAD_SIGN_KIND_PRIORITY[b.kind] ?? 20;
+    if (priorityA !== priorityB) return priorityA - priorityB;
+    const distA = Math.hypot(a.x - anchor.x, a.y - anchor.y);
+    const distB = Math.hypot(b.x - anchor.x, b.y - anchor.y);
+    return distA - distB;
+  };
+}
+
+function buildRoadDiscoverySignposts(regionId, anchor, context = {}) {
+  const offsets = ROAD_SIGN_OFFSETS[regionId] || ROAD_SIGN_OFFSETS.frontier;
+  return getPOIsForRegion(regionId)
+    .filter((poi) => poi.roadHook && poi.regionHint)
+    .sort(roadSignSort(anchor))
+    .slice(0, offsets.length)
+    .map((poi, index) => {
+      const offset = offsets[index] || offsets[offsets.length - 1];
+      const kind = POI_KINDS[poi.kind] || POI_KINDS.cache;
+      const distance = Number(Math.hypot(poi.x - anchor.x, poi.y - anchor.y).toFixed(1));
+      const direction = directionLabel(poi.x - anchor.x, poi.y - anchor.y);
+      const placed = placeSpec({
+        kind: "road-sign",
+        label: `${poi.label} Sign`,
+        dx: offset.dx,
+        dy: offset.dy,
+        color: kind.color,
+        size: 0.58,
+      }, anchor, context);
+
+      return {
+        ...placed,
+        targetId: poi.id,
+        targetKind: poi.kind,
+        targetLabel: poi.label,
+        kindLabel: kind.label,
+        regionHint: poi.regionHint,
+        dangerHint: poi.dangerHint || "Optional danger off the main road.",
+        mysteryLine: poi.mysteryLine || "",
+        returnReason: poi.returnReason || "",
+        distance,
+        direction,
+        distanceLine: `${distance} tiles ${direction}`,
+        line: `${poi.label} ${kind.label.toLowerCase()}: ${distance} tiles ${direction}. ${poi.dangerHint || "Optional danger off the main road."}`,
+      };
+    });
+}
+
 export function buildRegionWorldPresentation(regionId, context = {}) {
   const profile = getRegionVisualIdentity(regionId);
   const config = REGION_PRESENTATION[profile.id] || REGION_PRESENTATION.frontier;
@@ -192,5 +285,6 @@ export function buildRegionWorldPresentation(regionId, context = {}) {
     vistas: (config.vistas || []).map((vista) => placeSpec(vista, anchor, context)),
     roads: (config.roads || []).map((road) => placeSpec(road, anchor, context)),
     props: config.props.map((prop) => placeSpec(prop, anchor, context)),
+    roadSigns: buildRoadDiscoverySignposts(profile.id, anchor, context),
   };
 }

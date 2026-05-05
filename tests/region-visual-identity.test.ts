@@ -44,6 +44,35 @@ describe("regionVisualIdentity", () => {
     expect(presentation.roads.some((road: any) => road.label.includes("Marshal"))).toBe(true);
   });
 
+  it("adds road discovery signposts that point to authored POIs", () => {
+    const presentation = buildRegionWorldPresentation("frontier", { playerX: 9.5, playerY: 8.5 });
+
+    expect(presentation.roadSigns.length).toBeGreaterThanOrEqual(3);
+    expect(presentation.roadSigns.every((sign: any) => sign.kind === "road-sign")).toBe(true);
+    expect(presentation.roadSigns.every((sign: any) => sign.blocking === false)).toBe(true);
+    expect(presentation.roadSigns.every((sign: any) => sign.targetId && sign.distanceLine && sign.dangerHint)).toBe(true);
+    expect(presentation.roadSigns.map((sign: any) => sign.targetKind)).toEqual(expect.arrayContaining([
+      "ruin",
+      "hideout",
+      "stranger",
+    ]));
+  });
+
+  it("keeps road discovery signposts map-valid when their first placement is blocked", () => {
+    const blocked = new Set(["11.00,8.98"]);
+    const isPassable = (x: number, y: number) => !blocked.has(`${x.toFixed(2)},${y.toFixed(2)}`);
+    const isVisible = (x: number, y: number) => x >= 9 && x <= 16 && y >= 6 && y <= 11;
+    const presentation = buildRegionWorldPresentation("frontier", {
+      playerX: 9.5,
+      playerY: 8.5,
+      isPassable,
+      isVisible,
+    });
+
+    expect(presentation.roadSigns.every((sign: any) => isPassable(sign.x, sign.y) && isVisible(sign.x, sign.y))).toBe(true);
+    expect(presentation.roadSigns[0].placement).toBe("adjusted");
+  });
+
   it("adds first-view composition with validated vista silhouettes", () => {
     const presentation = buildRegionWorldPresentation("frontier", { playerX: 9.5, playerY: 8.5 });
 
@@ -70,7 +99,7 @@ describe("regionVisualIdentity", () => {
       isVisible,
     });
 
-    const placements = [presentation.landmark, ...presentation.props, ...presentation.roads, ...presentation.vistas];
+    const placements = [presentation.landmark, ...presentation.props, ...presentation.roads, ...presentation.vistas, ...presentation.roadSigns];
     expect(placements.every((item: any) => isPassable(item.x, item.y) && isVisible(item.x, item.y))).toBe(true);
     expect(presentation.props.find((prop: any) => prop.kind === "sign")).toMatchObject({
       placement: "adjusted",
@@ -86,5 +115,7 @@ describe("regionVisualIdentity", () => {
     expect(ashfall.props.map((prop: any) => prop.label)).not.toEqual(lantern.props.map((prop: any) => prop.label));
     expect(ashfall.roads.map((road: any) => road.label)).not.toEqual(lantern.roads.map((road: any) => road.label));
     expect(ashfall.vistas.map((vista: any) => vista.label)).not.toEqual(lantern.vistas.map((vista: any) => vista.label));
+    expect(ashfall.roadSigns.map((sign: any) => sign.targetKind)).toContain("mine");
+    expect(lantern.roadSigns.map((sign: any) => sign.targetKind)).toContain("hideout");
   });
 });
