@@ -10,6 +10,7 @@ import {
   resolveCodexUnlockForPOI,
   totalCodexProgress,
 } from "../src/codex.js";
+import { POI_DEFINITIONS } from "../src/poiSystem.js";
 
 describe("codex — data integrity", () => {
   it("has all lore tabs including POI letters", () => {
@@ -28,6 +29,16 @@ describe("codex — data integrity", () => {
         expect(typeof e.id).toBe("string");
         expect(typeof e.title).toBe("string");
         expect(typeof e.body).toBe("string");
+      }
+    }
+  });
+
+  it("has a letter entry for every authored POI", () => {
+    const letters = new Set(CODEX_ENTRIES.letters.map((entry) => entry.id));
+
+    for (const pois of Object.values(POI_DEFINITIONS)) {
+      for (const poi of pois) {
+        expect(letters.has(poi.id), `${poi.id} should unlock a codex letter`).toBe(true);
       }
     }
   });
