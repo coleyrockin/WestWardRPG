@@ -77,6 +77,7 @@ import {
   recordRunKill,
   syncQuestOutcomeCount,
 } from "./runSummary.js";
+import { resolveDiscoveryRewardFeedback } from "./discoveryRewardFeedback.js";
 import {
   ORIGINS,
   applyOrigin,
@@ -1273,6 +1274,7 @@ const canvas = document.getElementById("game");
   let dialogueOpen = false;
   let dialogueSelection = 0;
   let pendingDialogue = null; // { npcId, npcName, choices: DialogueChoice[] }
+  let discoveryBanner = null;
 
   function openDialogueChoiceFor(npcId, npcName) {
     if (!state.narrative) return false;
@@ -2666,6 +2668,14 @@ const canvas = document.getElementById("game");
     if (state.msg.length > 8) state.msg.length = 8;
   }
 
+  function showDiscoveryBanner(feedback) {
+    if (!feedback) return;
+    discoveryBanner = {
+      ...feedback,
+      ttl: Number.isFinite(feedback.ttl) ? feedback.ttl : 5.2,
+    };
+  }
+
   function emitCompanionBark(eventType) {
     if (!state.companion?.active) return null;
     const line = trySpeakBark(state.companion, eventType, state.time || 0);
@@ -3635,6 +3645,10 @@ const canvas = document.getElementById("game");
         const newlyDiscovered = markPOIDiscovered(state.regions, poi.id);
         const kind = POI_KINDS[poi.kind] || POI_KINDS.cache;
         let summary = `Discovered ${poi.label} (${kind.label})`;
+        const discoveryReward = { gold: 0, items: {}, hp: 0, stamina: 0 };
+        let renownReward = null;
+        let codexUnlock = null;
+        let routeReward = null;
         if (newlyDiscovered) {
           recordNpcMemoryEvent(state.narrative.npcMemory, "elder", {
             type: "poi_discovered",
@@ -3643,7 +3657,7 @@ const canvas = document.getElementById("game");
             regionId: state.regions.activeRegion,
             at: state.time,
           });
-          const renownReward = resolveExplorationRenownReward(state.regions.poisDiscovered.length);
+          renownReward = resolveExplorationRenownReward(state.regions.poisDiscovered.length);
           if (renownReward) {
             grantXp(renownReward.xp);
             state.player.gold += renownReward.gold;
@@ -3653,31 +3667,37 @@ const canvas = document.getElementById("game");
           if (poi.mysteryLine) summary += `. ${poi.mysteryLine}`;
           if (poi.returnReason) summary += `. ${poi.returnReason}`;
         }
-        const codexUnlock = resolveCodexUnlockForPOI(poi);
+        codexUnlock = resolveCodexUnlockForPOI(poi);
         if (codexUnlock && unlockCodexEntry(state, codexUnlock.tab, codexUnlock.id)) {
           summary += `. Letter unlocked: ${codexUnlock.title}`;
+        } else {
+          codexUnlock = null;
         }
         if (poi.loot?.gold) {
           state.player.gold += poi.loot.gold;
+          discoveryReward.gold += poi.loot.gold;
           summary += `. +${poi.loot.gold}g`;
         }
         if (poi.loot?.items) {
           for (const [name, count] of Object.entries(poi.loot.items)) {
             state.inventory[name] = (state.inventory[name] || 0) + count;
+            discoveryReward.items[name] = (discoveryReward.items[name] || 0) + count;
           }
           const itemList = Object.entries(poi.loot.items).map(([k, v]) => `${v} ${k}`).join(", ");
           summary += `. ${itemList}`;
         }
         if (poi.buff?.hp) {
           state.player.hp = Math.min(state.player.maxHp, state.player.hp + poi.buff.hp);
+          discoveryReward.hp += poi.buff.hp;
           summary += `. +${poi.buff.hp} HP`;
         }
         if (poi.buff?.stamina) {
           state.player.stamina = Math.min(100, state.player.stamina + poi.buff.stamina);
+          discoveryReward.stamina += poi.buff.stamina;
           summary += `. +${poi.buff.stamina} stamina`;
         }
         if (completesPinnedRoadRoute) {
-          const routeReward = resolveRoadRouteCompletionReward(state.world.roadRoute);
+          routeReward = resolveRoadRouteCompletionReward(state.world.roadRoute);
           if (routeReward) {
             state.player.gold += routeReward.gold;
             grantXp(routeReward.xp);
@@ -3686,6 +3706,13 @@ const canvas = document.getElementById("game");
           state.world.roadRoute = null;
         }
         logMsg(summary + ".");
+        showDiscoveryBanner(resolveDiscoveryRewardFeedback({
+          poi,
+          reward: discoveryReward,
+          codexUnlock,
+          renownReward,
+          routeReward,
+        }));
         if (poi.rollLoot !== false) {
           grantRolledLoot(poi.kind === "camp" || poi.kind === "hideout" ? "poi_camp" : "poi_cache", state.regions.activeRegion);
         }
@@ -4950,6 +4977,10 @@ const canvas = document.getElementById("game");
 
     for (const m of state.msg) {
       m.ttl -= dt;
+    }
+    if (discoveryBanner) {
+      discoveryBanner.ttl -= dt;
+      if (discoveryBanner.ttl <= 0) discoveryBanner = null;
     }
     // Use reverse loop to remove expired messages without creating new array
     for (let i = state.msg.length - 1; i >= 0; i--) {
@@ -7354,6 +7385,48 @@ const canvas = document.getElementById("game");
     ctx.restore();
   }
 
+  function drawDiscoveryBanner(bottomHudY, margin) {
+    if (!discoveryBanner) return;
+    const lines = Array.isArray(discoveryBanner.lines) ? discoveryBanner.lines.slice(0, 3) : [];
+    const compact = canvas.width < 560;
+    const w = Math.min(compact ? canvas.width - margin * 2 : 520, canvas.width - margin * 2);
+    const h = 54 + Math.max(1, lines.length) * 14;
+    const x = Math.round((canvas.width - w) / 2);
+    const y = Math.max(margin + 98, Math.round(bottomHudY - h - 10));
+    const color = discoveryBanner.color || "#d8bc6a";
+    const alpha = clamp(discoveryBanner.ttl / 0.45, 0, 1);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    drawSoftPanel(x, y, w, h, {
+      top: "rgba(30, 26, 18, 0.86)",
+      bottom: "rgba(10, 14, 16, 0.82)",
+      border: "rgba(255, 226, 150, 0.5)",
+      shadowBlur: 18,
+      shadowOffsetY: 8,
+    });
+    ctx.fillStyle = color;
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.fillRect(x + 10, y + 12, 4, h - 24);
+    ctx.beginPath();
+    ctx.arc(x + 24, y + 25, 6, 0, TAU);
+    ctx.fill();
+    ctx.globalAlpha = alpha;
+
+    ctx.font = "bold 14px Georgia";
+    drawClippedText(discoveryBanner.title || "Discovery found", x + 38, y + 23, w - 52, "#fff1d0");
+    ctx.font = "10px Georgia";
+    drawClippedText(discoveryBanner.subtitle || "Roadside discovery", x + 38, y + 38, w - 52, "#d8c7a2");
+
+    let lineY = y + 56;
+    for (const line of lines.length ? lines : [discoveryBanner.rewardLine || "New clue recorded"]) {
+      ctx.font = lineY === y + 56 ? "bold 11px Georgia" : "10px Georgia";
+      drawClippedText(line, x + 18, lineY, w - 34, lineY === y + 56 ? "#ffd77b" : "#f1e5c8");
+      lineY += 14;
+    }
+    ctx.restore();
+  }
+
   function drawHud() {
     const q1 = state.quests.crystal;
     const q2 = state.quests.slime;
@@ -7559,6 +7632,7 @@ const canvas = document.getElementById("game");
         drawClippedText(liveObjective.secondaryLine, strip.x + 10, strip.secondaryY, strip.w - 20, "#f1e5c8");
       }
     }
+    drawDiscoveryBanner(hudY, margin);
 
     if (state.mode === "gameover") {
       ctx.fillStyle = "rgba(18, 4, 5, 0.78)";
@@ -8753,6 +8827,17 @@ const canvas = document.getElementById("game");
         opening_route_guide: openingRouteGuide,
         road_discovery_lead: roadDiscoveryLead,
         roadside_discoveries_nearby: nearbyRoadsideDiscoveries,
+        discovery_banner: discoveryBanner
+          ? {
+            title: discoveryBanner.title,
+            subtitle: discoveryBanner.subtitle,
+            reward_line: discoveryBanner.rewardLine,
+            hook_line: discoveryBanner.hookLine,
+            codex_line: discoveryBanner.codexLine,
+            lines: discoveryBanner.lines,
+            ttl: Number((discoveryBanner.ttl || 0).toFixed(2)),
+          }
+          : null,
         road_sign_prompt: roadSignPrompt,
         road_route_objective: roadRouteObjective,
         first_minute_pressure: firstMinutePressure,

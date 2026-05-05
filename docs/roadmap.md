@@ -260,9 +260,10 @@ It needs the existing systems to feel connected in the player's first short sess
 
 ## Shipped Foundations (audit)
 
-Latest audit: `npm test` → 452 passing across 43 test files; 44 source modules; 14 Playwright scenarios. Commit `d989d1f+` plus the local Roadside Discovery 1 slice is the current verified state.
+Latest audit: `npm test` → 456 passing across 44 test files; 45 source modules; 14 Playwright scenarios. Commit `b9bdb58+` plus the local Discovery Reward Banner 1 slice is the current verified state.
 
 ### Phase 1 open-road slice (latest local)
+- **Discovery Reward Banner 1** (`src/discoveryRewardFeedback.js`) — discoveries now trigger a compact reward banner with title, reward line, story hook, codex unlock, and route/renown payoff lines. `render_game_to_text` exposes the active banner for browser smoke and human-test auditing.
 - **Roadside Discovery 1** (`src/poiSystem.js`) — the first Dustward roads now include a broken wagon, wayside shrine, and abandoned lunchfire near Boone. They are deterministic, one-shot, codex-backed, minimap-visible, render-text-visible, and small enough to stumble into before the bigger POI loop.
 
 ### Phase 2 + Phase 3 payoff slice
