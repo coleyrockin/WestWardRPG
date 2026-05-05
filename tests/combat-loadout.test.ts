@@ -21,8 +21,8 @@ describe("combatLoadout", () => {
 
   it("unlocks perks at level tiers", () => {
     const state = createInitialNarrativeState();
-    const profile = resolveCombatProgression(state, 9);
-    expect(profile.perks).toEqual(expect.arrayContaining(["weatheredGrip", "counterweight", "peoplePulse"]));
+    const profile = resolveCombatProgression(state, 12);
+    expect(profile.perks).toEqual(expect.arrayContaining(["weatheredGrip", "counterweight", "peoplePulse", "adrenalSurge"]));
   });
 
   it("applies weather and solidarity modifiers to swing profile", () => {
@@ -34,6 +34,18 @@ describe("combatLoadout", () => {
     );
     expect(swing.stamina).toBeGreaterThan(0);
     expect(swing.damage).toBeGreaterThanOrEqual(20);
+  });
+
+
+
+  it("amplifies follow-up swings after perfect defense at high level", () => {
+    const profile = resolveCombatProgression(createInitialNarrativeState(), 12);
+    const base = { damage: 20, stamina: 10, arc: 0.9, cooldown: 0.2, duration: 0.3, reach: 2, lunge: 0.1, knock: 0.2, staggerBonus: 0 };
+    const normal = applySwingLoadout(base, profile, { weatherKind: "clear", solidarityVsStatus: 0 });
+    const surged = applySwingLoadout(base, profile, { weatherKind: "clear", solidarityVsStatus: 0, recentPerfectDefense: true });
+    expect(surged.damage).toBeGreaterThan(normal.damage);
+    expect(surged.stamina).toBeLessThan(normal.stamina);
+    expect(surged.staggerBonus).toBeGreaterThan(normal.staggerBonus);
   });
 
   it("returns reduced incoming damage when blocking", () => {

@@ -64,10 +64,11 @@ export function formatRunDuration(seconds = 0) {
   return `${minutes}:${String(remain).padStart(2, "0")}`;
 }
 
-export function buildRunSummary(world, narrative, player, companion, now = 0) {
+export function buildRunSummary(world, narrative, player, companion, now = 0, houseProgress = null) {
   const stats = syncQuestOutcomeCount(world, narrative);
   const endedAt = Number.isFinite(stats.endedAt) ? stats.endedAt : now;
   const duration = Math.max(0, endedAt - stats.startedAt);
+  const trophies = Array.isArray(houseProgress?.trophies) ? houseProgress.trophies : [];
   return {
     victory: stats.victory,
     endingId: stats.endingId || narrative?.ending?.id || null,
@@ -83,6 +84,9 @@ export function buildRunSummary(world, narrative, player, companion, now = 0) {
     gold: Math.max(0, Math.floor(player?.gold || 0)),
     axes: { ...(narrative?.thematicAxes || {}) },
     latestDecisions: [...(narrative?.decisions || [])].slice(-3).map((entry) => entry.log || entry.prompt || entry.id),
+    houseTrophyCount: Math.max(0, Math.floor(houseProgress?.trophyCount || trophies.length || 0)),
+    houseTrophyLine: typeof houseProgress?.trophyLine === "string" ? houseProgress.trophyLine : "House proof not recorded",
+    houseTrophyHighlights: trophies.slice(0, 3).map((trophy) => trophy.line || trophy.label || trophy.id).filter(Boolean),
     companion: companion?.active
       ? `${companion.name} active (${Math.max(0, Math.round(companion.hp || 0))} HP)`
       : companion?.downed

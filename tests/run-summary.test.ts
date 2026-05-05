@@ -67,6 +67,32 @@ describe("run summary", () => {
     expect(summary.companion).toContain("recovering");
   });
 
+  it("surfaces house trophy proof when provided", () => {
+    const world: any = { runStats: createInitialRunStats(0) };
+    const summary = buildRunSummary(
+      world,
+      { questOutcomes: {}, decisions: [] },
+      { level: 2, gold: 12 },
+      { active: false },
+      30,
+      {
+        trophyCount: 2,
+        trophyLine: "Map Scrap pinned above the bench / Worn Badge on the shelf",
+        trophies: [
+          { line: "Map Scrap pinned above the bench" },
+          { line: "Worn Badge on the shelf" },
+        ],
+      },
+    );
+
+    expect(summary.houseTrophyCount).toBe(2);
+    expect(summary.houseTrophyLine).toContain("Map Scrap");
+    expect(summary.houseTrophyHighlights).toEqual([
+      "Map Scrap pinned above the bench",
+      "Worn Badge on the shelf",
+    ]);
+  });
+
   it("syncs quest outcome counts independently", () => {
     const world: any = {};
     const stats = syncQuestOutcomeCount(world, { questOutcomes: { a: 1, b: 2, c: 3 } });

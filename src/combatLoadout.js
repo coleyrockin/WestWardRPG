@@ -98,6 +98,12 @@ const PERK_TIERS = [
     label: "People's Pulse",
     description: "Strikes gain power when solidarity trends upward.",
   },
+  {
+    minLevel: 12,
+    id: "adrenalSurge",
+    label: "Adrenal Surge",
+    description: "Perfect defense windows prime your next strike with higher tempo and force.",
+  },
 ];
 
 function resolveStyleId(narrativeState) {
@@ -138,6 +144,12 @@ export function applySwingLoadout(baseSwing, combatProgression, context = {}) {
   }
   if (perks.has("peoplePulse") && (context.solidarityVsStatus || 0) > 10) {
     damage *= 1.08;
+  }
+  if (perks.has("adrenalSurge") && context.recentPerfectDefense) {
+    staminaCost *= 0.82;
+    damage *= 1.12;
+    arc += 0.03;
+    staggerBonus += 0.04;
   }
 
   return {

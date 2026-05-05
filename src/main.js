@@ -168,6 +168,14 @@ import {
 } from "./houseProgress.js";
 import { buildVisualMood } from "./visualProfile.js";
 import {
+  resolveDynamicLightAtPoint,
+  selectDynamicLights,
+} from "./dynamicLights.js";
+import {
+  createCodexUnlockNotice,
+  createFactionRepNotice,
+} from "./hudNotice.js";
+import {
   QUEST_DEFINITIONS,
   createInitialQuestState,
   updateQuestProgressFromInventoryDataDriven,
@@ -1319,6 +1327,7 @@ const canvas = document.getElementById("game");
   let dialogueSelection = 0;
   let pendingDialogue = null; // { npcId, npcName, choices: DialogueChoice[] }
   let discoveryBanner = null;
+  let hudNotice = null;
 
   function openDialogueChoiceFor(npcId, npcName) {
     if (!state.narrative) return false;
@@ -2769,6 +2778,14 @@ const canvas = document.getElementById("game");
     if (state.msg.length > 8) state.msg.length = 8;
   }
 
+  function showHudNotice(notice) {
+    if (!notice) return;
+    hudNotice = {
+      ...notice,
+      ttl: Number.isFinite(notice.ttl) ? notice.ttl : 5.2,
+    };
+  }
+
   // Wraps unlockCodexEntry: surfaces a player-visible message on first unlock.
   // Returns whatever unlockCodexEntry returned so callers can chain conditional logic.
   function unlockCodexAndPing(tab, id) {
@@ -2777,6 +2794,7 @@ const canvas = document.getElementById("game");
     const entry = getCodexEntry(tab, id);
     const title = entry?.title || id;
     logMsg(`Codex unlocked: ${title}.`);
+    showHudNotice(createCodexUnlockNotice(entry || { title }, tab));
     return true;
   }
 
@@ -2832,6 +2850,10 @@ const canvas = document.getElementById("game");
       const name = FACTION_DISPLAY_NAMES[fid];
       const label = factionBandLabel(current);
       logMsg(`Word travels: ${name} standing ${direction} to ${label}.`);
+      const priceLine = fid === "marketCartel"
+        ? (current > previous ? "Shop prices may soften." : "Shop prices may harden.")
+        : "";
+      showHudNotice(createFactionRepNotice({ factionName: name, direction, label, priceLine }));
       factionRepBandSnapshot[fid] = current;
     }
   }
@@ -5150,6 +5172,10 @@ const canvas = document.getElementById("game");
       discoveryBanner.ttl -= dt;
       if (discoveryBanner.ttl <= 0) discoveryBanner = null;
     }
+    if (hudNotice) {
+      hudNotice.ttl -= dt;
+      if (hudNotice.ttl <= 0) hudNotice = null;
+    }
     // Use reverse loop to remove expired messages without creating new array
     for (let i = state.msg.length - 1; i >= 0; i--) {
       if (state.msg[i].ttl <= 0) {
@@ -7010,6 +7036,173 @@ const canvas = document.getElementById("game");
   // Per-frame depth buffer reused across frames; reallocates on canvas resize only.
   let cachedDepthBuffer = null;
 
+  function pushDynamicLight(lights, light) {
+    if (!light || !Number.isFinite(light.x) || !Number.isFinite(light.y)) return;
+    lights.push(light);
+  }
+
+  function pushPropDynamicLight(lights, prop, fallback = {}) {
+    if (!prop) return;
+    const propKind = prop.propKind || prop.kind;
+    const lightKinds = {
+      lamp: { radius: 5.4, intensity: 0.72, flicker: 0.55 },
+      seam: { radius: 4.6, intensity: 0.55, flicker: 0.25 },
+      relay: { radius: 5.8, intensity: 0.68, flicker: 0.18 },
+      smoke: { radius: 4.8, intensity: 0.34, flicker: 0.75 },
+      gate: { radius: 4.6, intensity: 0.38, flicker: 0.08 },
+      road: { radius: 3.6, intensity: 0.2, flicker: 0.08 },
+      "road-sign": { radius: 3.2, intensity: 0.22, flicker: 0.18 },
+      signal: { radius: 6.4, intensity: 0.62, flicker: 0.12 },
+      tower: { radius: 5.6, intensity: 0.38, flicker: 0.28 },
+      watchtower: { radius: 5.6, intensity: 0.36, flicker: 0.22 },
+    };
+    const config = lightKinds[propKind];
+    if (!config) return;
+    pushDynamicLight(lights, {
+      id: fallback.id || `${propKind}-${prop.x}-${prop.y}`,
+      kind: propKind,
+      x: prop.x,
+      y: prop.y,
+      color: prop.color || fallback.color || "#ffd77b",
+      ...config,
+    });
+  }
+
+  function collectSceneDynamicLights(regionPresentation, visualMood) {
+    const lights = [];
+    const moodStrength = clamp(numberOr(visualMood?.dynamicLightStrength, 0.35), 0, 1.4);
+    const nightBoost = state.world?.timeOfDay > 0.68 || state.world?.timeOfDay < 0.2 ? 0.18 : 0;
+    pushDynamicLight(lights, {
+      id: "player-lantern",
+      kind: "player",
+      x: state.player.x,
+      y: state.player.y,
+      color: state.player.inHouse ? "#ffd7a0" : "#ffd77b",
+      radius: state.player.inHouse ? 4.8 : 5.6,
+      intensity: 0.26 + moodStrength * 0.18 + nightBoost,
+      flicker: 0.18,
+    });
+
+    if (state.player.inHouse) {
+      pushDynamicLight(lights, { id: "house-bed-light", kind: "lamp", x: state.house.bed.x, y: state.house.bed.y, color: "#ffd0a0", radius: 4.6, intensity: 0.42, flicker: 0.3 });
+      pushDynamicLight(lights, { id: "house-stash-light", kind: "lamp", x: state.house.stash.x, y: state.house.stash.y, color: "#ffd77b", radius: 4.2, intensity: 0.34, flicker: 0.2 });
+      return selectDynamicLights(lights, state.player, { maxLights: 8 });
+    }
+
+    const regionProfile = visualMood?.regionProfile || getRegionVisualIdentity(state.regions.activeRegion);
+    if (regionPresentation?.landmark) {
+      const variant = regionPresentation.landmark.variant;
+      pushDynamicLight(lights, {
+        id: `landmark-${variant || regionPresentation.landmark.label}`,
+        kind: "landmark",
+        x: regionPresentation.landmark.x,
+        y: regionPresentation.landmark.y,
+        color: regionPresentation.landmark.color || regionProfile.minimapTint || "#ffd77b",
+        radius: variant === "signal_mast" ? 7.2 : variant === "slag_tower" ? 6.4 : 5.4,
+        intensity: variant === "signal_mast" ? 0.64 : variant === "slag_tower" ? 0.52 : 0.36,
+        flicker: variant === "slag_tower" ? 0.38 : 0.16,
+      });
+    }
+    for (const prop of regionPresentation?.props || []) pushPropDynamicLight(lights, prop);
+    for (const vista of regionPresentation?.vistas || []) pushPropDynamicLight(lights, vista);
+    for (const road of regionPresentation?.roads || []) pushPropDynamicLight(lights, road);
+    for (const sign of regionPresentation?.roadSigns || []) pushPropDynamicLight(lights, sign, { color: sign.color });
+
+    const boardProp = getActiveJobBoardProp();
+    if (boardProp) {
+      pushDynamicLight(lights, { id: "job-board-light", kind: "job-board", x: boardProp.x, y: boardProp.y, color: boardProp.color || "#d8a84f", radius: 4.8, intensity: 0.5, flicker: 0.22 });
+    }
+
+    const pressure = resolveFirstMinutePressure({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      regionId: state.regions.activeRegion,
+      player: state.player,
+      inventory: state.inventory,
+      quests: state.quests,
+    });
+    if (pressure?.marker) {
+      pushDynamicLight(lights, { id: "first-pressure-light", kind: "pressure", x: pressure.marker.x, y: pressure.marker.y, color: pressure.marker.color || "#ffd77b", radius: 5.2, intensity: 0.64, flicker: 0.65 });
+    }
+
+    for (const discovery of findNearbyRoadsideDiscoveries(state.regions, state.regions.activeRegion, state.player.x, state.player.y, MAX_RAY_DIST).slice(0, 3)) {
+      const isShrine = discovery.kind === "shrine";
+      const isCamp = discovery.kind === "camp";
+      pushDynamicLight(lights, {
+        id: `roadside-${discovery.id}`,
+        kind: discovery.kind,
+        x: discovery.x,
+        y: discovery.y,
+        color: discovery.color || (isShrine ? "#cdb8ff" : "#ffd77b"),
+        radius: isShrine ? 5.4 : isCamp ? 4.8 : 3.6,
+        intensity: isShrine ? 0.58 : isCamp ? 0.5 : 0.26,
+        flicker: isCamp || isShrine ? 0.58 : 0.18,
+      });
+    }
+
+    for (const enemy of state.enemies) {
+      if (!enemy.alive) continue;
+      const windup = (enemy.windupTimer || 0) > 0;
+      pushDynamicLight(lights, {
+        id: `enemy-${enemy.id}`,
+        kind: "enemy",
+        x: enemy.x,
+        y: enemy.y,
+        color: windup ? "#ff4838" : enemy.color || "#6be873",
+        radius: windup ? 5.8 : 4.2,
+        intensity: windup ? 0.68 : 0.34,
+        flicker: windup ? 0.6 : 0.12,
+      });
+    }
+
+    for (const resource of state.resources) {
+      if (resource.harvested) continue;
+      const glowResources = {
+        crystal: "#8dc4ff",
+        "archive-node": "#d96cff",
+        ashglass: "#e2a36b",
+        "heat-resin": "#ff8a4c",
+        "lantern-filament": "#9bd3ff",
+        "cipher-lens": "#c8a8ff",
+        "pressurized-ink": "#7e8cff",
+      };
+      const color = glowResources[resource.type];
+      if (!color) continue;
+      pushDynamicLight(lights, { id: `resource-${resource.id}`, kind: "resource", x: resource.x, y: resource.y, color, radius: 3.6, intensity: 0.34, flicker: 0.16 });
+    }
+
+    if (!state.chest.opened) {
+      pushDynamicLight(lights, { id: "smoke-cache-light", kind: "cache", x: state.chest.x, y: state.chest.y, color: state.chest.firstRewardClaimed ? "#bf8a4f" : "#ffd77b", radius: 4.6, intensity: state.chest.firstRewardClaimed ? 0.26 : 0.52, flicker: 0.42 });
+    }
+
+    return selectDynamicLights(lights, state.player, { maxLights: 8 });
+  }
+
+  function drawDynamicLightPools(lights, horizon, width, height, shakeX, visualMood) {
+    if (!Array.isArray(lights) || lights.length === 0) return;
+    const strength = clamp(numberOr(visualMood?.dynamicLightStrength, 0.35), 0, 1.4);
+    for (const light of lights) {
+      const dx = light.x - state.player.x;
+      const dy = light.y - state.player.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < 0.2 || distance > MAX_RAY_DIST) continue;
+      const ang = normalizeAngle(Math.atan2(dy, dx) - state.player.angle);
+      if (Math.abs(ang) > FOV * 0.72) continue;
+      const sx = ((ang + FOV / 2) / FOV) * width + shakeX;
+      const depthFactor = clamp(1 - distance / Math.max(0.1, light.radius + 8), 0, 1);
+      if (depthFactor <= 0) continue;
+      const poolRadius = clamp((height / (distance + 0.8)) * light.radius * 0.12, 18, width * 0.22);
+      const y = clamp(horizon + (height - horizon) * (0.42 + distance / (MAX_RAY_DIST * 2.2)), horizon + 14, height - poolRadius * 0.35);
+      const alpha = clamp(light.intensity * depthFactor * strength * 0.2, 0, 0.24);
+      const gradient = ctx.createRadialGradient(sx, y, 0, sx, y, poolRadius);
+      gradient.addColorStop(0, `rgba(${light.rgb.r}, ${light.rgb.g}, ${light.rgb.b}, ${alpha})`);
+      gradient.addColorStop(1, `rgba(${light.rgb.r}, ${light.rgb.g}, ${light.rgb.b}, 0)`);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(sx - poolRadius, y - poolRadius, poolRadius * 2, poolRadius * 2);
+    }
+  }
+
   function render3D() {
     const width = canvas.width;
     const height = canvas.height;
@@ -7027,6 +7220,10 @@ const canvas = document.getElementById("game");
     latestColorblindPalette = getColorblindPalette(visualMood.colorblindMode);
     const gradientCacheEnabled = isGradientCacheEnabled();
     const cameraShakeStrength = clamp(visualMood.cameraShake ?? 1, 0, 1.5);
+    const sceneRegionPresentation = state.player.inHouse
+      ? null
+      : buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
+    const sceneLights = collectSceneDynamicLights(sceneRegionPresentation, visualMood);
 
     const baseHorizon = drawSkyAndGround(width, height, dayForMood, visualMood);
     const bobOffset = Math.sin(state.player.walkBob * 2.2) * (state.player.inHouse ? 1.2 : 2.2);
@@ -7047,6 +7244,8 @@ const canvas = document.getElementById("game");
       const rayAngle = state.player.angle - FOV / 2 + (x / width) * FOV;
       const hit = castRay(rayAngle);
       const correctedDist = Math.max(0.0001, hit.dist * Math.cos(rayAngle - state.player.angle));
+      const hitX = state.player.x + Math.cos(rayAngle) * hit.dist;
+      const hitY = state.player.y + Math.sin(rayAngle) * hit.dist;
       depth[x] = correctedDist;
       const projection = resolveWallProjection({
         height,
@@ -7081,6 +7280,18 @@ const canvas = document.getElementById("game");
       const baseShadow = clamp((projectedDist / MAX_RAY_DIST) * 0.5 + 0.06, 0.08, 0.56);
       ctx.fillStyle = `rgba(9, 14, 18, ${baseShadow})`;
       ctx.fillRect(x, y + wallHeight * 0.82, 1, wallHeight * 0.18);
+      const wallLight = resolveDynamicLightAtPoint(
+        { x: hitX, y: hitY },
+        sceneLights,
+        { time: state.time, strength: visualMood.dynamicLightStrength },
+      );
+      if (wallLight.active) {
+        const verticalAlpha = Number((wallLight.alpha * 0.09).toFixed(3));
+        ctx.fillStyle = wallLight.style;
+        ctx.fillRect(x, y, 1, wallHeight);
+        ctx.fillStyle = `rgba(${wallLight.r}, ${wallLight.g}, ${wallLight.b}, ${verticalAlpha})`;
+        ctx.fillRect(x, y + wallHeight * 0.72, 1, wallHeight * 0.28);
+      }
       const nearWall = resolveNearWallVisualTreatment({
         correctedDist,
         nearClip: WALL_RENDER_NEAR_CLIP,
@@ -7115,6 +7326,7 @@ const canvas = document.getElementById("game");
       }
     }
     ctx.imageSmoothingEnabled = true;
+    drawDynamicLightPools(sceneLights, horizon, width, height, shakeX, visualMood);
 
     const sprites = [];
 
@@ -7139,7 +7351,7 @@ const canvas = document.getElementById("game");
         });
       }
     } else {
-      const regionPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
+      const regionPresentation = sceneRegionPresentation || buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
       sprites.push({
         ...regionPresentation.landmark,
         kind: "landmark",
@@ -7385,7 +7597,12 @@ const canvas = document.getElementById("game");
       const depthIdx = Math.min(Math.floor(sprite.sx), width - 1);
       if (sprite.sx >= 0 && sprite.sx < width && sprite.distToPlayer > depth[depthIdx] + 0.08) continue;
 
-      const light = clamp(1 - sprite.distToPlayer / MAX_RAY_DIST + visualMood.dynamicLightStrength * 0.08, 0.25, 1.1);
+      const spriteLight = resolveDynamicLightAtPoint(
+        { x: sprite.x, y: sprite.y },
+        sceneLights,
+        { time: state.time, strength: visualMood.dynamicLightStrength },
+      );
+      const light = clamp(1 - sprite.distToPlayer / MAX_RAY_DIST + visualMood.dynamicLightStrength * 0.08 + spriteLight.alpha * 0.36, 0.25, 1.24);
       drawBillboardSprite(sprite, left, top, spriteWidth, spriteHeight, light);
 
       if (sprite.kind === "enemy") {
@@ -8047,6 +8264,33 @@ const canvas = document.getElementById("game");
     ctx.restore();
   }
 
+  function drawHudNotice(x, y, w) {
+    if (!hudNotice) return 0;
+    const color = hudNotice.color || "#ffd77b";
+    const alpha = clamp(hudNotice.ttl / 0.45, 0, 1);
+    const h = 28;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    drawSoftPanel(x, y, w, h, {
+      top: "rgba(35, 28, 42, 0.86)",
+      bottom: "rgba(10, 14, 18, 0.78)",
+      border: hexToRgba(color, 0.5),
+      shadowBlur: 9,
+      shadowOffsetY: 3,
+    });
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 8, y + 7, 3, h - 14);
+    ctx.beginPath();
+    ctx.arc(x + 19, y + 14, 4.5, 0, TAU);
+    ctx.fill();
+    ctx.font = "bold 10px Georgia";
+    drawClippedText(hudNotice.title || "Notice", x + 31, y + 11, w - 42, "#fff1d0");
+    ctx.font = "10px Georgia";
+    drawClippedText(hudNotice.line || "", x + 31, y + 23, w - 42, "#f1e5c8");
+    ctx.restore();
+    return h + 6;
+  }
+
   function drawHud() {
     const q1 = state.quests.crystal;
     const q2 = state.quests.slime;
@@ -8147,6 +8391,9 @@ const canvas = document.getElementById("game");
     if (eventMods.banner) {
       drawClippedText(`Event: ${eventMods.banner}`, topX + 10, topY + 50, topW - 20, "#ffb46d");
       msgY = topY + 66;
+    }
+    if (hudNotice) {
+      msgY += drawHudNotice(topX + 10, msgY - 2, topW - 20);
     }
     const shown = state.msg.slice(0, 2);
     ctx.font = "11px Georgia";
@@ -8280,7 +8527,12 @@ const canvas = document.getElementById("game");
 
     if (state.mode === "victory") {
       const ending = state.narrative.ending || resolveNarrativeEnding(state.narrative);
-      const summary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time);
+      const houseProgress = resolveHouseProgressDisplay({
+        inventory: state.inventory,
+        jobState: state.world.jobs,
+        house: state.house,
+      });
+      const summary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time, houseProgress);
       ctx.fillStyle = "rgba(8, 11, 16, 0.8)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       const panelW = Math.min(620, canvas.width - margin * 2);
@@ -8313,6 +8565,7 @@ const canvas = document.getElementById("game");
         [`Dialogue picks`, String(summary.dialogueChoicesCount || 0)],
         [`Gold`, String(summary.gold)],
         [`Level`, String(summary.level)],
+        [`Home proof`, String(summary.houseTrophyCount || 0)],
         [`Companion`, summary.companion],
       ];
       for (let i = 0; i < rows.length; i++) {
@@ -9311,7 +9564,6 @@ const canvas = document.getElementById("game");
     const activeResources = state.resources.filter((r) => !r.harvested);
     const activeNpcs = state.npcs;
     const activePigs = state.pigs;
-    const runSummary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time);
     const identity = normalizeCharacterIdentity(state.progression.identity);
     const characterSummary = buildCharacterIdentitySummary(identity);
     const gearSummary = buildGearSummary(state.progression.equipment, identity);
@@ -9322,6 +9574,7 @@ const canvas = document.getElementById("game");
       jobState: state.world.jobs,
       house: state.house,
     });
+    const runSummary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time, houseProgressSummary);
     const explorationRenown = resolveExplorationRenownStatus(state.regions.poisDiscovered?.length || 0);
     const openingObjective = resolveOpeningObjective({
       mode: state.mode,
@@ -9360,6 +9613,25 @@ const canvas = document.getElementById("game");
       : [];
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const worldPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
+    const textVisualMoodBase = buildVisualMood({
+      weather: state.weather,
+      chapterIndex: state.narrative.chapterIndex,
+      day: 0.5 + Math.sin(state.time * 0.014) * 0.45,
+      qualitySetting: state.weather.quality,
+      biome: state.regions.activeRegion,
+    });
+    textVisualMoodBase.regionProfile = regionProfile;
+    const textVisualMood = applyGraphicsAccessibility(textVisualMoodBase, state.graphics.accessibility);
+    const dynamicLightSnapshot = collectSceneDynamicLights(worldPresentation, textVisualMood)
+      .map((light) => ({
+        id: light.id,
+        kind: light.kind,
+        x: Number(light.x.toFixed(2)),
+        y: Number(light.y.toFixed(2)),
+        radius: Number(light.radius.toFixed(2)),
+        intensity: Number(light.intensity.toFixed(2)),
+        color: light.color,
+      }));
     const roadSignPrompt = !state.player.inHouse && state.regions?.activeRegion
       ? resolveRoadSignPrompt(worldPresentation.roadSigns, state.player.x, state.player.y)
       : null;
@@ -9466,6 +9738,15 @@ const canvas = document.getElementById("game");
             ttl: Number((discoveryBanner.ttl || 0).toFixed(2)),
           }
           : null,
+        hud_notice: hudNotice
+          ? {
+            kind: hudNotice.kind,
+            title: hudNotice.title,
+            line: hudNotice.line,
+            color: hudNotice.color,
+            ttl: Number((hudNotice.ttl || 0).toFixed(2)),
+          }
+          : null,
         road_sign_prompt: roadSignPrompt,
         road_route_objective: roadRouteObjective,
         first_minute_pressure: firstMinutePressure,
@@ -9545,6 +9826,12 @@ const canvas = document.getElementById("game");
         ...regionProfile,
         identity_line: buildRegionIdentityLine(state.regions.activeRegion),
         world_presentation: worldPresentation,
+      },
+      dynamic_lighting: {
+        active_count: dynamicLightSnapshot.length,
+        max_active: 8,
+        strength: Number((textVisualMood.dynamicLightStrength || 0).toFixed(2)),
+        lights: dynamicLightSnapshot,
       },
       house: {
         unlocked: state.house.unlocked,
