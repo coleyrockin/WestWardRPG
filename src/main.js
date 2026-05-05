@@ -232,6 +232,7 @@ import {
   poiUnderInteraction,
   getPOIsForRegion,
   resolvePOILead,
+  resolveRoadDiscoveryLead,
   resolveExplorationRenownReward,
   resolveExplorationRenownStatus,
 } from "./poiSystem.js";
@@ -3452,7 +3453,7 @@ const canvas = document.getElementById("game");
   function interact() {
     if (state.mode !== "playing") return;
 
-    // POI interaction (caches / shrines / camps).
+    // POI interaction (caches / shrines / camps / road discoveries).
     if (!state.player.inHouse && state.regions?.activeRegion) {
       ensurePoiDefaults(state.regions);
       const poi = poiUnderInteraction(state.regions, state.regions.activeRegion, state.player.x, state.player.y);
@@ -3475,6 +3476,8 @@ const canvas = document.getElementById("game");
             state.progression.upgradePoints += renownReward.upgradePoints;
             summary += `. ${renownReward.summary}`;
           }
+          if (poi.mysteryLine) summary += `. ${poi.mysteryLine}`;
+          if (poi.returnReason) summary += `. ${poi.returnReason}`;
         }
         const codexUnlock = resolveCodexUnlockForPOI(poi);
         if (codexUnlock && unlockCodexEntry(state, codexUnlock.tab, codexUnlock.id)) {
@@ -3500,7 +3503,7 @@ const canvas = document.getElementById("game");
           summary += `. +${poi.buff.stamina} stamina`;
         }
         logMsg(summary + ".");
-        grantRolledLoot(poi.kind === "camp" ? "poi_camp" : "poi_cache", state.regions.activeRegion);
+        grantRolledLoot(poi.kind === "camp" || poi.kind === "hideout" ? "poi_camp" : "poi_cache", state.regions.activeRegion);
         sfx.pickup();
         spawnParticles(canvas.width / 2, canvas.height * 0.5, 12, kind.color, 3, 0.6, { decorative: false });
         return;
@@ -5821,6 +5824,49 @@ const canvas = document.getElementById("game");
         ctx.lineTo(spriteWidth * 0.82, spriteHeight * 0.58);
         ctx.closePath();
         ctx.fill();
+      } else if (sprite.poiKind === "mine") {
+        ctx.fillStyle = "#3d3126";
+        ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.5, spriteWidth * 0.56, spriteHeight * 0.36);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.18, spriteHeight * 0.52);
+        ctx.lineTo(spriteWidth * 0.5, spriteHeight * 0.18);
+        ctx.lineTo(spriteWidth * 0.82, spriteHeight * 0.52);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(20, 16, 12, 0.7)";
+        ctx.fillRect(spriteWidth * 0.42, spriteHeight * 0.58, spriteWidth * 0.16, spriteHeight * 0.24);
+      } else if (sprite.poiKind === "ruin") {
+        ctx.fillStyle = shadeHex(color, 0.5);
+        ctx.fillRect(spriteWidth * 0.24, spriteHeight * 0.44, spriteWidth * 0.16, spriteHeight * 0.42);
+        ctx.fillRect(spriteWidth * 0.58, spriteHeight * 0.34, spriteWidth * 0.16, spriteHeight * 0.52);
+        ctx.fillStyle = color;
+        ctx.fillRect(spriteWidth * 0.2, spriteHeight * 0.38, spriteWidth * 0.24, spriteHeight * 0.08);
+        ctx.fillRect(spriteWidth * 0.54, spriteHeight * 0.28, spriteWidth * 0.24, spriteHeight * 0.08);
+      } else if (sprite.poiKind === "hideout") {
+        ctx.fillStyle = "#2b211b";
+        ctx.fillRect(spriteWidth * 0.24, spriteHeight * 0.54, spriteWidth * 0.52, spriteHeight * 0.32);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.22, spriteHeight * 0.54);
+        ctx.lineTo(spriteWidth * 0.5, spriteHeight * 0.26);
+        ctx.lineTo(spriteWidth * 0.78, spriteHeight * 0.54);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 218, 150, 0.38)";
+        ctx.fillRect(spriteWidth * 0.58, spriteHeight * 0.62, spriteWidth * 0.1, spriteHeight * 0.1);
+      } else if (sprite.poiKind === "stranger") {
+        ctx.fillStyle = shadeHex(color, 0.4);
+        ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.36, spriteWidth * 0.08, spriteHeight * 0.48);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.5, spriteHeight * 0.26, spriteWidth * 0.12, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 245, 210, 0.5)";
+        ctx.lineWidth = Math.max(1, spriteWidth * 0.025);
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.5, spriteHeight * 0.58, spriteWidth * 0.28, Math.PI * 0.15, Math.PI * 0.85);
+        ctx.stroke();
       } else {
         ctx.fillStyle = "#6c4b30";
         ctx.fillRect(spriteWidth * 0.25, spriteHeight * 0.52, spriteWidth * 0.5, spriteHeight * 0.34);
@@ -6361,7 +6407,8 @@ const canvas = document.getElementById("game");
           size: pressure.marker.size || 0.82,
         });
       }
-      const poiLead = resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: MAX_RAY_DIST });
+      const poiLead = resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: MAX_RAY_DIST })
+        || resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: MAX_RAY_DIST });
       if (poiLead) {
         sprites.push({
           x: poiLead.x,
@@ -6370,7 +6417,7 @@ const canvas = document.getElementById("game");
           label: poiLead.label,
           poiKind: poiLead.kind,
           kind: "poi",
-          size: poiLead.kind === "camp" ? 1.02 : 0.9,
+          size: poiLead.kind === "camp" || poiLead.kind === "hideout" ? 1.02 : 0.9,
         });
       }
       const jobMarker = getJobRouteMarker();
@@ -6913,6 +6960,11 @@ const canvas = document.getElementById("game");
         const blink = 0.5 + (Math.sin(state.time * 5.5) + 1) * 0.5;
         drawDot(jobMarker.x, jobMarker.y, jobMarker.color || "#ffd77b", 2.8 + blink);
       }
+      const roadDiscoveryLead = resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 28 });
+      if (roadDiscoveryLead) {
+        const blink = 0.5 + (Math.sin(state.time * 4.6) + 1) * 0.5;
+        drawDot(roadDiscoveryLead.x, roadDiscoveryLead.y, roadDiscoveryLead.color || "#d8bc6a", 2.4 + blink);
+      }
 
       // POI pings: blink nearby undiscovered POIs.
       if (state.regions?.activeRegion) {
@@ -7154,6 +7206,9 @@ const canvas = document.getElementById("game");
     const explorationLead = !state.player.inHouse && state.regions?.activeRegion
       ? resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 32 })
       : null;
+    const roadDiscoveryLead = !state.player.inHouse && state.regions?.activeRegion
+      ? resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 34 })
+      : null;
     const jobMarker = getJobRouteMarker();
     const boardProp = getActiveJobBoardProp();
     const jobObjective = activeJob
@@ -7182,7 +7237,7 @@ const canvas = document.getElementById("game");
       jobMarker,
       boardProp,
     });
-    const liveObjective = openingRouteGuide || firstPressure || jobObjective || openingObjective || explorationLead;
+    const liveObjective = openingRouteGuide || firstPressure || jobObjective || openingObjective || roadDiscoveryLead || explorationLead;
     const liveObjectiveLine = liveObjective?.objectiveLine || liveObjective?.line;
     if (liveObjective && msgY <= topY + topH - 10) {
       ctx.font = "bold 11px Georgia";
@@ -8234,6 +8289,9 @@ const canvas = document.getElementById("game");
     const explorationLead = !state.player.inHouse && state.regions?.activeRegion
       ? resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 32 })
       : null;
+    const roadDiscoveryLead = !state.player.inHouse && state.regions?.activeRegion
+      ? resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 34 })
+      : null;
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const worldPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
     const activeJob = getActiveJobSummary(state.world.jobs);
@@ -8324,6 +8382,7 @@ const canvas = document.getElementById("game");
         opening_objective: openingObjective,
         opening_fight_cue: openingFightCue,
         opening_route_guide: openingRouteGuide,
+        road_discovery_lead: roadDiscoveryLead,
         first_minute_pressure: firstMinutePressure,
         first_reward_cache: firstMinuteCache
           ? {

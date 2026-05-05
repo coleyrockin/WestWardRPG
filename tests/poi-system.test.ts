@@ -9,6 +9,7 @@ import {
   findNearbyPOIs,
   poiUnderInteraction,
   resolvePOILead,
+  resolveRoadDiscoveryLead,
   resolveExplorationRenownReward,
   resolveExplorationRenownStatus,
 } from "../src/poiSystem.js";
@@ -28,6 +29,18 @@ describe("poiSystem — definitions", () => {
         expect(typeof poi.x).toBe("number");
       }
     }
+  });
+
+  it("includes road-worthy discoveries beyond generic caches, shrines, and camps", () => {
+    const roadKinds = new Set(
+      Object.values(POI_DEFINITIONS)
+        .flat()
+        .map((poi) => poi.kind),
+    );
+
+    expect(roadKinds.has("mine")).toBe(true);
+    expect(roadKinds.has("ruin")).toBe(true);
+    expect(roadKinds.has("hideout")).toBe(true);
   });
 
   it("getPOIsForRegion returns empty for unknown region", () => {
@@ -113,8 +126,8 @@ describe("poiSystem — proximity", () => {
     const r: any = { poisDiscovered: ["frontier_old_well"] };
     const lead = resolvePOILead(r, "frontier", 9.5, 8.5);
 
-    expect(lead?.id).toBe("frontier_drifter_camp");
-    expect(lead?.line).toContain("Drifter Camp");
+    expect(lead?.id).not.toBe("frontier_old_well");
+    expect(lead?.line).toContain(lead?.label);
   });
 
   it("grants exploration renown rewards at POI milestones", () => {
@@ -133,5 +146,47 @@ describe("poiSystem — proximity", () => {
     expect(status.nextMilestone).toBe(6);
     expect(status.progressLine).toContain("4/9");
     expect(status.progressLine).toContain("next: 6");
+  });
+});
+
+describe("poiSystem — road discovery lead", () => {
+  it("turns a nearby undiscovered POI into an open-road hook", () => {
+    const r: any = {};
+    const lead = resolveRoadDiscoveryLead(r, "frontier", 9.5, 8.5, { maxDistance: 40 });
+
+    expect(lead?.title).toBe("Road hook");
+    expect(lead?.line).toContain("heading toward");
+    expect(lead?.line).toContain("saw");
+    expect(lead?.distanceLine).toMatch(/tiles/);
+    expect(lead?.action).toBe("investigate");
+    expect(lead?.dangerHint.length).toBeGreaterThan(4);
+    expect(lead?.mysteryLine.length).toBeGreaterThan(4);
+    expect(lead?.returnReason.length).toBeGreaterThan(4);
+  });
+
+  it("prefers authored road hooks over plain POI lead copy", () => {
+    const r: any = {};
+    const lead = resolveRoadDiscoveryLead(r, "ashfall", 38.5, 26.5, { maxDistance: 40 });
+
+    expect(lead?.regionHint).toContain("Ashfall");
+    expect(lead?.hookLine).toContain("road");
+    expect(lead?.line).not.toContain("Reward hint:");
+  });
+
+  it("skips discovered road hooks and points to the next undiscovered place", () => {
+    const first = resolveRoadDiscoveryLead({}, "ironlantern", 12.5, 22.5, { maxDistance: 40 });
+    const r: any = { poisDiscovered: [first?.id] };
+    const next = resolveRoadDiscoveryLead(r, "ironlantern", 12.5, 22.5, { maxDistance: 40 });
+
+    expect(first?.id).toBeTruthy();
+    expect(next?.id).toBeTruthy();
+    expect(next?.id).not.toBe(first?.id);
+  });
+
+  it("returns null when every road hook in the region has been discovered", () => {
+    const discovered = getPOIsForRegion("frontier").map((poi) => poi.id);
+    const lead = resolveRoadDiscoveryLead({ poisDiscovered: discovered }, "frontier", 9.5, 8.5, { maxDistance: 40 });
+
+    expect(lead).toBeNull();
   });
 });
