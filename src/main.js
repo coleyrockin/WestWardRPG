@@ -146,6 +146,7 @@ import {
   buildRegionIdentityLine,
   buildRegionWorldPresentation,
   getRegionVisualIdentity,
+  resolveRoadSignPrompt,
 } from "./regionVisualIdentity.js";
 import { buildVisualMood } from "./visualProfile.js";
 import {
@@ -2882,6 +2883,12 @@ const canvas = document.getElementById("game");
     return map[ty][tx];
   }
 
+  function getRoadSignPrompt() {
+    if (state.player.inHouse || !state.regions?.activeRegion) return null;
+    const presentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
+    return resolveRoadSignPrompt(presentation.roadSigns, state.player.x, state.player.y);
+  }
+
   function canOccupy(x, y, radius = PLAYER_COLLISION_RADIUS) {
     const diag = radius * 0.7;
     return (
@@ -3452,6 +3459,14 @@ const canvas = document.getElementById("game");
 
   function interact() {
     if (state.mode !== "playing") return;
+
+    const roadSignPrompt = getRoadSignPrompt();
+    if (roadSignPrompt) {
+      logMsg(roadSignPrompt.line);
+      if (roadSignPrompt.mysteryLine) logMsg(roadSignPrompt.mysteryLine);
+      sfx.pickup();
+      return;
+    }
 
     // POI interaction (caches / shrines / camps / road discoveries).
     if (!state.player.inHouse && state.regions?.activeRegion) {
@@ -7237,6 +7252,7 @@ const canvas = document.getElementById("game");
     const roadDiscoveryLead = !state.player.inHouse && state.regions?.activeRegion
       ? resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 34 })
       : null;
+    const roadSignPrompt = getRoadSignPrompt();
     const jobMarker = getJobRouteMarker();
     const boardProp = getActiveJobBoardProp();
     const jobObjective = activeJob
@@ -7265,7 +7281,7 @@ const canvas = document.getElementById("game");
       jobMarker,
       boardProp,
     });
-    const liveObjective = openingRouteGuide || firstPressure || jobObjective || openingObjective || roadDiscoveryLead || explorationLead;
+    const liveObjective = openingRouteGuide || firstPressure || jobObjective || roadSignPrompt || openingObjective || roadDiscoveryLead || explorationLead;
     const liveObjectiveLine = liveObjective?.objectiveLine || liveObjective?.line;
     if (liveObjective && msgY <= topY + topH - 10) {
       ctx.font = "bold 11px Georgia";
@@ -8322,6 +8338,9 @@ const canvas = document.getElementById("game");
       : null;
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const worldPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
+    const roadSignPrompt = !state.player.inHouse && state.regions?.activeRegion
+      ? resolveRoadSignPrompt(worldPresentation.roadSigns, state.player.x, state.player.y)
+      : null;
     const activeJob = getActiveJobSummary(state.world.jobs);
     const jobListings = getJobListings({
       regionId: state.regions.activeRegion,
@@ -8411,6 +8430,7 @@ const canvas = document.getElementById("game");
         opening_fight_cue: openingFightCue,
         opening_route_guide: openingRouteGuide,
         road_discovery_lead: roadDiscoveryLead,
+        road_sign_prompt: roadSignPrompt,
         first_minute_pressure: firstMinutePressure,
         first_reward_cache: firstMinuteCache
           ? {

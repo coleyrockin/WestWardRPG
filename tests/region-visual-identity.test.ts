@@ -4,6 +4,7 @@ import {
   buildRegionWorldPresentation,
   buildRegionIdentityLine,
   getRegionVisualIdentity,
+  resolveRoadSignPrompt,
 } from "../src/regionVisualIdentity.js";
 
 describe("regionVisualIdentity", () => {
@@ -71,6 +72,33 @@ describe("regionVisualIdentity", () => {
 
     expect(presentation.roadSigns.every((sign: any) => isPassable(sign.x, sign.y) && isVisible(sign.x, sign.y))).toBe(true);
     expect(presentation.roadSigns[0].placement).toBe("adjusted");
+  });
+
+  it("resolves a readable prompt when the player is near a road discovery sign", () => {
+    const presentation = buildRegionWorldPresentation("frontier", { playerX: 9.5, playerY: 8.5 });
+    const firstSign = presentation.roadSigns[0];
+    const prompt = resolveRoadSignPrompt(presentation.roadSigns, firstSign.x + 0.2, firstSign.y + 0.1);
+
+    expect(prompt?.title).toBe("Road sign");
+    expect(prompt?.action).toBe("read");
+    expect(prompt?.targetId).toBe(firstSign.targetId);
+    expect(prompt?.objectiveLine).toContain(firstSign.targetLabel);
+    expect(prompt?.secondaryLine).toContain(firstSign.dangerHint);
+    expect(prompt?.distanceToSign).toBeLessThan(0.4);
+  });
+
+  it("returns null when no road discovery sign is close enough to read", () => {
+    const presentation = buildRegionWorldPresentation("frontier", { playerX: 9.5, playerY: 8.5 });
+
+    expect(resolveRoadSignPrompt(presentation.roadSigns, 2, 2, { radius: 1 })).toBeNull();
+  });
+
+  it("prefers the nearest readable road sign", () => {
+    const presentation = buildRegionWorldPresentation("frontier", { playerX: 9.5, playerY: 8.5 });
+    const secondSign = presentation.roadSigns[1];
+    const prompt = resolveRoadSignPrompt(presentation.roadSigns, secondSign.x, secondSign.y, { radius: 3 });
+
+    expect(prompt?.targetId).toBe(secondSign.targetId);
   });
 
   it("adds first-view composition with validated vista silhouettes", () => {

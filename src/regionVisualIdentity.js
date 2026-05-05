@@ -288,3 +288,45 @@ export function buildRegionWorldPresentation(regionId, context = {}) {
     roadSigns: buildRoadDiscoverySignposts(profile.id, anchor, context),
   };
 }
+
+export function resolveRoadSignPrompt(roadSigns, x, y, options = {}) {
+  if (!Array.isArray(roadSigns) || roadSigns.length === 0) return null;
+  const radius = Number.isFinite(options.radius) ? Math.max(0, options.radius) : 1.45;
+  let best = null;
+  let bestDistance = Infinity;
+
+  for (const sign of roadSigns) {
+    if (!sign || !Number.isFinite(sign.x) || !Number.isFinite(sign.y)) continue;
+    const distance = Math.hypot(sign.x - x, sign.y - y);
+    if (distance > radius || distance >= bestDistance) continue;
+    best = sign;
+    bestDistance = distance;
+  }
+
+  if (!best) return null;
+  const distanceToSign = Number(bestDistance.toFixed(2));
+  const targetKind = best.kindLabel ? best.kindLabel.toLowerCase() : best.targetKind || "place";
+  const destinationLine = `${best.targetLabel} ${targetKind} - ${best.distanceLine}`;
+  const secondaryLine = [best.dangerHint, best.returnReason].filter(Boolean).join(" ");
+  return {
+    id: `road-sign-${best.targetId}`,
+    title: "Road sign",
+    action: "read",
+    actionLabel: "Read sign",
+    targetId: best.targetId,
+    targetKind: best.targetKind,
+    targetLabel: best.targetLabel,
+    x: best.x,
+    y: best.y,
+    color: best.color,
+    distanceToSign,
+    destinationLine,
+    dangerHint: best.dangerHint,
+    mysteryLine: best.mysteryLine,
+    returnReason: best.returnReason,
+    urgency: best.dangerHint?.startsWith("High danger") ? "high" : "medium",
+    objectiveLine: `Read sign: ${destinationLine}`,
+    secondaryLine,
+    line: `Road sign points to ${destinationLine}. ${secondaryLine}`,
+  };
+}
