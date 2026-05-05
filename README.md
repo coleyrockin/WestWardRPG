@@ -55,7 +55,7 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, and early Phase A open-world pressure/dressing work.
 
-Latest local fast gate: `npm test` reports **337 passing tests across 35 files**. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **482 passing tests across 45 files**. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
@@ -88,18 +88,25 @@ The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the
 git clone https://github.com/coleyrockin/WestWardRPG.git
 cd WestWardRPG
 npm install
-npm run dev
+npm run dev          # Vite dev server with HMR on port 5173
 ```
 
 Then open [http://localhost:5173](http://localhost:5173).
 
-If port `5173` is already used on your machine:
+For a production build:
 
 ```bash
-python3 -m http.server 5183
+npm run build        # outputs to dist/
+npm run preview      # serves the built bundle on port 4173
 ```
 
-Then open [http://localhost:5183](http://localhost:5183).
+Fallback static server (no build, no HMR — useful for quick spot-checks):
+
+```bash
+npm run dev:py       # python3 -m http.server 5173
+```
+
+If port `5173` is already used on your machine, Vite will automatically pick the next available port.
 
 ## Controls
 
@@ -165,9 +172,14 @@ WestWardRPG/
 
 ```bash
 # Local run
-npm run dev
+npm run dev          # Vite dev server (HMR)
+npm run dev:py       # Static-server fallback (python3, no build, no HMR)
 
-# Verification
+# Build
+npm run build        # Production bundle → dist/
+npm run preview      # Serve the built bundle locally
+
+# Verification (also runs in CI on every PR)
 npm test
 npm run typecheck:ts
 npm run test:syntax

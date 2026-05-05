@@ -4,8 +4,11 @@
   "description": "Story-first open-world frontier RPG with raycast combat, regional identity, gear progression, housing, and deterministic job-board systems.",
   "main": "src/main.js",
   "scripts": {
-    "start": "python3 -m http.server 5173",
-    "dev": "python3 -m http.server 5173",
+    "start": "vite",
+    "dev": "vite",
+    "dev:py": "python3 -m http.server 5173",
+    "build": "vite build",
+    "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -48,8 +51,10 @@
   "homepage": "https://github.com/coleyrockin/WestWardRPG#readme",
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.4",
+    "fake-indexeddb": "^6.2.5",
     "playwright": "^1.58.2",
     "typescript": "^6.0.2",
+    "vite": "^6.4.2",
     "vitest": "^4.1.4"
   }
 }

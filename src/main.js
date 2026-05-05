@@ -146,6 +146,7 @@ import {
 } from "./gameFeel.js";
 import {
   buildRegionIdentityLine,
+  buildRegionRoutePolyline,
   buildRegionWorldPresentation,
   getRegionVisualIdentity,
   resolveRoadSignPrompt,
@@ -192,6 +193,16 @@ import {
 } from "./companionBarks.js";
 import { migrateSaveToV3 } from "./saveMigration.js";
 import {
+  readSave as idbReadSave,
+  writeSave as idbWriteSave,
+  migrateFromLocalStorage as idbMigrateFromLocalStorage,
+  findMostRecentValidBackup as idbFindMostRecentValidBackup,
+  exportSaveBlob as idbExportSaveBlob,
+  importSaveFromText as idbImportSaveFromText,
+  deleteSave as idbDeleteSave,
+  DEFAULT_SLOT as IDB_DEFAULT_SLOT,
+} from "./savePersistence.js";
+import {
   createInitialProgressionState,
   unlockSkill,
   canUnlockSkill,
@@ -227,6 +238,9 @@ import {
   createAudioBuses,
   setAmbientRegion,
   stopAmbient,
+  setMusicRegion,
+  setCombatTension,
+  stopMusic,
 } from "./audio.js";
 import {
   hexToRgba as hexToRgbaUtil,
@@ -280,6 +294,7 @@ import {
   listEntriesForTab,
   resolveCodexUnlockForPOI,
   totalCodexProgress,
+  getEntry as getCodexEntry,
 } from "./codex.js";
 import {
   GRAPHICS_PRESETS,
@@ -1109,6 +1124,35 @@ const canvas = document.getElementById("game");
     if (!ctx || !audioBuses) return;
     if (regionId === lastAmbientRegion) return;
     try { setAmbientRegion(audioBuses, regionId); lastAmbientRegion = regionId; } catch { /* audio not critical */ }
+    // Procedural music tracks the ambient region. Cross-fades with the same cadence.
+    try { setMusicRegion(audioBuses, regionId); } catch { /* music not critical */ }
+  }
+
+  // Tension fader: smoothed enemy-pressure signal feeds the combat stem.
+  // Recomputed each frame in updateCombatMusicTension(); the music module
+  // applies its own audio-rate ramp so we don't have to sample-accurately fade.
+  let lastCombatTension = 0;
+  function updateCombatMusicTension(dt) {
+    if (!ambientEnabled || !soundEnabled || !audioBuses) return;
+    const enemies = Array.isArray(state.enemies) ? state.enemies : [];
+    let nearestThreat = 0;
+    for (const e of enemies) {
+      if (!e || !e.alive) continue;
+      const dx = e.x - state.player.x;
+      const dy = e.y - state.player.y;
+      const dist = Math.hypot(dx, dy);
+      // Only enemies within 8 units of the player count; closer = scarier.
+      const proximity = Math.max(0, 1 - dist / 8);
+      if (proximity > nearestThreat) nearestThreat = proximity;
+    }
+    // Smooth toward the target so combat tension fades naturally.
+    const target = Math.min(1, nearestThreat);
+    const rate = target > lastCombatTension ? 1.6 : 0.6;
+    const eased = lastCombatTension + (target - lastCombatTension) * Math.min(1, rate * dt);
+    if (Math.abs(eased - lastCombatTension) > 0.01) {
+      try { setCombatTension(audioBuses, eased, 0.25); } catch { /* music not critical */ }
+      lastCombatTension = eased;
+    }
   }
 
   function playTone(freq, duration, type, volume, detune) {
@@ -2321,25 +2365,79 @@ const canvas = document.getElementById("game");
     continueBtn.style.display = hasSaveData ? "inline-block" : "none";
   }
 
+  // IDB-backed cache. Populated by initSavePersistenceAsync(); read synchronously
+  // by the existing saveGame/loadGame flow. localStorage is a one-shot legacy drain.
+  let cachedSavePayload = null;
+  let cachedSaveSavedAt = null;
+
   function readSaveData() {
+    return cachedSavePayload;
+  }
+
+  // Legacy sync fallback used only if async init hasn't completed yet (rare race
+  // between the title screen rendering and the first IDB read finishing).
+  function readSaveDataLegacy() {
     const saveEntry = readStorageWithFallback(SAVE_KEY, LEGACY_SAVE_KEYS);
     if (!saveEntry) return null;
     try {
       const parsed = JSON.parse(saveEntry.value);
       if (!parsed || (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== 3)) return null;
-      migrateStorageValue(SAVE_KEY, saveEntry.key, saveEntry.value);
       return parsed;
     } catch {
       return null;
     }
   }
 
-  function syncSaveStateFromStorage() {
-    const save = readSaveData();
-    hasSaveData = Boolean(save);
-    lastSaveAt = save ? numberOr(save.savedAt, Date.now()) : null;
+  function setCachedSave(payload, savedAt) {
+    cachedSavePayload = payload || null;
+    cachedSaveSavedAt = Number.isFinite(savedAt) ? savedAt : (payload ? Date.now() : null);
+    hasSaveData = Boolean(payload);
+    lastSaveAt = cachedSaveSavedAt;
     refreshContinueButton();
   }
+
+  function syncSaveStateFromStorage() {
+    // Best-effort sync seed in case async init hasn't completed yet.
+    const legacy = readSaveDataLegacy();
+    if (legacy) setCachedSave(legacy, numberOr(legacy.savedAt, Date.now()));
+  }
+
+  async function initSavePersistenceAsync() {
+    // 1. Drain any localStorage save into IDB exactly once.
+    try {
+      await idbMigrateFromLocalStorage(IDB_DEFAULT_SLOT);
+    } catch (err) {
+      console.warn("[westward] localStorage→IDB migration skipped:", err);
+    }
+    // 2. Try to read the IDB primary.
+    let result;
+    try {
+      result = await idbReadSave(IDB_DEFAULT_SLOT);
+    } catch (err) {
+      console.warn("[westward] IDB read failed:", err);
+      return;
+    }
+    if (result.ok) {
+      setCachedSave(result.payload, result.savedAt);
+      return;
+    }
+    // 3. Corruption / missing: try to recover from backups.
+    if (result.reason === "hash-mismatch" || result.reason === "missing-payload" || result.reason === "missing-hash") {
+      try {
+        const recovered = await idbFindMostRecentValidBackup(IDB_DEFAULT_SLOT);
+        if (recovered && recovered.ok) {
+          setCachedSave(recovered.payload, recovered.savedAt);
+          // Surface the recovery once the player is in-session.
+          pendingSaveCorruptionMsg = "Save was corrupted; restored from a recent backup.";
+          return;
+        }
+      } catch (err) {
+        console.warn("[westward] IDB backup recovery failed:", err);
+      }
+    }
+    // 4. Nothing usable. hasSaveData remains false.
+  }
+  let pendingSaveCorruptionMsg = null;
 
   function captureSaveData() {
     state.narrative.ending = resolveNarrativeEnding(state.narrative);
@@ -2596,17 +2694,15 @@ const canvas = document.getElementById("game");
     }
 
     const payload = captureSaveData();
-    try {
-      window.localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
-    } catch {
-      if (!silent) logMsg("Save failed: local storage unavailable.");
-      return false;
-    }
-
-    hasSaveData = true;
-    lastSaveAt = payload.savedAt;
+    setCachedSave(payload, payload.savedAt);
     autoSaveTimer = 0;
-    refreshContinueButton();
+    // Async write-through to IDB. localStorage is no longer the primary store;
+    // the only fallback is the cache held in memory (which is enough for the
+    // current session — and the next session if IDB succeeds before tab close).
+    idbWriteSave(IDB_DEFAULT_SLOT, payload).catch((err) => {
+      console.warn("[westward] save write failed:", err);
+      if (!silent) logMsg("Save failed: storage error.");
+    });
     if (!silent) logMsg("Progress saved.");
     return true;
   }
@@ -2653,6 +2749,11 @@ const canvas = document.getElementById("game");
       ensureAudio();
     }
     syncAmbientForRegion(state.regions?.activeRegion || "frontier");
+    if (pendingSaveCorruptionMsg) {
+      logMsg(pendingSaveCorruptionMsg);
+      pendingSaveCorruptionMsg = null;
+    }
+    snapshotFactionRepBands();
     canvas.focus();
   }
 
@@ -2666,6 +2767,73 @@ const canvas = document.getElementById("game");
   function logMsg(text) {
     state.msg.unshift({ text, ttl: 8 });
     if (state.msg.length > 8) state.msg.length = 8;
+  }
+
+  // Wraps unlockCodexEntry: surfaces a player-visible message on first unlock.
+  // Returns whatever unlockCodexEntry returned so callers can chain conditional logic.
+  function unlockCodexAndPing(tab, id) {
+    const newlyUnlocked = unlockCodexEntry(state, tab, id);
+    if (!newlyUnlocked) return false;
+    const entry = getCodexEntry(tab, id);
+    const title = entry?.title || id;
+    logMsg(`Codex unlocked: ${title}.`);
+    return true;
+  }
+
+  // Faction rep bands and HUD ribbon — closes the audit's "shipped but invisible"
+  // finding for factionEffects. The rep itself was wired (price multipliers,
+  // smith gates) but never surfaced to the player during open-world play.
+  const FACTION_DISPLAY_NAMES = {
+    civicCouncil: "Civic Council",
+    workersGuild: "Workers' Guild",
+    marketCartel: "Market Cartel",
+  };
+
+  function factionRepBand(value) {
+    const v = Number.isFinite(value) ? value : 0;
+    if (v <= -50) return -50;
+    if (v <= -25) return -25;
+    if (v <= -10) return -10;
+    if (v < 10) return 0;
+    if (v < 25) return 10;
+    if (v < 50) return 25;
+    return 50;
+  }
+
+  function factionBandLabel(band) {
+    if (band >= 50) return "allied";
+    if (band >= 25) return "friendly";
+    if (band >= 10) return "favorable";
+    if (band === 0) return "neutral";
+    if (band === -10) return "wary";
+    if (band === -25) return "hostile";
+    return "vendetta";
+  }
+
+  let factionRepBandSnapshot = { civicCouncil: 0, workersGuild: 0, marketCartel: 0 };
+
+  // Re-snapshot without firing pings — used on session start / save load.
+  function snapshotFactionRepBands() {
+    const rep = state?.narrative?.factionRep;
+    if (!rep) return;
+    for (const fid of Object.keys(FACTION_DISPLAY_NAMES)) {
+      factionRepBandSnapshot[fid] = factionRepBand(rep[fid]);
+    }
+  }
+
+  function tickFactionRepBands() {
+    const rep = state?.narrative?.factionRep;
+    if (!rep) return;
+    for (const fid of Object.keys(FACTION_DISPLAY_NAMES)) {
+      const current = factionRepBand(rep[fid]);
+      const previous = factionRepBandSnapshot[fid];
+      if (current === previous) continue;
+      const direction = current > previous ? "rises" : "falls";
+      const name = FACTION_DISPLAY_NAMES[fid];
+      const label = factionBandLabel(current);
+      logMsg(`Word travels: ${name} standing ${direction} to ${label}.`);
+      factionRepBandSnapshot[fid] = current;
+    }
   }
 
   function showDiscoveryBanner(feedback) {
@@ -2850,7 +3018,7 @@ const canvas = document.getElementById("game");
       }
       logMsg("Region unlocked: Ashfall Basin. Heat haze now distorts the horizon.");
       ensureRegionMiniBosses("ashfall");
-      unlockCodexEntry(state, "regions", "ashfall");
+      unlockCodexAndPing("regions", "ashfall");
       emitCompanionBark("region_entry");
     }
     if (state.player.level >= 7 && !state.regions.discovered.includes("ironlantern")) {
@@ -2860,7 +3028,7 @@ const canvas = document.getElementById("game");
       }
       logMsg("Region unlocked: Iron Lantern District. Surveillance pressure is rising.");
       ensureRegionMiniBosses("ironlantern");
-      unlockCodexEntry(state, "regions", "ironlantern");
+      unlockCodexAndPing("regions", "ironlantern");
       emitCompanionBark("region_entry");
     }
   }
@@ -3668,7 +3836,7 @@ const canvas = document.getElementById("game");
           if (poi.returnReason) summary += `. ${poi.returnReason}`;
         }
         codexUnlock = resolveCodexUnlockForPOI(poi);
-        if (codexUnlock && unlockCodexEntry(state, codexUnlock.tab, codexUnlock.id)) {
+        if (codexUnlock && unlockCodexAndPing(codexUnlock.tab, codexUnlock.id)) {
           summary += `. Letter unlocked: ${codexUnlock.title}`;
         } else {
           codexUnlock = null;
@@ -4371,8 +4539,8 @@ const canvas = document.getElementById("game");
         enemy.alive = false;
         recordRunKill(state.world, enemy);
         recordKillForJobs(enemy);
-        unlockCodexEntry(state, "enemies", enemy.behavior === "balanced" ? "slime" : enemy.behavior);
-        unlockCodexEntry(state, "regions", "frontier");
+        unlockCodexAndPing("enemies", enemy.behavior === "balanced" ? "slime" : enemy.behavior);
+        unlockCodexAndPing("regions", "frontier");
         const spawnMods = getActiveRegionEventModifiers();
         const phaseMods = state.world ? resolveSpawnModifier(state.world.timeOfDay || 0) : { hostileMult: 1 };
         const totalDensity = Math.max(0.4, spawnMods.spawnDensityMult * phaseMods.hostileMult);
@@ -5322,6 +5490,8 @@ const canvas = document.getElementById("game");
     }
 
     updateQuestProgressFromInventory();
+    updateCombatMusicTension(dt);
+    tickFactionRepBands();
     tickAutoSave(dt);
   }
 
@@ -5394,6 +5564,181 @@ const canvas = document.getElementById("game");
   // Cache for gradients to avoid recreation every frame
   let cachedCloudGradient = null;
   let lastCloudOpacity = -1;
+
+  function drawRegionHorizonAccents(regionId, regionProfile, horizon, width, normalizedDay, weather) {
+    const baseAlpha = 0.16 + normalizedDay * 0.12 + weather.fog * 0.06;
+    if (regionId === "ashfall") {
+      ctx.fillStyle = hexToRgba(regionProfile.groundPalette[1], 0.42 + weather.fog * 0.12);
+      for (let i = 0; i < 6; i++) {
+        const x = width * (0.08 + i * 0.16);
+        const towerH = 20 + (i % 3) * 12;
+        ctx.fillRect(x, horizon - towerH, 10 + (i % 2) * 5, towerH + 26);
+        ctx.beginPath();
+        ctx.moveTo(x - 16, horizon + 2);
+        ctx.lineTo(x + 4, horizon - towerH - 10);
+        ctx.lineTo(x + 26, horizon + 4);
+        ctx.closePath();
+        ctx.fill();
+      }
+      for (let i = 0; i < 5; i++) {
+        const plumeX = width * (0.18 + i * 0.17);
+        const plumeY = horizon - 42 - (i % 2) * 10;
+        for (let puff = 0; puff < 4; puff++) {
+          ctx.fillStyle = `rgba(230, 156, 104, ${0.08 + puff * 0.03})`;
+          ctx.beginPath();
+          ctx.ellipse(plumeX + puff * 10, plumeY - puff * 8, 18 - puff * 2, 10 - puff, 0, 0, TAU);
+          ctx.fill();
+        }
+      }
+      return;
+    }
+
+    if (regionId === "ironlantern") {
+      ctx.strokeStyle = hexToRgba(regionProfile.minimapTint || regionProfile.skyTint, 0.24 + normalizedDay * 0.08);
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 7; i++) {
+        const x = width * (0.1 + i * 0.13);
+        const mastH = 28 + (i % 3) * 16;
+        ctx.beginPath();
+        ctx.moveTo(x, horizon + 14);
+        ctx.lineTo(x, horizon - mastH);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x - 7, horizon - mastH + 12);
+        ctx.lineTo(x + 7, horizon - mastH + 12);
+        ctx.stroke();
+        ctx.fillStyle = hexToRgba(regionProfile.minimapTint || regionProfile.skyTint, 0.34);
+        ctx.fillRect(x - 2, horizon - mastH - 5, 4, 5);
+      }
+      ctx.strokeStyle = hexToRgba(regionProfile.roadEdgeColor || regionProfile.groundPalette[0], 0.34);
+      ctx.lineWidth = 1.4;
+      for (let i = 0; i < 3; i++) {
+        const y = horizon - 34 + i * 18;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y + Math.sin(i + state.time * 0.08) * 4);
+        ctx.stroke();
+      }
+      for (let i = 0; i < 10; i++) {
+        ctx.fillStyle = `rgba(155, 211, 255, ${0.18 + (i % 3) * 0.05})`;
+        ctx.fillRect(width * (0.06 + i * 0.09), horizon + 2 + (i % 2) * 6, 10, 3);
+      }
+      return;
+    }
+
+    ctx.fillStyle = hexToRgba(regionProfile.groundPalette[0], 0.24 + baseAlpha * 0.3);
+    for (let i = 0; i < 6; i++) {
+      const baseX = width * (0.08 + i * 0.15);
+      const roofY = horizon - 18 - (i % 2) * 8;
+      ctx.fillRect(baseX, roofY, 16 + (i % 3) * 4, 22 + (i % 2) * 8);
+      ctx.beginPath();
+      ctx.moveTo(baseX - 4, roofY);
+      ctx.lineTo(baseX + 8, roofY - 12);
+      ctx.lineTo(baseX + 22, roofY);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = hexToRgba(regionProfile.roadEdgeColor || "#8d6c43", 0.48);
+    ctx.fillRect(width * 0.78, horizon - 52, 12, 64);
+    ctx.fillRect(width * 0.76, horizon - 48, 16, 8);
+    ctx.strokeStyle = hexToRgba(regionProfile.roadEdgeColor || "#8d6c43", 0.26);
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 9; i++) {
+      const x = width * (0.06 + i * 0.1);
+      ctx.beginPath();
+      ctx.moveTo(x, horizon + 14);
+      ctx.lineTo(x, horizon - 4 - (i % 2) * 6);
+      ctx.stroke();
+    }
+  }
+
+  function drawRegionRoadSurface(regionId, regionProfile, horizon, width, height, trailCenter, normalizedDay) {
+    const groundDepth = height - horizon;
+    const roadColor = regionProfile.roadColor || regionProfile.groundPalette?.[2] || "#c79d5f";
+    const edgeColor = regionProfile.roadEdgeColor || regionProfile.groundPalette?.[0] || "#7d5d3e";
+
+    if (regionId === "ashfall") {
+      ctx.fillStyle = hexToRgba("#2b211b", 0.88);
+      ctx.beginPath();
+      ctx.moveTo(trailCenter - width * 0.03, horizon + 4);
+      ctx.bezierCurveTo(width * 0.42, horizon + groundDepth * 0.32, width * 0.28, height * 0.82, width * 0.18, height + 18);
+      ctx.lineTo(width * 0.82, height + 18);
+      ctx.bezierCurveTo(width * 0.72, height * 0.82, width * 0.58, horizon + groundDepth * 0.32, trailCenter + width * 0.03, horizon + 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = hexToRgba(roadColor, 0.42);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(trailCenter - width * 0.04, horizon + 2);
+      ctx.bezierCurveTo(width * 0.4, horizon + groundDepth * 0.34, width * 0.24, height * 0.82, width * 0.12, height + 14);
+      ctx.moveTo(trailCenter + width * 0.04, horizon + 2);
+      ctx.bezierCurveTo(width * 0.6, horizon + groundDepth * 0.34, width * 0.76, height * 0.82, width * 0.88, height + 14);
+      ctx.stroke();
+      for (let i = 0; i < 14; i++) {
+        const t = i / 13;
+        const y = horizon + Math.pow(t, 1.4) * groundDepth;
+        const spread = lerp(width * 0.01, width * 0.1, t);
+        ctx.fillStyle = `rgba(255, 192, 120, ${0.04 + (1 - t) * 0.07})`;
+        ctx.fillRect(trailCenter - spread, y, 4 + (1 - t) * 4, 1.5);
+        ctx.fillRect(trailCenter + spread - 4, y + 1.5, 4 + (1 - t) * 4, 1.5);
+      }
+      return;
+    }
+
+    if (regionId === "ironlantern") {
+      ctx.fillStyle = hexToRgba("#1c2634", 0.9);
+      ctx.beginPath();
+      ctx.moveTo(trailCenter - width * 0.018, horizon + 3);
+      ctx.bezierCurveTo(width * 0.44, horizon + groundDepth * 0.34, width * 0.38, height * 0.84, width * 0.34, height + 18);
+      ctx.lineTo(width * 0.66, height + 18);
+      ctx.bezierCurveTo(width * 0.62, height * 0.84, width * 0.56, horizon + groundDepth * 0.34, trailCenter + width * 0.018, horizon + 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = hexToRgba(roadColor, 0.5);
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(trailCenter - width * 0.03, horizon + 2);
+      ctx.lineTo(width * 0.35, height + 12);
+      ctx.moveTo(trailCenter + width * 0.03, horizon + 2);
+      ctx.lineTo(width * 0.65, height + 12);
+      ctx.stroke();
+      for (let i = 0; i < 11; i++) {
+        const t = i / 10;
+        const y = horizon + Math.pow(t, 1.3) * groundDepth;
+        ctx.fillStyle = `rgba(155, 211, 255, ${0.1 + (1 - t) * 0.12})`;
+        ctx.fillRect(trailCenter - width * 0.006, y, width * 0.012, 2.5);
+      }
+      return;
+    }
+
+    const trail = ctx.createLinearGradient(0, horizon, 0, height);
+    trail.addColorStop(0, hexToRgba(roadColor, 0.05 + normalizedDay * 0.04));
+    trail.addColorStop(1, hexToRgba(roadColor, 0.18 + normalizedDay * 0.08));
+    ctx.fillStyle = trail;
+    ctx.beginPath();
+    ctx.moveTo(trailCenter - width * 0.03, horizon + 4);
+    ctx.bezierCurveTo(width * 0.38, horizon + groundDepth * 0.36, width * 0.24, height * 0.82, width * 0.12, height + 18);
+    ctx.lineTo(width * 0.9, height + 18);
+    ctx.bezierCurveTo(width * 0.74, height * 0.82, width * 0.62, horizon + groundDepth * 0.36, trailCenter + width * 0.03, horizon + 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba(edgeColor, 0.18 + normalizedDay * 0.08);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(trailCenter - width * 0.025, horizon + 2);
+    ctx.bezierCurveTo(width * 0.4, horizon + groundDepth * 0.36, width * 0.28, height * 0.82, width * 0.2, height + 8);
+    ctx.moveTo(trailCenter + width * 0.025, horizon + 2);
+    ctx.bezierCurveTo(width * 0.6, horizon + groundDepth * 0.36, width * 0.72, height * 0.82, width * 0.8, height + 8);
+    ctx.stroke();
+    for (let i = 0; i < 11; i++) {
+      const t = i / 10;
+      const y = horizon + Math.pow(t, 1.45) * groundDepth;
+      const spread = lerp(width * 0.015, width * 0.09, t);
+      ctx.fillStyle = `rgba(79, 61, 39, ${0.05 + (1 - t) * 0.06})`;
+      ctx.fillRect(trailCenter - spread, y, width * 0.012, 1.8);
+      ctx.fillRect(trailCenter + spread - width * 0.012, y + 1.5, width * 0.012, 1.8);
+    }
+  }
 
   function drawSkyAndGround(width, height, day, visualMood) {
     if (state.player.inHouse) {
@@ -5533,6 +5878,7 @@ const canvas = document.getElementById("game");
     ctx.lineTo(0, horizon + 38);
     ctx.closePath();
     ctx.fill();
+    drawRegionHorizonAccents(regionProfile.id, regionProfile, horizon, width, normalizedDay, weather);
 
     const groundGrad = ctx.createLinearGradient(0, horizon, 0, height);
     groundGrad.addColorStop(
@@ -5554,34 +5900,10 @@ const canvas = document.getElementById("game");
       ctx.fillRect(0, horizon, width, height - horizon);
     }
 
-    const groundDepth = height - horizon;
     const trailCenter = width * 0.5 + Math.sin(state.player.angle * 1.7) * width * 0.08;
-    const trail = ctx.createLinearGradient(0, horizon, 0, height);
-    const trailTop = regionProfile?.groundPalette?.[2] || "#be975c";
-    const trailBottom = regionProfile?.groundPalette?.[1] || "#c79d5f";
-    trail.addColorStop(0, hexToRgba(trailTop, 0.015 + normalizedDay * 0.02));
-    trail.addColorStop(1, hexToRgba(trailBottom, 0.08 + normalizedDay * 0.06));
-    ctx.fillStyle = trail;
-    ctx.beginPath();
-    ctx.moveTo(trailCenter - width * 0.025, horizon + 4);
-    ctx.bezierCurveTo(width * 0.38, horizon + groundDepth * 0.36, width * 0.24, height * 0.82, width * 0.12, height + 18);
-    ctx.lineTo(width * 0.9, height + 18);
-    ctx.bezierCurveTo(width * 0.74, height * 0.82, width * 0.62, horizon + groundDepth * 0.36, trailCenter + width * 0.025, horizon + 4);
-    ctx.closePath();
-    ctx.fill();
+    drawRegionRoadSurface(regionProfile.id, regionProfile, horizon, width, height, trailCenter, normalizedDay);
 
-    ctx.strokeStyle = `rgba(79, 61, 39, ${0.08 + normalizedDay * 0.04})`;
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 9; i++) {
-      const t = i / 8;
-      const y = horizon + Math.pow(t, 1.45) * groundDepth;
-      const spread = lerp(width * 0.04, width * 0.28, t);
-      ctx.beginPath();
-      ctx.moveTo(trailCenter - spread, y);
-      ctx.lineTo(trailCenter + spread, y + 2);
-      ctx.stroke();
-    }
-
+    const groundDepth = height - horizon;
     for (let i = 0; i < 30; i++) {
       const t = i / 29;
       const y = horizon + t * t * (height - horizon);
@@ -5630,6 +5952,72 @@ const canvas = document.getElementById("game");
 
     const weather = state.weather;
     const depth = height - horizon;
+    const regionProfile = visualMood?.regionProfile || getRegionVisualIdentity(state.regions.activeRegion);
+    const regionId = regionProfile.id;
+
+    if (regionId === "ashfall") {
+      const shardCount = Math.floor(width / 9);
+      for (let i = 0; i < shardCount; i++) {
+        const t = ((i * 53) % 100) / 100;
+        const near = 1 - t;
+        const y = horizon + Math.pow(t, 1.28) * depth;
+        const x = (i * 71.7 + 13) % width;
+        const heightScale = 3 + near * 12;
+        const lean = Math.sin(state.time * 0.45 + i * 0.8) * (1.5 + near * 3);
+        ctx.strokeStyle = `rgba(${182 + near * 28}, ${108 + near * 24}, ${72 + near * 18}, ${0.12 + near * 0.26})`;
+        ctx.lineWidth = 0.8 + near * 1.1;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + lean, y - heightScale);
+        ctx.stroke();
+      }
+      for (let i = 0; i < Math.floor(width / 12); i++) {
+        const t = ((i * 41) % 100) / 100;
+        const near = 1 - t;
+        const y = horizon + (0.5 + t * 0.48) * depth;
+        const x = (i * 83.2 + 7) % width;
+        ctx.fillStyle = `rgba(255, 194, 126, ${0.06 + near * 0.12})`;
+        ctx.fillRect(x, y, 1.4 + near * 2.2, 1.1 + near * 0.6);
+      }
+      for (let i = 0; i < Math.floor(width / 75); i++) {
+        const baseX = (i * 163 + 29) % width;
+        const baseY = height - 14 - ((i * 31) % 44);
+        ctx.strokeStyle = "rgba(76, 54, 40, 0.34)";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(baseX - 8, baseY + 2);
+        ctx.lineTo(baseX + 3, baseY - 9);
+        ctx.lineTo(baseX + 12, baseY + 4);
+        ctx.stroke();
+      }
+      return;
+    }
+
+    if (regionId === "ironlantern") {
+      for (let i = 0; i < Math.floor(width / 10); i++) {
+        const t = ((i * 59) % 100) / 100;
+        const near = 1 - t;
+        const y = horizon + Math.pow(t, 1.18) * depth;
+        const x = (i * 79.4 + 9) % width;
+        const barWidth = 2 + near * 4;
+        ctx.fillStyle = `rgba(95, 122, 157, ${0.1 + near * 0.16})`;
+        ctx.fillRect(x, y, barWidth, 1.2 + near * 0.4);
+        ctx.fillStyle = `rgba(155, 211, 255, ${0.08 + near * 0.18})`;
+        ctx.fillRect(x + 0.4, y - 0.8, Math.max(1, barWidth - 0.8), 0.9);
+      }
+      for (let i = 0; i < Math.floor(width / 58); i++) {
+        const baseX = (i * 149 + 47) % width;
+        const baseY = height - 16 - ((i * 17) % 30);
+        ctx.strokeStyle = "rgba(120, 145, 186, 0.22)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(baseX - 10, baseY);
+        ctx.lineTo(baseX + 10, baseY - 3);
+        ctx.stroke();
+      }
+      return;
+    }
+
     const tuftCount = Math.floor(width / 7);
 
     for (let i = 0; i < tuftCount; i++) {
@@ -6041,6 +6429,52 @@ const canvas = document.getElementById("game");
         ctx.ellipse(spriteWidth * (0.4 + i * 0.08), spriteHeight * (0.36 - i * 0.08), spriteWidth * 0.12, spriteHeight * 0.1, 0, 0, TAU);
         ctx.fill();
       }
+    } else if (sprite.kind === "roadside-discovery") {
+      const color = sprite.color || "#d8bc6a";
+      const pulse = 0.5 + Math.sin(state.time * 4.6) * 0.5;
+      ctx.fillStyle = `rgba(255, 232, 168, ${0.16 + pulse * 0.12})`;
+      ctx.beginPath();
+      ctx.arc(spriteWidth * 0.5, spriteHeight * 0.6, spriteWidth * (0.32 + pulse * 0.06), 0, TAU);
+      ctx.fill();
+      if (sprite.poiKind === "wagon") {
+        ctx.fillStyle = shadeHex(color, 0.46);
+        ctx.fillRect(spriteWidth * 0.2, spriteHeight * 0.48, spriteWidth * 0.6, spriteHeight * 0.18);
+        ctx.fillRect(spriteWidth * 0.28, spriteHeight * 0.36, spriteWidth * 0.44, spriteHeight * 0.12);
+        ctx.strokeStyle = "#5b402b";
+        ctx.lineWidth = Math.max(1.6, spriteWidth * 0.04);
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.32, spriteHeight * 0.74, spriteWidth * 0.1, 0, TAU);
+        ctx.arc(spriteWidth * 0.68, spriteHeight * 0.74, spriteWidth * 0.1, 0, TAU);
+        ctx.stroke();
+        ctx.fillStyle = color;
+        ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.32, spriteWidth * 0.08, spriteHeight * 0.18);
+      } else if (sprite.poiKind === "shrine") {
+        ctx.fillStyle = shadeHex(color, 0.42);
+        ctx.fillRect(spriteWidth * 0.42, spriteHeight * 0.34, spriteWidth * 0.16, spriteHeight * 0.52);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.5, spriteHeight * 0.12);
+        ctx.lineTo(spriteWidth * 0.74, spriteHeight * 0.42);
+        ctx.lineTo(spriteWidth * 0.26, spriteHeight * 0.42);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 246, 205, 0.34)";
+        ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.16, spriteWidth * 0.06, spriteHeight * 0.12);
+      } else {
+        ctx.fillStyle = "#5b402b";
+        ctx.fillRect(spriteWidth * 0.28, spriteHeight * 0.54, spriteWidth * 0.44, spriteHeight * 0.3);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.16, spriteHeight * 0.58);
+        ctx.lineTo(spriteWidth * 0.5, spriteHeight * 0.2);
+        ctx.lineTo(spriteWidth * 0.84, spriteHeight * 0.58);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 201, 110, 0.32)";
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.5, spriteHeight * 0.6, spriteWidth * 0.08, 0, TAU);
+        ctx.fill();
+      }
     } else if (sprite.kind === "poi") {
       const color = sprite.color || "#d8bc6a";
       const pulse = 0.5 + Math.sin(state.time * 4.2) * 0.5;
@@ -6120,15 +6554,49 @@ const canvas = document.getElementById("game");
         ctx.fillRect(spriteWidth * 0.45, spriteHeight * 0.58, spriteWidth * 0.1, spriteHeight * 0.16);
       }
     } else if (sprite.kind === "landmark") {
-      ctx.fillStyle = shadeHex(sprite.color || "#d9b66d", 0.52);
-      ctx.fillRect(spriteWidth * 0.44, spriteHeight * 0.2, spriteWidth * 0.12, spriteHeight * 0.72);
-      ctx.fillStyle = sprite.color || "#d9b66d";
-      ctx.fillRect(spriteWidth * 0.32, spriteHeight * 0.14, spriteWidth * 0.36, spriteHeight * 0.12);
-      ctx.fillStyle = "rgba(255, 236, 176, 0.45)";
-      ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.06, spriteWidth * 0.06, spriteHeight * 0.16);
-      ctx.strokeStyle = "rgba(30, 22, 16, 0.45)";
-      ctx.lineWidth = Math.max(1, spriteWidth * 0.025);
-      ctx.strokeRect(spriteWidth * 0.44, spriteHeight * 0.2, spriteWidth * 0.12, spriteHeight * 0.72);
+      const color = sprite.color || "#d9b66d";
+      if (sprite.landmarkVariant === "slag_tower") {
+        ctx.fillStyle = shadeHex(color, 0.34);
+        ctx.fillRect(spriteWidth * 0.34, spriteHeight * 0.2, spriteWidth * 0.32, spriteHeight * 0.66);
+        ctx.fillStyle = color;
+        ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.14, spriteWidth * 0.4, spriteHeight * 0.12);
+        ctx.fillRect(spriteWidth * 0.4, spriteHeight * 0.08, spriteWidth * 0.2, spriteHeight * 0.1);
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = `rgba(236, 174, 110, ${0.14 + i * 0.08})`;
+          ctx.beginPath();
+          ctx.ellipse(spriteWidth * (0.48 + i * 0.06), spriteHeight * (0.02 + i * 0.06), spriteWidth * 0.14, spriteHeight * 0.08, 0, 0, TAU);
+          ctx.fill();
+        }
+      } else if (sprite.landmarkVariant === "signal_mast") {
+        ctx.strokeStyle = shadeHex(color, 0.58);
+        ctx.lineWidth = Math.max(2, spriteWidth * 0.05);
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.5, spriteHeight * 0.12);
+        ctx.lineTo(spriteWidth * 0.5, spriteHeight * 0.9);
+        ctx.moveTo(spriteWidth * 0.34, spriteHeight * 0.26);
+        ctx.lineTo(spriteWidth * 0.66, spriteHeight * 0.26);
+        ctx.moveTo(spriteWidth * 0.38, spriteHeight * 0.44);
+        ctx.lineTo(spriteWidth * 0.62, spriteHeight * 0.44);
+        ctx.stroke();
+        ctx.fillStyle = color;
+        ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.12, spriteWidth * 0.06, spriteHeight * 0.62);
+        ctx.fillStyle = "rgba(155, 211, 255, 0.46)";
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.5, spriteHeight * 0.08, spriteWidth * 0.1, 0, TAU);
+        ctx.fill();
+        ctx.fillRect(spriteWidth * 0.32, spriteHeight * 0.22, spriteWidth * 0.08, spriteHeight * 0.06);
+        ctx.fillRect(spriteWidth * 0.6, spriteHeight * 0.22, spriteWidth * 0.08, spriteHeight * 0.06);
+      } else {
+        ctx.fillStyle = shadeHex(color, 0.52);
+        ctx.fillRect(spriteWidth * 0.44, spriteHeight * 0.2, spriteWidth * 0.12, spriteHeight * 0.72);
+        ctx.fillStyle = color;
+        ctx.fillRect(spriteWidth * 0.32, spriteHeight * 0.14, spriteWidth * 0.36, spriteHeight * 0.12);
+        ctx.fillStyle = "rgba(255, 236, 176, 0.45)";
+        ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.06, spriteWidth * 0.06, spriteHeight * 0.16);
+        ctx.strokeStyle = "rgba(30, 22, 16, 0.45)";
+        ctx.lineWidth = Math.max(1, spriteWidth * 0.025);
+        ctx.strokeRect(spriteWidth * 0.44, spriteHeight * 0.2, spriteWidth * 0.12, spriteHeight * 0.72);
+      }
     } else if (sprite.kind === "world-prop") {
       const color = sprite.color || "#b9824d";
       if (sprite.propKind === "lamp" || sprite.propKind === "seam" || sprite.propKind === "relay") {
@@ -6165,6 +6633,49 @@ const canvas = document.getElementById("game");
         ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.24, spriteWidth * 0.56, spriteHeight * 0.2);
         ctx.strokeStyle = "rgba(28, 18, 12, 0.5)";
         ctx.strokeRect(spriteWidth * 0.22, spriteHeight * 0.24, spriteWidth * 0.56, spriteHeight * 0.2);
+      } else if (sprite.propKind === "cart") {
+        ctx.fillStyle = shadeHex(color, 0.48);
+        ctx.fillRect(spriteWidth * 0.2, spriteHeight * 0.48, spriteWidth * 0.6, spriteHeight * 0.18);
+        ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.36, spriteWidth * 0.4, spriteHeight * 0.12);
+        ctx.strokeStyle = "#5b402b";
+        ctx.lineWidth = Math.max(1.4, spriteWidth * 0.04);
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.32, spriteHeight * 0.74, spriteWidth * 0.1, 0, TAU);
+        ctx.arc(spriteWidth * 0.68, spriteHeight * 0.74, spriteWidth * 0.1, 0, TAU);
+        ctx.stroke();
+      } else if (sprite.propKind === "crate") {
+        ctx.fillStyle = shadeHex(color, 0.52);
+        ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.48, spriteWidth * 0.24, spriteHeight * 0.28);
+        ctx.fillRect(spriteWidth * 0.48, spriteHeight * 0.4, spriteWidth * 0.26, spriteHeight * 0.36);
+        ctx.strokeStyle = "rgba(46, 28, 14, 0.45)";
+        ctx.lineWidth = Math.max(1, spriteWidth * 0.025);
+        ctx.strokeRect(spriteWidth * 0.22, spriteHeight * 0.48, spriteWidth * 0.24, spriteHeight * 0.28);
+        ctx.strokeRect(spriteWidth * 0.48, spriteHeight * 0.4, spriteWidth * 0.26, spriteHeight * 0.36);
+      } else if (sprite.propKind === "post") {
+        ctx.fillStyle = shadeHex(color, 0.5);
+        ctx.fillRect(spriteWidth * 0.44, spriteHeight * 0.18, spriteWidth * 0.12, spriteHeight * 0.68);
+        ctx.fillStyle = color;
+        ctx.fillRect(spriteWidth * 0.28, spriteHeight * 0.16, spriteWidth * 0.44, spriteHeight * 0.1);
+      } else if (sprite.propKind === "pipe") {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(2, spriteWidth * 0.07);
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.28, spriteHeight * 0.24);
+        ctx.lineTo(spriteWidth * 0.28, spriteHeight * 0.64);
+        ctx.quadraticCurveTo(spriteWidth * 0.3, spriteHeight * 0.8, spriteWidth * 0.52, spriteHeight * 0.8);
+        ctx.lineTo(spriteWidth * 0.74, spriteHeight * 0.8);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255, 214, 154, 0.2)";
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.74, spriteHeight * 0.8, spriteWidth * 0.08, 0, TAU);
+        ctx.fill();
+      } else if (sprite.propKind === "smoke") {
+        for (let i = 0; i < 4; i++) {
+          ctx.fillStyle = `rgba(222, 216, 196, ${0.12 + i * 0.06})`;
+          ctx.beginPath();
+          ctx.ellipse(spriteWidth * (0.42 + i * 0.08), spriteHeight * (0.64 - i * 0.12), spriteWidth * (0.16 - i * 0.01), spriteHeight * (0.12 - i * 0.01), 0, 0, TAU);
+          ctx.fill();
+        }
       } else if (sprite.propKind === "fence" || sprite.propKind === "rail" || sprite.propKind === "cable") {
         ctx.strokeStyle = color;
         ctx.lineWidth = Math.max(2, spriteWidth * 0.08);
@@ -6496,6 +7007,9 @@ const canvas = document.getElementById("game");
     ctx.restore();
   }
 
+  // Per-frame depth buffer reused across frames; reallocates on canvas resize only.
+  let cachedDepthBuffer = null;
+
   function render3D() {
     const width = canvas.width;
     const height = canvas.height;
@@ -6523,7 +7037,10 @@ const canvas = document.getElementById("game");
     const horizon = clamp(baseHorizon + bobOffset + hitJitter + shakeY, height * 0.38, height * 0.66);
     drawGroundDetails(horizon, width, height, visualMood);
 
-    const depth = new Float32Array(width);
+    if (!cachedDepthBuffer || cachedDepthBuffer.length !== width) {
+      cachedDepthBuffer = new Float32Array(width);
+    }
+    const depth = cachedDepthBuffer;
     ctx.imageSmoothingEnabled = false;
 
     for (let x = 0; x < width; x++) {
@@ -6626,6 +7143,7 @@ const canvas = document.getElementById("game");
       sprites.push({
         ...regionPresentation.landmark,
         kind: "landmark",
+        landmarkVariant: regionPresentation.landmark.variant,
         label: regionPresentation.landmark.label,
         size: regionPresentation.landmark.size || 1.2,
       });
@@ -7115,6 +7633,8 @@ const canvas = document.getElementById("game");
     if (!state.showMap || canvas.width < 760) return;
 
     const map = currentMap();
+    const regionProfile = state.player.inHouse ? null : getRegionVisualIdentity(state.regions.activeRegion);
+    const presentation = state.player.inHouse ? null : buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
     const tileRadius = state.player.inHouse ? 5 : 6;
     const cells = tileRadius * 2;
     const mapDiameter = canvas.width < 620 ? 116 : canvas.width < 900 ? 138 : 164;
@@ -7138,10 +7658,19 @@ const canvas = document.getElementById("game");
     ctx.shadowBlur = 0;
 
     // Dark background disc
-    ctx.fillStyle = "rgba(8, 18, 20, 0.78)";
+    ctx.fillStyle = state.player.inHouse ? "rgba(8, 18, 20, 0.78)" : hexToRgba(regionProfile?.minimapTint || "#1b2830", 0.12);
     ctx.beginPath();
     ctx.arc(cx, cy, mapRadius + 4, 0, TAU);
     ctx.fill();
+    if (!state.player.inHouse && regionProfile?.minimapTint) {
+      const tintGlow = ctx.createRadialGradient(cx, cy, mapRadius * 0.24, cx, cy, mapRadius + 6);
+      tintGlow.addColorStop(0, hexToRgba(regionProfile.minimapTint, 0.08));
+      tintGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
+      ctx.fillStyle = tintGlow;
+      ctx.beginPath();
+      ctx.arc(cx, cy, mapRadius + 4, 0, TAU);
+      ctx.fill();
+    }
 
     // Clip to circle for terrain
     ctx.save();
@@ -7154,18 +7683,46 @@ const canvas = document.getElementById("game");
     const originX = cx - mapRadius;
     const originY = cy - mapRadius;
 
+    const regionMiniMapPalette = {
+      frontier: {
+        0: "#5a915c",
+        1: "#8d745a",
+        2: "#548eb2",
+        3: "#7a5a3a",
+        4: "#ada08e",
+        5: "#5f6fa3",
+      },
+      ashfall: {
+        0: "#6d4b3a",
+        1: "#41342c",
+        2: "#597e97",
+        3: "#a4653e",
+        4: "#d39b67",
+        5: "#805a8e",
+      },
+      ironlantern: {
+        0: "#41586b",
+        1: "#2d3742",
+        2: "#5f7fa8",
+        3: "#617793",
+        4: "#95b1cd",
+        5: "#7a68b2",
+      },
+    };
+    const outdoorPalette = regionMiniMapPalette[regionProfile?.id] || regionMiniMapPalette.frontier;
+
     for (let my = 0; my < cells; my++) {
       for (let mx = 0; mx < cells; mx++) {
         const wx = px - tileRadius + mx;
         const wy = py - tileRadius + my;
         const tile = map[wy]?.[wx] ?? 1;
 
-        let color = state.player.inHouse ? "#6f6253" : "#5a915c";
-        if (tile === 1) color = "#8d745a";
-        if (tile === 2) color = "#548eb2";
-        if (tile === 3) color = "#7a5a3a";
-        if (tile === 4) color = "#ada08e";
-        if (tile === 5) color = "#5f6fa3";
+        let color = state.player.inHouse ? "#6f6253" : outdoorPalette[0];
+        if (tile === 1) color = state.player.inHouse ? "#8f7d64" : outdoorPalette[1];
+        if (tile === 2) color = state.player.inHouse ? "#8f7d64" : outdoorPalette[2];
+        if (tile === 3) color = state.player.inHouse ? "#7d654e" : outdoorPalette[3];
+        if (tile === 4) color = state.player.inHouse ? "#a8957d" : outdoorPalette[4];
+        if (tile === 5) color = state.player.inHouse ? "#8a7dc0" : outdoorPalette[5];
 
         ctx.fillStyle = color;
         ctx.fillRect(originX + mx * cell, originY + my * cell, cell + 0.5, cell + 0.5);
@@ -7212,11 +7769,63 @@ const canvas = document.getElementById("game");
       ctx.fill();
     }
 
+    function worldToMap(wx, wy) {
+      const dx = wx - (px - tileRadius);
+      const dy = wy - (py - tileRadius);
+      return {
+        x: originX + dx * cell,
+        y: originY + dy * cell,
+      };
+    }
+
+    function drawMarker(wx, wy, color, size, shape = "diamond") {
+      const point = worldToMap(wx, wy);
+      const distFromCenter = Math.sqrt((point.x - cx) ** 2 + (point.y - cy) ** 2);
+      if (distFromCenter > mapRadius - 2) return;
+      ctx.fillStyle = withAlpha(color, 0.28);
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, size + 2.2, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      if (shape === "triangle") {
+        ctx.moveTo(point.x, point.y - size);
+        ctx.lineTo(point.x + size * 0.9, point.y + size * 0.75);
+        ctx.lineTo(point.x - size * 0.9, point.y + size * 0.75);
+      } else if (shape === "square") {
+        ctx.rect(point.x - size * 0.72, point.y - size * 0.72, size * 1.44, size * 1.44);
+      } else {
+        ctx.moveTo(point.x, point.y - size);
+        ctx.lineTo(point.x + size, point.y);
+        ctx.lineTo(point.x, point.y + size);
+        ctx.lineTo(point.x - size, point.y);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawPolyline(points, color, alpha, lineWidth = 2) {
+      const route = points
+        .filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y))
+        .map((point) => worldToMap(point.x, point.y));
+      if (route.length < 2) return;
+      ctx.strokeStyle = withAlpha(color, alpha);
+      ctx.lineWidth = lineWidth;
+      ctx.beginPath();
+      ctx.moveTo(route[0].x, route[0].y);
+      for (let i = 1; i < route.length; i++) {
+        ctx.lineTo(route[i].x, route[i].y);
+      }
+      ctx.stroke();
+    }
+
     if (!state.player.inHouse) {
       const cbPal = latestColorblindPalette;
       const enemyDot = cbPal ? cbPal.foe : "#98f39b";
       const npcDot = cbPal ? cbPal.friend : "#ffd77b";
       const pigDot = cbPal ? cbPal.neutral : "#f0adb4";
+      const routePolyline = buildRegionRoutePolyline(presentation, { startX: state.player.x, startY: state.player.y });
+      drawPolyline(routePolyline, regionProfile?.roadColor || "#d8bc6a", 0.42, 2.2);
       for (const enemy of state.enemies) {
         if (!enemy.alive) continue;
         drawDot(enemy.x, enemy.y, enemyDot, 2.5);
@@ -7231,10 +7840,9 @@ const canvas = document.getElementById("game");
         state.house.unlocked ? "#d8bc6a" : "#9b7b56", 3.5);
       const boardProp = getActiveJobBoardProp();
       if (boardProp) {
-        drawDot(boardProp.x, boardProp.y, boardProp.color || "#d8a84f", 3.4);
+        drawMarker(boardProp.x, boardProp.y, boardProp.color || "#d8a84f", 4, "square");
       }
-      const presentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
-      drawDot(presentation.landmark.x, presentation.landmark.y, presentation.landmark.color || "#ffd77b", 3.2);
+      drawMarker(presentation.landmark.x, presentation.landmark.y, presentation.landmark.color || "#ffd77b", 4.2, "diamond");
       for (const vista of presentation.vistas || []) {
         drawDot(vista.x, vista.y, vista.color || "#ffd77b", 2.4);
       }
@@ -7260,28 +7868,40 @@ const canvas = document.getElementById("game");
       });
       if (pressure?.marker) {
         const blink = 0.5 + (Math.sin(state.time * 5) + 1) * 0.5;
-        drawDot(pressure.marker.x, pressure.marker.y, pressure.marker.color || "#ffd77b", 2.4 + blink);
+        drawMarker(pressure.marker.x, pressure.marker.y, pressure.marker.color || "#ffd77b", 2.8 + blink * 0.6, "triangle");
       }
       const jobMarker = getJobRouteMarker();
       if (jobMarker) {
         const blink = 0.5 + (Math.sin(state.time * 5.5) + 1) * 0.5;
-        drawDot(jobMarker.x, jobMarker.y, jobMarker.color || "#ffd77b", 2.8 + blink);
+        drawPolyline([
+          { x: state.player.x, y: state.player.y },
+          { x: jobMarker.x, y: jobMarker.y },
+        ], jobMarker.color || "#ffd77b", 0.28, 1.6);
+        drawMarker(jobMarker.x, jobMarker.y, jobMarker.color || "#ffd77b", 3 + blink * 0.7, "triangle");
       }
       const roadRoute = getRoadRouteObjective();
       if (roadRoute && Number.isFinite(roadRoute.x) && Number.isFinite(roadRoute.y)) {
         const blink = 0.45 + (Math.sin(state.time * 4.9) + 1) * 0.45;
-        drawDot(roadRoute.x, roadRoute.y, "#ffde91", 2.6 + blink);
+        drawPolyline([
+          { x: state.player.x, y: state.player.y },
+          { x: roadRoute.x, y: roadRoute.y },
+        ], "#ffde91", 0.22, 1.4);
+        drawMarker(roadRoute.x, roadRoute.y, "#ffde91", 2.8 + blink * 0.6, "diamond");
       }
       const roadDiscoveryLead = resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 28 });
       if (roadDiscoveryLead) {
         const blink = 0.5 + (Math.sin(state.time * 4.6) + 1) * 0.5;
-        drawDot(roadDiscoveryLead.x, roadDiscoveryLead.y, roadDiscoveryLead.color || "#d8bc6a", 2.4 + blink);
+        drawPolyline([
+          { x: state.player.x, y: state.player.y },
+          { x: roadDiscoveryLead.x, y: roadDiscoveryLead.y },
+        ], roadDiscoveryLead.color || "#d8bc6a", 0.2, 1.3);
+        drawMarker(roadDiscoveryLead.x, roadDiscoveryLead.y, roadDiscoveryLead.color || "#d8bc6a", 2.5 + blink * 0.5, "diamond");
       }
       const roadsideDiscoveries = findNearbyRoadsideDiscoveries(state.regions, state.regions.activeRegion, state.player.x, state.player.y, 12).slice(0, 3);
       const roadsideIds = new Set(roadsideDiscoveries.map((poi) => poi.id));
       for (const discovery of roadsideDiscoveries) {
         const pulse = 0.45 + (Math.sin(state.time * 5.1 + discovery.distance) + 1) * 0.45;
-        drawDot(discovery.x, discovery.y, discovery.color || "#d89f62", 2.1 + pulse);
+        drawMarker(discovery.x, discovery.y, discovery.color || "#d89f62", 2.2 + pulse * 0.5, "diamond");
       }
 
       // POI pings: blink nearby undiscovered POIs.
@@ -7341,9 +7961,9 @@ const canvas = document.getElementById("game");
     // Gradient ring border
     ctx.lineWidth = 2.5;
     const ringGrad = ctx.createLinearGradient(cx - mapRadius, cy - mapRadius, cx + mapRadius, cy + mapRadius);
-    ringGrad.addColorStop(0, "#d8bc6a");
-    ringGrad.addColorStop(0.5, "#8a7448");
-    ringGrad.addColorStop(1, "#d8bc6a");
+    ringGrad.addColorStop(0, state.player.inHouse ? "#d8bc6a" : (regionProfile?.roadColor || "#d8bc6a"));
+    ringGrad.addColorStop(0.5, state.player.inHouse ? "#8a7448" : (regionProfile?.roadEdgeColor || "#8a7448"));
+    ringGrad.addColorStop(1, state.player.inHouse ? "#d8bc6a" : (regionProfile?.minimapTint || "#d8bc6a"));
     ctx.strokeStyle = ringGrad;
     ctx.beginPath();
     ctx.arc(cx, cy, mapRadius + 1, 0, TAU);
@@ -8164,7 +8784,13 @@ const canvas = document.getElementById("game");
 
   window.addEventListener("resize", resize);
   resize();
+  // Sync best-effort seed from localStorage so the title-screen Continue button
+  // is correct immediately. The async path then upgrades the cache to the IDB
+  // primary (which may include the most-recent save written this session).
   syncSaveStateFromStorage();
+  initSavePersistenceAsync().catch((err) => {
+    console.warn("[westward] save persistence init failed:", err);
+  });
 
   try {
     const params = new URLSearchParams(window.location.search || "");
@@ -8475,6 +9101,7 @@ const canvas = document.getElementById("game");
       logMsg(soundEnabled ? "Sound ON. Your ears will thank you. Maybe." : "Sound OFF. Blissful silence.");
       if (!soundEnabled && audioBuses) {
         try { stopAmbient(audioBuses); } catch { /* not critical */ }
+        try { stopMusic(audioBuses); } catch { /* not critical */ }
         lastAmbientRegion = null;
       } else if (soundEnabled && state.mode === "playing") {
         syncAmbientForRegion(state.regions?.activeRegion || "frontier");
@@ -8483,9 +9110,10 @@ const canvas = document.getElementById("game");
 
     if (event.code === "KeyM" && event.shiftKey) {
       ambientEnabled = !ambientEnabled;
-      logMsg(`Ambient drone: ${ambientEnabled ? "ON" : "OFF"}.`);
+      logMsg(`Ambient + music: ${ambientEnabled ? "ON" : "OFF"}.`);
       if (!ambientEnabled && audioBuses) {
         try { stopAmbient(audioBuses); } catch { /* not critical */ }
+        try { stopMusic(audioBuses); } catch { /* not critical */ }
         lastAmbientRegion = null;
       } else if (ambientEnabled && state.mode === "playing") {
         syncAmbientForRegion(state.regions?.activeRegion || "frontier");

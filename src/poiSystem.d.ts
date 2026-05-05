@@ -32,3 +32,16 @@ export function resolvePOILead(regions: any, regionId: string, x: number, y: num
 export function resolveRoadDiscoveryLead(regions: any, regionId: string, x: number, y: number, options?: any): any;
 export function resolveExplorationRenownReward(discoveredCount: number): any;
 export function resolveExplorationRenownStatus(discoveredCount: number, totalCount?: number): any;
+
+export interface JobBoardPropDef {
+  id: string;
+  kind: string;
+  label: string;
+  npcId: string;
+  regionId: string;
+  x: number;
+  y: number;
+  color: string;
+}
+
+export const JOB_BOARD_PROPS: Record<string, JobBoardPropDef>;

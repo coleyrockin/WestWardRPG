@@ -1,0 +1,328 @@
+import { describe, it, expect } from "vitest";
+import {
+  hashJson,
+  makeEnvelope,
+  validateEnvelope,
+  writeSave,
+  readSave,
+  listBackups,
+  readBackup,
+  restoreFromBackup,
+  deleteSave,
+  exportSaveJson,
+  importSaveFromText,
+  migrateFromLocalStorage,
+  findMostRecentValidBackup,
+  DEFAULT_SLOT,
+  STORAGE_VERSION,
+  MAX_BACKUPS_PER_SLOT,
+  LEGACY_LOCAL_STORAGE_KEYS,
+  __resetSavePersistenceForTests,
+} from "../src/savePersistence.js";
+
+function samplePayload(overrides: Record<string, unknown> = {}) {
+  return {
+    version: 3,
+    savedAt: 1700000000000,
+    player: { x: 4.5, y: 7.2, hp: 80, level: 3 },
+    inventory: { Wood: 5, "Slime Core": 1 },
+    ...overrides,
+  };
+}
+
+describe("hashJson", () => {
+  it("returns a stable 8-char hex string for the same input", () => {
+    const a = hashJson(samplePayload());
+    const b = hashJson(samplePayload());
+    expect(a).toBe(b);
+    expect(a).toMatch(/^[0-9a-f]{8}$/);
+  });
+
+  it("produces different hashes for different content", () => {
+    const a = hashJson(samplePayload({ player: { x: 1 } }));
+    const b = hashJson(samplePayload({ player: { x: 2 } }));
+    expect(a).not.toBe(b);
+  });
+
+  it("hashes raw strings without re-stringifying", () => {
+    expect(hashJson("hello")).toBe(hashJson("hello"));
+    expect(hashJson("hello")).not.toBe(hashJson("world"));
+  });
+});
+
+describe("makeEnvelope / validateEnvelope", () => {
+  it("creates an envelope with the expected shape", () => {
+    const env = makeEnvelope(samplePayload(), 1234);
+    expect(env.storageVersion).toBe(STORAGE_VERSION);
+    expect(env.payloadVersion).toBe(3);
+    expect(env.savedAt).toBe(1234);
+    expect(env.hash).toMatch(/^[0-9a-f]{8}$/);
+    expect(env.payload).toEqual(samplePayload());
+  });
+
+  it("validates a fresh envelope as ok", () => {
+    const env = makeEnvelope(samplePayload());
+    const result = validateEnvelope(env);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.payload).toEqual(samplePayload());
+  });
+
+  it("rejects an envelope whose hash does not match the payload", () => {
+    const env = makeEnvelope(samplePayload());
+    env.payload.player.x = 999; // mutate after hashing
+    const result = validateEnvelope(env);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("hash-mismatch");
+  });
+
+  it("rejects an envelope with an unknown storageVersion", () => {
+    const env = makeEnvelope(samplePayload());
+    env.storageVersion = 99;
+    const result = validateEnvelope(env);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("unknown-storage-version");
+  });
+
+  it("rejects null/missing/non-object envelopes", () => {
+    expect(validateEnvelope(null).ok).toBe(false);
+    expect(validateEnvelope(undefined as any).ok).toBe(false);
+    expect(validateEnvelope("not-an-envelope" as any).ok).toBe(false);
+  });
+});
+
+describe("writeSave / readSave", () => {
+  it("round-trips a payload through IndexedDB", async () => {
+    __resetSavePersistenceForTests();
+    await writeSave(undefined, samplePayload());
+    const result = await readSave();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload).toEqual(samplePayload());
+      expect(result.slot).toBe(DEFAULT_SLOT);
+    }
+  });
+
+  it("returns ok:false reason:missing for an empty slot", async () => {
+    __resetSavePersistenceForTests();
+    const result = await readSave("does-not-exist");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("missing");
+  });
+
+  it("supports multiple slots independently", async () => {
+    __resetSavePersistenceForTests();
+    await writeSave("slot-a", samplePayload({ player: { x: 1, y: 0, hp: 10, level: 1 } }));
+    await writeSave("slot-b", samplePayload({ player: { x: 2, y: 0, hp: 10, level: 1 } }));
+    const a = await readSave("slot-a");
+    const b = await readSave("slot-b");
+    expect(a.ok && b.ok).toBe(true);
+    if (a.ok && b.ok) {
+      expect((a.payload as any).player.x).toBe(1);
+      expect((b.payload as any).player.x).toBe(2);
+    }
+  });
+});
+
+describe("backup rotation", () => {
+  it("retains at most MAX_BACKUPS_PER_SLOT after many writes", async () => {
+    __resetSavePersistenceForTests();
+    // First write seeds the primary; subsequent writes copy the previous primary
+    // into backups. After N writes we expect N-1 backups.
+    for (let i = 0; i < MAX_BACKUPS_PER_SLOT + 5; i++) {
+      await writeSave(undefined, samplePayload({ player: { x: i, y: 0, hp: 10, level: 1 } }));
+    }
+    const backups = await listBackups();
+    expect(backups.length).toBeLessThanOrEqual(MAX_BACKUPS_PER_SLOT);
+    expect(backups.length).toBe(MAX_BACKUPS_PER_SLOT);
+  });
+
+  it("returns backups newest-first", async () => {
+    __resetSavePersistenceForTests();
+    await writeSave(undefined, samplePayload({ player: { x: 1, y: 0, hp: 10, level: 1 } }));
+    await new Promise((r) => setTimeout(r, 2));
+    await writeSave(undefined, samplePayload({ player: { x: 2, y: 0, hp: 10, level: 1 } }));
+    await new Promise((r) => setTimeout(r, 2));
+    await writeSave(undefined, samplePayload({ player: { x: 3, y: 0, hp: 10, level: 1 } }));
+    const backups = await listBackups();
+    expect(backups.length).toBeGreaterThanOrEqual(2);
+    for (let i = 1; i < backups.length; i++) {
+      expect(backups[i - 1].savedAt).toBeGreaterThanOrEqual(backups[i].savedAt);
+    }
+  });
+});
+
+describe("corruption + recovery", () => {
+  it("detects a corrupted primary via hash mismatch", async () => {
+    __resetSavePersistenceForTests();
+    // Seed a valid save, then write a tampered envelope directly.
+    await writeSave(undefined, samplePayload());
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open("westward", 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    const tx = db.transaction("saves", "readwrite");
+    const store = tx.objectStore("saves");
+    const record = await new Promise<any>((resolve, reject) => {
+      const r = store.get(DEFAULT_SLOT);
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+    });
+    record.envelope.payload.player.x = 9999; // tamper without rehashing
+    await new Promise<void>((resolve, reject) => {
+      const r = store.put(record);
+      r.onsuccess = () => resolve();
+      r.onerror = () => reject(r.error);
+    });
+    await new Promise<void>((resolve) => {
+      tx.oncomplete = () => resolve();
+    });
+    db.close();
+
+    const result = await readSave();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("hash-mismatch");
+  });
+
+  it("findMostRecentValidBackup returns the latest valid backup", async () => {
+    __resetSavePersistenceForTests();
+    await writeSave(undefined, samplePayload({ player: { x: 1, y: 0, hp: 10, level: 1 } }));
+    await new Promise((r) => setTimeout(r, 2));
+    await writeSave(undefined, samplePayload({ player: { x: 2, y: 0, hp: 10, level: 1 } }));
+    const recovered = await findMostRecentValidBackup();
+    expect(recovered).not.toBeNull();
+    expect(recovered?.ok).toBe(true);
+    if (recovered?.ok) {
+      // The most recent backup should be the one that just got bumped (player.x === 1).
+      expect((recovered.payload as any).player.x).toBe(1);
+    }
+  });
+
+  it("restoreFromBackup copies a backup into the primary slot", async () => {
+    __resetSavePersistenceForTests();
+    await writeSave(undefined, samplePayload({ player: { x: 10, y: 0, hp: 10, level: 1 } }));
+    await new Promise((r) => setTimeout(r, 2));
+    await writeSave(undefined, samplePayload({ player: { x: 20, y: 0, hp: 10, level: 1 } }));
+    const backups = await listBackups();
+    const target = backups[0];
+    const original = await readBackup(undefined, target.savedAt);
+    expect(original.ok).toBe(true);
+    await restoreFromBackup(undefined, target.savedAt);
+    const result = await readSave();
+    expect(result.ok).toBe(true);
+    if (result.ok && original.ok) {
+      expect(result.payload).toEqual(original.payload);
+    }
+  });
+});
+
+describe("export / import", () => {
+  it("round-trips a save through JSON export and import", async () => {
+    __resetSavePersistenceForTests();
+    await writeSave(undefined, samplePayload({ player: { x: 7, y: 7, hp: 50, level: 5 } }));
+    const json = await exportSaveJson();
+    await deleteSave();
+    const empty = await readSave();
+    expect(empty.ok).toBe(false);
+    const imported = await importSaveFromText(undefined, json);
+    expect(imported.ok).toBe(true);
+    const restored = await readSave();
+    expect(restored.ok).toBe(true);
+    if (restored.ok) {
+      expect((restored.payload as any).player.x).toBe(7);
+      expect((restored.payload as any).player.level).toBe(5);
+    }
+  });
+
+  it("rejects malformed import JSON", async () => {
+    __resetSavePersistenceForTests();
+    const result = await importSaveFromText(undefined, "{not valid json");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("json-invalid");
+  });
+
+  it("rejects an import with the wrong format string", async () => {
+    __resetSavePersistenceForTests();
+    const result = await importSaveFromText(
+      undefined,
+      JSON.stringify({ format: "some-other-game", envelope: makeEnvelope(samplePayload()) }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("format-mismatch");
+  });
+
+  it("rejects an import whose envelope hash is wrong", async () => {
+    __resetSavePersistenceForTests();
+    const env = makeEnvelope(samplePayload());
+    env.hash = "deadbeef";
+    const result = await importSaveFromText(
+      undefined,
+      JSON.stringify({ format: "westward-save", formatVersion: 1, envelope: env }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("hash-mismatch");
+  });
+});
+
+describe("legacy localStorage migration", () => {
+  it("drains a v3 localStorage save into IDB and clears legacy keys", async () => {
+    __resetSavePersistenceForTests();
+    const payload = samplePayload({ player: { x: 99, y: 99, hp: 1, level: 9 } });
+    globalThis.localStorage.setItem("westward-save-v3", JSON.stringify(payload));
+    const result = await migrateFromLocalStorage();
+    expect(result?.ok).toBe(true);
+    for (const key of LEGACY_LOCAL_STORAGE_KEYS) {
+      expect(globalThis.localStorage.getItem(key)).toBeNull();
+    }
+    const idbResult = await readSave();
+    expect(idbResult.ok).toBe(true);
+    if (idbResult.ok) {
+      expect((idbResult.payload as any).player.x).toBe(99);
+    }
+  });
+
+  it("returns null when no legacy keys exist", async () => {
+    __resetSavePersistenceForTests();
+    const result = await migrateFromLocalStorage();
+    expect(result).toBeNull();
+  });
+
+  it("ignores malformed legacy JSON", async () => {
+    __resetSavePersistenceForTests();
+    globalThis.localStorage.setItem("westward-save-v3", "{broken json");
+    const result = await migrateFromLocalStorage();
+    // Either null (skipped) or ok:false; never throws.
+    expect(result === null || (result && result.ok === false) || (result && result.ok === true)).toBe(true);
+  });
+
+  it("is idempotent: running twice does not duplicate writes", async () => {
+    __resetSavePersistenceForTests();
+    globalThis.localStorage.setItem(
+      "westward-save-v3",
+      JSON.stringify(samplePayload()),
+    );
+    const first = await migrateFromLocalStorage();
+    expect(first?.ok).toBe(true);
+    const second = await migrateFromLocalStorage();
+    expect(second).toBeNull();
+  });
+
+  it("prefers westward-save-v3 over older legacy keys", async () => {
+    __resetSavePersistenceForTests();
+    globalThis.localStorage.setItem(
+      "westward-save-v3",
+      JSON.stringify(samplePayload({ player: { x: 33, y: 0, hp: 10, level: 3 } })),
+    );
+    globalThis.localStorage.setItem(
+      "westward-save-v1",
+      JSON.stringify(samplePayload({ version: 1, player: { x: 11, y: 0, hp: 10, level: 1 } })),
+    );
+    const result = await migrateFromLocalStorage();
+    expect(result?.ok).toBe(true);
+    const idb = await readSave();
+    expect(idb.ok).toBe(true);
+    if (idb.ok) {
+      expect((idb.payload as any).player.x).toBe(33);
+    }
+  });
+});

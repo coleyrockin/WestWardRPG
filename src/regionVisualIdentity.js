@@ -13,6 +13,9 @@ export const REGION_VISUAL_IDENTITIES = {
     propPalette: ["split-rail fences", "supply crates", "weathered signs", "camp lanterns"],
     encounterTone: "frontier law and small-town bargains",
     screenshotCue: "warm dusk, green marsh bands, timber homestead silhouettes",
+    roadColor: "#d5b178",
+    roadEdgeColor: "#8d6c43",
+    minimapTint: "#d6b57b",
   },
   ashfall: {
     id: "ashfall",
@@ -26,6 +29,9 @@ export const REGION_VISUAL_IDENTITIES = {
     propPalette: ["bent pipework", "ashglass seams", "broken pumps", "heat flags"],
     encounterTone: "salvage rights, labor fights, and machines that never cooled",
     screenshotCue: "orange haze, dark slag ridges, bright ashglass flecks",
+    roadColor: "#d5834d",
+    roadEdgeColor: "#5e3629",
+    minimapTint: "#e28a55",
   },
   ironlantern: {
     id: "ironlantern",
@@ -39,6 +45,9 @@ export const REGION_VISUAL_IDENTITIES = {
     propPalette: ["neon shutters", "cable posts", "iron placards", "glass relays"],
     encounterTone: "curfew pressure, surveillance politics, and coded rebellion",
     screenshotCue: "cool blue skyline, violet haze, hard iron silhouettes",
+    roadColor: "#8dc5ff",
+    roadEdgeColor: "#41536d",
+    minimapTint: "#8fc8ff",
   },
 };
 
@@ -56,7 +65,7 @@ const REGION_PRESENTATION = {
     anchor: { x: 9.5, y: 8.5 },
     routeLine: "marshal road east past the town circle",
     compositionLine: "marshal road frames the town cluster, watchtower, and gate silhouettes from the first view",
-    landmark: { kind: "landmark", label: "North Watchtower", dx: 4.7, dy: -1.25, color: "#d9b66d", size: 1.38 },
+    landmark: { kind: "landmark", variant: "watchtower", label: "North Watchtower", dx: 4.7, dy: -1.25, color: "#d9b66d", size: 1.38 },
     vistas: [
       { kind: "town", label: "Town Silhouette", dx: 1.65, dy: -0.75, color: "#caa66c", size: 1.12 },
       { kind: "watchtower", label: "Watchtower Frame", dx: 4.15, dy: -1.65, color: "#d9b66d", size: 1.0 },
@@ -81,7 +90,7 @@ const REGION_PRESENTATION = {
     anchor: { x: 39.5, y: 39.5 },
     routeLine: "slag road between mine ribs and cooling wells",
     compositionLine: "slag road frames mine ribs, heat flags, and a smoking tower from the first basin view",
-    landmark: { kind: "landmark", label: "Slag Tower", dx: 3.9, dy: -1.6, color: "#e08a4a", size: 1.46 },
+    landmark: { kind: "landmark", variant: "slag_tower", label: "Slag Tower", dx: 3.9, dy: -1.6, color: "#e08a4a", size: 1.46 },
     vistas: [
       { kind: "mine", label: "Mine Rib Silhouette", dx: 1.75, dy: -0.85, color: "#80533d", size: 1.05 },
       { kind: "tower", label: "Smoking Slag Tower", dx: 3.95, dy: -1.85, color: "#e08a4a", size: 1.08 },
@@ -104,7 +113,7 @@ const REGION_PRESENTATION = {
     anchor: { x: 14.5, y: 39.5 },
     routeLine: "signal lane under the blue checkpoint mast",
     compositionLine: "signal lane frames the mast, gate lights, and watched street silhouettes from the first district view",
-    landmark: { kind: "landmark", label: "Signal Mast", dx: 4.2, dy: -1.35, color: "#8fc8ff", size: 1.5 },
+    landmark: { kind: "landmark", variant: "signal_mast", label: "Signal Mast", dx: 4.2, dy: -1.35, color: "#8fc8ff", size: 1.5 },
     vistas: [
       { kind: "signal", label: "Signal Mast Frame", dx: 4.05, dy: -1.7, color: "#8fc8ff", size: 1.08 },
       { kind: "checkpoint", label: "Checkpoint Silhouette", dx: 2.25, dy: -0.85, color: "#657a9b", size: 0.92 },
@@ -198,6 +207,7 @@ function placeSpec(spec, anchor, context = {}) {
 
   return {
     kind: spec.kind,
+    variant: spec.variant || null,
     label: spec.label,
     x: point.x,
     y: point.y,
@@ -281,6 +291,7 @@ export function buildRegionWorldPresentation(regionId, context = {}) {
   return {
     regionId: profile.id,
     label: profile.label,
+    anchor,
     routeLine: config.routeLine,
     compositionLine: config.compositionLine,
     landmark: placeSpec(config.landmark, anchor, context),
@@ -289,6 +300,31 @@ export function buildRegionWorldPresentation(regionId, context = {}) {
     props: config.props.map((prop) => placeSpec(prop, anchor, context)),
     roadSigns: buildRoadDiscoverySignposts(profile.id, anchor, context),
   };
+}
+
+export function buildRegionRoutePolyline(presentation, options = {}) {
+  if (!presentation || typeof presentation !== "object") return [];
+  const startX = Number.isFinite(options.startX) ? options.startX : presentation.anchor?.x;
+  const startY = Number.isFinite(options.startY) ? options.startY : presentation.anchor?.y;
+  const points = [];
+  if (Number.isFinite(startX) && Number.isFinite(startY)) {
+    points.push({ x: Number(startX.toFixed(2)), y: Number(startY.toFixed(2)), kind: "start", label: "Player" });
+  }
+  for (const road of Array.isArray(presentation.roads) ? presentation.roads : []) {
+    if (!Number.isFinite(road?.x) || !Number.isFinite(road?.y)) continue;
+    points.push({ x: road.x, y: road.y, kind: "road", label: road.label, color: road.color });
+  }
+  const landmark = presentation.landmark;
+  if (Number.isFinite(landmark?.x) && Number.isFinite(landmark?.y)) {
+    points.push({
+      x: landmark.x,
+      y: landmark.y,
+      kind: "landmark",
+      label: landmark.label,
+      color: landmark.color,
+    });
+  }
+  return points;
 }
 
 export function resolveRoadSignPrompt(roadSigns, x, y, options = {}) {

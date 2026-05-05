@@ -4,10 +4,12 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     environment: "node",
+    setupFiles: ["./tests/setup-idb.ts"],
+    globals: true,
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
-      include: ["atmosphere.ts"],
+      include: ["atmosphere.ts", "src/savePersistence.js"],
     },
   },
 });

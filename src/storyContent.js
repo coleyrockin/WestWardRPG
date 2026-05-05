@@ -77,3 +77,27 @@ export const DEATH_MESSAGES = [
   "K.O. The blob offered no comment on governance reform.",
   "Flattened by gelatin. History will call it a 'necessary correction.'",
 ];
+
+// Job-board UI strings — extracted from jobBoard.js so all player-facing copy
+// lives next to the rest of the narrative content. jobBoard.js consumes this
+// via getJobBoardPresentation().
+export const JOB_BOARD_PRESENTATION = {
+  frontier: {
+    title: "Marshal Boone's Job Board",
+    subtitle: "Dustward Frontier work: road law, town defense, rescue, and escort pay.",
+    emptyLine: "No posted work in Dustward Frontier.",
+    openLine: "Marshal Boone opens the job board.",
+  },
+  ashfall: {
+    title: "Ashfall Warrant Board",
+    subtitle: "Ashfall Basin work: salvage warrants, cooling patrols, and heat-risk bonuses.",
+    emptyLine: "No Ashfall warrants are posted.",
+    openLine: "Marshal Boone checks the Ashfall warrant board.",
+  },
+  ironlantern: {
+    title: "Lantern Quiet Board",
+    subtitle: "Iron Lantern work: watched routes, quiet couriers, and signal-risk pay.",
+    emptyLine: "No Iron Lantern quiet work is posted.",
+    openLine: "Marshal Boone lowers his voice at the Lantern board.",
+  },
+};

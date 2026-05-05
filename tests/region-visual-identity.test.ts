@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   REGION_VISUAL_IDENTITIES,
+  buildRegionRoutePolyline,
   buildRegionWorldPresentation,
   buildRegionIdentityLine,
   getRegionVisualIdentity,
@@ -17,6 +18,9 @@ describe("regionVisualIdentity", () => {
       expect(profile.groundPalette.length).toBeGreaterThanOrEqual(3);
       expect(profile.landmarkHints.length).toBeGreaterThanOrEqual(3);
       expect(profile.propPalette.length).toBeGreaterThanOrEqual(3);
+      expect(profile.roadColor).toMatch(/^#/);
+      expect(profile.roadEdgeColor).toMatch(/^#/);
+      expect(profile.minimapTint).toMatch(/^#/);
       expect(profile.dangerIdentity.length).toBeGreaterThan(8);
     }
   });
@@ -108,6 +112,7 @@ describe("regionVisualIdentity", () => {
 
     expect(presentation.compositionLine).toContain("road");
     expect(presentation.compositionLine).toContain("town");
+    expect(presentation.anchor).toMatchObject({ x: 9.5, y: 8.5 });
     expect(presentation.vistas.length).toBeGreaterThanOrEqual(3);
     expect(presentation.vistas.every((vista: any) => vista.blocking === false)).toBe(true);
     expect(presentation.vistas.map((vista: any) => vista.kind)).toEqual(expect.arrayContaining([
@@ -147,5 +152,15 @@ describe("regionVisualIdentity", () => {
     expect(ashfall.vistas.map((vista: any) => vista.label)).not.toEqual(lantern.vistas.map((vista: any) => vista.label));
     expect(ashfall.roadSigns.map((sign: any) => sign.targetKind)).toContain("mine");
     expect(lantern.roadSigns.map((sign: any) => sign.targetKind)).toContain("hideout");
+  });
+
+  it("builds an ordered route polyline from player anchor through road dressing to the landmark", () => {
+    const presentation = buildRegionWorldPresentation("frontier", { playerX: 9.5, playerY: 8.5 });
+    const route = buildRegionRoutePolyline(presentation);
+
+    expect(route[0]).toMatchObject({ kind: "start", x: 9.5, y: 8.5 });
+    expect(route.slice(1, 4).every((point: any) => point.kind === "road")).toBe(true);
+    expect(route[route.length - 1]).toMatchObject({ kind: "landmark", label: "North Watchtower" });
+    expect(route).toHaveLength(presentation.roads.length + 2);
   });
 });

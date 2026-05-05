@@ -1,6 +1,9 @@
 import { getRegionVisualIdentity } from "./regionVisualIdentity.js";
 import { resolveStoryLootBoardReaction } from "./storyLootReactions.js";
 import { normalizeInventoryState } from "./inventoryState.js";
+import { JOB_BOARD_PROPS } from "./poiSystem.js";
+import { JOB_BOARD_PRESENTATION } from "./storyContent.js";
+import { COMPLETED_JOB_BOARD_LINES } from "./npcMemory.js";
 
 const JOB_STATUS = new Set(["active", "ready", "completed", "failed"]);
 
@@ -468,60 +471,6 @@ export const JOB_DEFINITIONS = {
   },
 };
 
-const JOB_BOARD_PROPS = {
-  frontier: {
-    id: "frontier_job_board",
-    kind: "job_board",
-    label: "Boone's Job Board",
-    npcId: "warden",
-    regionId: "frontier",
-    x: 12.35,
-    y: 8.55,
-    color: "#d8a84f",
-  },
-  ashfall: {
-    id: "ashfall_job_board",
-    kind: "job_board",
-    label: "Ashfall Warrant Board",
-    npcId: "warden",
-    regionId: "ashfall",
-    x: 41.25,
-    y: 39.65,
-    color: "#ff9f5f",
-  },
-  ironlantern: {
-    id: "ironlantern_job_board",
-    kind: "job_board",
-    label: "Lantern Quiet Board",
-    npcId: "warden",
-    regionId: "ironlantern",
-    x: 15.25,
-    y: 39.35,
-    color: "#9bd3ff",
-  },
-};
-
-const JOB_BOARD_PRESENTATION = {
-  frontier: {
-    title: "Marshal Boone's Job Board",
-    subtitle: "Dustward Frontier work: road law, town defense, rescue, and escort pay.",
-    emptyLine: "No posted work in Dustward Frontier.",
-    openLine: "Marshal Boone opens the job board.",
-  },
-  ashfall: {
-    title: "Ashfall Warrant Board",
-    subtitle: "Ashfall Basin work: salvage warrants, cooling patrols, and heat-risk bonuses.",
-    emptyLine: "No Ashfall warrants are posted.",
-    openLine: "Marshal Boone checks the Ashfall warrant board.",
-  },
-  ironlantern: {
-    title: "Lantern Quiet Board",
-    subtitle: "Iron Lantern work: watched routes, quiet couriers, and signal-risk pay.",
-    emptyLine: "No Iron Lantern quiet work is posted.",
-    openLine: "Marshal Boone lowers his voice at the Lantern board.",
-  },
-};
-
 export function getJobBoardPresentation({ regionId = "frontier" } = {}) {
   const presentation = JOB_BOARD_PRESENTATION[regionId] || JOB_BOARD_PRESENTATION.frontier;
   return { ...presentation, regionId: JOB_BOARD_PRESENTATION[regionId] ? regionId : "frontier" };
@@ -560,25 +509,6 @@ function cloneReward(reward = {}) {
 }
 
 const EMPTY_REWARD = { gold: 0, xp: 0, items: {} };
-
-const COMPLETED_JOB_BOARD_LINES = {
-  frontier_badge_return: {
-    regionId: "frontier",
-    line: "The returned badge has Boone posting deputy work with fewer whispers around it.",
-  },
-  frontier_map_survey: {
-    regionId: "frontier",
-    line: "Your old-road survey has Boone marking one route as trusted again.",
-  },
-  frontier_quiet_note_trace: {
-    regionId: "frontier",
-    line: "The traced note has Quill's quiet routes showing up in Boone's margins.",
-  },
-  ashfall_miner_helmet_salvage: {
-    regionId: "ashfall",
-    line: "Your helmet-lamp salvage check has Ashfall crews marking one shaft as workable again.",
-  },
-};
 
 function combineRewards(...rewards) {
   const combined = { gold: 0, xp: 0, items: {} };

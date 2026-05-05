@@ -260,7 +260,7 @@ It needs the existing systems to feel connected in the player's first short sess
 
 ## Shipped Foundations (audit)
 
-Latest audit: `npm test` → 456 passing across 44 test files; 45 source modules; 14 Playwright scenarios. Commit `b9bdb58+` plus the local Discovery Reward Banner 1 slice is the current verified state.
+Latest audit (2026-05-05, post Track-A1+A5+A2): `npm test` → **482 passing across 45 test files**; 46 source modules (added `savePersistence.js`); 14 Playwright scripted-replay scenarios; **CI live** (`.github/workflows/qa.yml`, two-job pipeline). `main.js` is **~9,225 lines** (extraction debt — see below). README test count refreshed to 457/44 then 482/45 as A2 landed.
 
 ### Phase 1 open-road slice (latest local)
 - **Discovery Reward Banner 1** (`src/discoveryRewardFeedback.js`) — discoveries now trigger a compact reward banner with title, reward line, story hook, codex unlock, and route/renown payoff lines. `render_game_to_text` exposes the active banner for browser smoke and human-test auditing.
@@ -325,6 +325,68 @@ Latest audit: `npm test` → 456 passing across 44 test files; 45 source modules
 - Skill tree, shop, smith tabs, quest outcome modal — shop-pattern modal idiom.
 - Colorblind palette wired into mini-map dots, floating damage colors, NPC + enemy sprite glows.
 - First-minute objective HUD strip; opening route guide; first-view vista composition.
+
+## Audit (2026-05-05): Wired-But-Invisible Inventory
+
+Three deep audits ran on the engine, the system coupling, and the test suite. Findings are concrete and broken into "do this week," "do this month," and "do this quarter" buckets.
+
+### Engine debt — main.js is the elephant
+
+- `src/main.js` is 9,210 lines. Approximate composition: ~30% rendering (`render3D` ≈ lines 6652–8296), ~25% update loop (`update` ≈ lines 4953–6651), ~20% input + modal handling, ~15% save/load + state init, ~10% setup + language packs.
+- Top extraction targets (each one is a small PR):
+  1. **`InputManager`** — centralize keydown/keyup/mousemove/pointer-lock; gamepad-ready scaffold; replace 8 modal-aware keydown branches with one dispatcher.
+  2. **`ModalStack`** — `dialogueSelection`, `questOutcomeSelection`, `jobBoardSelection`, `codexTab`, `settingsSelection` are currently **module-globals**, which means save/load can't preserve them and reopening a modal can land on a stale index. Move into `state.ui.modals[]`.
+  3. **`HudRenderer`** — every `draw*` HUD function (mini-map, bars, floating text, objective strip).
+  4. **`CombatProcessor`** — attack / block / parry / combo / stamina / guard-break logic currently mixed into `update`.
+  5. **`NPCBehavior`** — `updateNPCs`, `updatePigs`, companion AI (~lines 4667–4951).
+  6. **`SaveStateManager`** — save/load handlers, autosave ticker, storage sync.
+  7. **`WeatherSystem`** — `updateWeather`, mood, rain/lightning physics (~lines 4597–4666).
+  8. **`LanguageManager`** — `LANGUAGE_PACKS` (~360 lines of inline locale strings, lines 339–700) → JSON files, lazy-loaded per language.
+- `src/jobBoard.js` is 1,434 lines and crosses concerns: `JOB_BOARD_PROPS` belongs in `poiSystem.js`; `JOB_BOARD_PRESENTATION` belongs in `storyContent.js`; `COMPLETED_JOB_BOARD_LINES` belongs in `npcMemory.js`.
+- `index.html` has 600+ lines of inline menu CSS (`<style>` block, ~lines 26–641). Extract to `menu.css`; lazy-load on title.
+- ~~`atmosphere.js` is loaded in `index.html` but never called from `main.js`~~ — **correction (2026-05-05)**: the initial audit was wrong; `main.js:322` reads `window.WestWardTS.computeAtmosphere` and `main.js:5583` calls it. The IIFE is live. As of A1 it lives in `public/atmosphere.js` and is served as-is by Vite.
+- Per-frame allocations in the render hot path: `new Float32Array(width)` allocated every frame for the depth buffer; per-pixel `rgba(...)` template-string interpolation in the inner column loop. Pre-allocate the depth buffer once; pool color strings or pre-compute lighting LUTs.
+- `update()` runs full physics / AI / weather while modals are open. Gate non-essential update on `state.mode === "playing" && !modalStack.any()`.
+- No gamepad support. No update-while-paused gating. No music tracks loaded (the `music` audio bus exists at `audio.js:21` but is never populated).
+- Renderer ceiling: textured walls, distance fog, distance-based shading, sprite billboards — all good. **No dynamic lights, no per-entity glow, no flashlight, no parallax ground detail.** This is the single biggest visual upgrade for atmosphere (see Track B2 below).
+
+### Systems debt — "shipped but not wired"
+
+Cross-checked against `decisionEngine`, `factionEffects`, `economyServices`, `npcMemory`, `dialogueChoices`, `jobBoard`, `companionBarks`, `houseProgress`, `runSummary`, `questDefinitions`, `lootSystem`.
+
+- **`economyServices.buildEconomySnapshot`** is exported but **never called** in `main.js`. Either wire it into a vendor-context modal or delete the file.
+- **`factionRep` → shop prices** fires correctly (`factionEffects.resolveShopPriceMultiplier` at `main.js:1396`) but is **invisible during play**. The player only sees the change if they re-open the shop modal. Add a "Word travels: market prices changed" HUD ribbon when `factionRep` crosses ±10 / ±25 / ±50 thresholds.
+- **Codex unlocks are silent** (`resolveCodexUnlockForPOI` at `main.js:3654`). Add an in-world ping ("New codex entry: Lantern Filament") with a flash on the codex icon.
+- **Quest outcomes ↛ job board.** `getJobListings` (`jobBoard.js:794`) filters by `playerLevel` + story-loot inventory; it ignores `narrative.factionRep` and `narrative.questOutcomes` entirely. Add gating + outcome-specific job unlocks ("Guild Revenge" after publishing the ledger, "Council Fallout" after suppressing the survey).
+- **`npcAffinity` vs `npcMemory.byNpc[id].greetings`** — both track "does this NPC know the player." Pick one as authoritative; the other becomes a derived view. Today it's unclear which to read.
+- **`narrative.factionRep` vs `narrative.npcAffinity`** — semantics are conflated. Decide: faction = political, affinity = personal. Then test both surfaces.
+- **`houseProgress` trophies ↛ run summary.** Trophy cards are built (`houseProgress.js:90–95`) but never surfaced in `runSummary.js`. Wire them into the summary modal.
+- **`companionBarks` ↛ quest outcomes.** Barks fire on combat events only. Add quest-outcome bark variants per companion personality (Cogwheel sardonic, Nora warm, Boone laconic).
+- **`dialogueChoices` ↛ identity gates.** Choices are not gated by origin or attributes. Add `Speech` gate + origin-flavor gates per the "ten-flavor identity reactions" stretch (existing future-idea).
+- **Endings.** Only 3 distinct outcomes in `decisionEngine.js:198–219`; most runs fall through to "Elite Rotation" fallback. Add `globalFlags` + companion-state modulation per the existing 8-ending stretch.
+- **Quest outcomes are the master keystone of the world's reactivity, and the world barely reads them back.** This is the single biggest gap in the project right now: the player makes choices, the choices are recorded, and the world doesn't notice.
+
+### Test debt — confidence is overstated
+
+- README claims **337 / 35**. Roadmap claimed **456 / 44**. Reality: **457 / 44**. README is stale.
+- Test pyramid is healthy at the bottom (~250 unit) and middle (~200 state-machine), **thin at the top** (~7 integration; 0 real E2E with assertions).
+- Zero tests for: `main.js` render loop lifecycle, input layer, Canvas/DOM rendering contract, save corruption fallback (despite the README's claim), pause/resume.
+- `test-actions/*.json` are **scripted input replays without assertions** — they prove the loop didn't throw, not that any state value is correct. A silently-broken state passes.
+- `security-best-practices.test.ts` is a single string-scan for `.innerHTML` in `main.js`. Necessary, not sufficient.
+- A few false-confidence tests exist (e.g., `weapon-affixes.test.ts:11–13` asserts `length >= 4`; `economy-services.test.ts:28` asserts a fixed array order). These pass forever without proving anything substantive.
+- **No CI.** No `.github/workflows/`. Tests only run on the developer's machine. This is the easiest risk to fix; see Track A5.
+
+### Quick-win cleanup (each is < 1 day, do them this week)
+
+1. README: update test count `337 / 35` → `457 / 44`.
+2. ~~Delete or wire `atmosphere.js`~~ — already wired (corrected 2026-05-05); served from `public/atmosphere.js` by Vite.
+3. Wire or delete `economyServices.buildEconomySnapshot`.
+4. Add codex-unlock HUD ping (small floating-text + icon flash).
+5. Add price-shift HUD ribbon when faction rep crosses ±10 / ±25 / ±50.
+6. Move `JOB_BOARD_PROPS` → `poiSystem.js`; `JOB_BOARD_PRESENTATION` → `storyContent.js`; `COMPLETED_JOB_BOARD_LINES` → `npcMemory.js`.
+7. Pre-allocate the raycaster depth buffer (move `new Float32Array(width)` out of the per-frame path).
+8. Add `state.ui.modals[]` and migrate `dialogueSelection` / `questOutcomeSelection` / etc. into it (saved with v3; bumps to v4 only when other v4 items land).
+9. Update Anti-goals (see Track-section near the bottom of this file) to reflect the project-owner directive of 2026-05-05.
 
 ## Definition of Done
 
@@ -592,11 +654,205 @@ Stretch concepts. Only worth scheduling after Phases 1–6 are honestly green.
 - **Mobile touch overlay** — investigation only; combat is fast enough that touch-only would need rebalanced timings.
 - **Itch packaging** — single zip with `index.html`, hashed asset paths, offline service worker, no Codex/agent dependency to launch.
 
-### Anti-goals (do not do)
-- WebGL or three.js port — kills the aesthetic and breaks every screenshot.
-- Procedural full-region tile-map regeneration — the highest-risk save-migration item; revisit only if NG+ ships and players ask for it.
-- Multiplayer / online leaderboards / cloud saves — scope explosion; daily seed gives the social-comparison hook without backend cost.
-- LLM-generated NPC dialogue — see Roadmap Rule #8; chase the feeling with handcrafted lines.
+### Anti-goals (revised 2026-05-05 — see "Tech Modernization Tracks" below for the full statement)
+
+The original anti-goals were tightened *and* loosened by project-owner directive on 2026-05-05. The short version:
+
+- ❌ Still anti-goal: WebGL world rewrite, three.js / Babylon.js port, full procedural region regeneration, realtime multiplayer, LLM-generated *major* dialogue.
+- ✅ Now allowed (under strict scope): WebGL2 *post-process layer only*, WebAssembly hot paths, opt-in WebLLM *non-canon ambient flavor* with handcrafted fallback, async ghost replays.
+
+The full table — including kill-switches, gates, and migration units — is in **Tech Modernization Tracks** below.
+
+## Tech Modernization Tracks (project-owner approved 2026-05-05)
+
+These tracks run **in parallel** with Phases 1–6. They exist because the project owner explicitly directed (2026-05-05) that WestWardRPG should now use modern web technology to push past the current ceiling, while keeping the raycaster identity, the offline-first promise, and handcrafted main content.
+
+Each track names: the technology, why it matters, scope, the migration unit, a kill-switch, and the verification gate it must pass. Track D requires explicit re-approval per item.
+
+### Track A: Engine foundations (low-risk, high-leverage)
+
+**A1. Build pipeline (Vite). ✅ Shipped 2026-05-05.**
+- Why: replace `python3 -m http.server` with a real dev server (HMR), production build (minification, code splitting, hashed assets, CSP), and a manifest. Today every change requires a hard reload; that's not the 2026 dev loop.
+- Shipped: `vite@^6.4.2` devDep; `vite.config.js` at root; `npm run dev` → Vite; `npm run dev:py` → python static fallback; `npm run build` → `dist/`; `npm run preview` → serves built bundle. `vercel.json` updated to `framework: vite` + `buildCommand: npm run build` + `outputDirectory: dist`. `atmosphere.js` moved to `public/` so Vite serves it as-is. `index.html` script tags updated to absolute `/atmosphere.js` and `/src/main.js`.
+- Gate result: `npm run build` produces 374.9 KB raw → **122.84 KB gzipped** (under 300 KB gate). 457/457 tests still passing. Typecheck + lint + syntax all clean.
+- Kill-switch: revert `package.json` scripts; remove `vite.config.js`; revert `vercel.json`; move `public/atmosphere.js` back to root. Static `index.html` still works against the python fallback.
+
+**A2. IndexedDB-backed saves with export/import + corruption recovery. ✅ Shipped 2026-05-05 (Phase 1).**
+- Why: localStorage is a 5–10 MB hard cap and not transactional. Save corruption was undetected on load.
+- Shipped:
+  - New `src/savePersistence.js` (+ `.d.ts`) — IDB wrapper with `writeSave` / `readSave` / `listBackups` / `readBackup` / `restoreFromBackup` / `deleteSave` / `exportSaveBlob` / `exportSaveJson` / `importSaveFromText` / `migrateFromLocalStorage` / `findMostRecentValidBackup`.
+  - **Storage envelope (storageVersion 1):** `{ storageVersion, payloadVersion, savedAt, hash, payload }`. Hash is FNV-1a 32-bit over the JSON serialization (cheap, deterministic, accident-detection grade — not adversarial integrity).
+  - **Backup rotation:** automatic on every write — current primary moves to backups, last 3 retained per slot.
+  - **Corruption recovery (no UI yet):** on init, hash mismatch triggers `findMostRecentValidBackup` and auto-restores; player sees a one-line message ("Save was corrupted; restored from a recent backup") on next session start.
+  - **Cache-fed sync facade:** `main.js` keeps its existing sync `saveGame` / `loadGame` API. Reads serve from a memory cache populated asynchronously; writes update cache + fire async IDB write-through.
+  - **localStorage migration:** one-shot drain on init via `migrateFromLocalStorage` reads `westward-save-v3` (and the three legacy keys), writes to IDB, then clears all legacy keys. Idempotent.
+  - **Export/import:** portable `westward-save` JSON format with full envelope; round-trip tested.
+  - **Test polyfill:** `fake-indexeddb` devDep + `tests/setup-idb.ts` setup file (also polyfills `localStorage` and `structuredClone` for the node test env). DB is wiped between tests via `beforeEach`.
+- **Tests added: 25** (test count 457 → 482; file count 44 → 45). Coverage:
+  - `hashJson` determinism, distinctness, raw-string handling.
+  - `makeEnvelope` / `validateEnvelope`: shape, hash mismatch, unknown storage version, null/missing/non-object input.
+  - `writeSave` / `readSave`: round-trip, empty slot, multi-slot independence.
+  - Backup rotation: cap to MAX_BACKUPS_PER_SLOT, newest-first ordering.
+  - Corruption: tampered-payload detection, `findMostRecentValidBackup`, `restoreFromBackup`.
+  - Export/import: round-trip, malformed JSON, format mismatch, hash-mismatch envelope.
+  - Legacy migration: drains legacy key + clears all four legacy keys, returns null when none, ignores malformed legacy JSON, idempotent on second run, prefers `westward-save-v3` over older keys.
+- Gate: 482/482 tests pass; build 124.69 KB gzipped (+1.8 KB for IDB layer; under 300 KB gate); typecheck clean.
+- Schema-bump deferred: the **payload** schema stays at v3 (no field changes); only the **storage envelope** is new. A v3→v4 payload bump will land with the next item that adds save fields (likely Track A4 typed UI state or B2 light entities).
+- Kill-switch: revert main.js wiring (`initSavePersistenceAsync` + `idbWriteSave` calls); old localStorage path is still in `readSaveDataLegacy` as the sync seed and can be re-promoted to primary by deleting the IDB-cache pair.
+- **Future polish (not blocking):** corruption-recovery modal that lets the player pick which backup to restore, instead of auto-rolling-back; UI buttons for export/import; IndexedDB quota-exceeded handling.
+
+**A3. Service Worker + PWA manifest.**
+- Why: installable offline-first build is core to the "playable offline" promise. Also enables update messaging.
+- Scope: precaching strategy (Workbox or hand-rolled); PWA manifest; install prompt UI on title.
+- Gate: Lighthouse PWA score 90+; works offline after first load; "update available" toast on new SW.
+
+**A4. Strict TypeScript over the state shape.**
+- Why: `state` is a god object with no type boundary. Save migration patches by hand. Modal selections are module-globals (non-serializable). Type-safety is the cheapest insurance against the next refactor breaking saves.
+- Scope: write `gameState.d.ts` (or convert the relevant modules to `.ts`) declaring `PlayerState`, `WorldState`, `NarrativeState`, `RegionsState`, `UiState` (modal selections live here); `npm run typecheck:ts` becomes a hard gate.
+- Migration unit: per subtree (start with `UiState`); refactor modules one at a time.
+- Gate: `tsc --noEmit` clean; existing tests still green.
+
+**A5. CI on GitHub Actions. ✅ Shipped 2026-05-05.**
+- Why: there was zero automated gate. Anyone could ship broken code.
+- Shipped: `.github/workflows/qa.yml` with two jobs:
+  - **`fast`** — Node 22, runs typecheck → syntax check → lint → vitest → vite build → uploads `dist/` artifact (10-min timeout).
+  - **`smoke`** — needs `fast`; installs Playwright chromium with deps; runs `npm run test:smoke`; uploads `output/` on failure (20-min timeout).
+- Triggers: push to `main`, PRs targeting `main`. Concurrency group `qa` cancels superseded runs.
+- Gate: the workflow itself is the gate. CI is now the source of truth for "is this branch shippable."
+
+### Track B: Render & audio next-level
+
+**B1. Hybrid renderer — Canvas raycaster + WebGL2 post-process.**
+- Why: the existing raycaster *is* the project's identity. WebGL2 only as a *post-process* layer keeps that look while unlocking bloom, CRT/dust-haze, screen-space fog, color grading, vignette, film grain, and a real god-rays pass.
+- Scope: blit the 2D canvas to a WebGL2 RGBA8 texture per frame; FBO chain runs ~5–10 ms of fragment shaders; back to a screen quad. The raycaster code is untouched.
+- Anti-goal note: this is **not** a WebGL world rewrite. The raycaster image stays. Only the *image* is post-processed.
+- Kill-switch: graphics setting "Post-FX: Off" disables the FBO chain; render goes straight to screen.
+- Gate: visual regression (pixelmatch) suite passes a curated baseline; FPS budget on Low preset stays at 60 on a 2018 MacBook.
+
+**B2. Dynamic point lights in the raycaster (highest-impact visual upgrade).**
+- Why: today, all shading is distance + side-of-wall fade. Enemies, lanterns, fires, and the player's flashlight have zero light influence. This is *the* single biggest visual-atmosphere upgrade for the smallest tech risk.
+- Scope: per-column light accumulation. Each light contributes distance-attenuated tint; cap at 8 active lights per scene; spatial-hash query for "lights affecting column X." Pure JS Canvas, no shaders required (B1 not a prerequisite).
+- Migration unit: add `state.lights` (entities with type / position / color / radius / flicker). Existing torches, neon signs, and campfires in regions become lights.
+- Gate: 8-light scene at 60 fps on Low preset; visual regression.
+
+**B3. Raycaster column loop in WebAssembly.**
+- Why: the inner column loop is the main FPS ceiling. Rust → wasm gives 5–20× headroom, which is what pays for B1+B2 once both ship.
+- Scope: write `raycaster_step(state_ptr, depth_buffer_ptr) → void` in Rust; build to wasm; preserve identical pixel output.
+- Migration unit: 1 PR, 1 wasm module, behind a `useWasm` graphics flag for A/B comparison.
+- Kill-switch: `useWasm: false` falls back to the JS path.
+- Gate: pixel-identical output to the JS path on a curated set of test frames; faster on every preset.
+
+**B4. Procedural adaptive music (the empty music bus). ✅ Shipped 2026-05-05.**
+- Why: `audio.js` defined a music bus that was never populated. Region ambience existed; music did not.
+- Shipped: hand-rolled WebAudio scheduler, **zero audio assets** (stays offline-first):
+  - **Three voices per region:** pad (dual detuned oscillators through a soft lowpass), melody (oscillator with per-note envelopes scheduled via WebAudio time), tension stem (filtered sawtooth, normally silent).
+  - **Per-region motifs** (`MUSIC_REGION_PROFILE`): frontier in A2 minor pentatonic at 72 BPM (warm, sparse), ashfall in F#2 at 64 BPM (duskier sawtooth pad), iron lantern in C3 at 88 BPM (colder, square pad with bluesy 6th).
+  - **Look-ahead scheduler** (`scheduleMelodyAhead`) with a 0.6 s horizon, re-armed every 250 ms via setTimeout. Stops when the music node's `active` flag flips.
+  - **Cross-fade on region change** via `setMusicRegion` — 2 s default, mirrors the ambient drone cadence.
+  - **Combat tension fader** (`setCombatTension`, clamped to [0,1]) — `main.js`'s `updateCombatMusicTension(dt)` polls enemy proximity each frame, computes the closest enemy's threat, eases the tension control toward target (faster up, slower down). Music module applies an audio-rate ramp; the eased frame-rate signal stays smooth.
+  - **Settings respect:** N (sound off) and Shift+M (ambient/music off) both call `stopMusic` alongside `stopAmbient`. Music re-starts when toggled back on while in a session.
+  - **Pure helper `previewMelody(profile, beats)`** — returns the next N scheduled notes deterministically; used by tests instead of mocking the WebAudio scheduler.
+- Tests added: 11 (test count 482 → 493). Coverage: profile presence, scale/melody coherence (every non-rest index lies in the scale), tempo sanity range, melody preview shape + loop alignment, music-bus connect, cross-fade behavior, tension clamp, stop, fallback to frontier profile for unknown regions.
+- Gate: 493/493 pass; build 126.00 KB gzipped (under 300 KB gate); typecheck clean.
+
+**B5. Web Animations API for all UI feedback.**
+- Why: CLAUDE.md gotcha already notes WAAPI is the only way to bypass the `prefers-reduced-motion` UA stylesheet override. Standardize on it instead of mixing CSS keyframes.
+- Scope: replace any remaining CSS-keyframe animations on game canvas with `element.animate()` calls; centralize in a `ui/animation.js` helper.
+- Gate: motion-reduction setting still suppresses non-essential animation; combat readability hits unaffected.
+
+### Track C: Smarter living world
+
+**C1. Behavior Trees for NPC AI.**
+- Why: ad-hoc state machines in `updateNPCs` get unwieldy. NPC schedules (existing future-idea: townspeople walk to homes at dusk; allied factions leave doors unlocked) need a real planner, not nested ifs.
+- Scope: small in-house BT library (~200 lines); each NPC has a tree; trees are JSON-serializable for hot-reload; companion uses a separate tree (pursuit + utility + bark hooks).
+- Migration unit: companion first; then town NPCs; then patrols.
+- Gate: existing companion behavior preserved by tree; new "townspeople walk to homes at dusk" demo runs deterministically.
+
+**C2. Influence maps for faction territory.**
+- Why: patrol density, ambient encounters, and "the world reacts to your rep" all want a heatmap, not a per-NPC check.
+- Scope: low-resolution grid (e.g., 32×32) per region per faction; rep-driven blend; consumed by spawn density and route-marker tinting.
+- Gate: rep change → patrol density visibly changes within one in-game day.
+
+**C3. Event-sourced narrative state.**
+- Why: every player action becomes an event; world state is a pure fold over events. Trivializes save migration, replay, "what changed because of me?" UI, and ending generation. This is the cleanest fix for the audit's biggest gap (quest outcomes don't sync back to the world).
+- Scope: append-only `narrative.events` log; reducer composes current state; existing `applyMajorDecision` / `applyQuestOutcome` become event emitters.
+- Migration unit: schema v4 (parallel to A2); reducer tested against fixtures.
+- Gate: replaying the event log from a v3 save reproduces the same narrative state byte-for-byte; new event types are additive.
+
+**C4. Constraint-satisfaction side-job generator.**
+- Why: handcrafted main quests stay handcrafted (Roadmap Rule #8). Side jobs from world state — faction tension × region heat × player rep — give density without scope explosion.
+- Scope: small CSP that picks job type, target region, faction angle, and reward band given current world state. All seeded.
+- Anti-goal note: this does **not** generate dialogue or rewrite handcrafted jobs. It selects + composes from a handcrafted pool.
+- Gate: deterministic seed reproduces the same job; never produces a job that contradicts current quest state.
+
+**C5. Wave-Function-Collapse for cave/mine/ruin interiors.**
+- Why: future-idea explicitly calls for one-room interiors per region. WFC is bounded, seeded, and tiny.
+- Scope: one tile-set per region; WFC runs once per interior on first entry; cached for the run.
+- Anti-goal note: interior-only. The world map and POI placement remain handcrafted.
+- Gate: deterministic seed reproduces; 100% generation success on the test fixture set.
+
+**C6. Tile-based fog of war.**
+- Why: exploration tension. The road becomes a real choice when you can't see what's past the next ridge.
+- Scope: per-region discovery grid (32×32 bool); minimap reveals as you discover; renders as soft falloff.
+- Gate: full grid reveal works; clear-on-region-enter respects existing world layer.
+
+### Track D: Optional AI boundary (each item requires explicit per-item go-ahead)
+
+These items override the previous "no LLM" anti-goal under strict scope. Each is opt-in, has a strict scope, and a hand-crafted fallback. Verifying them is the entire test of "did we keep the project's identity."
+
+**D1. WebLLM ambient flavor (TinyLlama or Llama-3.2-1B in-browser via WebGPU).**
+- Why: ambient barks ("the wind's bad today"; "that scrap heap moves at night") give density without inflating the handcrafted dialogue file.
+- Scope: strictly *non-canon* ambient lines, never major dialogue, never quest-relevant. Allowlist of intents (greet, weather-comment, region-mood); LLM output is sanity-checked against a regex/length filter; failure falls back to a handcrafted line. WebGPU only; CPU fallback disables the feature.
+- Anti-goal note: replaces the previous "no LLM" rule under strict non-canon scope. **Major dialogue stays handcrafted (Roadmap Rule #8 stands.)**
+- Kill-switch: settings toggle "Ambient AI: Off" — handcrafted lines only.
+- Gate: a) every LLM output passes the filter; b) median latency < 300 ms on WebGPU; c) a 30-minute play session with the LLM disabled is indistinguishable in *core experience* from one with it enabled.
+
+**D2. Speech synthesis for accessibility.**
+- Why: codex letters, run summary, and major dialogue read aloud via Web Speech API for accessibility.
+- Scope: opt-in setting; uses platform TTS (no model download). Does not change game behavior.
+- Gate: works on macOS/Windows/Linux Chrome; respects audio settings.
+
+**D3. Voice command for companion (Whisper-tiny via wasm, optional).**
+- Why: distinctive — whistle/shout to recall companion. Anti-goal-stretching but extremely thematic for a frontier RPG.
+- Scope: small wake-word + 3 fixed verbs ("come", "stay", "go"). Local-only; mic permission gated; no audio leaves the device.
+- Gate: 95%+ recognition rate on the verb set in a quiet environment; mic permission denial cleanly disables.
+
+**D4. WebRTC ghost replays.**
+- Why: existing daily-seed mode (future-idea) is single-player. Async ghost replays — record run, share file, watch a friend's path on the road as a translucent ghost — give the social hook without realtime multiplayer.
+- Scope: replay system from existing future-idea; sharing is *file-based* (no server). Optional: WebRTC DataChannel peer-to-peer share via a free signaling service. Strictly opt-in.
+- Anti-goal note: this is async ghost data, not realtime co-op. The realtime-multiplayer anti-goal stays in force.
+- Gate: file-share path works fully offline; WebRTC path is gated behind a feature flag.
+
+### Revised anti-goals (full table, 2026-05-05)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| WebGL world rewrite | ❌ Anti-goal | The raycaster look is the project. |
+| Three.js / Babylon.js port | ❌ Anti-goal | Same reason. |
+| Full procedural region regeneration | ❌ Anti-goal | POI placement and road layout stay handcrafted. |
+| Realtime multiplayer / online leaderboards / cloud saves | ❌ Anti-goal | Async ghost replays (D4) are the limit. |
+| LLM-generated *major* dialogue / quest content / named-NPC speech | ❌ Anti-goal | Handcrafted is the contract; D1 is non-canon flavor only. |
+| WebGL2 *post-process layer only* (B1) | ✅ Allowed | Project-owner directive 2026-05-05. Strict scope: post-process only. |
+| WebAssembly hot paths (B3, C5) | ✅ Allowed | Project-owner directive 2026-05-05. |
+| Opt-in WebLLM *non-canon ambient flavor* with handcrafted fallback (D1) | ✅ Allowed | Project-owner directive 2026-05-05. Strict allowlist + filter. |
+| Async ghost replays (D4) | ✅ Allowed | Project-owner directive 2026-05-05. Realtime stays anti-goal. |
+
+### Track sequencing recommendation (lowest-risk-first)
+
+1. **A1, A5** (build pipeline + CI) — pays for itself the moment the next regression is caught.
+2. **A4** (typed state) — unlocks safe extraction work in `main.js`.
+3. **A2** (IndexedDB saves + export/import + corruption recovery) — eliminates the largest data-loss risk.
+4. **B5** (WAAPI standardization) — small, high-clarity cleanup.
+5. **B4** (procedural music) — fills an empty bus; immediate audible impact.
+6. Audit Quick-Win Cleanup items 1–9 (above; each < 1 day).
+7. **B2** (dynamic lights) — biggest perceived visual jump for the smallest tech risk.
+8. **C1, C2** (BT NPCs + influence maps) — make the world feel alive between scripted beats.
+9. **C3, C4** (event-sourced narrative + CSP side jobs) — give the player density without breaking handcrafted content. C3 directly fixes the audit's biggest gap.
+10. **B3** (wasm raycaster) — only after dynamic lights ship; this buys the next wave of perf budget.
+11. **B1** (WebGL2 post-process) — only after wasm. The raycaster image quality at this point will be CPU-budget-limited; post-process is worth it.
+12. **C5, C6** (WFC interiors + fog of war) — content tracks; ship after the engine is stable.
+13. **A3** (PWA + Service Worker) — once content is dense enough that "install offline" is a real selling point.
+14. **D1–D4** — only after Phases 1–6 are honestly green. Each requires explicit per-item re-approval.
 
 ## Verification Gates
 

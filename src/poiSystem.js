@@ -556,3 +556,39 @@ export function resolveExplorationRenownStatus(discoveredCount, totalCount = get
     progressLine: `${title} - POIs ${discovered}/${total}, ${nextLine}`,
   };
 }
+
+// Job-board POIs — extracted from jobBoard.js so POI placement (coordinates,
+// labels, region tinting) lives next to the rest of the world's POI data.
+// jobBoard.js consumes these via getJobBoardProp().
+export const JOB_BOARD_PROPS = {
+  frontier: {
+    id: "frontier_job_board",
+    kind: "job_board",
+    label: "Boone's Job Board",
+    npcId: "warden",
+    regionId: "frontier",
+    x: 12.35,
+    y: 8.55,
+    color: "#d8a84f",
+  },
+  ashfall: {
+    id: "ashfall_job_board",
+    kind: "job_board",
+    label: "Ashfall Warrant Board",
+    npcId: "warden",
+    regionId: "ashfall",
+    x: 41.25,
+    y: 39.65,
+    color: "#ff9f5f",
+  },
+  ironlantern: {
+    id: "ironlantern_job_board",
+    kind: "job_board",
+    label: "Lantern Quiet Board",
+    npcId: "warden",
+    regionId: "ironlantern",
+    x: 15.25,
+    y: 39.35,
+    color: "#9bd3ff",
+  },
+};

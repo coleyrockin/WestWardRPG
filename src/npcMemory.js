@@ -146,3 +146,26 @@ export function resolveNpcReactiveLine(npcId, memory, context = {}) {
   }
   return null;
 }
+
+// Reactions to recently completed jobs, surfaced when the player re-opens a
+// job board in the matching region. Extracted from jobBoard.js so NPC reaction
+// content lives alongside the rest of NPC memory. jobBoard.js looks these up
+// in resolveCompletedJobBoardLine().
+export const COMPLETED_JOB_BOARD_LINES = {
+  frontier_badge_return: {
+    regionId: "frontier",
+    line: "The returned badge has Boone posting deputy work with fewer whispers around it.",
+  },
+  frontier_map_survey: {
+    regionId: "frontier",
+    line: "Your old-road survey has Boone marking one route as trusted again.",
+  },
+  frontier_quiet_note_trace: {
+    regionId: "frontier",
+    line: "The traced note has Quill's quiet routes showing up in Boone's margins.",
+  },
+  ashfall_miner_helmet_salvage: {
+    regionId: "ashfall",
+    line: "Your helmet-lamp salvage check has Ashfall crews marking one shaft as workable again.",
+  },
+};
