@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createRoadRouteFromSignPrompt,
   normalizeRoadRouteState,
+  resolveRoadRouteCompletionReward,
   resolveRoadRouteObjective,
 } from "../src/roadRoutes.js";
 
@@ -68,5 +69,28 @@ describe("roadRoutes", () => {
     const route = createRoadRouteFromSignPrompt(prompt, { regionId: "frontier", time: 12 });
 
     expect(resolveRoadRouteObjective(route, 24.2, 20.4, "ashfall")).toBeNull();
+  });
+
+  it("rewards completed pinned routes based on danger and destination type", () => {
+    const route = createRoadRouteFromSignPrompt({
+      ...prompt,
+      targetKind: "hideout",
+      dangerHint: "High danger: outlaw cover and poor retreat lanes.",
+    }, { regionId: "frontier", time: 12 });
+    const reward = resolveRoadRouteCompletionReward(route);
+
+    expect(reward).toMatchObject({
+      title: "Route scouted",
+      xp: 18,
+      gold: 10,
+      targetLabel: "Sunken Coach Ruins",
+    });
+    expect(reward?.summary).toContain("Route scouted");
+    expect(reward?.summary).toContain("+18 XP");
+  });
+
+  it("does not reward malformed or inactive pinned routes", () => {
+    expect(resolveRoadRouteCompletionReward(null)).toBeNull();
+    expect(resolveRoadRouteCompletionReward({ targetId: "x", targetLabel: "X", active: false })).toBeNull();
   });
 });

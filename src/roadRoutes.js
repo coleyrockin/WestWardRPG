@@ -92,3 +92,37 @@ export function resolveRoadRouteObjective(routeState, playerX, playerY, activeRe
     line: `${objectiveLine}. ${secondaryLine}`,
   };
 }
+
+export function resolveRoadRouteCompletionReward(routeState) {
+  const route = normalizeRoadRouteState(routeState);
+  if (!route || route.active === false) return null;
+
+  const danger = route.dangerHint.startsWith("High danger")
+    ? "high"
+    : route.dangerHint.startsWith("Medium danger") || route.dangerHint.startsWith("Unknown danger")
+      ? "medium"
+      : "low";
+  const dangerReward = {
+    low: { xp: 6, gold: 3 },
+    medium: { xp: 10, gold: 5 },
+    high: { xp: 14, gold: 8 },
+  }[danger];
+  const kindReward = {
+    hideout: { xp: 4, gold: 2 },
+    mine: { xp: 4, gold: 2 },
+    ruin: { xp: 3, gold: 1 },
+    stranger: { xp: 2, gold: 1 },
+  }[route.targetKind] || { xp: 0, gold: 0 };
+  const xp = dangerReward.xp + kindReward.xp;
+  const gold = dangerReward.gold + kindReward.gold;
+
+  return {
+    title: "Route scouted",
+    targetId: route.targetId,
+    targetLabel: route.targetLabel,
+    targetKind: route.targetKind,
+    xp,
+    gold,
+    summary: `Route scouted: ${route.targetLabel}. +${xp} XP, +${gold}g`,
+  };
+}

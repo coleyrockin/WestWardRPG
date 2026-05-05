@@ -151,6 +151,7 @@ import {
 import {
   createRoadRouteFromSignPrompt,
   normalizeRoadRouteState,
+  resolveRoadRouteCompletionReward,
   resolveRoadRouteObjective,
 } from "./roadRoutes.js";
 import {
@@ -3520,8 +3521,13 @@ const canvas = document.getElementById("game");
           summary += `. +${poi.buff.stamina} stamina`;
         }
         if (completesPinnedRoadRoute) {
+          const routeReward = resolveRoadRouteCompletionReward(state.world.roadRoute);
+          if (routeReward) {
+            state.player.gold += routeReward.gold;
+            grantXp(routeReward.xp);
+            summary += `. ${routeReward.summary}`;
+          }
           state.world.roadRoute = null;
-          summary += ". Road route complete";
         }
         logMsg(summary + ".");
         grantRolledLoot(poi.kind === "camp" || poi.kind === "hideout" ? "poi_camp" : "poi_cache", state.regions.activeRegion);
