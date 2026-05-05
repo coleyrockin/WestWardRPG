@@ -258,6 +258,62 @@ The project does not need more scattered systems yet.
 
 It needs the existing systems to feel connected in the player's first short session.
 
+## Shipped Foundations (audit)
+
+Latest audit: `npm test` → 380 passing across 38 test files; 39 source modules (~15.7k LOC); 14 Playwright scenarios. Commit `1b64cf4` is the current head on `main`.
+
+### Engine and rendering
+- `src/render.js` — pure helpers (`hexToRgba`, `gradientBucket`, `createGradientCache`) plus ctx-bound factory `createRenderHelpers(ctx)`; raycaster math helpers `resolveWallProjection`, `resolveNearWallVisualTreatment`, and `resolveObjectiveStripLayout` so the wall renderer stays testable.
+- `src/particlePool.js` — pre-allocated 1500-slot ring buffer with no per-frame alloc, cleared on session reset.
+- `src/spatialHash.js` — uniform grid (cellSize 4) rebuilt once per tick, powers AoE queries (smoke, flare, perfect-dodge proximity).
+- `src/audio.js` — three-bus graph (master / sfx / ambient / music) with per-region procedural drones (frontier=warm, ashfall=mid, ironlantern=metallic) and crossfade on region change. Shift+M toggles ambient.
+- `src/timeOfDay.js` — `state.world.timeOfDay` advances over ~10 real minutes; phase-tint LUT layered on biome grading; night doubles hostile spawn density. KeyU fast-forwards 10% for testing.
+- `src/regionVisualIdentity.js` — per-region palette, prop list, signage, vista composition.
+- `src/gameFeel.js` — first-fight VFX polish, boss flash beats, chunked screen-shake easing.
+- `src/combatReadability.js` — windup outline pulse, INTERRUPT/PARRY/PERFECT pop sizing, hit-flash duration ramps so timing reads at speed.
+
+### Combat identity
+- `src/statusEffects.js` — burn / bleed / shock / frost stack with DoT, slow, and frost shatter on max-magnitude expiry. Speed multiplier feeds enemy pursuit.
+- `src/combatLoadout.js` — perfect dodge (0.15s window, slow-mo + stamina refund), perfect parry (0.15s window, doubled riposte + 1.5s stagger), weapon archetype movesets (light / heavy / spear shape arc + reach + stagger).
+- `src/combatMilestones.js` — mini-boss phase-two transitions (Scrap Tyrant: brute → charger; Iron Chanter: control → ranged) at 50% HP.
+- `src/weaponAffixes.js` — additive prefix + suffix mods on weapon drops, three suffix tiers; affix selection seeded by region + drop source.
+- Enemy telegraph windups (`charge` / `tank` / `shield` / `control` archetypes) with INTERRUPT reward when struck mid-windup.
+
+### Character, gear, economy
+- `src/characterIdentity.js` — six attributes (might / grit / cunning / craft / speech / lore) drive damage, stamina, prices, dialogue gates, and crafting yield.
+- `src/gearCrafting.js` — weapon families (saber / pistol / rifle / hammer) and armor pieces (head / chest / legs / cloak) with branch progression.
+- `src/craftingStation.js` — workbench projects: forge upgrades, alchemy, map table, repair, refining; previews + cost summaries.
+- `src/inventoryState.js` — single source of truth for inventory; story loot fields preserved on save.
+- `src/economyServices.js` — vendor service catalog (repair, courier, bounty permits, training, regional cosmetics) keyed off region identity.
+- `src/lootSystem.js` — region + danger weighted loot tables, attribute-modulated rarity rolls.
+- `src/storyLootReactions.js` — handcrafted reactions for notable loot picked up (badge, sealed note, map scrap) — feeds NPC memory + job board + dialogue.
+
+### World and exploration
+- `src/poiSystem.js` — 17 hand-placed POIs across three regions (cache / shrine / camp / mine / ruin / hideout / stranger) with regionHint, roadHook, dangerHint, mysteryLine, returnReason copy on every record. `resolvePOILead`, `resolveRoadDiscoveryLead`, `resolveExplorationRenownReward`, `resolveExplorationRenownStatus`.
+- `src/roadRoutes.js` — readable road signs that pin POI routes; sign placement; route-completion XP + upgrade payoff.
+- `src/factionEffects.js` — `marketCartel` shop prices (-15% allied / +30% hostile), `workersGuild` smith-tier gates, `civicCouncil` patrol density.
+- `src/regionSystem.js` — region unlocks, region events, mini-boss flag set.
+- `src/codex.js` — six tabs (regions / enemies / items / factions / ideology / letters); POI letters auto-unlock via `resolveCodexUnlockForPOI`.
+
+### Narrative and progression
+- `src/decisionEngine.js` — thematic axes, faction rep, NPC affinity, decisions log, `applyMajorDecision`, `applyQuestOutcome`, `resolveNarrativeEnding`.
+- `src/questDefinitions.js` — branching quest outcomes (`outcomes: { a, b }`); region-resource turn-ins drive Ashfall / Lantern advancement.
+- `src/companion.js` — one-slot follower at affinity ≥ 60; pursuit AI; downed state; recovery timer; affinity penalty on death.
+- `src/storyContent.js` — chapter beats, NPC story lines.
+- `src/jobBoard.js` — Boone's selectable job board (courier, rescue/escort, bounty), regional copy, route markers, completed-route reward gates.
+- `src/npcMemory.js` — deterministic NPC reactions to origin, region, recent quest outcomes, gear identity, story loot, current job.
+- `src/runSummary.js` — kills, mini-boss kills, jobs taken/completed/failed, resources harvested, quest outcome count, time played, ending cause.
+
+### Save resilience
+- `src/saveMigration.js` — v1 / v2 / v3 fixtures all migrate cleanly; backfill helpers for `regions.miniBosses`, `regions.poisDiscovered`, `world.timeOfDay`, `world.companionId / Hp / Downed / RecoveryTimer`, `narrative.questOutcomes`, story loot inventory keys, codex unlocks.
+
+### UI / accessibility
+- Settings modal (KeyO) — preset, gradient cache, colorblind mode, font scale, motion reduction, camera shake.
+- Codex modal (KeyZ) — five-tab tabbed lore browser, undiscovered entries masked.
+- Skill tree, shop, smith tabs, quest outcome modal — shop-pattern modal idiom.
+- Colorblind palette wired into mini-map dots, floating damage colors, NPC + enemy sprite glows.
+- First-minute objective HUD strip; opening route guide; first-view vista composition.
+
 ## Definition of Done
 
 WestWardRPG is roadmap finished when a new player can:
@@ -468,6 +524,67 @@ Goal: Package the project so it looks serious to employers, recruiters, and othe
 ### Acceptance Test
 
 A non developer can open the repo, understand the project, run the game, see proof of quality, and understand why the project is technically impressive.
+
+## Future Ideas — Beyond the Phase Plan
+
+Stretch concepts. Only worth scheduling after Phases 1–6 are honestly green.
+
+### Combat round 2
+- **Boss multi-phase choreography** — extend `src/combatMilestones.js` from a 50% HP swap to a real second phase: arena hazards (kiln burst on Scorch Engine), summon waves (chanter call-down on Iron Chanter), or terrain reshape. Keep gating on existing `mini_boss_flow` scenario.
+- **Counter-windup baits** — enemy occasionally cancels its own windup mid-swing and re-commits later, training the player to read the second telegraph.
+- **Stamina chip + guard-break** — blocked hits chip stamina; guard-break stagger when stamina hits 0 mid-block.
+- **Status synergies** — burn + frost cracks for a small AOE ice-burst; bleed + shock chains a second jump on the chained target.
+- **Aimable charged attacks** — current charged attack uses comboStep 3 only; let the player aim a wider sweep vs. a directed thrust.
+- **Companion combat synergy** — companion smoke/flare/tonic stack with the player utility; companion barks tied to `state.combat` events (low HP, perfect dodge, kill streak).
+
+### World round 2
+- **Patrol entities** — civic-council patrols actually spawn as friendly NPCs that engage hostiles when allied; hostile patrols turn on the player when `civicCouncil` rep tanks.
+- **Seasonal events** — long real-time cycle (4 in-game weeks per season) layered on top of `timeOfDay` with `state.world.calendarDay`. Festival in Frontier (vendor-only items), dust storm in Ashfall (reduced visibility, more spawns), blackout in Iron Lantern (patrol pause, stealth window).
+- **NPC schedules** — NPCs walk to home cells at night; allied factions leave doors unlocked; hostile factions lock the road earlier.
+- **Procedural region overlays** — keep handcrafted POI placement, but seed-randomize a small set of overlay encounters (ambush, wandering trader, downed traveler) along the road every in-game day. Bound by daily-seed RNG.
+- **POI round 2** — 6+ POIs per region, treasure-hunter POIs that point to other POIs via map-scrap clues, time-locked POIs that only appear at dusk or in storms.
+- **Cave / mine / ruin interiors** — currently surface-only; even a single one-room interior per region would multiply the "I followed a road and found a place" moment.
+
+### Narrative round 2
+- **Lite dialogue** — per-NPC stateless 2–3 choice prompts per chapter. Modal applies axis/rep deltas via `applyMajorDecision`. Not a tree; flat menu gated by chapter + flag. Already drafted; needs UI + scenarios.
+- **Companion barks** — short lines for low HP, first kill, boss phase, region entry, house unlock, key quest outcomes. Save the more memorable ones for repeat playthroughs.
+- **Endings expansion** — go from 4 axis endings to 8 by adding `globalFlags`-modulated variants per axis (Solidarity Hopeful vs Solidarity Pyrrhic depending on `ledgerPublished` + companion alive + workersGuild rep).
+- **Letters / journal entries** — hand-written paragraphs picked up at POIs, viewable in codex letters tab; some letters reference each other and reveal lore not exposed via dialogue.
+- **Cursed item tradeoffs** — relics that buff one stat and debuff another, plus a hidden NPC reaction line that names the curse.
+
+### Player build round 2
+- **Ten-flavor identity reactions** — extend `src/characterIdentity.js` so each of the ten archetype labels (outlaw gunslinger, heavy bounty hunter, survivalist scout, silver-tongued trader, relic hunter, alchemist drifter, faction loyalist, cursed wanderer, local hero, greedy opportunist) has at least one NPC who reacts and one job-board listing that opens up.
+- **Skill tree round 2** — beyond the three trunk branches, add a small set of capstone perks gated by attribute thresholds + faction allegiance, so a character feels stamped by their build.
+- **Build-mark equipment** — when a build crosses a threshold (e.g., relic-tier weapon + 60+ marketCartel rep), Trader Nyx or the Smith hands the player a build-flavored cosmetic item that registers in run summary.
+
+### Engine round 2
+- **OffscreenCanvas pre-render** — bake static minimap layer + biome ground tiles to off-canvas; cuts redundant per-tile fills on Low preset.
+- **Sprite atlas** — atlas every `makeTexture` output once per session start; pre-render the bands the gradient cache tracks.
+- **Web Worker pathfinding** — A* off-thread for any new enemy archetype that needs route awareness (mounted, ranged-with-cover).
+- **Save schema bump v4** — narrative + replay state has grown; do an explicit v3→v4 with new fields (`world.companionId`, `world.ngPlusLevel`, `world.calendarDay`, `narrative.questOutcomes`). Keep the `backfill*` helper pattern.
+- **Replay system** — record input + RNG seed per run for bug repro and shareable death replays.
+- **Telemetry / dev overlay** — toggle key for FPS, particle count, grid bucket count, ambient drone state, and status-effect summary on hovered enemy.
+
+### Replayability round 2
+- **New Game+** — `state.world.ngPlusLevel` carries forward `progression.upgradePoints` / `skillTree` / `weaponTier` / `armorMods` / cosmetic identity items. Resets quests / inventory / regions. Enemy HP × (1 + 0.25 · ngPlusLevel).
+- **Daily seed mode** — main-menu button. Seed = YYYY-MM-DD hash drives spawn order, POI overlay placement, region-event severity. Score = `kills × 5 + gold + dayDepth × 100`. Local leaderboard.
+- **Challenge runs** — new-game checkboxes: ironman (no reload after death), no-shop, no-skill, no-companion. Each modestly multiplies score.
+- **Run history** — track past N runs locally; show ending, build, choices, time-to-first-kill metric.
+
+### Polish + meta
+- **Visual regression diffing** — current `scripts/visual_regression_capture.sh` archives baselines; add pixelmatch-based pass/fail CI step.
+- **Localization expansion** — extend the 8-language pack to cover codex letters, job board copy, and combat subtitles.
+- **Accessibility round 2** — combat subtitles ("hit", "crit", "low HP", "regen") via accessibility flag; audio cues on perfect dodge/parry; text-scale-aware modal layout.
+- **Keybind remap** — settings sub-menu, persisted in `state.input.keybinds`.
+- **Save slots (3)** — prefix `westward_save_<slot>`. Title-screen UI for slot select; existing key migrates to slot 1.
+- **Mobile touch overlay** — investigation only; combat is fast enough that touch-only would need rebalanced timings.
+- **Itch packaging** — single zip with `index.html`, hashed asset paths, offline service worker, no Codex/agent dependency to launch.
+
+### Anti-goals (do not do)
+- WebGL or three.js port — kills the aesthetic and breaks every screenshot.
+- Procedural full-region tile-map regeneration — the highest-risk save-migration item; revisit only if NG+ ships and players ask for it.
+- Multiplayer / online leaderboards / cloud saves — scope explosion; daily seed gives the social-comparison hook without backend cost.
+- LLM-generated NPC dialogue — see Roadmap Rule #8; chase the feeling with handcrafted lines.
 
 ## Verification Gates
 
