@@ -25,11 +25,14 @@ trap cleanup EXIT
 
 if ! lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   cd "$PROJECT_ROOT"
-  python3 -m http.server "$PORT" >/tmp/westward-smoke-server.log 2>&1 &
+  # Vite dev serves public/atmosphere.js at /atmosphere.js, which the raw
+  # python static server cannot do post-Vite-migration.
+  npx --no-install vite --port "$PORT" --host 127.0.0.1 --strictPort \
+    >/tmp/westward-smoke-server.log 2>&1 &
   SERVER_PID="$!"
 
   started=0
-  for _ in $(seq 1 10); do
+  for _ in $(seq 1 30); do
     if curl -g -sSf "http://localhost:${PORT}/index.html" >/dev/null 2>&1; then
       started=1
       break
@@ -42,6 +45,8 @@ if ! lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
 
   if [ "$started" -ne 1 ]; then
     echo "[WARN] Auto-started server did not become reachable on localhost:${PORT}."
+    echo "[WARN] Server log:"
+    sed 's/^/[server] /' /tmp/westward-smoke-server.log >&2 || true
     echo "[WARN] Continuing URL detection against existing listeners."
     SERVER_PID=""
   fi
