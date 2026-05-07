@@ -16,6 +16,8 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 
 ▶ **Play in your browser:** [westward-rpg.vercel.app](https://westward-rpg.vercel.app) — runs entirely client-side, no install, no account.
 
+📦 **Download the offline build:** [latest release](https://github.com/coleyrockin/WestWardRPG/releases/latest) — unzip and double-click `index.html`, no server required.
+
 ![Opening view: Dustward town, route guide, HUD, and minimap](docs/images/launch-opening.png)
 ![Town dusk: signs, lanterns, props, and NPC silhouettes — region identity work](docs/images/launch-town-dusk.png)
 ![Local cast: Dustward's small handcrafted NPC roster](docs/images/launch-cast.png)
