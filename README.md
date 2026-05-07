@@ -107,10 +107,17 @@ npm run build        # outputs to dist/
 npm run preview      # serves the built bundle on port 4173
 ```
 
+For an offline-playable ZIP (itch.io style — runs by double-clicking
+`index.html`, no server, no install):
+
+```bash
+npm run package:itch  # writes releases/westward-rpg-offline-v<version>.zip
+```
+
 Fallback static server (no build, no HMR — useful for quick spot-checks):
 
 ```bash
-npm run dev:py       # python3 -m http.server 5173
+npm run dev:py       # python3 -m http.server 5173 (serves project root)
 ```
 
 If port `5173` is already used on your machine, Vite will automatically pick the next available port.

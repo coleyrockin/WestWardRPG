@@ -8,6 +8,8 @@
     "dev": "vite",
     "dev:py": "ln -sf public/atmosphere.js atmosphere.js && python3 -m http.server 5173",
     "build": "vite build",
+    "build:itch": "vite build --base=./ --outDir dist-itch",
+    "package:itch": "bash scripts/itch_package.sh",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

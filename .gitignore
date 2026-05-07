@@ -5,6 +5,8 @@ node_modules/
 output/
 coverage/
 dist/
+dist-itch/
+releases/
 build/
 
 # Compiled binaries
