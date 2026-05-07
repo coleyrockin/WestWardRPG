@@ -42,6 +42,7 @@ export function createInitialRegionState() {
       lantern_overseer: { defeated: false },
       lantern_iron_chanter: { defeated: false },
     },
+    interiorsVisited: {},
   };
 }
 

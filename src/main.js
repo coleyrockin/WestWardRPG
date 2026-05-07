@@ -214,6 +214,18 @@ import {
   trySpeakBark,
   resetBarkState,
 } from "./companionBarks.js";
+import {
+  resolveWalkCycle,
+  resolveAttackCycle,
+} from "./spriteAnimation.js";
+import {
+  REGION_INTERIORS,
+  buildRegionInteriorMap,
+  getRegionInteriorByRegion,
+  hasVisitedInterior,
+  markInteriorVisited,
+  ensureInteriorVisitState,
+} from "./regionInteriors.js";
 import { migrateSaveToV3 } from "./saveMigration.js";
 import {
   readSave as idbReadSave,
@@ -2006,6 +2018,15 @@ const canvas = document.getElementById("game");
 
   const worldMap = createWorldMap(56, 56);
   const houseInteriorMap = createHouseInteriorMap();
+  const regionInteriorMaps = Object.fromEntries(
+    Object.keys(REGION_INTERIORS).map((id) => [id, buildRegionInteriorMap(id)]),
+  );
+  // Shared world entrance position for the active region's interior. Same
+  // world tile is reused per region; the prop appearance and destination
+  // interior swap based on state.regions.activeRegion.
+  const REGION_INTERIOR_ENTRANCE = { x: 10.5, y: 5.5 };
+  // Make sure the entrance tile is walkable (in case of procgen variance).
+  worldMap[Math.floor(REGION_INTERIOR_ENTRANCE.y)][Math.floor(REGION_INTERIOR_ENTRANCE.x)] = 0;
 
   const textures = {
     stone: makeTexture("stone"),
@@ -2049,6 +2070,7 @@ const canvas = document.getElementById("game");
       chargeAttackWindupMax: 0,
       walkBob: 0,
       inHouse: false,
+      regionInterior: null,
       blocking: false,
       guardBroken: false,
       guardBrokenTimer: 0,
@@ -2220,7 +2242,14 @@ const canvas = document.getElementById("game");
   let autoSaveTimer = 0;
 
   function currentMap() {
+    if (state.player.regionInterior && regionInteriorMaps[state.player.regionInterior]) {
+      return regionInteriorMaps[state.player.regionInterior];
+    }
     return state.player.inHouse ? houseInteriorMap : worldMap;
+  }
+
+  function isIndoors() {
+    return Boolean(state.player.inHouse || state.player.regionInterior);
   }
 
   function spawnEnemies() {
@@ -2490,6 +2519,7 @@ const canvas = document.getElementById("game");
         gold: state.player.gold,
         deaths: state.player.deaths,
         inHouse: state.player.inHouse,
+        regionInterior: state.player.regionInterior,
         loadout: state.player.loadout,
         perks: state.player.perks,
         upgradePoints: state.progression.upgradePoints,
@@ -2680,9 +2710,20 @@ const canvas = document.getElementById("game");
 
     const wantsHouse = Boolean(player.inHouse && state.house.unlocked);
     state.player.inHouse = wantsHouse;
+    // Saved region interior id, if valid; otherwise null. Loading inside an
+    // unknown interior id should drop the player back outdoors safely.
+    const savedInterior = typeof player.regionInterior === "string" ? player.regionInterior : null;
+    state.player.regionInterior = savedInterior && regionInteriorMaps[savedInterior] ? savedInterior : null;
 
-    const activeMap = state.player.inHouse ? houseInteriorMap : worldMap;
-    const fallback = state.player.inHouse ? { x: 9.5, y: 14.2, angle: -Math.PI / 2 } : { x: 9.5, y: 8.5, angle: 0 };
+    const activeMap = currentMap();
+    const interiorSpawn = state.player.regionInterior
+      ? REGION_INTERIORS[state.player.regionInterior].spawn
+      : null;
+    const fallback = interiorSpawn
+      ? { ...interiorSpawn }
+      : state.player.inHouse
+        ? { x: 9.5, y: 14.2, angle: -Math.PI / 2 }
+        : { x: 9.5, y: 8.5, angle: 0 };
     const px = clamp(numberOr(player.x, fallback.x), 1.2, activeMap[0].length - 1.2);
     const py = clamp(numberOr(player.y, fallback.y), 1.2, activeMap.length - 1.2);
     if (isBlocking(px, py)) {
@@ -3822,6 +3863,56 @@ const canvas = document.getElementById("game");
     sfx.doorOpen();
   }
 
+  function enterRegionInterior(interiorId) {
+    const interior = REGION_INTERIORS[interiorId];
+    if (!interior || !regionInteriorMaps[interiorId]) return;
+    state.regionInteriorReturn = {
+      x: state.player.x,
+      y: state.player.y,
+      angle: state.player.angle,
+    };
+    state.player.regionInterior = interiorId;
+    state.player.inHouse = false;
+    state.player.blocking = false;
+    state.mouseButtons.right = false;
+    state.player.x = interior.spawn.x;
+    state.player.y = interior.spawn.y;
+    state.player.angle = interior.spawn.angle;
+    logMsg(interior.entryLog);
+    sfx.doorOpen();
+
+    ensureInteriorVisitState(state.regions);
+    if (!hasVisitedInterior(state.regions, interiorId)) {
+      markInteriorVisited(state.regions, interiorId);
+      logMsg(interior.firstVisitLore);
+      const loot = interior.firstVisitLoot || {};
+      if (Number.isFinite(loot.gold) && loot.gold > 0) {
+        state.player.gold += loot.gold;
+        logMsg(`You pocket ${loot.gold} gold from the dust.`);
+      }
+      if (loot.items) {
+        for (const [item, qty] of Object.entries(loot.items)) {
+          if (!Number.isFinite(qty) || qty <= 0) continue;
+          state.inventory[item] = (state.inventory[item] || 0) + qty;
+          logMsg(`You recover ${qty}× ${item}.`);
+        }
+      }
+    }
+  }
+
+  function exitRegionInterior() {
+    const ret = state.regionInteriorReturn || { x: REGION_INTERIOR_ENTRANCE.x, y: REGION_INTERIOR_ENTRANCE.y + 1, angle: -Math.PI / 2 };
+    state.player.regionInterior = null;
+    state.player.inHouse = false;
+    state.player.x = ret.x;
+    state.player.y = ret.y;
+    state.player.angle = Number.isFinite(ret.angle) ? ret.angle : -Math.PI / 2;
+    state.player.blocking = false;
+    state.mouseButtons.right = false;
+    logMsg("You return to the open road.");
+    sfx.doorOpen();
+  }
+
   function interact() {
     if (state.mode !== "playing") return;
 
@@ -3928,6 +4019,16 @@ const canvas = document.getElementById("game");
       }
     }
 
+    if (state.player.regionInterior) {
+      const interior = REGION_INTERIORS[state.player.regionInterior];
+      if (interior && dist(state.player, interior.exit) < 1.7) {
+        exitRegionInterior();
+        return;
+      }
+      logMsg("Quiet down here. Find the door to leave.");
+      return;
+    }
+
     if (state.player.inHouse) {
       if (dist(state.player, state.house.interiorDoor) < 1.7) {
         exitHouse();
@@ -3967,6 +4068,14 @@ const canvas = document.getElementById("game");
     if (dist(state.player, state.house.outsideDoor) < 1.8) {
       enterHouse();
       return;
+    }
+
+    {
+      const regionInterior = getRegionInteriorByRegion(state.regions.activeRegion);
+      if (regionInterior && dist(state.player, REGION_INTERIOR_ENTRANCE) < 1.8) {
+        enterRegionInterior(regionInterior.id);
+        return;
+      }
     }
 
     const boardProp = getActiveJobBoardProp();
@@ -5786,7 +5895,7 @@ const canvas = document.getElementById("game");
   }
 
   function drawSkyAndGround(width, height, day, visualMood) {
-    if (state.player.inHouse) {
+    if (isIndoors()) {
       return drawInteriorBackdrop(width, height);
     }
 
@@ -6224,6 +6333,14 @@ const canvas = document.getElementById("game");
     ctx.shadowOffsetY = 0;
 
     if (sprite.kind === "npc") {
+      const cycle = resolveWalkCycle({
+        id: sprite.label || sprite.color,
+        time: state.time,
+        kind: "npc",
+        moving: sprite.moving !== false,
+      });
+      const bobPx = cycle.bob * spriteHeight;
+      const swayPx = cycle.swayX * spriteWidth;
       const robe = getCachedGradient(
         `sprite-npc-robe|${sizeKey}|${sprite.color}`,
         () => {
@@ -6237,26 +6354,43 @@ const canvas = document.getElementById("game");
       ctx.fillStyle = robe;
       ctx.strokeStyle = "rgba(21, 18, 16, 0.34)";
       ctx.lineWidth = Math.max(1, spriteWidth * 0.025);
-      ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.3, spriteWidth * 0.4, spriteHeight * 0.62);
-      ctx.strokeRect(spriteWidth * 0.3, spriteHeight * 0.3, spriteWidth * 0.4, spriteHeight * 0.62);
+      ctx.fillRect(spriteWidth * 0.3 + swayPx, spriteHeight * 0.3 + bobPx, spriteWidth * 0.4, spriteHeight * 0.5);
+      ctx.strokeRect(spriteWidth * 0.3 + swayPx, spriteHeight * 0.3 + bobPx, spriteWidth * 0.4, spriteHeight * 0.5);
       ctx.fillStyle = "rgba(30, 23, 18, 0.24)";
-      ctx.fillRect(spriteWidth * 0.36, spriteHeight * 0.58, spriteWidth * 0.28, spriteHeight * 0.04);
+      ctx.fillRect(spriteWidth * 0.36 + swayPx, spriteHeight * 0.58 + bobPx, spriteWidth * 0.28, spriteHeight * 0.04);
+      // Alternating legs — sweep one forward while the other tucks back.
+      const legSweep = cycle.legPhase * cycle.legAmp * spriteHeight;
+      ctx.fillStyle = shadeHex(sprite.color, 0.42);
+      ctx.fillRect(spriteWidth * 0.36 + swayPx, spriteHeight * 0.78 - Math.max(0, legSweep), spriteWidth * 0.1, spriteHeight * 0.16 + Math.max(0, legSweep));
+      ctx.fillRect(spriteWidth * 0.54 + swayPx, spriteHeight * 0.78 + Math.max(0, -legSweep), spriteWidth * 0.1, spriteHeight * 0.16 + Math.max(0, -legSweep));
       ctx.fillStyle = "#e0c0a7";
       ctx.beginPath();
-      ctx.arc(spriteWidth * 0.5, spriteHeight * 0.2, Math.max(3, spriteWidth * 0.14), 0, TAU);
+      ctx.arc(spriteWidth * 0.5 + swayPx * 0.6, spriteHeight * 0.2 + bobPx * 1.2, Math.max(3, spriteWidth * 0.14), 0, TAU);
       ctx.fill();
       ctx.fillStyle = "#4e3428";
-      ctx.fillRect(spriteWidth * 0.38, spriteHeight * 0.08, spriteWidth * 0.24, spriteHeight * 0.06);
+      ctx.fillRect(spriteWidth * 0.38 + swayPx * 0.6, spriteHeight * 0.08 + bobPx * 1.2, spriteWidth * 0.24, spriteHeight * 0.06);
       ctx.fillStyle = "rgba(42, 30, 24, 0.72)";
-      ctx.fillRect(spriteWidth * 0.43, spriteHeight * 0.18, spriteWidth * 0.035, spriteHeight * 0.025);
-      ctx.fillRect(spriteWidth * 0.55, spriteHeight * 0.18, spriteWidth * 0.035, spriteHeight * 0.025);
+      ctx.fillRect(spriteWidth * 0.43 + swayPx * 0.6, spriteHeight * 0.18 + bobPx * 1.2, spriteWidth * 0.035, spriteHeight * 0.025);
+      ctx.fillRect(spriteWidth * 0.55 + swayPx * 0.6, spriteHeight * 0.18 + bobPx * 1.2, spriteWidth * 0.035, spriteHeight * 0.025);
       ctx.fillStyle = "rgba(255,255,255,0.18)";
-      ctx.fillRect(spriteWidth * 0.35, spriteHeight * 0.34, spriteWidth * 0.06, spriteHeight * 0.35);
+      ctx.fillRect(spriteWidth * 0.35 + swayPx, spriteHeight * 0.34 + bobPx, spriteWidth * 0.06, spriteHeight * 0.35);
     } else if (sprite.kind === "enemy") {
       const enemyBase = sprite.color || "#6be873";
       const enemyTypeKey = sprite.enemyType || "slime";
       const cue = sprite.readabilityCue || resolveEnemyReadabilityCue(sprite);
-      const bodyScale = clamp(cue.bodyScale || 1, 0.9, 1.14);
+      const enemyCycle = resolveWalkCycle({
+        id: `${enemyTypeKey}-${sprite.label || ""}`,
+        time: state.time,
+        kind: "enemy",
+        moving: (sprite.windupTimer || 0) <= 0,
+      });
+      const enemyAttack = resolveAttackCycle({
+        windupTimer: sprite.windupTimer,
+        windupMax: sprite.windupMax,
+      });
+      const breathScale = 1 + enemyCycle.breath;
+      const lungeY = enemyAttack.active ? -enemyAttack.lunge * spriteHeight * 0.04 : enemyCycle.bob * spriteHeight;
+      const bodyScale = clamp((cue.bodyScale || 1) * breathScale, 0.86, 1.2);
       if ((sprite.windupTimer || 0) > 0) {
         const windupPulse = 0.5 + Math.sin(state.time * 18) * 0.5;
         const windupRatio = clamp(sprite.windupTimer / Math.max(0.01, sprite.windupMax || sprite.windupTimer), 0, 1);
@@ -6289,6 +6423,8 @@ const canvas = document.getElementById("game");
         },
         gradientCacheEnabled,
       );
+      ctx.save();
+      ctx.translate(0, lungeY);
       ctx.fillStyle = slime;
       ctx.beginPath();
       ctx.moveTo(spriteWidth * 0.14, spriteHeight * 0.84);
@@ -6307,6 +6443,7 @@ const canvas = document.getElementById("game");
       ctx.beginPath();
       ctx.arc(spriteWidth * 0.38, spriteHeight * 0.33, spriteWidth * 0.06, 0, TAU);
       ctx.fill();
+      ctx.restore();
       if ((sprite.flashTimer || 0) > 0) {
         ctx.fillStyle = "rgba(255, 248, 216, 0.42)";
         ctx.beginPath();
@@ -7452,7 +7589,12 @@ const canvas = document.getElementById("game");
 
     const sprites = [];
 
-    if (state.player.inHouse) {
+    if (state.player.regionInterior) {
+      const interior = REGION_INTERIORS[state.player.regionInterior];
+      if (interior) {
+        sprites.push({ x: interior.exit.x, y: interior.exit.y, color: "#6d5a45", label: "Exit", size: 0.95, kind: "exit-door" });
+      }
+    } else if (state.player.inHouse) {
       const houseProgress = resolveHouseProgressDisplay({
         inventory: state.inventory,
         jobState: state.world.jobs,
@@ -7474,6 +7616,17 @@ const canvas = document.getElementById("game");
       }
     } else {
       const regionPresentation = sceneRegionPresentation || buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
+      const regionInteriorEntry = getRegionInteriorByRegion(state.regions.activeRegion);
+      if (regionInteriorEntry) {
+        sprites.push({
+          x: REGION_INTERIOR_ENTRANCE.x,
+          y: REGION_INTERIOR_ENTRANCE.y,
+          color: regionInteriorEntry.propColor,
+          label: regionInteriorEntry.propLabel,
+          size: 1.05,
+          kind: "exit-door",
+        });
+      }
       sprites.push({
         ...regionPresentation.landmark,
         kind: "landmark",
