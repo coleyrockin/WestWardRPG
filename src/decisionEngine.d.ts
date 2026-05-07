@@ -5,5 +5,6 @@ export function syncChapterFromProgress(state: any, level: number): void;
 export function applyMajorDecision(state: any, npcId: string): any;
 export function applyQuestOutcome(state: any, questId: string, outcomeId: string): any;
 export function createDecisionRecap(state: any): string;
-export function resolveNarrativeEnding(state: any): any;
+export function resolveNarrativeEnding(state: any): { id: string; title: string; summary: string };
+export const ENDING_CATALOG: Array<{ id: string; title: string; summary: string }>;
 export function migrateNarrativeState(save: any): any;

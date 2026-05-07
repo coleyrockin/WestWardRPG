@@ -6,6 +6,7 @@ import {
   migrateNarrativeState,
   syncChapterFromProgress,
   applyQuestOutcome,
+  ENDING_CATALOG,
 } from "../src/decisionEngine.js";
 
 describe("decisionEngine", () => {
@@ -45,6 +46,68 @@ describe("decisionEngine", () => {
     state.thematicAxes.truthVsComfort = 25;
     state.thematicAxes.solidarityVsStatus = 30;
     expect(resolveNarrativeEnding(state).id).toBe("messy_commons");
+  });
+
+  it("falls back to elite_rotation when no rule matches", () => {
+    const state = createInitialNarrativeState();
+    state.thematicAxes.controlVsFreedom = 12;
+    state.thematicAxes.truthVsComfort = -3;
+    state.thematicAxes.solidarityVsStatus = 12;
+    expect(resolveNarrativeEnding(state).id).toBe("elite_rotation");
+  });
+
+  it("returns ash_drift_detente for low-engagement runs", () => {
+    const state = createInitialNarrativeState();
+    expect(resolveNarrativeEnding(state).id).toBe("ash_drift_detente");
+  });
+
+  it("returns ledger_wakes when whistleblowing pays off", () => {
+    const state = createInitialNarrativeState();
+    state.globalFlags.ledgerPublished = true;
+    state.thematicAxes.truthVsComfort = 22;
+    state.factionRep.workersGuild = 18;
+    expect(resolveNarrativeEnding(state).id).toBe("ledger_wakes");
+  });
+
+  it("returns open_forge_compact when worker tooling commons takes hold", () => {
+    const state = createInitialNarrativeState();
+    state.globalFlags.toolCommonsCreated = true;
+    state.thematicAxes.solidarityVsStatus = 20;
+    state.factionRep.workersGuild = 25;
+    expect(resolveNarrativeEnding(state).id).toBe("open_forge_compact");
+  });
+
+  it("returns curfew_pact for normalized hard-order runs", () => {
+    const state = createInitialNarrativeState();
+    state.globalFlags.curfewNormalized = true;
+    state.thematicAxes.controlVsFreedom = 24;
+    state.factionRep.civicCouncil = 18;
+    expect(resolveNarrativeEnding(state).id).toBe("curfew_pact");
+  });
+
+  it("returns iron_lantern_doctrine for transparent authoritarian runs", () => {
+    const state = createInitialNarrativeState();
+    state.thematicAxes.controlVsFreedom = 30;
+    state.thematicAxes.truthVsComfort = 14;
+    state.factionRep.civicCouncil = 25;
+    expect(resolveNarrativeEnding(state).id).toBe("iron_lantern_doctrine");
+  });
+
+  it("returns cartel_quietus when the cartel is broken from below", () => {
+    const state = createInitialNarrativeState();
+    state.thematicAxes.controlVsFreedom = -20;
+    state.thematicAxes.solidarityVsStatus = 18;
+    state.factionRep.marketCartel = -28;
+    expect(resolveNarrativeEnding(state).id).toBe("cartel_quietus");
+  });
+
+  it("exposes a deduplicated ending catalog", () => {
+    const ids = ENDING_CATALOG.map((entry) => entry.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain("order_without_truth");
+    expect(ids).toContain("messy_commons");
+    expect(ids).toContain("ledger_wakes");
+    expect(ids.length).toBeGreaterThanOrEqual(8);
   });
 
   it("migrates v1 saves into narrative defaults", () => {

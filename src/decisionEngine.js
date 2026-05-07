@@ -195,28 +195,110 @@ export function applyQuestOutcome(narrativeState, questId, outcomeId) {
   return spec;
 }
 
-export function resolveNarrativeEnding(narrativeState) {
-  const { controlVsFreedom, truthVsComfort, solidarityVsStatus } = narrativeState.thematicAxes;
-  if (controlVsFreedom > 25 && truthVsComfort < -10) {
-    return {
-      id: "order_without_truth",
-      title: "Order Without Truth",
-      summary: "The valley is safe, obedient, and quietly hollow.",
-    };
-  }
-  if (solidarityVsStatus > 20 && truthVsComfort > 5) {
-    return {
-      id: "messy_commons",
-      title: "Messy Commons",
-      summary: "People govern together, loudly, imperfectly, and honestly.",
-    };
-  }
-  return {
+// Ordered most-specific to least-specific. The first predicate that matches wins.
+// New endings layered on top of the original three; existing ids are preserved
+// so saved runs stay valid.
+const ENDING_RULES = [
+  {
+    id: "ledger_wakes",
+    title: "The Ledger Wakes",
+    summary: "Receipts unsealed, debts named — the workers' hall rewrites the rules in daylight.",
+    test: ({ axes, rep, flags }) =>
+      flags.ledgerPublished === true &&
+      axes.truthVsComfort > 15 &&
+      rep.workersGuild > 15,
+  },
+  {
+    id: "open_forge_compact",
+    title: "Open Forge Compact",
+    summary: "Tooling spreads to every shed; the cartel's leverage cools with the coal.",
+    test: ({ axes, rep, flags }) =>
+      flags.toolCommonsCreated === true &&
+      axes.solidarityVsStatus > 15 &&
+      rep.workersGuild > 20,
+  },
+  {
+    id: "curfew_pact",
+    title: "The Curfew Pact",
+    summary: "Lanterns dim on schedule. Nobody starves; nobody speaks at night either.",
+    test: ({ axes, rep, flags }) =>
+      flags.curfewNormalized === true &&
+      axes.controlVsFreedom > 20 &&
+      rep.civicCouncil > 15,
+  },
+  {
+    id: "iron_lantern_doctrine",
+    title: "Iron Lantern Doctrine",
+    summary: "Every truth is filed in triplicate, every freedom indexed and stamped.",
+    test: ({ axes, rep }) =>
+      axes.controlVsFreedom > 25 &&
+      axes.truthVsComfort > 10 &&
+      rep.civicCouncil > 20,
+  },
+  {
+    id: "cartel_quietus",
+    title: "Cartel Quietus",
+    summary: "The Cartel folds inward. Neighbors trade direct; the markup dies on the road.",
+    test: ({ axes, rep }) =>
+      axes.controlVsFreedom < -15 &&
+      rep.marketCartel < -20 &&
+      axes.solidarityVsStatus > 10,
+  },
+  {
+    id: "order_without_truth",
+    title: "Order Without Truth",
+    summary: "The valley is safe, obedient, and quietly hollow.",
+    test: ({ axes }) => axes.controlVsFreedom > 25 && axes.truthVsComfort < -10,
+  },
+  {
+    id: "messy_commons",
+    title: "Messy Commons",
+    summary: "People govern together, loudly, imperfectly, and honestly.",
+    test: ({ axes }) => axes.solidarityVsStatus > 20 && axes.truthVsComfort > 5,
+  },
+  {
+    id: "ash_drift_detente",
+    title: "Ash Drift Detente",
+    summary: "Nothing decided, nothing toppled. The wind keeps the score for now.",
+    test: ({ axes }) =>
+      Math.abs(axes.controlVsFreedom) <= 8 &&
+      Math.abs(axes.truthVsComfort) <= 8 &&
+      Math.abs(axes.solidarityVsStatus) <= 8,
+  },
+  {
     id: "elite_rotation",
     title: "Elite Rotation",
     summary: "The slogans changed; the hierarchy mostly did not.",
+    test: () => true,
+  },
+];
+
+export function resolveNarrativeEnding(narrativeState) {
+  const axes = narrativeState?.thematicAxes || {};
+  const rep = narrativeState?.factionRep || {};
+  const flags = narrativeState?.globalFlags || {};
+  const ctx = {
+    axes: {
+      controlVsFreedom: Number(axes.controlVsFreedom) || 0,
+      truthVsComfort: Number(axes.truthVsComfort) || 0,
+      solidarityVsStatus: Number(axes.solidarityVsStatus) || 0,
+    },
+    rep: {
+      civicCouncil: Number(rep.civicCouncil) || 0,
+      workersGuild: Number(rep.workersGuild) || 0,
+      marketCartel: Number(rep.marketCartel) || 0,
+    },
+    flags,
   };
+  for (const rule of ENDING_RULES) {
+    if (rule.test(ctx)) {
+      return { id: rule.id, title: rule.title, summary: rule.summary };
+    }
+  }
+  return { id: "elite_rotation", title: "Elite Rotation", summary: "The slogans changed; the hierarchy mostly did not." };
 }
+
+export const ENDING_CATALOG = ENDING_RULES.map(({ id, title, summary }) => ({ id, title, summary }));
 
 export function createDecisionRecap(narrativeState) {
   const latest = narrativeState.decisions[narrativeState.decisions.length - 1];
