@@ -33,3 +33,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .vercel
+
+# dev:py symlinks public/atmosphere.js to root so the python static fallback can
+# serve it. Vite already serves from public/, so the root copy is dev-only.
+/atmosphere.js

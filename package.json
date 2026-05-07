@@ -6,7 +6,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "dev:py": "python3 -m http.server 5173",
+    "dev:py": "ln -sf public/atmosphere.js atmosphere.js && python3 -m http.server 5173",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
