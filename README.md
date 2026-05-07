@@ -14,6 +14,8 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 
 ## Preview
 
+▶ **Play in your browser:** [westward-rpg.vercel.app](https://westward-rpg.vercel.app) — runs entirely client-side, no install, no account.
+
 ![Flagship Story Overview](docs/flagship-story-overview.svg)
 ![Flagship Systems Overview](docs/flagship-systems-overview.svg)
 ![Flagship NPC Cast](docs/flagship-npc-cast.svg)
@@ -55,7 +57,7 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, and early Phase A open-world pressure/dressing work.
 
-Latest local fast gate: `npm test` reports **482 passing tests across 45 files**. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **538 passing tests across 52 files**. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
