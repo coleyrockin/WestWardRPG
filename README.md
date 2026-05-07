@@ -16,6 +16,9 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 
 ▶ **Play in your browser:** [westward-rpg.vercel.app](https://westward-rpg.vercel.app) — runs entirely client-side, no install, no account.
 
+![Opening view: Dustward town, HUD, route guide, and minimap](docs/images/launch-opening.png)
+![NPC encounter: Marshal Boone with HUD threat readout](docs/images/launch-npc-encounter.png)
+
 ![Flagship Story Overview](docs/flagship-story-overview.svg)
 ![Flagship Systems Overview](docs/flagship-systems-overview.svg)
 ![Flagship NPC Cast](docs/flagship-npc-cast.svg)
