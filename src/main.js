@@ -4337,7 +4337,7 @@ const canvas = document.getElementById("game");
           logMsg(vendorServiceProfile("merchant").serviceLine);
           if (Math.random() < 0.35) describeNpcBackground("merchant");
         } else {
-          logMsg("Trader Nyx: Come back when you have more gold... or desperation.");
+          logMsg("Reverend Quill: Come back when you have more gold... or desperation.");
         }
         return;
       }
@@ -4347,14 +4347,14 @@ const canvas = document.getElementById("game");
           state.player.gold -= 8;
           state.player.hp = Math.min(state.player.maxHp, state.player.hp + 28);
           sfx.potionUse();
-          logMsg("Innkeeper Mora patched your wounds for 8 gold. 'You owe me a tip.'");
+          logMsg("Nora Knuckles patched your wounds for 8 gold. 'You owe me a tip.'");
         } else if (state.player.hp >= state.player.maxHp) {
-          if (openDialogueChoiceFor("innkeeper", "Innkeeper Mora")) { sfx.npcChat(); return; }
+          if (openDialogueChoiceFor("innkeeper", "Nora Knuckles")) { sfx.npcChat(); return; }
           logMsg(choice(npcDialogue.innkeeper.idle));
           if (Math.random() < 0.35) describeNpcBackground("innkeeper");
           sfx.npcChat();
         } else {
-          logMsg("Innkeeper Mora: 8 gold for healing. I don't do charity... or quality.");
+          logMsg("Nora Knuckles: 8 gold for healing. I don't do charity... or quality.");
           sfx.npcChat();
         }
         return;
@@ -9601,17 +9601,17 @@ const canvas = document.getElementById("game");
             state.player.gold += adjustedCost;
           } else {
             sfx.shopBuy();
-            logMsg(`Bought ${shopItemName(item)} for ${adjustedCost}g! ${choice(["Money well spent!", "Trader Nyx grins.", "Ka-ching!", "Nyx winks."])}`);
+            logMsg(`Bought ${shopItemName(item)} for ${adjustedCost}g! ${choice(["Money well spent!", "Quill nods.", "Ka-ching!", "Quill winks."])}`);
           }
         } else {
-          logMsg("Trader Nyx: No gold, no goods. That's business, baby.");
+          logMsg("Reverend Quill: No gold, no goods. That's business, baby.");
         }
         event.preventDefault();
         return;
       }
       if (event.code === "Escape") {
         shopOpen = false;
-        logMsg("Trader Nyx: Come back anytime! I'm always here. Literally. I live here.");
+        logMsg("Reverend Quill: Come back anytime! I'm always here. Literally. I live here.");
         event.preventDefault();
         return;
       }
