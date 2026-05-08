@@ -456,6 +456,110 @@
       background: hsla(195, 30%, 14%, 0.5);
     }
 
+    .save-slots {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 22px;
+      width: min(520px, 92vw);
+    }
+
+    .save-slot {
+      display: grid;
+      grid-template-columns: 64px 1fr auto auto;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 14px;
+      background: hsla(195, 30%, 12%, 0.55);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      color: var(--cream-soft);
+      font-family: var(--font-body);
+      cursor: pointer;
+      transition:
+        transform 180ms var(--reveal-ease),
+        border-color 180ms var(--reveal-ease),
+        background 180ms var(--reveal-ease);
+      text-align: left;
+    }
+
+    .save-slot:hover {
+      transform: translateY(-1px);
+      border-color: var(--hairline);
+      background: hsla(195, 30%, 16%, 0.7);
+    }
+
+    .save-slot:focus-visible {
+      outline: 2px solid hsl(36 96% 76%);
+      outline-offset: 2px;
+    }
+
+    .save-slot-label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: hsl(36 96% 76%);
+    }
+
+    .save-slot-summary {
+      font-size: 13px;
+      color: var(--cream);
+    }
+
+    .save-slot.is-empty .save-slot-summary {
+      color: var(--cream-soft);
+      opacity: 0.6;
+      font-style: italic;
+    }
+
+    .save-slot-action {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--cream-soft);
+      cursor: pointer;
+    }
+
+    .save-slot:hover .save-slot-action {
+      color: var(--cream);
+      border-color: var(--hairline);
+    }
+
+    .save-slot-delete {
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: var(--cream-soft);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0.55;
+    }
+
+    .save-slot-delete:hover {
+      opacity: 1;
+      color: hsl(0 70% 70%);
+      border-color: hsla(0, 70%, 50%, 0.5);
+    }
+
+    .save-slot.is-corrupted {
+      border-color: hsla(0, 70%, 50%, 0.5);
+    }
+    .save-slot.is-corrupted .save-slot-summary {
+      color: hsl(0 70% 70%);
+    }
+
     /* ─────────── Bottom rail / disclosure ─────────── */
     .rail {
       display: flex;
@@ -701,6 +805,7 @@
           <p class="subtitle reveal r4" id="menu-subtitle">A story-first frontier where every choice tilts the
             valley.</p>
           <div class="origin-picker reveal r5" id="origin-picker" role="group" aria-label="Choose origin"></div>
+          <div class="save-slots reveal r6" id="save-slots" role="group" aria-label="Save slots"></div>
           <div class="actions reveal r6">
             <button id="start-btn">Begin Journey</button>
             <button id="continue-btn">Continue Journey</button>

@@ -374,6 +374,7 @@ const canvas = document.getElementById("game");
   const menu = document.getElementById("menu");
   const startBtn = document.getElementById("start-btn");
   const continueBtn = document.getElementById("continue-btn");
+  const saveSlotsContainer = document.getElementById("save-slots");
   const originPicker = document.getElementById("origin-picker");
   const langSelect = document.getElementById("lang-select");
   const langLabel = document.getElementById("lang-label");
@@ -2434,6 +2435,114 @@ const canvas = document.getElementById("game");
   function refreshContinueButton() {
     if (!continueBtn) return;
     continueBtn.style.display = hasSaveData ? "inline-block" : "none";
+    renderSaveSlots();
+  }
+
+  const REGION_DISPLAY_NAMES = {
+    frontier: "Dustward",
+    ashfall: "Ashfall",
+    ironlantern: "Iron Lantern",
+  };
+
+  function formatPlayedTime(seconds) {
+    const s = Math.max(0, Math.floor(seconds || 0));
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    return rem > 0 ? `${h}h ${rem}m` : `${h}h`;
+  }
+
+  function buildSlotSummaryText(meta) {
+    if (!meta) return "Empty";
+    if (meta.empty) return "Empty";
+    if (!meta.valid) return "Save corrupted (use ↺ to attempt recovery)";
+    const summary = summarizeSavePayload(meta.payload);
+    if (!summary) return "Save present";
+    const region = REGION_DISPLAY_NAMES[summary.regionId] || summary.regionId;
+    const time = formatPlayedTime(summary.timePlayedSeconds);
+    if (summary.victory) {
+      const ending = summary.endingId ? ` (${summary.endingId})` : "";
+      return `Won${ending} · Lvl ${summary.level} · ${region} · ${time}`;
+    }
+    return `Lvl ${summary.level} · ${region} · ${time}`;
+  }
+
+  function slotDisplayLabel(slot) {
+    const idx = IDB_KNOWN_SLOTS.indexOf(slot);
+    return `Slot ${idx >= 0 ? idx + 1 : "?"}`;
+  }
+
+  function clearChildren(el) {
+    while (el.firstChild) el.removeChild(el.firstChild);
+  }
+
+  function renderSaveSlots() {
+    if (!saveSlotsContainer) return;
+    const metas = getSlotMetas();
+    clearChildren(saveSlotsContainer);
+    const ordered = IDB_KNOWN_SLOTS.map((slot) =>
+      metas.find((m) => m.slot === slot) || { slot, empty: true, valid: true, payload: null, savedAt: null });
+    for (const meta of ordered) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "save-slot";
+      if (meta.empty) row.classList.add("is-empty");
+      if (!meta.empty && !meta.valid) row.classList.add("is-corrupted");
+      row.dataset.slot = meta.slot;
+      row.setAttribute("aria-label", `${slotDisplayLabel(meta.slot)}: ${buildSlotSummaryText(meta)}`);
+
+      const label = document.createElement("span");
+      label.className = "save-slot-label";
+      label.textContent = slotDisplayLabel(meta.slot);
+
+      const summary = document.createElement("span");
+      summary.className = "save-slot-summary";
+      summary.textContent = buildSlotSummaryText(meta);
+
+      const action = document.createElement("span");
+      action.className = "save-slot-action";
+      action.textContent = meta.empty ? "New" : (meta.valid ? "Continue" : "Recover");
+
+      row.appendChild(label);
+      row.appendChild(summary);
+      row.appendChild(action);
+
+      if (!meta.empty) {
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "save-slot-delete";
+        del.setAttribute("aria-label", `Delete ${slotDisplayLabel(meta.slot)}`);
+        del.textContent = "×";
+        del.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          if (!confirm(`Delete ${slotDisplayLabel(meta.slot)}? This cannot be undone.`)) return;
+          try {
+            await idbDeleteSave(meta.slot);
+            await refreshSlotsAndPickActive();
+            renderSaveSlots();
+          } catch (err) {
+            console.warn("[westward] deleteSave failed:", err);
+          }
+        });
+        row.appendChild(del);
+      }
+
+      row.addEventListener("click", async () => {
+        ensureAudio();
+        const ok = await setCurrentSaveSlot(meta.slot);
+        if (!ok) return;
+        if (meta.empty || !meta.valid) {
+          beginSession();
+        } else {
+          if (!loadGame({ fromMenu: true })) beginSession();
+        }
+        renderSaveSlots();
+      });
+
+      saveSlotsContainer.appendChild(row);
+    }
   }
 
   // IDB-backed cache. Populated by initSavePersistenceAsync(); read synchronously
