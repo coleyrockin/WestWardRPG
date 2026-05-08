@@ -3776,6 +3776,7 @@ const canvas = document.getElementById("game");
     const memoryLine = resolveNpcReactiveLine(npcId, state.narrative.npcMemory, {
       factionRep: state.narrative.factionRep,
       recentQuestOutcome: Object.values(state.narrative.questOutcomes || {}).slice(-1)[0] || null,
+      questOutcomes: state.narrative.questOutcomes || {},
       inventory: state.inventory,
       completedJobIds: state.world.jobs?.completedJobIds || [],
     });

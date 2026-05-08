@@ -10,6 +10,82 @@ const NPC_NAMES = {
   cat: "Whiskers the Cat",
 };
 
+// Per-NPC quest-outcome reactions for the social/dialogue surface. Vendor
+// (commerce) reactions live in economyServices.js — these target the chat
+// path through resolveNpcReactiveLine. Lookup priority walks late-chain
+// quests first, so a finished campaign reads back its most recent decision.
+// Vendors (merchant, smith) intentionally absent here so the player does
+// not see double reaction lines; their outcome line comes from the vendor
+// profile.
+const QUEST_PRIORITY = [
+  "lantern_revolt",
+  "lantern_probe",
+  "ashfall_boss",
+  "ashfall_intro",
+  "archive",
+  "wood",
+  "crystal",
+];
+
+const NPC_OUTCOME_REACTIONS = {
+  elder: {
+    archive: {
+      truth: "Mayor Clem: The archive is loose. I cannot keep up with the angry letters. I think I am proud of you.",
+      comfort: "Mayor Clem: We sealed the archive. The peace is real. The cost will outlive me.",
+    },
+    wood: {
+      solidarity: "Mayor Clem: Half the town has plans for a roof now. Whatever you did, do it again.",
+      status: "Mayor Clem: A private deed in your name. Your house. Your shadow on the map.",
+    },
+    lantern_revolt: {
+      guild: "Mayor Clem: Lantern listens to the guild now. We will see what it decides to hear.",
+      council: "Mayor Clem: The council brokered terms. Neat ink, ragged outcomes.",
+    },
+  },
+  warden: {
+    archive: {
+      truth: "Marshal Boone: That archive going public made my job louder.",
+      comfort: "Marshal Boone: Sealed archive. Town's calmer. I'll take it.",
+    },
+    ashfall_boss: {
+      mercy: "Marshal Boone: You spared the tyrant's crew. I get witnesses, not corpses.",
+      purge: "Marshal Boone: Purge cleaned Ashfall. Less paperwork. More silence.",
+    },
+    lantern_revolt: {
+      guild: "Marshal Boone: Lantern guild backed. Patrols thinner where they organize.",
+      council: "Marshal Boone: Council terms hold. Streets quiet. Watchers paid.",
+    },
+  },
+  innkeeper: {
+    wood: {
+      solidarity: "Nora Knuckles: Heard your house plans went to the workers. Round on me, drifter.",
+      status: "Nora Knuckles: Private deed, fancy stoop. You drink alone or with the pretty people now.",
+    },
+    ashfall_intro: {
+      salvage: "Nora Knuckles: Open salvage means Ashfall crews come through hungry. Good for stew, bad for chairs.",
+      monopoly: "Nora Knuckles: Licensed route. Same crews, fewer of them, twice the swagger.",
+    },
+    lantern_revolt: {
+      guild: "Nora Knuckles: Guild backed. The bar gets loud arguments and louder toasts.",
+      council: "Nora Knuckles: Council terms. The bar gets paperwork and quieter regulars.",
+    },
+  },
+};
+
+function resolveQuestOutcomeReaction(npcId, questOutcomes) {
+  const table = NPC_OUTCOME_REACTIONS[npcId];
+  if (!table) return null;
+  if (!questOutcomes || typeof questOutcomes !== "object") return null;
+  for (const questId of QUEST_PRIORITY) {
+    if (!table[questId]) continue;
+    const outcomeId = questOutcomes[questId];
+    if (!outcomeId) continue;
+    const line = table[questId][outcomeId];
+    if (typeof line === "string" && line.length > 0) return line;
+  }
+  return null;
+}
+
 const COMPLETED_JOB_REACTIONS = {
   warden: [
     {
@@ -122,6 +198,9 @@ export function resolveNpcReactiveLine(npcId, memory, context = {}) {
 
   const storyLootReaction = resolveStoryLootNpcReaction(npcId, context.inventory);
   if (storyLootReaction) return storyLootReaction.line;
+
+  const outcomeLine = resolveQuestOutcomeReaction(npcId, context.questOutcomes);
+  if (outcomeLine) return outcomeLine;
 
   if (npcId === "smith" && entry.houseUnlocked) {
     return `${name}: Your workbench is more than furniture now. Bring me salvage and we turn it into leverage.`;

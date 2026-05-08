@@ -124,4 +124,101 @@ describe("npcMemory", () => {
     expect(smith).toContain("Professor Cogwheel");
     expect(smith).toContain("slag dust");
   });
+
+  describe("quest outcome reactions", () => {
+    it("elder reacts to archive truth outcome", () => {
+      const memory = createInitialNpcMemoryState();
+      const line = resolveNpcReactiveLine("elder", memory, {
+        questOutcomes: { archive: "truth" },
+      });
+      expect(line).toContain("Mayor Clem");
+      expect(line).toMatch(/archive/i);
+    });
+
+    it("elder reacts to archive comfort with different copy than truth", () => {
+      const memory = createInitialNpcMemoryState();
+      const truth = resolveNpcReactiveLine("elder", memory, {
+        questOutcomes: { archive: "truth" },
+      });
+      const comfort = resolveNpcReactiveLine("elder", memory, {
+        questOutcomes: { archive: "comfort" },
+      });
+      expect(truth).not.toBe(comfort);
+      expect(truth).toBeTruthy();
+      expect(comfort).toBeTruthy();
+    });
+
+    it("warden reacts to ashfall_boss mercy outcome", () => {
+      const memory = createInitialNpcMemoryState();
+      const line = resolveNpcReactiveLine("warden", memory, {
+        questOutcomes: { ashfall_boss: "mercy" },
+      });
+      expect(line).toContain("Marshal Boone");
+      expect(line).toMatch(/spared|crew|witness/i);
+    });
+
+    it("warden reacts to ashfall_boss purge with different copy", () => {
+      const memory = createInitialNpcMemoryState();
+      const mercy = resolveNpcReactiveLine("warden", memory, {
+        questOutcomes: { ashfall_boss: "mercy" },
+      });
+      const purge = resolveNpcReactiveLine("warden", memory, {
+        questOutcomes: { ashfall_boss: "purge" },
+      });
+      expect(mercy).not.toBe(purge);
+    });
+
+    it("innkeeper reacts to wood solidarity outcome", () => {
+      const memory = createInitialNpcMemoryState();
+      const line = resolveNpcReactiveLine("innkeeper", memory, {
+        questOutcomes: { wood: "solidarity" },
+      });
+      expect(line).toContain("Nora Knuckles");
+      expect(line).toMatch(/plan|workers|round|drink/i);
+    });
+
+    it("prefers a later-quest outcome when multiple are present", () => {
+      const memory = createInitialNpcMemoryState();
+      const line = resolveNpcReactiveLine("elder", memory, {
+        questOutcomes: { archive: "truth", lantern_revolt: "guild" },
+      });
+      expect(line).toMatch(/lantern|guild/i);
+    });
+
+    it("falls back to other reactions when no quest outcome matches", () => {
+      const memory = createInitialNpcMemoryState();
+      recordNpcMemoryEvent(memory, "elder", {
+        type: "poi_discovered",
+        poiId: "frontier_old_well",
+        poiLabel: "Old Well",
+        regionId: "frontier",
+      });
+      const line = resolveNpcReactiveLine("elder", memory, {
+        questOutcomes: {},
+      });
+      expect(line).toContain("Old Well");
+    });
+
+    it("completed-job reaction still beats outcome reaction (more specific recent action)", () => {
+      const memory = createInitialNpcMemoryState();
+      const line = resolveNpcReactiveLine("warden", memory, {
+        questOutcomes: { ashfall_boss: "mercy" },
+        completedJobIds: ["frontier_map_survey"],
+      });
+      expect(line).toContain("road survey");
+    });
+
+    it("ignores unknown outcome ids and falls through", () => {
+      const memory = createInitialNpcMemoryState();
+      recordNpcMemoryEvent(memory, "elder", {
+        type: "poi_discovered",
+        poiLabel: "Old Well",
+        regionId: "frontier",
+      });
+      const line = resolveNpcReactiveLine("elder", memory, {
+        questOutcomes: { archive: "not-a-real-outcome" },
+      });
+      expect(line).toContain("Old Well");
+    });
+  });
 });
