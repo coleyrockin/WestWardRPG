@@ -260,7 +260,7 @@ It needs the existing systems to feel connected in the player's first short sess
 
 ## Shipped Foundations (audit)
 
-Latest audit (2026-05-07, post audit-cleanup batch): `npm test` → **566 passing across 52 test files**; 46 source modules (added `savePersistence.js`); 14 Playwright scripted-replay scenarios; **CI live** (`.github/workflows/qa.yml`, two-job pipeline). `main.js` is **~10,293 lines** (extraction debt has gotten worse — Phase 1/2/3 audit-followups all landed inline). README test count refreshed in lockstep with each batch.
+Latest audit (2026-05-08, post quest-outcome reactivity batch): `npm test` → **613 passing across 54 test files**; 48 source modules (added `uiModals.js`, `questOutcomeEchoes.js`); 14 Playwright scripted-replay scenarios; **CI live** (`.github/workflows/qa.yml`, two-job pipeline). `main.js` is **~10,310 lines** (extraction debt unchanged this batch — work landed in dedicated modules + 5 small wires). README test count refreshed in lockstep with each batch.
 
 ### Phase 1 open-road slice (latest local)
 - **Discovery Reward Banner 1** (`src/discoveryRewardFeedback.js`) — discoveries now trigger a compact reward banner with title, reward line, story hook, codex unlock, and route/renown payoff lines. `render_game_to_text` exposes the active banner for browser smoke and human-test auditing.
@@ -368,7 +368,13 @@ Cross-checked against `decisionEngine`, `factionEffects`, `economyServices`, `np
 - ~~**`companionBarks` ↛ quest outcomes.**~~ **Shipped 2026-05-07:** `BARK_QUEST_OUTCOMES` table + `tryQuestOutcomeBark` covers all 7 branching quests × 3 companions, with per-quest dedup and respect for the global cooldown. Wired in `confirmQuestOutcomeChoice`.
 - ~~**`dialogueChoices` ↛ identity gates.**~~ **Shipped 2026-05-07:** `passesIdentityGate` filters by origin (single id or array), attribute thresholds, or factionLean. Six new identity-flavored prompts cover all four origins plus high-Speech (warden) and high-Cunning (merchant) persuasion paths. Gated choices are promoted ahead of ungated ones so a build-matching prompt always shows up among the visible 3.
 - ~~**Endings — only 3 distinct outcomes.**~~ **Shipped 2026-05-05 (commit `2fa5f1d`):** `decisionEngine.js:201-273` now defines 9 ending rules gated by faction rep + globalFlags + axes; "Elite Rotation" is the explicit edge fallback, not the default landing.
-- **Quest outcomes are the master keystone of the world's reactivity, and the world barely reads them back.** This is the single biggest gap in the project right now: the player makes choices, the choices are recorded, and the world doesn't notice.
+- ~~**Quest outcomes are the master keystone of the world's reactivity, and the world barely reads them back.**~~ **Shipped 2026-05-08:** five player-visible read-back surfaces wired across the same `narrative.questOutcomes` map.
+  - **Moment of decision (`questOutcomeEchoes.js` + `confirmQuestOutcomeChoice`):** every outcome resolution fires a "Word travels:" chat line plus a HUD notice ribbon. 14 handcrafted lines cover all outcome-bearing quests × 2 outcomes each.
+  - **Vendor commerce (`economyServices.getVendorServiceProfile`):** 32 reaction lines across merchant / smith / apothecary / warden × archive / wood / ashfall_intro / lantern_revolt. Logged after the existing serviceLine/priceNote so the player feels the vendor "remember" their last decision.
+  - **NPC chat (`npcMemory.resolveNpcReactiveLine`):** 18 reaction lines across elder / warden / innkeeper × the same 4 outcome-bearing quests. Slots into the priority chain after completed-job and story-loot lines (more specific recent actions still beat broader outcome flavor).
+  - **Job board (`jobBoard.decorateJob`):** every regional listing appends a one-sentence flavor line drawn from the most recent regional outcome. Late-chain wins per region.
+  - **Companion barks** were already wired (2026-05-07).
+  - Late-chain priority order is consistent across surfaces (lantern_revolt > lantern_probe > ashfall_boss > ashfall_intro > archive > wood > crystal), so a finished campaign reads back its most recent decision first.
 
 ### Test debt — confidence is overstated
 
@@ -389,7 +395,7 @@ Cross-checked against `decisionEngine`, `factionEffects`, `economyServices`, `np
 5. ~~Add price-shift HUD ribbon when faction rep crosses ±10 / ±25 / ±50.~~ **Shipped:** `tickFactionRepBands` fires `showHudNotice(createFactionRepNotice(...))` on band crossings (with Market Cartel price-line variant).
 6. ~~Move `JOB_BOARD_PROPS` → `poiSystem.js`; `JOB_BOARD_PRESENTATION` → `storyContent.js`; `COMPLETED_JOB_BOARD_LINES` → `npcMemory.js`.~~ **Shipped:** `jobBoard.js` already imports them from those modules.
 7. ~~Pre-allocate the raycaster depth buffer.~~ **Shipped:** `cachedDepthBuffer` cached outside the per-frame path at `main.js:7499`.
-8. Add `state.ui.modals[]` and migrate `dialogueSelection` / `questOutcomeSelection` / etc. into it (saved with v3; bumps to v4 only when other v4 items land).
+8. ~~Add `state.ui.modals[]` and migrate `dialogueSelection` / `questOutcomeSelection` / etc. into it (saved with v3; bumps to v4 only when other v4 items land).~~ **Shipped 2026-05-08:** `src/uiModals.js` defines `state.ui.modals` (dialogue/questOutcome/jobBoard/codexTab/settings selection indices); `saveMigration.js` backfills it on v3 + v2→v3; `main.js` syncs runtime module-globals into/out of state.ui.modals at save/load boundaries. Codex tab and settings row now survive page reload.
 9. Update Anti-goals (see Track-section near the bottom of this file) to reflect the project-owner directive of 2026-05-05.
 
 ## Definition of Done
