@@ -236,6 +236,7 @@ import {
   writeSave as idbWriteSave,
   migrateFromLocalStorage as idbMigrateFromLocalStorage,
   findMostRecentValidBackup as idbFindMostRecentValidBackup,
+  restoreFromBackup as idbRestoreFromBackup,
   exportSaveBlob as idbExportSaveBlob,
   importSaveFromText as idbImportSaveFromText,
   deleteSave as idbDeleteSave,
@@ -2257,6 +2258,11 @@ const canvas = document.getElementById("game");
   let hasSaveData = false;
   let lastSaveAt = null;
   let currentSaveSlot = IDB_DEFAULT_SLOT;
+  // Tracks whether refreshSlotsAndPickActive has populated cachedSlotMetas at
+  // least once. Until then the slot picker rows are click-disabled so a fast
+  // click during the ~200ms IDB-init window can't read a stale "empty" meta
+  // and overwrite an actual save.
+  let savesLoaded = false;
   let autoSaveTimer = 0;
 
   function currentMap() {
@@ -2490,6 +2496,8 @@ const canvas = document.getElementById("game");
       row.className = "save-slot";
       if (meta.empty) row.classList.add("is-empty");
       if (!meta.empty && !meta.valid) row.classList.add("is-corrupted");
+      if (!savesLoaded) row.classList.add("is-loading");
+      row.disabled = !savesLoaded;
       row.dataset.slot = meta.slot;
       row.setAttribute("aria-label", `${slotDisplayLabel(meta.slot)}: ${buildSlotSummaryText(meta)}`);
 
@@ -2530,13 +2538,41 @@ const canvas = document.getElementById("game");
       }
 
       row.addEventListener("click", async () => {
+        // Block clicks until the IDB scan has populated cachedSlotMetas.
+        // Otherwise a click during the init window reads stale empty=true and
+        // overwrites a real save.
+        if (!savesLoaded) return;
         ensureAudio();
-        const ok = await setCurrentSaveSlot(meta.slot);
-        if (!ok) return;
-        if (meta.empty || !meta.valid) {
-          beginSession();
-        } else {
+        const switched = await setCurrentSaveSlot(meta.slot);
+        if (!switched) return;
+
+        // Corrupted-primary path: try the most-recent valid backup before
+        // falling through to "begin a new run that overwrites this slot."
+        // Without this attempt the "Recover" copy is a lie.
+        if (!hasSaveData) {
+          const stillCorrupted = cachedSlotMetas.find((m) => m.slot === meta.slot && !m.empty && !m.valid);
+          if (stillCorrupted) {
+            try {
+              const recovered = await idbFindMostRecentValidBackup(meta.slot);
+              if (recovered && recovered.ok) {
+                await idbRestoreFromBackup(meta.slot, recovered.savedAt);
+                setCachedSave(recovered.payload, recovered.savedAt);
+                pendingSaveCorruptionMsg = "Save was corrupted; restored from a recent backup.";
+                if (!loadGame({ fromMenu: true })) beginSession();
+                await refreshSlotsAndPickActive();
+                renderSaveSlots();
+                return;
+              }
+            } catch (err) {
+              console.warn("[westward] backup recovery on click failed:", err);
+            }
+          }
+        }
+
+        if (hasSaveData) {
           if (!loadGame({ fromMenu: true })) beginSession();
+        } else {
+          beginSession();
         }
         renderSaveSlots();
       });
@@ -2608,6 +2644,7 @@ const canvas = document.getElementById("game");
       console.warn("[westward] listSlots failed:", err);
       cachedSlotMetas = IDB_KNOWN_SLOTS.map((slot) => ({ slot, empty: true, valid: true, payload: null, savedAt: null }));
     }
+    savesLoaded = true;
     const validWritten = cachedSlotMetas
       .filter((m) => !m.empty && m.valid && m.savedAt)
       .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
