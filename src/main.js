@@ -174,6 +174,7 @@ import {
 import {
   createCodexUnlockNotice,
   createFactionRepNotice,
+  createHudNotice,
 } from "./hudNotice.js";
 import {
   buildJobObjective,
@@ -229,6 +230,7 @@ import {
 } from "./regionInteriors.js";
 import { migrateSaveToV3 } from "./saveMigration.js";
 import { createInitialUiModalState, normalizeUiModalState } from "./uiModals.js";
+import { resolveQuestOutcomeEcho } from "./questOutcomeEchoes.js";
 import {
   readSave as idbReadSave,
   writeSave as idbWriteSave,
@@ -1289,6 +1291,16 @@ const canvas = document.getElementById("game");
       logMsg(createDecisionRecap(state.narrative));
       syncCombatProfileState({ announce: true });
       syncQuestOutcomeCount(state.world, state.narrative);
+      const echo = resolveQuestOutcomeEcho(questId, selected?.id);
+      if (echo) {
+        logMsg(`Word travels: ${echo.line}`);
+        showHudNotice(createHudNotice({
+          kind: "outcome",
+          title: echo.title,
+          line: echo.line,
+          color: echo.color,
+        }));
+      }
       const bark = tryQuestOutcomeBark(state.companion, questId, selected?.id, state.time || 0);
       if (bark) logMsg(bark);
     }
