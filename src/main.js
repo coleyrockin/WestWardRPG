@@ -5264,6 +5264,11 @@ const canvas = document.getElementById("game");
     }
   }
 
+  function anyModalOpen() {
+    return dialogueOpen || jobBoardOpen || codexOpen || questOutcomeOpen
+      || shopOpen || settingsOpen || skillScreenOpen || characterSheetOpen;
+  }
+
   function update(dt) {
     state.time += dt;
     if ((state.player.timeScaleTimer || 0) > 0) {
@@ -5275,11 +5280,8 @@ const canvas = document.getElementById("game");
     }
     const tScale = state.player.timeScale || 1;
     if (tScale !== 1) dt = dt * tScale;
-    if (state.world) advanceTimeOfDay(state.world, dt);
     state.player.dodgeCooldown = Math.max(0, numberOr(state.player.dodgeCooldown, 0) - dt);
     rebuildSpatialHash(enemyGrid, state.enemies, { filter: aliveEnemy });
-    rollRegionEvent(state.regions, dt);
-    applyDynamicRegionProgression();
     if (state.graphics.autoRecommended) {
       const recommended = resolveRecommendedPreset({
         width: canvas.width,
@@ -5328,7 +5330,10 @@ const canvas = document.getElementById("game");
     state.pigJokeCooldown = Math.max(0, state.pigJokeCooldown - dt);
     updateWeather(dt);
 
-    if (state.mode !== "playing") return;
+    if (state.mode !== "playing" || anyModalOpen()) return;
+    if (state.world) advanceTimeOfDay(state.world, dt);
+    rollRegionEvent(state.regions, dt);
+    applyDynamicRegionProgression();
     if (tickChargedAttack(player, dt)) {
       releaseChargedAttack();
     }
