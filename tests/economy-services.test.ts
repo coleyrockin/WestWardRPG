@@ -49,4 +49,106 @@ describe("economyServices", () => {
     });
     expect(smith.serviceLine).toContain("Craft 5");
   });
+
+  describe("outcomeReactionLine", () => {
+    it("returns null when no quest outcomes have been resolved", () => {
+      const merchant = getVendorServiceProfile("merchant", { regionId: "frontier" });
+      expect(merchant.outcomeReactionLine).toBeNull();
+    });
+
+    it("returns null when narrative has outcomes but vendor has no matching reactions", () => {
+      const merchant = getVendorServiceProfile("merchant", {
+        regionId: "frontier",
+        narrative: { questOutcomes: { slime: "any-outcome-that-doesnt-exist" } },
+      });
+      expect(merchant.outcomeReactionLine).toBeNull();
+    });
+
+    it("merchant reacts to archive outcome (truth)", () => {
+      const merchant = getVendorServiceProfile("merchant", {
+        regionId: "frontier",
+        narrative: { questOutcomes: { archive: "truth" } },
+      });
+      expect(merchant.outcomeReactionLine).toMatch(/archive/i);
+    });
+
+    it("merchant reacts to archive outcome (comfort) with different copy than truth", () => {
+      const truth = getVendorServiceProfile("merchant", {
+        regionId: "frontier",
+        narrative: { questOutcomes: { archive: "truth" } },
+      });
+      const comfort = getVendorServiceProfile("merchant", {
+        regionId: "frontier",
+        narrative: { questOutcomes: { archive: "comfort" } },
+      });
+      expect(truth.outcomeReactionLine).not.toBe(comfort.outcomeReactionLine);
+      expect(truth.outcomeReactionLine).toBeTruthy();
+      expect(comfort.outcomeReactionLine).toBeTruthy();
+    });
+
+    it("smith reacts to wood outcome (solidarity)", () => {
+      const smith = getVendorServiceProfile("smith", {
+        regionId: "frontier",
+        narrative: { questOutcomes: { wood: "solidarity" } },
+      });
+      expect(smith.outcomeReactionLine).toBeTruthy();
+      expect(smith.outcomeReactionLine).toMatch(/plan|guild|workers/i);
+    });
+
+    it("smith reacts to wood outcome (status) with different copy", () => {
+      const solidarity = getVendorServiceProfile("smith", {
+        regionId: "frontier",
+        narrative: { questOutcomes: { wood: "solidarity" } },
+      });
+      const status = getVendorServiceProfile("smith", {
+        regionId: "frontier",
+        narrative: { questOutcomes: { wood: "status" } },
+      });
+      expect(solidarity.outcomeReactionLine).not.toBe(status.outcomeReactionLine);
+    });
+
+    it("apothecary reacts to ashfall_boss outcome (mercy)", () => {
+      const apothecary = getVendorServiceProfile("apothecary", {
+        regionId: "frontier",
+        narrative: { questOutcomes: { ashfall_boss: "mercy" } },
+      });
+      expect(apothecary.outcomeReactionLine).toBeTruthy();
+    });
+
+    it("warden reacts to archive outcome (comfort)", () => {
+      const warden = getVendorServiceProfile("warden", {
+        regionId: "frontier",
+        narrative: { questOutcomes: { archive: "comfort" } },
+      });
+      expect(warden.outcomeReactionLine).toBeTruthy();
+    });
+
+    it("prefers a later-quest outcome when multiple are present (lantern_revolt > archive)", () => {
+      const merchant = getVendorServiceProfile("merchant", {
+        regionId: "frontier",
+        narrative: { questOutcomes: { archive: "truth", lantern_revolt: "guild" } },
+      });
+      // lantern_revolt is the last quest in the chain — its reaction wins.
+      expect(merchant.outcomeReactionLine).toMatch(/guild|lantern/i);
+    });
+
+    it("ignores unknown outcome ids and falls back to null", () => {
+      const merchant = getVendorServiceProfile("merchant", {
+        regionId: "frontier",
+        narrative: { questOutcomes: { archive: "not-a-real-outcome" } },
+      });
+      expect(merchant.outcomeReactionLine).toBeNull();
+    });
+
+    it("buildEconomySnapshot threads narrative through to all vendor services", () => {
+      const snapshot = buildEconomySnapshot({
+        regionId: "frontier",
+        narrative: { questOutcomes: { archive: "truth", wood: "solidarity" } },
+      });
+      const merchant = snapshot.vendorServices.find((s: any) => s.id === "merchant");
+      const smith = snapshot.vendorServices.find((s: any) => s.id === "smith");
+      expect(merchant?.outcomeReactionLine).toBeTruthy();
+      expect(smith?.outcomeReactionLine).toBeTruthy();
+    });
+  });
 });

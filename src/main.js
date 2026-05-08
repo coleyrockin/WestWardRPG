@@ -3619,6 +3619,7 @@ const canvas = document.getElementById("game");
       regionId: state.regions.activeRegion,
       identity: normalizeCharacterIdentity(state.progression.identity),
       house: state.house,
+      narrative: state.narrative,
     });
   }
 
@@ -3628,6 +3629,7 @@ const canvas = document.getElementById("game");
       identity: normalizeCharacterIdentity(state.progression.identity),
       house: state.house,
       activeJob: getActiveJobSummary(state.world.jobs),
+      narrative: state.narrative,
     });
   }
 
@@ -4351,7 +4353,9 @@ const canvas = document.getElementById("game");
         }
         if (openDialogueChoiceFor("smith", npc.name)) { sfx.npcChat(); return; }
         logMsg(storyReactiveQuip("smith") || choice(npcDialogue.smith.idle));
-        logMsg(vendorServiceProfile("smith").priceNote);
+        const smithProfile = vendorServiceProfile("smith");
+        logMsg(smithProfile.priceNote);
+        if (smithProfile.outcomeReactionLine) logMsg(smithProfile.outcomeReactionLine);
         if (Math.random() < 0.35) describeNpcBackground("smith");
         sfx.npcChat();
         return;
@@ -4365,7 +4369,9 @@ const canvas = document.getElementById("game");
         if (shopOpen) {
           sfx.npcChat();
           logMsg(storyReactiveQuip("merchant") || choice(npcDialogue.merchant.idle));
-          logMsg(vendorServiceProfile("merchant").serviceLine);
+          const merchantProfile = vendorServiceProfile("merchant");
+          logMsg(merchantProfile.serviceLine);
+          if (merchantProfile.outcomeReactionLine) logMsg(merchantProfile.outcomeReactionLine);
           if (Math.random() < 0.35) describeNpcBackground("merchant");
         } else {
           logMsg("Reverend Quill: Come back when you have more gold... or desperation.");
