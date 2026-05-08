@@ -239,6 +239,9 @@ import {
   exportSaveBlob as idbExportSaveBlob,
   importSaveFromText as idbImportSaveFromText,
   deleteSave as idbDeleteSave,
+  listSlots as idbListSlots,
+  summarizeSavePayload,
+  KNOWN_SLOTS as IDB_KNOWN_SLOTS,
   DEFAULT_SLOT as IDB_DEFAULT_SLOT,
 } from "./savePersistence.js";
 import {
@@ -2252,6 +2255,7 @@ const canvas = document.getElementById("game");
 
   let hasSaveData = false;
   let lastSaveAt = null;
+  let currentSaveSlot = IDB_DEFAULT_SLOT;
   let autoSaveTimer = 0;
 
   function currentMap() {
@@ -2470,31 +2474,48 @@ const canvas = document.getElementById("game");
   }
 
   async function initSavePersistenceAsync() {
-    // 1. Drain any localStorage save into IDB exactly once.
+    // 1. Drain any localStorage save into the default slot exactly once.
     try {
       await idbMigrateFromLocalStorage(IDB_DEFAULT_SLOT);
     } catch (err) {
       console.warn("[westward] localStorage→IDB migration skipped:", err);
     }
-    // 2. Try to read the IDB primary.
-    let result;
+    // 2. Refresh the slot picker so it shows the migrated save plus any
+    // pre-existing slots. This also seeds the active-slot cache from the
+    // most recent valid slot.
+    await refreshSlotsAndPickActive();
+    refreshContinueButton();
+  }
+
+  // Reads all 3 slots, picks the most-recent-saved as the active one, and
+  // primes the read cache so the existing single-slot Continue path works.
+  // Falls through to backup recovery for the active slot if the primary is
+  // corrupted (existing behavior, now slot-aware).
+  let cachedSlotMetas = [];
+  async function refreshSlotsAndPickActive() {
     try {
-      result = await idbReadSave(IDB_DEFAULT_SLOT);
+      cachedSlotMetas = await idbListSlots();
     } catch (err) {
-      console.warn("[westward] IDB read failed:", err);
+      console.warn("[westward] listSlots failed:", err);
+      cachedSlotMetas = IDB_KNOWN_SLOTS.map((slot) => ({ slot, empty: true, valid: true, payload: null, savedAt: null }));
+    }
+    const validWritten = cachedSlotMetas
+      .filter((m) => !m.empty && m.valid && m.savedAt)
+      .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+    if (validWritten.length > 0) {
+      const top = validWritten[0];
+      currentSaveSlot = top.slot;
+      setCachedSave(top.payload, top.savedAt);
       return;
     }
-    if (result.ok) {
-      setCachedSave(result.payload, result.savedAt);
-      return;
-    }
-    // 3. Corruption / missing: try to recover from backups.
-    if (result.reason === "hash-mismatch" || result.reason === "missing-payload" || result.reason === "missing-hash") {
+    // Active primary is empty/corrupted — try backup recovery against the
+    // current slot before giving up.
+    const corruptedActive = cachedSlotMetas.find((m) => m.slot === currentSaveSlot && !m.empty && !m.valid);
+    if (corruptedActive) {
       try {
-        const recovered = await idbFindMostRecentValidBackup(IDB_DEFAULT_SLOT);
+        const recovered = await idbFindMostRecentValidBackup(currentSaveSlot);
         if (recovered && recovered.ok) {
           setCachedSave(recovered.payload, recovered.savedAt);
-          // Surface the recovery once the player is in-session.
           pendingSaveCorruptionMsg = "Save was corrupted; restored from a recent backup.";
           return;
         }
@@ -2502,7 +2523,30 @@ const canvas = document.getElementById("game");
         console.warn("[westward] IDB backup recovery failed:", err);
       }
     }
-    // 4. Nothing usable. hasSaveData remains false.
+    // Nothing usable across any slot.
+    setCachedSave(null, null);
+  }
+
+  function getSlotMetas() {
+    return cachedSlotMetas;
+  }
+
+  async function setCurrentSaveSlot(slot) {
+    if (typeof slot !== "string" || !IDB_KNOWN_SLOTS.includes(slot)) return false;
+    currentSaveSlot = slot;
+    // Re-read the chosen slot's primary so Continue uses its payload.
+    try {
+      const result = await idbReadSave(slot);
+      if (result.ok) {
+        setCachedSave(result.payload, result.savedAt);
+      } else {
+        setCachedSave(null, null);
+      }
+    } catch (err) {
+      console.warn("[westward] setCurrentSaveSlot read failed:", err);
+      setCachedSave(null, null);
+    }
+    return true;
   }
   let pendingSaveCorruptionMsg = null;
 
@@ -2807,7 +2851,7 @@ const canvas = document.getElementById("game");
     // Async write-through to IDB. localStorage is no longer the primary store;
     // the only fallback is the cache held in memory (which is enough for the
     // current session — and the next session if IDB succeeds before tab close).
-    idbWriteSave(IDB_DEFAULT_SLOT, payload).catch((err) => {
+    idbWriteSave(currentSaveSlot, payload).catch((err) => {
       console.warn("[westward] save write failed:", err);
       if (!silent) logMsg("Save failed: storage error.");
     });
