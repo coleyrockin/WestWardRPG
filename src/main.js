@@ -1422,11 +1422,19 @@ const canvas = document.getElementById("game");
     target: "world",
   };
 
+  const QUIT_TO_TITLE_ROW = {
+    id: "quit_to_title",
+    label: "Quit to title (autosaves)",
+    kind: "action",
+    handler: () => quitToTitle(),
+  };
+
   function getCombinedSettingsRows() {
-    return [...SETTINGS_ROWS, DIFFICULTY_SETTING_ROW];
+    return [...SETTINGS_ROWS, DIFFICULTY_SETTING_ROW, QUIT_TO_TITLE_ROW];
   }
 
   function readSettingsRowValue(row) {
+    if (row.kind === "action") return null;
     if (row.target === "world") {
       if (row.id === "difficulty") {
         ensureDifficultyDefaults(state.world);
@@ -1438,6 +1446,11 @@ const canvas = document.getElementById("game");
   }
 
   function stepSettingsRow(row, dir) {
+    if (row.kind === "action") {
+      // Direction is ignored; any input on an action row fires the handler.
+      try { row.handler && row.handler(); } catch (err) { console.warn("[westward] settings action failed:", err); }
+      return null;
+    }
     if (row.target === "world") {
       if (row.id === "difficulty") {
         cycleDifficulty(state.world, dir);
@@ -1454,6 +1467,29 @@ const canvas = document.getElementById("game");
     }
     logMsg(`${row.label}: ${typeof next === "boolean" ? (next ? "ON" : "OFF") : next}`);
     return next;
+  }
+
+  function quitToTitle() {
+    // Best-effort autosave to the active slot before exiting back to title.
+    if (state.mode === "playing" || state.mode === "victory") {
+      try { saveGame({ silent: true }); } catch (err) { console.warn("[westward] quit save failed:", err); }
+    }
+    // Close any open modals so the picker isn't covered when the title returns.
+    settingsOpen = false;
+    shopOpen = false;
+    workbenchOpen = false;
+    skillScreenOpen = false;
+    codexOpen = false;
+    characterSheetOpen = false;
+    jobBoardOpen = false;
+    questOutcomeOpen = false;
+    dialogueOpen = false;
+    state.mode = "menu";
+    if (menu) menu.style.display = "";
+    refreshSlotsAndPickActive()
+      .then(() => renderSaveSlots())
+      .catch((err) => console.warn("[westward] quit refresh failed:", err));
+    logMsg("Returned to title.");
   }
 
   function describeChoiceEffectTags(choice) {
@@ -9291,15 +9327,19 @@ const canvas = document.getElementById("game");
         if (selected) strokeRoundedRect(sx + 8.5, iy + 0.5, sw - 17, 37, 7, "#cce4ff", 1);
         ctx.font = "bold 14px Georgia";
         drawClippedText(row.label, sx + 20, iy + 16, sw * 0.55, selected ? "#cce4ff" : "#f3ecd8");
-        const value = readSettingsRowValue(row);
-        let valueText;
-        if (row.kind === "bool") valueText = value ? "ON" : "OFF";
-        else if (row.kind === "range") valueText = row.format ? row.format(value) : String(value);
-        else valueText = String(value);
         ctx.font = "13px Georgia";
         ctx.textAlign = "right";
         ctx.fillStyle = selected ? "#cce4ff" : "#f3ecd8";
-        ctx.fillText(`◀ ${valueText} ▶`, sx + sw - 20, iy + 24);
+        if (row.kind === "action") {
+          ctx.fillText("Enter ▶", sx + sw - 20, iy + 24);
+        } else {
+          const value = readSettingsRowValue(row);
+          let valueText;
+          if (row.kind === "bool") valueText = value ? "ON" : "OFF";
+          else if (row.kind === "range") valueText = row.format ? row.format(value) : String(value);
+          else valueText = String(value);
+          ctx.fillText(`◀ ${valueText} ▶`, sx + sw - 20, iy + 24);
+        }
         ctx.textAlign = "left";
       }
     }
