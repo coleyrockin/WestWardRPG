@@ -8805,7 +8805,22 @@ const canvas = document.getElementById("game");
       ctx.fillStyle = "rgba(8, 11, 16, 0.8)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       const panelW = Math.min(620, canvas.width - margin * 2);
-      const panelH = compact ? 330 : 365;
+      const decisions = summary.latestDecisions.length ? summary.latestDecisions : ["No major decisions recorded."];
+      const decisionsCount = Math.min(3, decisions.length);
+      const trophyHighlights = (summary.houseTrophyHighlights || []).slice(0, 3);
+      const trophyDisplay = trophyHighlights.length
+        ? trophyHighlights
+        : [summary.houseTrophyLine || "No house trophies recorded yet."];
+      const trophyCap = compact ? 2 : 3;
+      const trophyCount = Math.min(trophyCap, trophyDisplay.length);
+      const decisionLineH = 18;
+      const trophyLineH = 18;
+      const decisionsBlockBottom = 287 + (decisionsCount - 1) * decisionLineH;
+      const trophyHeaderY = decisionsBlockBottom + 25;
+      const trophyFirstY = trophyHeaderY + 21;
+      const trophyBlockBottom = trophyFirstY + (trophyCount - 1) * trophyLineH;
+      const footerY = trophyBlockBottom + 22;
+      const panelH = footerY + 14;
       const px = Math.floor((canvas.width - panelW) / 2);
       const py = Math.max(margin, Math.floor((canvas.height - panelH) / 2));
       drawSoftPanel(px, py, panelW, panelH, {
@@ -8855,12 +8870,17 @@ const canvas = document.getElementById("game");
       ctx.font = "bold 12px Georgia";
       drawClippedText("Latest Decisions", px + 22, py + 266, panelW - 44, "#ffe16a");
       ctx.font = "11px Georgia";
-      const decisions = summary.latestDecisions.length ? summary.latestDecisions : ["No major decisions recorded."];
-      for (let i = 0; i < Math.min(3, decisions.length); i++) {
-        drawClippedText(`- ${decisions[i]}`, px + 22, py + 287 + i * 18, panelW - 44, "#e6d8bd");
+      for (let i = 0; i < decisionsCount; i++) {
+        drawClippedText(`- ${decisions[i]}`, px + 22, py + 287 + i * decisionLineH, panelW - 44, "#e6d8bd");
+      }
+      ctx.font = "bold 12px Georgia";
+      drawClippedText("Home Trophies", px + 22, py + trophyHeaderY, panelW - 44, "#ffe16a");
+      ctx.font = "11px Georgia";
+      for (let i = 0; i < trophyCount; i++) {
+        drawClippedText(`- ${trophyDisplay[i]}`, px + 22, py + trophyFirstY + i * trophyLineH, panelW - 44, "#e6d8bd");
       }
       ctx.font = "italic 11px Georgia";
-      drawClippedText("Progress is saved. Load this ending from the title screen later.", px + 22, py + panelH - 20, panelW - 44, "#b8a792");
+      drawClippedText("Progress is saved. Load this ending from the title screen later.", px + 22, py + footerY, panelW - 44, "#b8a792");
     }
 
     /* Dialogue choice overlay (lite) */
