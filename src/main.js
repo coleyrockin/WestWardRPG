@@ -4400,7 +4400,7 @@ const canvas = document.getElementById("game");
           logMsg("Nora Knuckles patched your wounds for 8 gold. 'You owe me a tip.'");
         } else if (state.player.hp >= state.player.maxHp) {
           if (openDialogueChoiceFor("innkeeper", "Nora Knuckles")) { sfx.npcChat(); return; }
-          logMsg(choice(npcDialogue.innkeeper.idle));
+          logMsg(storyReactiveQuip("innkeeper") || choice(npcDialogue.innkeeper.idle));
           if (Math.random() < 0.35) describeNpcBackground("innkeeper");
           sfx.npcChat();
         } else {
