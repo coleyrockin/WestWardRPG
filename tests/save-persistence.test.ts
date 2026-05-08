@@ -437,6 +437,29 @@ describe("summarizeSavePayload", () => {
       regionId: "frontier",
       victory: false,
       timePlayedSeconds: 0,
+      difficulty: "standard",
     });
+  });
+
+  it("preserves a stored difficulty when known", () => {
+    const summary = summarizeSavePayload({
+      version: 3,
+      time: 60,
+      player: { level: 2 },
+      regions: { activeRegion: "frontier" },
+      world: { difficulty: "hard" },
+    });
+    expect(summary?.difficulty).toBe("hard");
+  });
+
+  it("rejects unknown difficulty strings", () => {
+    const summary = summarizeSavePayload({
+      version: 3,
+      time: 60,
+      player: { level: 2 },
+      regions: { activeRegion: "frontier" },
+      world: { difficulty: "nightmare" },
+    });
+    expect(summary?.difficulty).toBe("standard");
   });
 });

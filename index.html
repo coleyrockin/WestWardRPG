@@ -382,6 +382,48 @@
       color: var(--cream-mute);
     }
 
+    .difficulty-picker {
+      display: inline-flex;
+      gap: 8px;
+      margin-top: 16px;
+      align-items: center;
+    }
+
+    .difficulty-picker-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cream-mute);
+      margin-right: 4px;
+    }
+
+    .difficulty-pill {
+      font-family: var(--font-body);
+      font-size: 12px;
+      padding: 7px 12px;
+      border: 1px solid var(--rule);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--cream-soft);
+      cursor: pointer;
+      transition:
+        border-color 220ms var(--reveal-ease),
+        color 220ms var(--reveal-ease),
+        background 220ms var(--reveal-ease);
+    }
+
+    .difficulty-pill:hover {
+      color: var(--cream);
+      border-color: var(--hairline);
+    }
+
+    .difficulty-pill.is-selected {
+      color: hsl(195 30% 8%);
+      background: linear-gradient(180deg, hsl(36 96% 76%), hsl(22 72% 56%));
+      border-color: hsla(22, 72%, 35%, 0.6);
+    }
+
     .actions {
       display: inline-flex;
       align-items: center;
@@ -811,6 +853,7 @@
           <p class="subtitle reveal r4" id="menu-subtitle">A story-first frontier where every choice tilts the
             valley.</p>
           <div class="origin-picker reveal r5" id="origin-picker" role="group" aria-label="Choose origin"></div>
+          <div class="difficulty-picker reveal r5" id="difficulty-picker" role="group" aria-label="Choose difficulty"></div>
           <div class="save-slots reveal r6" id="save-slots" role="group" aria-label="Save slots"></div>
           <div class="actions reveal r6">
             <button id="start-btn">Begin Journey</button>

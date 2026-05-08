@@ -207,6 +207,7 @@ import {
   resolveDifficultyProfile,
   ensureDifficultyDefaults,
   cycleDifficulty,
+  setDifficulty,
   getEnemyHpMultiplier,
   getEnemyDamageMultiplier,
   getRewardMultiplier,
@@ -376,6 +377,7 @@ const canvas = document.getElementById("game");
   const startBtn = document.getElementById("start-btn");
   const continueBtn = document.getElementById("continue-btn");
   const saveSlotsContainer = document.getElementById("save-slots");
+  const difficultyPicker = document.getElementById("difficulty-picker");
   const originPicker = document.getElementById("origin-picker");
   const langSelect = document.getElementById("lang-select");
   const langLabel = document.getElementById("lang-label");
@@ -1064,6 +1066,41 @@ const canvas = document.getElementById("game");
     }
   }
 
+  function renderDifficultyPicker() {
+    if (!difficultyPicker) return;
+    difficultyPicker.textContent = "";
+    const label = document.createElement("span");
+    label.className = "difficulty-picker-label";
+    label.textContent = "Difficulty";
+    difficultyPicker.appendChild(label);
+    ensureDifficultyDefaults(state.world);
+    for (const id of DIFFICULTY_LEVELS) {
+      const profile = resolveDifficultyProfile(id);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "difficulty-pill";
+      button.dataset.difficultyId = id;
+      button.textContent = profile.label;
+      button.title = profile.description;
+      button.setAttribute("aria-pressed", id === state.world.difficulty ? "true" : "false");
+      button.addEventListener("click", () => {
+        setDifficulty(state.world, id);
+        updateDifficultyPickerSelection();
+      });
+      difficultyPicker.appendChild(button);
+    }
+    updateDifficultyPickerSelection();
+  }
+
+  function updateDifficultyPickerSelection() {
+    if (!difficultyPicker) return;
+    for (const button of difficultyPicker.querySelectorAll("[data-difficulty-id]")) {
+      const selected = button.dataset.difficultyId === state.world.difficulty;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+    }
+  }
+
   function refreshLocalizedStateText() {
     state.quests.crystal.title = t("quests.crystal");
     state.quests.slime.title = t("quests.slime");
@@ -1486,6 +1523,7 @@ const canvas = document.getElementById("game");
     dialogueOpen = false;
     state.mode = "menu";
     if (menu) menu.style.display = "";
+    updateDifficultyPickerSelection();
     refreshSlotsAndPickActive()
       .then(() => renderSaveSlots())
       .catch((err) => console.warn("[westward] quit refresh failed:", err));
@@ -2290,6 +2328,7 @@ const canvas = document.getElementById("game");
   syncChapterFromProgress(state.narrative, state.player.level);
   syncCombatProfileState();
   renderOriginPicker();
+  renderDifficultyPicker();
 
   let hasSaveData = false;
   let lastSaveAt = null;
@@ -2504,11 +2543,14 @@ const canvas = document.getElementById("game");
     if (!summary) return "Save present";
     const region = REGION_DISPLAY_NAMES[summary.regionId] || summary.regionId;
     const time = formatPlayedTime(summary.timePlayedSeconds);
+    const diffTag = summary.difficulty && summary.difficulty !== "standard"
+      ? ` · ${resolveDifficultyProfile(summary.difficulty).label}`
+      : "";
     if (summary.victory) {
       const ending = summary.endingId ? ` (${summary.endingId})` : "";
-      return `Won${ending} · Lvl ${summary.level} · ${region} · ${time}`;
+      return `Won${ending} · Lvl ${summary.level} · ${region} · ${time}${diffTag}`;
     }
-    return `Lvl ${summary.level} · ${region} · ${time}`;
+    return `Lvl ${summary.level} · ${region} · ${time}${diffTag}`;
   }
 
   function slotDisplayLabel(slot) {
@@ -2831,6 +2873,7 @@ const canvas = document.getElementById("game");
         harvestedResourceIds: state.resources.filter((resource) => resource.harvested).map((resource) => resource.id),
         defeatedEnemyIds: state.enemies.filter((enemy) => !enemy.alive).map((enemy) => enemy.id),
         timeOfDay: typeof state.world?.timeOfDay === "number" ? state.world.timeOfDay : 0.25,
+        difficulty: ensureDifficultyDefaults(state.world),
         companionId: state.companion.active ? state.companion.id : (state.world?.companionId || null),
         companionHp: state.companion.active ? Math.max(1, Math.round(state.companion.hp)) : null,
         companionDowned: Boolean(state.companion.downed),
@@ -2906,6 +2949,7 @@ const canvas = document.getElementById("game");
     ensureCodexState(state);
     state.world = {
       timeOfDay: typeof save.world?.timeOfDay === "number" ? save.world.timeOfDay : 0.25,
+      difficulty: typeof save.world?.difficulty === "string" ? save.world.difficulty : "standard",
       companionId: typeof save.world?.companionId === "string" ? save.world.companionId : null,
       companionHp: typeof save.world?.companionHp === "number" ? save.world.companionHp : null,
       companionDowned: Boolean(save.world?.companionDowned),
@@ -2915,6 +2959,7 @@ const canvas = document.getElementById("game");
       jobs: normalizeJobBoardState(save.world?.jobs),
       roadRoute: normalizeRoadRouteState(save.world?.roadRoute),
     };
+    ensureDifficultyDefaults(state.world);
     state.mode = save.mode === "victory" || state.world.runStats?.victory ? "victory" : state.mode;
     state.progression = save.progression || createInitialProgressionState();
     state.progression.identity = normalizeCharacterIdentity(state.progression.identity);

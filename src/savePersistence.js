@@ -447,7 +447,10 @@ const SUMMARY_DEFAULTS = {
   timePlayedSeconds: 0,
   victory: false,
   endingId: null,
+  difficulty: "standard",
 };
+
+const KNOWN_DIFFICULTIES = ["beginner", "standard", "hard"];
 
 export function summarizeSavePayload(payload) {
   if (!payload || typeof payload !== "object") return null;
@@ -464,7 +467,10 @@ export function summarizeSavePayload(payload) {
   const endingId = typeof payload?.world?.runStats?.endingId === "string"
     ? payload.world.runStats.endingId
     : null;
-  return { level, regionId, timePlayedSeconds, victory, endingId };
+  const difficulty = KNOWN_DIFFICULTIES.includes(payload?.world?.difficulty)
+    ? payload.world.difficulty
+    : SUMMARY_DEFAULTS.difficulty;
+  return { level, regionId, timePlayedSeconds, victory, endingId, difficulty };
 }
 
 // Helper for the corruption-recovery path: walks backups newest-first and

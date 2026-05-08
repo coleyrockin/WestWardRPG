@@ -20,6 +20,7 @@ export interface SavePayloadSummary {
   timePlayedSeconds: number;
   victory: boolean;
   endingId: string | null;
+  difficulty: string;
 }
 
 export interface SaveEnvelope {
