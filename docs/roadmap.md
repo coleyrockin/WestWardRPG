@@ -355,12 +355,12 @@ Three deep audits ran on the engine, the system coupling, and the test suite. Fi
 Cross-checked against `decisionEngine`, `factionEffects`, `economyServices`, `npcMemory`, `dialogueChoices`, `jobBoard`, `companionBarks`, `houseProgress`, `runSummary`, `questDefinitions`, `lootSystem`.
 
 - **`economyServices.buildEconomySnapshot`** is exported but **never called** in `main.js`. Either wire it into a vendor-context modal or delete the file.
-- **`factionRep` → shop prices** fires correctly (`factionEffects.resolveShopPriceMultiplier` at `main.js:1396`) but is **invisible during play**. The player only sees the change if they re-open the shop modal. Add a "Word travels: market prices changed" HUD ribbon when `factionRep` crosses ±10 / ±25 / ±50 thresholds.
-- **Codex unlocks are silent** (`resolveCodexUnlockForPOI` at `main.js:3654`). Add an in-world ping ("New codex entry: Lantern Filament") with a flash on the codex icon.
-- **Quest outcomes ↛ job board.** `getJobListings` (`jobBoard.js:794`) filters by `playerLevel` + story-loot inventory; it ignores `narrative.factionRep` and `narrative.questOutcomes` entirely. Add gating + outcome-specific job unlocks ("Guild Revenge" after publishing the ledger, "Council Fallout" after suppressing the survey).
+- ~~**`factionRep` → shop prices** invisible during play.~~ **Shipped:** `tickFactionRepBands` runs in `update`, fires `showHudNotice(createFactionRepNotice(...))` on every band crossing.
+- ~~**Codex unlocks are silent.**~~ **Shipped:** `unlockCodexAndPing` calls `showHudNotice(createCodexUnlockNotice(...))` on every newly unlocked entry.
+- ~~**Quest outcomes ↛ job board.**~~ **Shipped 2026-05-07:** `passesNarrativeGate` in `jobBoard.js` gates listings by `globalFlags`, `questOutcomes`, and `factionRep`. Three outcome-gated frontier jobs (Council Fallout, Guild Pressure Run, Archive Stragglers) appear on Boone's board only after the matching quest choice. `acceptJob` re-validates the gate.
 - **`npcAffinity` vs `npcMemory.byNpc[id].greetings`** — both track "does this NPC know the player." Pick one as authoritative; the other becomes a derived view. Today it's unclear which to read.
 - **`narrative.factionRep` vs `narrative.npcAffinity`** — semantics are conflated. Decide: faction = political, affinity = personal. Then test both surfaces.
-- **`houseProgress` trophies ↛ run summary.** Trophy cards are built (`houseProgress.js:90–95`) but never surfaced in `runSummary.js`. Wire them into the summary modal.
+- ~~**`houseProgress` trophies ↛ run summary.**~~ **Shipped 2026-05-07:** `runSummary.houseTrophyHighlights` is rendered into the victory panel under "Home Trophies" with cursor-driven layout that fits compact and full modes.
 - **`companionBarks` ↛ quest outcomes.** Barks fire on combat events only. Add quest-outcome bark variants per companion personality (Cogwheel sardonic, Nora warm, Boone laconic).
 - **`dialogueChoices` ↛ identity gates.** Choices are not gated by origin or attributes. Add `Speech` gate + origin-flavor gates per the "ten-flavor identity reactions" stretch (existing future-idea).
 - **Endings.** Only 3 distinct outcomes in `decisionEngine.js:198–219`; most runs fall through to "Elite Rotation" fallback. Add `globalFlags` + companion-state modulation per the existing 8-ending stretch.
@@ -378,12 +378,12 @@ Cross-checked against `decisionEngine`, `factionEffects`, `economyServices`, `np
 
 ### Quick-win cleanup (each is < 1 day, do them this week)
 
-1. README: update test count `337 / 35` → `457 / 44`.
+1. ~~README: update test count `337 / 35` → `457 / 44`.~~ **Shipped 2026-05-07:** README now reads 548 / 52, matching reality.
 2. ~~Delete or wire `atmosphere.js`~~ — already wired (corrected 2026-05-05); served from `public/atmosphere.js` by Vite.
 3. Wire or delete `economyServices.buildEconomySnapshot`.
-4. Add codex-unlock HUD ping (small floating-text + icon flash).
-5. Add price-shift HUD ribbon when faction rep crosses ±10 / ±25 / ±50.
-6. Move `JOB_BOARD_PROPS` → `poiSystem.js`; `JOB_BOARD_PRESENTATION` → `storyContent.js`; `COMPLETED_JOB_BOARD_LINES` → `npcMemory.js`.
+4. ~~Add codex-unlock HUD ping (small floating-text + icon flash).~~ **Shipped:** `unlockCodexAndPing` already fires `showHudNotice(createCodexUnlockNotice(...))`.
+5. ~~Add price-shift HUD ribbon when faction rep crosses ±10 / ±25 / ±50.~~ **Shipped:** `tickFactionRepBands` fires `showHudNotice(createFactionRepNotice(...))` on band crossings (with Market Cartel price-line variant).
+6. ~~Move `JOB_BOARD_PROPS` → `poiSystem.js`; `JOB_BOARD_PRESENTATION` → `storyContent.js`; `COMPLETED_JOB_BOARD_LINES` → `npcMemory.js`.~~ **Shipped:** `jobBoard.js` already imports them from those modules.
 7. Pre-allocate the raycaster depth buffer (move `new Float32Array(width)` out of the per-frame path).
 8. Add `state.ui.modals[]` and migrate `dialogueSelection` / `questOutcomeSelection` / etc. into it (saved with v3; bumps to v4 only when other v4 items land).
 9. Update Anti-goals (see Track-section near the bottom of this file) to reflect the project-owner directive of 2026-05-05.

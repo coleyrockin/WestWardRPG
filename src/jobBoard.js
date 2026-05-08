@@ -315,6 +315,95 @@ export const JOB_DEFINITIONS = {
       items: { Potion: 1 },
     },
   },
+  // Outcome-gated frontier jobs — visible proof Boone's board reacts to
+  // the player's quest choices. Each one is listed only when the matching
+  // quest outcome flag is set, so the player sees the world reroute.
+  frontier_council_fallout: {
+    id: "frontier_council_fallout",
+    title: "Council Fallout",
+    kind: "bounty",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 12,
+    hint: "Drive off the angry workers picketing Boone's office after the survey was buried.",
+    boardNote: "Boone hates this one. Says the survey would have been quieter than the picket lines.",
+    narrativeGate: { requiresFlag: "surveySuppressed" },
+    objective: {
+      type: "kill",
+      enemyType: "slime",
+      behavior: "balanced",
+      count: 2,
+      label: "agitators chased off",
+    },
+    reward: {
+      gold: 40,
+      xp: 18,
+      items: { Potion: 1 },
+    },
+  },
+  frontier_guild_pressure: {
+    id: "frontier_guild_pressure",
+    title: "Guild Pressure Run",
+    kind: "courier",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 14,
+    hint: "Hand-deliver the workers' answer to Elder Nira so the published survey lands with weight.",
+    boardNote: "Now that the survey is public, the guild wants it pushed past pleasantries.",
+    narrativeGate: { requiresFlag: "surveyPublished" },
+    objective: {
+      type: "delivery",
+      count: 2,
+      label: "guild reply delivered",
+      pickup: { id: "frontier_guild_reply_cache", label: "Guild Reply", x: 12.95, y: 8.45 },
+      deliveryNpcId: "elder",
+      deliveryLabel: "Elder Nira",
+    },
+    bonus: {
+      type: "time_limit",
+      seconds: 90,
+      line: "Same-day delivery bonus if Nira reads it within 90s.",
+      missedLine: "Same-day delivery bonus missed.",
+      reward: { gold: 10, xp: 4 },
+    },
+    reward: {
+      gold: 38,
+      xp: 19,
+      items: { Tonic: 1 },
+    },
+  },
+  frontier_archive_quiet: {
+    id: "frontier_archive_quiet",
+    title: "Archive Stragglers",
+    kind: "salvage",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 16,
+    hint: "Sweep two stashes of stray archive copies before they leak past the council seal.",
+    boardNote: "The Council wants the loose pages collected fast. Boone left the order on top of the board.",
+    narrativeGate: { requiresFlag: "archiveSealed" },
+    objective: {
+      type: "collect",
+      item: "Stone",
+      resourceType: "rock",
+      count: 2,
+      label: "archive stashes recovered",
+    },
+    reward: {
+      gold: 32,
+      xp: 16,
+      items: { Ashglass: 1 },
+    },
+  },
   ashfall_scrap_warrant: {
     id: "ashfall_scrap_warrant",
     title: "Scrap Warrant",
@@ -546,6 +635,37 @@ function requiredStoryLootLabel(job) {
   return Array.isArray(required) ? required.join(", ") : String(required);
 }
 
+// Quest-outcome and faction-rep gating. Lets a job listing appear (or hide)
+// based on narrative state the player created — closes the audit's
+// "quest outcomes ↛ job board" gap so Boone's board visibly reacts to choices.
+export function passesNarrativeGate(job, narrative = {}) {
+  const gate = job?.narrativeGate;
+  if (!gate || typeof gate !== "object") return true;
+  const flags = (narrative && typeof narrative.globalFlags === "object" && narrative.globalFlags) || {};
+  const rep = (narrative && typeof narrative.factionRep === "object" && narrative.factionRep) || {};
+  const outcomes = (narrative && typeof narrative.questOutcomes === "object" && narrative.questOutcomes) || {};
+  if (gate.requiresFlag && flags[gate.requiresFlag] !== true) return false;
+  if (gate.forbidsFlag && flags[gate.forbidsFlag] === true) return false;
+  if (gate.requiresQuestOutcome) {
+    const { questId, outcomeId } = gate.requiresQuestOutcome;
+    if (!questId || outcomes[questId] !== outcomeId) return false;
+  }
+  if (gate.requiresFactionRep) {
+    const { faction, min } = gate.requiresFactionRep;
+    if (!faction) return false;
+    const value = Number.isFinite(rep[faction]) ? rep[faction] : 0;
+    if (value < (Number.isFinite(min) ? min : 0)) return false;
+  }
+  if (gate.forbidsFactionRep) {
+    const { faction, max } = gate.forbidsFactionRep;
+    if (faction) {
+      const value = Number.isFinite(rep[faction]) ? rep[faction] : 0;
+      if (value > (Number.isFinite(max) ? max : 0)) return false;
+    }
+  }
+  return true;
+}
+
 function resolveCompletedJobBoardLine(completedJobIds = [], regionId = "frontier") {
   const ids = Array.isArray(completedJobIds) ? completedJobIds.slice().reverse() : [];
   const match = ids
@@ -721,13 +841,14 @@ function decorateJob(job, progress = null, context = {}) {
   };
 }
 
-export function getJobListings({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState(), inventory = {} } = {}) {
+export function getJobListings({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState(), inventory = {}, narrative = {} } = {}) {
   const safeState = normalizeJobBoardState(jobState);
   const safeLevel = Math.max(1, Math.floor(Number.isFinite(playerLevel) ? playerLevel : 1));
   return Object.values(JOB_DEFINITIONS)
     .filter((job) => job.regionId === regionId)
     .filter((job) => job.minLevel <= safeLevel)
     .filter((job) => hasRequiredStoryLoot(job, inventory))
+    .filter((job) => passesNarrativeGate(job, narrative))
     .filter((job) => !safeState.completedJobIds.includes(job.id))
     .map((job) => decorateJob(job, safeState.progressByJobId[job.id], {
       inventory,
@@ -741,7 +862,7 @@ export function getJobDefinition(jobId) {
   return job ? decorateJob(job) : null;
 }
 
-export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState(), npcId = "warden", limit = 7, inventory = {} } = {}) {
+export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, jobState = createInitialJobBoardState(), npcId = "warden", limit = 7, inventory = {}, narrative = {} } = {}) {
   const active = getActiveJobSummary(jobState);
   if (active?.npcId === npcId) {
     return [{
@@ -750,7 +871,7 @@ export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, job
       selectable: active.status === "ready" || active.status === "failed",
     }];
   }
-  return getJobListings({ regionId, playerLevel, jobState, inventory })
+  return getJobListings({ regionId, playerLevel, jobState, inventory, narrative })
     .filter((job) => job.npcId === npcId)
     .slice(0, Math.max(1, Math.floor(limit)))
     .map((job) => ({
@@ -760,7 +881,7 @@ export function getJobBoardChoices({ regionId = "frontier", playerLevel = 1, job
     }));
 }
 
-export function acceptJob(jobState, jobId, { time = 0, inventory = {} } = {}) {
+export function acceptJob(jobState, jobId, { time = 0, inventory = {}, narrative = {} } = {}) {
   const state = syncJobState(jobState);
   const job = knownJob(jobId);
   if (!job) return { ok: false, message: "Job not found.", jobState: state };
@@ -768,6 +889,14 @@ export function acceptJob(jobState, jobId, { time = 0, inventory = {} } = {}) {
     return {
       ok: false,
       message: `Job requires ${requiredStoryLootLabel(job)} to be in your inventory.`,
+      job: decorateJob(job),
+      jobState: state,
+    };
+  }
+  if (!passesNarrativeGate(job, narrative)) {
+    return {
+      ok: false,
+      message: "That listing is no longer offered.",
       job: decorateJob(job),
       jobState: state,
     };

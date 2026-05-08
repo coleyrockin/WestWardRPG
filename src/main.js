@@ -3563,6 +3563,7 @@ const canvas = document.getElementById("game");
       jobState: state.world.jobs,
       npcId: "warden",
       inventory: state.inventory,
+      narrative: state.narrative,
       limit: 7,
     });
   }
@@ -3653,7 +3654,7 @@ const canvas = document.getElementById("game");
       return;
     }
     if (choiceJob.boardState === "available") {
-      const accepted = acceptJob(state.world.jobs, choiceJob.id, { time: state.time, inventory: state.inventory });
+      const accepted = acceptJob(state.world.jobs, choiceJob.id, { time: state.time, inventory: state.inventory, narrative: state.narrative });
       if (accepted.ok) {
         const condition = [accepted.job.bonusLine, accepted.job.failureLine].filter(Boolean).join(" ");
         logMsg(`Job accepted: ${accepted.job.title}. ${accepted.job.hint} Reward ${accepted.job.rewardLine}.${condition ? ` ${condition}` : ""}`);
@@ -9956,6 +9957,7 @@ const canvas = document.getElementById("game");
       playerLevel: state.player.level,
       jobState: state.world.jobs,
       inventory: state.inventory,
+      narrative: state.narrative,
     });
     const jobRouteMarker = getJobRouteMarker();
     const boardProp = getActiveJobBoardProp();

@@ -9,6 +9,7 @@ import {
   getJobBoardChoices,
   getJobListings,
   normalizeJobBoardState,
+  passesNarrativeGate,
   recordJobEvent,
   resolveJobRouteMarker,
 } from "../src/jobBoard.js";
@@ -827,5 +828,94 @@ describe("jobBoard", () => {
     expect(claimed.reward).toEqual({ gold: 74, xp: 36, items: { "Scrap Coil": 1, "Heat Resin": 1 } });
     expect(listings[0].completedJobLine).toContain("helmet-lamp salvage");
     expect(listings[0].boardNote).toContain("workable again");
+  });
+
+  describe("narrativeGate", () => {
+    it("passes when no gate is defined", () => {
+      expect(passesNarrativeGate({}, {})).toBe(true);
+      expect(passesNarrativeGate({ narrativeGate: null } as any, {})).toBe(true);
+    });
+
+    it("requires a flag when requiresFlag is set", () => {
+      const job = { narrativeGate: { requiresFlag: "surveyPublished" } } as any;
+      expect(passesNarrativeGate(job, { globalFlags: {} })).toBe(false);
+      expect(passesNarrativeGate(job, { globalFlags: { surveyPublished: true } })).toBe(true);
+    });
+
+    it("rejects when forbidsFlag is set", () => {
+      const job = { narrativeGate: { forbidsFlag: "tyrantOperationPurged" } } as any;
+      expect(passesNarrativeGate(job, { globalFlags: { tyrantOperationPurged: true } })).toBe(false);
+      expect(passesNarrativeGate(job, { globalFlags: {} })).toBe(true);
+    });
+
+    it("checks quest outcome match", () => {
+      const job = { narrativeGate: { requiresQuestOutcome: { questId: "crystal", outcomeId: "truth" } } } as any;
+      expect(passesNarrativeGate(job, { questOutcomes: { crystal: "comfort" } })).toBe(false);
+      expect(passesNarrativeGate(job, { questOutcomes: { crystal: "truth" } })).toBe(true);
+    });
+
+    it("checks faction rep min and max", () => {
+      const minJob = { narrativeGate: { requiresFactionRep: { faction: "workersGuild", min: 25 } } } as any;
+      expect(passesNarrativeGate(minJob, { factionRep: { workersGuild: 10 } })).toBe(false);
+      expect(passesNarrativeGate(minJob, { factionRep: { workersGuild: 25 } })).toBe(true);
+
+      const maxJob = { narrativeGate: { forbidsFactionRep: { faction: "civicCouncil", max: -25 } } } as any;
+      expect(passesNarrativeGate(maxJob, { factionRep: { civicCouncil: 0 } })).toBe(false);
+      expect(passesNarrativeGate(maxJob, { factionRep: { civicCouncil: -50 } })).toBe(true);
+    });
+  });
+
+  describe("outcome-gated frontier jobs", () => {
+    it("hides outcome-gated jobs by default", () => {
+      const ids = getJobListings({
+        regionId: "frontier",
+        playerLevel: 1,
+        jobState: createInitialJobBoardState(),
+        inventory: {},
+        narrative: {},
+      }).map((j) => j.id);
+      expect(ids).not.toContain("frontier_council_fallout");
+      expect(ids).not.toContain("frontier_guild_pressure");
+      expect(ids).not.toContain("frontier_archive_quiet");
+    });
+
+    it("surfaces Guild Pressure Run after surveyPublished", () => {
+      const ids = getJobListings({
+        regionId: "frontier",
+        playerLevel: 1,
+        jobState: createInitialJobBoardState(),
+        inventory: {},
+        narrative: { globalFlags: { surveyPublished: true } },
+      }).map((j) => j.id);
+      expect(ids).toContain("frontier_guild_pressure");
+      expect(ids).not.toContain("frontier_council_fallout");
+    });
+
+    it("surfaces Council Fallout after surveySuppressed and Archive Stragglers after archiveSealed", () => {
+      const ids = getJobListings({
+        regionId: "frontier",
+        playerLevel: 1,
+        jobState: createInitialJobBoardState(),
+        inventory: {},
+        narrative: { globalFlags: { surveySuppressed: true, archiveSealed: true } },
+      }).map((j) => j.id);
+      expect(ids).toContain("frontier_council_fallout");
+      expect(ids).toContain("frontier_archive_quiet");
+      expect(ids).not.toContain("frontier_guild_pressure");
+    });
+
+    it("blocks acceptJob when the narrative gate fails", () => {
+      const result = acceptJob(createInitialJobBoardState(), "frontier_guild_pressure", { narrative: {} });
+      expect(result.ok).toBe(false);
+      expect(result.message).toMatch(/no longer offered/i);
+    });
+
+    it("allows acceptJob when the narrative gate passes", () => {
+      const result = acceptJob(createInitialJobBoardState(), "frontier_guild_pressure", {
+        narrative: { globalFlags: { surveyPublished: true } },
+      });
+      expect(result.ok).toBe(true);
+      expect(result.job?.id).toBe("frontier_guild_pressure");
+    });
   });
 });
