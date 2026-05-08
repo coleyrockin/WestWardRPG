@@ -270,9 +270,11 @@ function scheduleMelodyAhead(ctx, node) {
   }
 }
 
-export function startMusicForRegion(buses, regionId, fadeSec = 2.0) {
+export function startMusicForRegion(buses, regionId, fadeSec = 2.0, options = {}) {
   if (!buses || !buses.music) return null;
-  const profile = MUSIC_REGION_PROFILE[regionId] || MUSIC_REGION_PROFILE.frontier;
+  const profile = (options && options.profile)
+    ? options.profile
+    : (MUSIC_REGION_PROFILE[regionId] || MUSIC_REGION_PROFILE.frontier);
   const node = buildMusicNode(buses.ctx, profile);
   node.padGain.connect(buses.music);
   node.melodyOutGain.connect(buses.music);
@@ -296,10 +298,10 @@ export function startMusicForRegion(buses, regionId, fadeSec = 2.0) {
   return node;
 }
 
-export function setMusicRegion(buses, regionId, fadeSec = 2.0) {
+export function setMusicRegion(buses, regionId, fadeSec = 2.0, options = {}) {
   if (!buses || !buses.music) return null;
   const previous = buses.currentMusic;
-  const next = startMusicForRegion(buses, regionId, fadeSec);
+  const next = startMusicForRegion(buses, regionId, fadeSec, options);
   if (previous) {
     const now = buses.ctx.currentTime;
     previous.active = false;

@@ -285,7 +285,9 @@ import {
   setMusicRegion,
   setCombatTension,
   stopMusic,
+  MUSIC_REGION_PROFILE,
 } from "./audio.js";
+import { applyOutcomeModulation } from "./musicReactivity.js";
 import {
   hexToRgba as hexToRgbaUtil,
   gradientBucket as gradientBucketUtil,
@@ -1196,6 +1198,11 @@ const canvas = document.getElementById("game");
     return audioCtx;
   }
 
+  function resolveModulatedMusicProfile(regionId) {
+    const base = MUSIC_REGION_PROFILE[regionId] || MUSIC_REGION_PROFILE.frontier;
+    return applyOutcomeModulation(base, state.narrative);
+  }
+
   function syncAmbientForRegion(regionId) {
     if (!ambientEnabled || !soundEnabled) return;
     const ctx = ensureAudio();
@@ -1203,7 +1210,22 @@ const canvas = document.getElementById("game");
     if (regionId === lastAmbientRegion) return;
     try { setAmbientRegion(audioBuses, regionId); lastAmbientRegion = regionId; } catch { /* audio not critical */ }
     // Procedural music tracks the ambient region. Cross-fades with the same cadence.
-    try { setMusicRegion(audioBuses, regionId); } catch { /* music not critical */ }
+    // Profile is modulated by narrative.questOutcomes so post-decision tone shifts.
+    try {
+      setMusicRegion(audioBuses, regionId, undefined, { profile: resolveModulatedMusicProfile(regionId) });
+    } catch { /* music not critical */ }
+  }
+
+  // After a quest outcome resolves, re-fire setMusicRegion so the modulation
+  // takes effect mid-region without waiting for a region change. Forces the
+  // crossfade by clearing lastAmbientRegion. Cheap because the audio nodes
+  // get rebuilt on every setMusicRegion call anyway.
+  function refreshMusicForCurrentNarrative() {
+    if (!ambientEnabled || !soundEnabled || !audioBuses) return;
+    const regionId = state.regions?.activeRegion || "frontier";
+    try {
+      setMusicRegion(audioBuses, regionId, undefined, { profile: resolveModulatedMusicProfile(regionId) });
+    } catch { /* music not critical */ }
   }
 
   // Tension fader: smoothed enemy-pressure signal feeds the combat stem.
@@ -1345,6 +1367,10 @@ const canvas = document.getElementById("game");
       }
       const bark = tryQuestOutcomeBark(state.companion, questId, selected?.id, state.time || 0);
       if (bark) logMsg(bark);
+      // Music profile re-modulates against the new questOutcomes map so the
+      // score reflects the player's most recent decision without waiting for
+      // a region change.
+      refreshMusicForCurrentNarrative();
     }
     pendingQuestOutcome = null;
     questOutcomeOpen = false;
