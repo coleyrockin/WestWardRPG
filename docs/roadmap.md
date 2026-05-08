@@ -260,7 +260,7 @@ It needs the existing systems to feel connected in the player's first short sess
 
 ## Shipped Foundations (audit)
 
-Latest audit (2026-05-08, post quest-outcome reactivity batch): `npm test` → **613 passing across 54 test files**; 48 source modules (added `uiModals.js`, `questOutcomeEchoes.js`); 14 Playwright scripted-replay scenarios; **CI live** (`.github/workflows/qa.yml`, two-job pipeline). `main.js` is **~10,310 lines** (extraction debt unchanged this batch — work landed in dedicated modules + 5 small wires). README test count refreshed in lockstep with each batch.
+Latest audit (2026-05-08, post save-slot picker batch): `npm test` → **621 passing across 54 test files**; 48 source modules; 14 Playwright scripted-replay scenarios; **CI live** (`.github/workflows/qa.yml`, two-job pipeline). `main.js` is **~10,420 lines** (slot-picker rendering + 5 reactivity wires landed inline; `savePersistence.js` grew with `listSlots` + `summarizeSavePayload`). README test count refreshed in lockstep with each batch.
 
 ### Phase 1 open-road slice (latest local)
 - **Discovery Reward Banner 1** (`src/discoveryRewardFeedback.js`) — discoveries now trigger a compact reward banner with title, reward line, story hook, codex unlock, and route/renown payoff lines. `render_game_to_text` exposes the active banner for browser smoke and human-test auditing.
@@ -558,10 +558,10 @@ Goal: The game should be stable enough for someone else to test without you stan
    7. Difficulty selection
 
 2. Save resilience
-   1. Multiple save slots
-   2. Backup rotation
-   3. Corruption recovery screen
-   4. Export and import
+   1. ~~Multiple save slots~~ **Shipped 2026-05-08:** title-screen 3-slot picker (`#save-slots`); each row shows level / region / time / "Won (ending)" / "Empty"; click selects slot + continues or begins fresh. New `KNOWN_SLOTS`, `listSlots()`, `summarizeSavePayload()` in `savePersistence.js`; `currentSaveSlot` runtime in `main.js` routes save/load/auto-save/delete through the active slot.
+   2. ~~Backup rotation~~ **Shipped 2026-05-05** (3 backups per slot via `MAX_BACKUPS_PER_SLOT`, automatic on every write).
+   3. Corruption recovery screen — partial: boot-time recovery from backup is automatic; the slot picker flags corrupted saves as "Save corrupted (use ↺ to attempt recovery)" but doesn't yet expose a per-slot recover button.
+   4. ~~Export and import~~ **Shipped 2026-05-05** (`exportSaveBlob` / `importSaveFromText`); per-slot UI buttons not yet wired.
    5. Clear future schema messaging
 
 3. Local run history
