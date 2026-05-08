@@ -12,6 +12,7 @@ import { normalizeWorkstationState } from "./craftingStation.js";
 import { normalizeNpcMemoryState } from "./npcMemory.js";
 import { normalizeRoadRouteState } from "./roadRoutes.js";
 import { normalizeInventoryState } from "./inventoryState.js";
+import { normalizeUiModalState } from "./uiModals.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -125,6 +126,11 @@ function backfillQuickUtilityDefaults(quickUtility) {
   return { active, inventory };
 }
 
+function backfillUiDefaults(ui) {
+  const source = ui && typeof ui === "object" && !Array.isArray(ui) ? ui : {};
+  return { modals: normalizeUiModalState(source.modals) };
+}
+
 function backfillNarrativeDefaults(narrative) {
   const defaults = createInitialNarrativeState();
   const source = narrative && typeof narrative === "object" ? clone(narrative) : {};
@@ -171,6 +177,7 @@ export function migrateSaveToV3(save) {
     save.player.quickUtility = backfillQuickUtilityDefaults(save.player.quickUtility);
     save.player.equipment = backfillEquipmentDefaults(save.player.equipment);
     save.progression = backfillProgressionDefaults(save.progression);
+    save.ui = backfillUiDefaults(save.ui);
     return save;
   }
   if (save.version !== 2 && save.version !== 1) return null;
@@ -217,6 +224,7 @@ export function migrateSaveToV3(save) {
         ...(save.graphics?.performance || {}),
       },
     },
+    ui: backfillUiDefaults(save.ui),
   };
 
   if (save.version === 1) {

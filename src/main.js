@@ -228,6 +228,7 @@ import {
   ensureInteriorVisitState,
 } from "./regionInteriors.js";
 import { migrateSaveToV3 } from "./saveMigration.js";
+import { createInitialUiModalState, normalizeUiModalState } from "./uiModals.js";
 import {
   readSave as idbReadSave,
   writeSave as idbWriteSave,
@@ -2114,6 +2115,7 @@ const canvas = document.getElementById("game");
       roadRoute: null,
     },
     companion: createInitialCompanionRuntime(),
+    ui: { modals: createInitialUiModalState() },
     codex: { unlocked: { regions: [], enemies: [], items: [], factions: [], ideology: [], letters: [] } },
     npcs: [
       {
@@ -2492,6 +2494,31 @@ const canvas = document.getElementById("game");
   }
   let pendingSaveCorruptionMsg = null;
 
+  // Sync runtime modal-selection module-globals → state.ui.modals before save.
+  // Module-globals stay authoritative during play; this just snapshots them
+  // into state at save boundaries so the persisted file carries them.
+  function syncUiModalsFromRuntime() {
+    if (!state.ui || !state.ui.modals) state.ui = { modals: createInitialUiModalState() };
+    state.ui.modals.dialogue = dialogueSelection;
+    state.ui.modals.questOutcome = questOutcomeSelection;
+    state.ui.modals.jobBoard = jobBoardSelection;
+    state.ui.modals.codexTab = codexTab;
+    state.ui.modals.settings = settingsSelection;
+  }
+
+  // Sync state.ui.modals → runtime module-globals after load. Mirror of the
+  // capture-side sync. Modal-open handlers reset most of these on open, so
+  // the practical effect is preserving codexTab + settingsSelection across
+  // reload (the two not auto-reset on open).
+  function syncUiModalsToRuntime() {
+    const m = state.ui && state.ui.modals ? state.ui.modals : createInitialUiModalState();
+    dialogueSelection = m.dialogue;
+    questOutcomeSelection = m.questOutcome;
+    jobBoardSelection = m.jobBoard;
+    codexTab = m.codexTab;
+    settingsSelection = m.settings;
+  }
+
   function captureSaveData() {
     state.narrative.ending = resolveNarrativeEnding(state.narrative);
     ensureRunStats(state.world, state.time);
@@ -2500,6 +2527,7 @@ const canvas = document.getElementById("game");
     state.progression.equipment = normalizeGearState(state.progression.equipment);
     state.world.jobs = normalizeJobBoardState(state.world.jobs);
     state.world.roadRoute = normalizeRoadRouteState(state.world.roadRoute);
+    syncUiModalsFromRuntime();
     return {
       version: 3,
       savedAt: Date.now(),
@@ -2580,6 +2608,7 @@ const canvas = document.getElementById("game");
       progression: state.progression,
       regions: state.regions,
       graphics: state.graphics,
+      ui: { modals: { ...state.ui.modals } },
     };
   }
 
@@ -2655,6 +2684,8 @@ const canvas = document.getElementById("game");
     selectedOriginId = state.progression.identity.originId;
     updateOriginPickerSelection();
     state.regions = save.regions || createInitialRegionState();
+    state.ui = { modals: normalizeUiModalState(save.ui?.modals) };
+    syncUiModalsToRuntime();
     const graphicsDefaults = createInitialGraphicsState();
     state.graphics = {
       ...graphicsDefaults,

@@ -273,4 +273,42 @@ describe("saveMigration", () => {
     });
     expect(out?.player?.equipment?.affixes).toEqual([]);
   });
+
+  it("backfills ui.modals on v3 saves missing it", () => {
+    const out = migrateSaveToV3({ version: 3, savedAt: 99 });
+    expect(out?.ui?.modals).toEqual({
+      dialogue: 0,
+      questOutcome: 0,
+      jobBoard: 0,
+      codexTab: 0,
+      settings: 0,
+    });
+  });
+
+  it("preserves existing ui.modals indices through v3 backfill", () => {
+    const save = {
+      version: 3,
+      savedAt: 99,
+      ui: { modals: { dialogue: 1, questOutcome: 2, jobBoard: 3, codexTab: 4, settings: 5 } },
+    };
+    const out = migrateSaveToV3(save);
+    expect(out?.ui?.modals).toEqual({
+      dialogue: 1,
+      questOutcome: 2,
+      jobBoard: 3,
+      codexTab: 4,
+      settings: 5,
+    });
+  });
+
+  it("v2 to v3 migration seeds default ui.modals", () => {
+    const out = migrateSaveToV3({ version: 2, savedAt: 1 });
+    expect(out?.ui?.modals).toEqual({
+      dialogue: 0,
+      questOutcome: 0,
+      jobBoard: 0,
+      codexTab: 0,
+      settings: 0,
+    });
+  });
 });
