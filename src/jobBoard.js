@@ -799,6 +799,69 @@ function buildProgressLine(job, progress = null) {
   return `${count}/${objective.count} ${objective.label}`;
 }
 
+// Region-aware quest-outcome flavor for the job board. Each board listing in
+// the matching region picks up one extra sentence reflecting the player's
+// most recent decision in that region's storyline. Late-chain outcomes win.
+const REGION_QUEST_PRIORITY = {
+  frontier: ["archive", "wood", "crystal"],
+  ashfall: ["ashfall_boss", "ashfall_intro"],
+  ironlantern: ["lantern_revolt", "lantern_probe"],
+};
+
+const REGION_OUTCOME_BOARD_LINES = {
+  frontier: {
+    archive: {
+      truth: "The board sits heavier since the archive went public — every contract reads tense.",
+      comfort: "With the archive sealed, the board's tone is calmer, almost lazy.",
+    },
+    wood: {
+      solidarity: "Workers swap house plans at the board now; postings move fast.",
+      status: "A private deed posted nearby. The board reads quieter — and choosier.",
+    },
+    crystal: {
+      truth: "The published survey nudges every notice toward truthful posting.",
+      comfort: "The quieted survey leaves the board comfortably vague.",
+    },
+  },
+  ashfall: {
+    ashfall_boss: {
+      mercy: "The tyrant fell; the crew lived. Witnesses leave fresh tips on the board.",
+      purge: "After the purge, the board reads thin — every notice underlined twice.",
+    },
+    ashfall_intro: {
+      salvage: "Open salvage rights mean the board fills faster than the wind takes it.",
+      monopoly: "Licensed routes shrink the board to premium-only postings.",
+    },
+  },
+  ironlantern: {
+    lantern_revolt: {
+      guild: "Guild backing has the Lantern board posting bargaining-friendly hours.",
+      council: "Council terms shaved the Lantern board to careful, paper-trail work.",
+    },
+    lantern_probe: {
+      broadcast: "Since the signal broadcast, the board reads bolder, looser.",
+      decrypt: "The signal stayed private — the board posts in coded shorthand again.",
+    },
+  },
+};
+
+function resolveOutcomeBoardLine(regionId, narrative) {
+  const priority = REGION_QUEST_PRIORITY[regionId];
+  const table = REGION_OUTCOME_BOARD_LINES[regionId];
+  if (!priority || !table) return null;
+  const outcomes = (narrative && typeof narrative === "object" && narrative.questOutcomes && typeof narrative.questOutcomes === "object")
+    ? narrative.questOutcomes
+    : null;
+  if (!outcomes) return null;
+  for (const questId of priority) {
+    const outcomeId = outcomes[questId];
+    if (!outcomeId) continue;
+    const line = table[questId]?.[outcomeId];
+    if (typeof line === "string" && line.length > 0) return line;
+  }
+  return null;
+}
+
 function decorateJob(job, progress = null, context = {}) {
   const reward = cloneReward(job.reward);
   const availabilityBits = [
@@ -810,8 +873,9 @@ function decorateJob(job, progress = null, context = {}) {
   const visibleReward = progress?.status === "ready" ? payableReward(job, progress) : reward;
   const storyLoot = resolveStoryLootBoardReaction(context.inventory, job.regionId);
   const completedJobLine = resolveCompletedJobBoardLine(context.completedJobIds, job.regionId);
+  const outcomeBoardLine = resolveOutcomeBoardLine(job.regionId, context.narrative);
   const baseBoardNote = job.boardNote || job.hint;
-  const boardNote = [baseBoardNote, storyLoot?.line, completedJobLine].filter(Boolean).join(" ");
+  const boardNote = [baseBoardNote, storyLoot?.line, completedJobLine, outcomeBoardLine].filter(Boolean).join(" ");
   return {
     ...job,
     objective: cloneObjective(job.objective),
@@ -853,6 +917,7 @@ export function getJobListings({ regionId = "frontier", playerLevel = 1, jobStat
     .map((job) => decorateJob(job, safeState.progressByJobId[job.id], {
       inventory,
       completedJobIds: safeState.completedJobIds,
+      narrative,
     }))
     .sort((a, b) => a.minLevel - b.minLevel || (a.priority || 50) - (b.priority || 50) || a.id.localeCompare(b.id));
 }

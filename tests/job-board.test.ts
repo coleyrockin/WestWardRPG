@@ -988,4 +988,68 @@ describe("jobBoard", () => {
       expect(ids).toContain("frontier_archive_quiet");
     });
   });
+
+  describe("outcome-flavored board notes", () => {
+    it("frontier job listing without outcomes reads the base board note", async () => {
+      const { createInitialNarrativeState } = await import("../src/decisionEngine.js");
+      const narrative = createInitialNarrativeState();
+      const listings = getJobListings({ regionId: "frontier", playerLevel: 1, narrative });
+      const slime = listings.find((j: any) => j.id === "frontier_slime_bounty");
+      expect(slime).toBeTruthy();
+      expect(slime?.boardNote).toContain("marsh road");
+      expect(slime?.boardNote).not.toMatch(/archive|sealed|published/i);
+    });
+
+    it("frontier job listing appends archive-truth flavor when that outcome is set", async () => {
+      const { applyQuestOutcome, createInitialNarrativeState } = await import("../src/decisionEngine.js");
+      const narrative = createInitialNarrativeState();
+      applyQuestOutcome(narrative, "archive", "truth");
+      const listings = getJobListings({ regionId: "frontier", playerLevel: 1, narrative });
+      const slime = listings.find((j: any) => j.id === "frontier_slime_bounty");
+      expect(slime?.boardNote).toMatch(/archive/i);
+    });
+
+    it("frontier outcome flavor differs by outcome (truth vs comfort)", async () => {
+      const { applyQuestOutcome, createInitialNarrativeState } = await import("../src/decisionEngine.js");
+      const truthNarrative = createInitialNarrativeState();
+      applyQuestOutcome(truthNarrative, "archive", "truth");
+      const comfortNarrative = createInitialNarrativeState();
+      applyQuestOutcome(comfortNarrative, "archive", "comfort");
+      const truthListings = getJobListings({ regionId: "frontier", playerLevel: 1, narrative: truthNarrative });
+      const comfortListings = getJobListings({ regionId: "frontier", playerLevel: 1, narrative: comfortNarrative });
+      const truthSlime = truthListings.find((j: any) => j.id === "frontier_slime_bounty");
+      const comfortSlime = comfortListings.find((j: any) => j.id === "frontier_slime_bounty");
+      expect(truthSlime?.boardNote).not.toBe(comfortSlime?.boardNote);
+    });
+
+    it("ashfall jobs read ashfall-region outcome flavor (not frontier outcomes)", async () => {
+      const { applyQuestOutcome, createInitialNarrativeState } = await import("../src/decisionEngine.js");
+      const narrative = createInitialNarrativeState();
+      applyQuestOutcome(narrative, "archive", "truth");
+      applyQuestOutcome(narrative, "ashfall_intro", "salvage");
+      const listings = getJobListings({ regionId: "ashfall", playerLevel: 4, narrative });
+      const ashJob = listings.find((j: any) => j.id === "ashfall_scrap_warrant");
+      expect(ashJob?.boardNote).toMatch(/salvage|ashfall/i);
+    });
+
+    it("ironlantern jobs read lantern outcome flavor", async () => {
+      const { applyQuestOutcome, createInitialNarrativeState } = await import("../src/decisionEngine.js");
+      const narrative = createInitialNarrativeState();
+      applyQuestOutcome(narrative, "lantern_revolt", "guild");
+      const listings = getJobListings({ regionId: "ironlantern", playerLevel: 5, narrative });
+      const lanternJob = listings.find((j: any) => j.id === "ironlantern_signal_breaker");
+      expect(lanternJob?.boardNote).toMatch(/guild|lantern/i);
+    });
+
+    it("late-chain regional outcomes win over earlier ones", async () => {
+      const { applyQuestOutcome, createInitialNarrativeState } = await import("../src/decisionEngine.js");
+      const narrative = createInitialNarrativeState();
+      applyQuestOutcome(narrative, "ashfall_intro", "salvage");
+      applyQuestOutcome(narrative, "ashfall_boss", "mercy");
+      const listings = getJobListings({ regionId: "ashfall", playerLevel: 4, narrative });
+      const ashJob = listings.find((j: any) => j.id === "ashfall_scrap_warrant");
+      // ashfall_boss is later in the chain — its flavor should dominate.
+      expect(ashJob?.boardNote).toMatch(/spared|crew|tyrant|witnesses|purge/i);
+    });
+  });
 });
