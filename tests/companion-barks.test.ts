@@ -2,10 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   BARK_EVENTS,
   BARK_LIBRARY,
+  BARK_QUEST_OUTCOMES,
   ensureBarkState,
   pickBark,
   markBarkSpoken,
   trySpeakBark,
+  tryQuestOutcomeBark,
   resetBarkState,
 } from "../src/companionBarks.js";
 import { createInitialCompanionRuntime, COMPANION_DEFINITIONS } from "../src/companion.js";
@@ -92,7 +94,7 @@ describe("companionBarks — state lifecycle", () => {
   it("ensureBarkState seeds an empty state", () => {
     const r: any = {};
     ensureBarkState(r);
-    expect(r.barkState).toEqual({ lastSpokenAt: null, eventCooldowns: {}, eventsFired: {} });
+    expect(r.barkState).toEqual({ lastSpokenAt: null, eventCooldowns: {}, eventsFired: {}, questOutcomesSpoken: {} });
   });
 
   it("markBarkSpoken records timestamps + counts", () => {
@@ -125,5 +127,56 @@ describe("companionBarks — trySpeakBark", () => {
     const first = trySpeakBark(r, "perfect_dodge", 0);
     expect(first).toMatch(/Boone/);
     expect(trySpeakBark(r, "perfect_dodge", 1)).toBeNull();
+  });
+});
+
+describe("companionBarks — quest outcomes", () => {
+  it("each companion has lines for the seven branching quests", () => {
+    const expectedQuests = ["crystal", "wood", "archive", "ashfall_intro", "ashfall_boss", "lantern_probe", "lantern_revolt"];
+    for (const cid of ["smith", "innkeeper", "warden"]) {
+      for (const qid of expectedQuests) {
+        expect(BARK_QUEST_OUTCOMES[cid][qid]).toBeDefined();
+        const outcomes = Object.values(BARK_QUEST_OUTCOMES[cid][qid]);
+        expect(outcomes.length).toBeGreaterThanOrEqual(2);
+        for (const line of outcomes) expect(line.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("returns the matching line for known quest+outcome", () => {
+    const r = makeRuntime("smith");
+    const line = tryQuestOutcomeBark(r, "crystal", "truth", 0);
+    expect(line).toMatch(/Cogwheel/);
+  });
+
+  it("dedups per quest within a run", () => {
+    const r = makeRuntime("warden");
+    const first = tryQuestOutcomeBark(r, "archive", "truth", 0);
+    expect(first).toMatch(/Boone/);
+    expect(tryQuestOutcomeBark(r, "archive", "comfort", 100)).toBeNull();
+  });
+
+  it("respects the global cooldown after a recent bark", () => {
+    const r = makeRuntime("innkeeper");
+    markBarkSpoken(r, "first_kill", 5);
+    expect(tryQuestOutcomeBark(r, "wood", "solidarity", 6)).toBeNull();
+    expect(tryQuestOutcomeBark(r, "wood", "solidarity", 30)).toMatch(/Nora/);
+  });
+
+  it("returns null when companion is not active or data is missing", () => {
+    const r = makeRuntime("smith");
+    r.active = false;
+    expect(tryQuestOutcomeBark(r, "crystal", "truth", 0)).toBeNull();
+    r.active = true;
+    expect(tryQuestOutcomeBark(r, "missingQuest", "truth", 0)).toBeNull();
+    expect(tryQuestOutcomeBark(r, "crystal", "missingOutcome", 0)).toBeNull();
+  });
+
+  it("resetBarkState wipes quest dedup so a new run can re-bark", () => {
+    const r = makeRuntime("smith");
+    expect(tryQuestOutcomeBark(r, "crystal", "truth", 0)).toBeTruthy();
+    expect(tryQuestOutcomeBark(r, "crystal", "truth", 100)).toBeNull();
+    resetBarkState(r);
+    expect(tryQuestOutcomeBark(r, "crystal", "truth", 200)).toBeTruthy();
   });
 });

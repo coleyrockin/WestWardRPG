@@ -361,7 +361,7 @@ Cross-checked against `decisionEngine`, `factionEffects`, `economyServices`, `np
 - **`npcAffinity` vs `npcMemory.byNpc[id].greetings`** — both track "does this NPC know the player." Pick one as authoritative; the other becomes a derived view. Today it's unclear which to read.
 - **`narrative.factionRep` vs `narrative.npcAffinity`** — semantics are conflated. Decide: faction = political, affinity = personal. Then test both surfaces.
 - ~~**`houseProgress` trophies ↛ run summary.**~~ **Shipped 2026-05-07:** `runSummary.houseTrophyHighlights` is rendered into the victory panel under "Home Trophies" with cursor-driven layout that fits compact and full modes.
-- **`companionBarks` ↛ quest outcomes.** Barks fire on combat events only. Add quest-outcome bark variants per companion personality (Cogwheel sardonic, Nora warm, Boone laconic).
+- ~~**`companionBarks` ↛ quest outcomes.**~~ **Shipped 2026-05-07:** `BARK_QUEST_OUTCOMES` table + `tryQuestOutcomeBark` covers all 7 branching quests × 3 companions, with per-quest dedup and respect for the global cooldown. Wired in `confirmQuestOutcomeChoice`.
 - **`dialogueChoices` ↛ identity gates.** Choices are not gated by origin or attributes. Add `Speech` gate + origin-flavor gates per the "ten-flavor identity reactions" stretch (existing future-idea).
 - **Endings.** Only 3 distinct outcomes in `decisionEngine.js:198–219`; most runs fall through to "Elite Rotation" fallback. Add `globalFlags` + companion-state modulation per the existing 8-ending stretch.
 - **Quest outcomes are the master keystone of the world's reactivity, and the world barely reads them back.** This is the single biggest gap in the project right now: the player makes choices, the choices are recorded, and the world doesn't notice.

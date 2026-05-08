@@ -114,13 +114,111 @@ export const BARK_LIBRARY = {
   },
 };
 
+// Quest-outcome reactions per companion. Keyed by questId → outcomeId → line.
+// Voices stay consistent: Cogwheel sardonic-empirical, Nora bartender-warm,
+// Boone laconic-marshal. One bark per quest per run; the host clears the
+// dedup map on new-game / load via resetBarkState.
+export const BARK_QUEST_OUTCOMES = {
+  smith: {
+    crystal: {
+      truth: "Cogwheel: You handed them the map. Let's see what they make of it.",
+      comfort: "Cogwheel: A quiet ledger is still a ledger. Someone will read it.",
+    },
+    wood: {
+      solidarity: "Cogwheel: A house plan turned into a working hypothesis. Good.",
+      status: "Cogwheel: A private deed. Cleaner numbers, fewer eyes.",
+    },
+    archive: {
+      truth: "Cogwheel: Releasing it forces the experiment. Brace for noise.",
+      comfort: "Cogwheel: A sealed archive is a delayed correction. Pages keep counting.",
+    },
+    ashfall_intro: {
+      salvage: "Cogwheel: Shared salvage is a slower payout, but a wider one.",
+      monopoly: "Cogwheel: A licensed route. Boone will lose sleep over the paperwork.",
+    },
+    ashfall_boss: {
+      mercy: "Cogwheel: You spared the crew. The system stays. Watch it carefully.",
+      purge: "Cogwheel: A purge always reads cleaner than it is. Track the names.",
+    },
+    lantern_probe: {
+      broadcast: "Cogwheel: Broadcast. The signal is now everyone's problem.",
+      decrypt: "Cogwheel: Decrypted in private. A leverage you'll have to maintain.",
+    },
+    lantern_revolt: {
+      guild: "Cogwheel: The guild has the floor. Now it has to keep it.",
+      council: "Cogwheel: Reform paperwork. Half the noise, twice the years.",
+    },
+  },
+  innkeeper: {
+    crystal: {
+      truth: "Nora: You said it out loud. The bar will be louder tonight.",
+      comfort: "Nora: Nice and quiet. People drink slower when the truth is missing.",
+    },
+    wood: {
+      solidarity: "Nora: A roof anyone can copy. That's a good kind of trouble.",
+      status: "Nora: Your name on the deed. Don't sit on it.",
+    },
+    archive: {
+      truth: "Nora: They'll be arguing about that one in my back booth for years.",
+      comfort: "Nora: Sealed. The kind of quiet you have to keep refilling.",
+    },
+    ashfall_intro: {
+      salvage: "Nora: Shared route. Crews will toast you, then ask for credit.",
+      monopoly: "Nora: A licensed road. Strangers will ask Boone before they ask me.",
+    },
+    ashfall_boss: {
+      mercy: "Nora: You let the crew live. Some of them might walk in here for a drink.",
+      purge: "Nora: Quieter Ashfall. Quieter for the wrong reason.",
+    },
+    lantern_probe: {
+      broadcast: "Nora: Everybody's listening now. Hope the song was worth it.",
+      decrypt: "Nora: Held it close. That kind of secret turns into a tab.",
+    },
+    lantern_revolt: {
+      guild: "Nora: The guild's drinking on credit tonight. They'll pay it back loud.",
+      council: "Nora: Council terms. The street goes home, the paperwork stays late.",
+    },
+  },
+  warden: {
+    crystal: {
+      truth: "Boone: Survey's out. I'll get the questions before sundown.",
+      comfort: "Boone: Buried the survey. Easier nights, harder mornings.",
+    },
+    wood: {
+      solidarity: "Boone: Open plans. Less I have to chase off curious folks.",
+      status: "Boone: Private deed. Don't make me defend it twice.",
+    },
+    archive: {
+      truth: "Boone: Released. Hope you're ready for the foot traffic.",
+      comfort: "Boone: Sealed. I'll stand the watch. Don't waste it.",
+    },
+    ashfall_intro: {
+      salvage: "Boone: Shared route. Less brawls, more paperwork.",
+      monopoly: "Boone: Licensed. I'll be writing more permits than warrants.",
+    },
+    ashfall_boss: {
+      mercy: "Boone: Crew lives. I'll keep an eye on them.",
+      purge: "Boone: Cleaner sheet. Quieter conscience? Ask yourself later.",
+    },
+    lantern_probe: {
+      broadcast: "Boone: Signal's loose. I'll triple the night patrols.",
+      decrypt: "Boone: Held tight. Don't let it slip on my watch.",
+    },
+    lantern_revolt: {
+      guild: "Boone: Guild's standing. Long road from here.",
+      council: "Boone: Council's writing terms. Streets go quiet, file gets thick.",
+    },
+  },
+};
+
 export function ensureBarkState(runtime) {
   if (!runtime || typeof runtime !== "object") return;
   if (!runtime.barkState || typeof runtime.barkState !== "object") {
-    runtime.barkState = { lastSpokenAt: null, eventCooldowns: {}, eventsFired: {} };
+    runtime.barkState = { lastSpokenAt: null, eventCooldowns: {}, eventsFired: {}, questOutcomesSpoken: {} };
   }
   if (!runtime.barkState.eventCooldowns) runtime.barkState.eventCooldowns = {};
   if (!runtime.barkState.eventsFired) runtime.barkState.eventsFired = {};
+  if (!runtime.barkState.questOutcomesSpoken) runtime.barkState.questOutcomesSpoken = {};
 }
 
 function listForEvent(companionId, eventType) {
@@ -170,5 +268,24 @@ export function trySpeakBark(runtime, eventType, now = 0, opts = {}) {
 
 export function resetBarkState(runtime) {
   if (!runtime) return;
-  runtime.barkState = { lastSpokenAt: null, eventCooldowns: {}, eventsFired: {} };
+  runtime.barkState = { lastSpokenAt: null, eventCooldowns: {}, eventsFired: {}, questOutcomesSpoken: {} };
+}
+
+// Quest outcome bark — one per quest per run, ignores per-event cooldown but
+// still respects the global cooldown so it doesn't tread on a fresh combat
+// bark. The host is expected to call this immediately after applyQuestOutcome.
+export function tryQuestOutcomeBark(runtime, questId, outcomeId, now = 0, opts = {}) {
+  if (!runtime || !runtime.active) return null;
+  if (!questId || !outcomeId) return null;
+  ensureBarkState(runtime);
+  const lib = BARK_QUEST_OUTCOMES[runtime.id];
+  const line = lib?.[questId]?.[outcomeId];
+  if (!line) return null;
+  const state = runtime.barkState;
+  if (state.questOutcomesSpoken[questId]) return null;
+  const globalCd = opts.globalCooldown ?? DEFAULT_GLOBAL_COOLDOWN;
+  if (state.lastSpokenAt != null && now - state.lastSpokenAt < globalCd) return null;
+  state.questOutcomesSpoken[questId] = true;
+  state.lastSpokenAt = now;
+  return line;
 }

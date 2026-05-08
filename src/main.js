@@ -212,6 +212,7 @@ import {
 } from "./difficultyTuning.js";
 import {
   trySpeakBark,
+  tryQuestOutcomeBark,
   resetBarkState,
 } from "./companionBarks.js";
 import {
@@ -1291,6 +1292,8 @@ const canvas = document.getElementById("game");
       logMsg(createDecisionRecap(state.narrative));
       syncCombatProfileState({ announce: true });
       syncQuestOutcomeCount(state.world, state.narrative);
+      const bark = tryQuestOutcomeBark(state.companion, questId, selected?.id, state.time || 0);
+      if (bark) logMsg(bark);
     }
     pendingQuestOutcome = null;
     questOutcomeOpen = false;
