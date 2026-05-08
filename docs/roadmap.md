@@ -260,7 +260,7 @@ It needs the existing systems to feel connected in the player's first short sess
 
 ## Shipped Foundations (audit)
 
-Latest audit (2026-05-05, post Track-A1+A5+A2): `npm test` → **482 passing across 45 test files**; 46 source modules (added `savePersistence.js`); 14 Playwright scripted-replay scenarios; **CI live** (`.github/workflows/qa.yml`, two-job pipeline). `main.js` is **~9,225 lines** (extraction debt — see below). README test count refreshed to 457/44 then 482/45 as A2 landed.
+Latest audit (2026-05-07, post audit-cleanup batch): `npm test` → **566 passing across 52 test files**; 46 source modules (added `savePersistence.js`); 14 Playwright scripted-replay scenarios; **CI live** (`.github/workflows/qa.yml`, two-job pipeline). `main.js` is **~10,293 lines** (extraction debt has gotten worse — Phase 1/2/3 audit-followups all landed inline). README test count refreshed in lockstep with each batch.
 
 ### Phase 1 open-road slice (latest local)
 - **Discovery Reward Banner 1** (`src/discoveryRewardFeedback.js`) — discoveries now trigger a compact reward banner with title, reward line, story hook, codex unlock, and route/renown payoff lines. `render_game_to_text` exposes the active banner for browser smoke and human-test auditing.
@@ -268,6 +268,10 @@ Latest audit (2026-05-05, post Track-A1+A5+A2): `npm test` → **482 passing acr
 
 ### Phase 2 + Phase 3 payoff slice
 - **Job reward feedback** (`src/jobRewardFeedback.js`) — job payouts now use a pure feedback helper, story-loot jobs point back to house trophy proof, bonus pay is surfaced consistently, and generic jobs no longer say "bounty" when they are patrols, deliveries, or surveys.
+
+### Region interiors + post-audit batch (2026-05-07)
+- **Region interiors** (`src/regionInteriors.js`, commit `ddd14a1`) — three hand-built one-room interiors (frontier-cave, ashfall-ruin, ironlantern-relay) with one-shot lore + loot; surfaces the "I followed a road and found a place" moment per region.
+- **Audit followups (2026-05-07 batch):** trophies in run summary; outcome-gated jobs on Boone's board; companion-bark library covering all 7 branching quests × 3 companions; identity-gated dialogue with 6 origin/attribute-flavored prompts; NPC name drift across `dialogueChoices` / `jobBoard` / `economyServices` / `main.js` reconciled to the canonical names in `npcMemory.NPC_NAMES`; `economyServices` attribute-case bug fixed; title screen rebranded DUSTWARD → WESTWARD across all 8 language packs.
 
 ### Phase 4 + Phase 5 partial closeouts (latest)
 - **Lite dialogue choices** (`src/dialogueChoices.js`) — chapter-gated 2–3 choice modal for Elder, Warden, Smith, Trader, Innkeeper. Each choice applies axis / faction-rep / NPC-affinity deltas, records a `narrative.dialogueChoicesTaken` flag, and feeds run summary. Modal hooked into existing E-key NPC interact path.
@@ -321,7 +325,7 @@ Latest audit (2026-05-05, post Track-A1+A5+A2): `npm test` → **482 passing acr
 
 ### UI / accessibility
 - Settings modal (KeyO) — preset, gradient cache, colorblind mode, font scale, motion reduction, camera shake.
-- Codex modal (KeyZ) — five-tab tabbed lore browser, undiscovered entries masked.
+- Codex modal (KeyZ) — six-tab tabbed lore browser (regions / enemies / items / factions / ideology / letters), undiscovered entries masked.
 - Skill tree, shop, smith tabs, quest outcome modal — shop-pattern modal idiom.
 - Colorblind palette wired into mini-map dots, floating damage colors, NPC + enemy sprite glows.
 - First-minute objective HUD strip; opening route guide; first-view vista composition.
@@ -332,7 +336,7 @@ Three deep audits ran on the engine, the system coupling, and the test suite. Fi
 
 ### Engine debt — main.js is the elephant
 
-- `src/main.js` is 9,210 lines. Approximate composition: ~30% rendering (`render3D` ≈ lines 6652–8296), ~25% update loop (`update` ≈ lines 4953–6651), ~20% input + modal handling, ~15% save/load + state init, ~10% setup + language packs.
+- `src/main.js` is 10,293 lines (grew ~1,070 since the 2026-05-05 audit — HUD trophy block, identity-gated dialogue wiring, narrative-gated job board calls, region interiors, expanded endings, dynamic lights). Approximate composition: ~30% rendering (`render3D`), ~25% update loop, ~20% input + modal handling, ~15% save/load + state init, ~10% setup + language packs.
 - Top extraction targets (each one is a small PR):
   1. **`InputManager`** — centralize keydown/keyup/mousemove/pointer-lock; gamepad-ready scaffold; replace 8 modal-aware keydown branches with one dispatcher.
   2. **`ModalStack`** — `dialogueSelection`, `questOutcomeSelection`, `jobBoardSelection`, `codexTab`, `settingsSelection` are currently **module-globals**, which means save/load can't preserve them and reopening a modal can land on a stale index. Move into `state.ui.modals[]`.
@@ -354,7 +358,7 @@ Three deep audits ran on the engine, the system coupling, and the test suite. Fi
 
 Cross-checked against `decisionEngine`, `factionEffects`, `economyServices`, `npcMemory`, `dialogueChoices`, `jobBoard`, `companionBarks`, `houseProgress`, `runSummary`, `questDefinitions`, `lootSystem`.
 
-- **`economyServices.buildEconomySnapshot`** is exported but **never called** in `main.js`. Either wire it into a vendor-context modal or delete the file.
+- ~~**`economyServices.buildEconomySnapshot` never called.**~~ **Shipped:** wired in `main.js:3598-3605` and surfaced in render-text. Note: the helper had a silent attribute-case bug (looked up `Craft`/`Speech` while attributes are stored lowercase) — fixed 2026-05-07 alongside a regression test that asserts on the actual snapshot fields.
 - ~~**`factionRep` → shop prices** invisible during play.~~ **Shipped:** `tickFactionRepBands` runs in `update`, fires `showHudNotice(createFactionRepNotice(...))` on every band crossing.
 - ~~**Codex unlocks are silent.**~~ **Shipped:** `unlockCodexAndPing` calls `showHudNotice(createCodexUnlockNotice(...))` on every newly unlocked entry.
 - ~~**Quest outcomes ↛ job board.**~~ **Shipped 2026-05-07:** `passesNarrativeGate` in `jobBoard.js` gates listings by `globalFlags`, `questOutcomes`, and `factionRep`. Three outcome-gated frontier jobs (Council Fallout, Guild Pressure Run, Archive Stragglers) appear on Boone's board only after the matching quest choice. `acceptJob` re-validates the gate.
@@ -363,7 +367,7 @@ Cross-checked against `decisionEngine`, `factionEffects`, `economyServices`, `np
 - ~~**`houseProgress` trophies ↛ run summary.**~~ **Shipped 2026-05-07:** `runSummary.houseTrophyHighlights` is rendered into the victory panel under "Home Trophies" with cursor-driven layout that fits compact and full modes.
 - ~~**`companionBarks` ↛ quest outcomes.**~~ **Shipped 2026-05-07:** `BARK_QUEST_OUTCOMES` table + `tryQuestOutcomeBark` covers all 7 branching quests × 3 companions, with per-quest dedup and respect for the global cooldown. Wired in `confirmQuestOutcomeChoice`.
 - ~~**`dialogueChoices` ↛ identity gates.**~~ **Shipped 2026-05-07:** `passesIdentityGate` filters by origin (single id or array), attribute thresholds, or factionLean. Six new identity-flavored prompts cover all four origins plus high-Speech (warden) and high-Cunning (merchant) persuasion paths. Gated choices are promoted ahead of ungated ones so a build-matching prompt always shows up among the visible 3.
-- **Endings.** Only 3 distinct outcomes in `decisionEngine.js:198–219`; most runs fall through to "Elite Rotation" fallback. Add `globalFlags` + companion-state modulation per the existing 8-ending stretch.
+- ~~**Endings — only 3 distinct outcomes.**~~ **Shipped 2026-05-05 (commit `2fa5f1d`):** `decisionEngine.js:201-273` now defines 9 ending rules gated by faction rep + globalFlags + axes; "Elite Rotation" is the explicit edge fallback, not the default landing.
 - **Quest outcomes are the master keystone of the world's reactivity, and the world barely reads them back.** This is the single biggest gap in the project right now: the player makes choices, the choices are recorded, and the world doesn't notice.
 
 ### Test debt — confidence is overstated
@@ -378,13 +382,13 @@ Cross-checked against `decisionEngine`, `factionEffects`, `economyServices`, `np
 
 ### Quick-win cleanup (each is < 1 day, do them this week)
 
-1. ~~README: update test count `337 / 35` → `457 / 44`.~~ **Shipped 2026-05-07:** README now reads 548 / 52, matching reality.
+1. ~~README: update test count `337 / 35` → `457 / 44`.~~ **Shipped 2026-05-07:** README now reads 566 / 52, matching reality.
 2. ~~Delete or wire `atmosphere.js`~~ — already wired (corrected 2026-05-05); served from `public/atmosphere.js` by Vite.
 3. Wire or delete `economyServices.buildEconomySnapshot`.
 4. ~~Add codex-unlock HUD ping (small floating-text + icon flash).~~ **Shipped:** `unlockCodexAndPing` already fires `showHudNotice(createCodexUnlockNotice(...))`.
 5. ~~Add price-shift HUD ribbon when faction rep crosses ±10 / ±25 / ±50.~~ **Shipped:** `tickFactionRepBands` fires `showHudNotice(createFactionRepNotice(...))` on band crossings (with Market Cartel price-line variant).
 6. ~~Move `JOB_BOARD_PROPS` → `poiSystem.js`; `JOB_BOARD_PRESENTATION` → `storyContent.js`; `COMPLETED_JOB_BOARD_LINES` → `npcMemory.js`.~~ **Shipped:** `jobBoard.js` already imports them from those modules.
-7. Pre-allocate the raycaster depth buffer (move `new Float32Array(width)` out of the per-frame path).
+7. ~~Pre-allocate the raycaster depth buffer.~~ **Shipped:** `cachedDepthBuffer` cached outside the per-frame path at `main.js:7499`.
 8. Add `state.ui.modals[]` and migrate `dialogueSelection` / `questOutcomeSelection` / etc. into it (saved with v3; bumps to v4 only when other v4 items land).
 9. Update Anti-goals (see Track-section near the bottom of this file) to reflect the project-owner directive of 2026-05-05.
 
@@ -729,11 +733,10 @@ Each track names: the technology, why it matters, scope, the migration unit, a k
 - Kill-switch: graphics setting "Post-FX: Off" disables the FBO chain; render goes straight to screen.
 - Gate: visual regression (pixelmatch) suite passes a curated baseline; FPS budget on Low preset stays at 60 on a 2018 MacBook.
 
-**B2. Dynamic point lights in the raycaster (highest-impact visual upgrade).**
-- Why: today, all shading is distance + side-of-wall fade. Enemies, lanterns, fires, and the player's flashlight have zero light influence. This is *the* single biggest visual-atmosphere upgrade for the smallest tech risk.
-- Scope: per-column light accumulation. Each light contributes distance-attenuated tint; cap at 8 active lights per scene; spatial-hash query for "lights affecting column X." Pure JS Canvas, no shaders required (B1 not a prerequisite).
-- Migration unit: add `state.lights` (entities with type / position / color / radius / flicker). Existing torches, neon signs, and campfires in regions become lights.
-- Gate: 8-light scene at 60 fps on Low preset; visual regression.
+**B2. Dynamic point lights in the raycaster (highest-impact visual upgrade). ✅ Shipped.**
+- Why: today, all shading is distance + side-of-wall fade. Enemies, lanterns, fires, and the player's flashlight had zero light influence. This was the single biggest visual-atmosphere upgrade for the smallest tech risk.
+- Shipped: `src/dynamicLights.js` (111 lines) + `tests/dynamic-lights.test.ts` (53 lines). Wired in `main.js` at lines 7285, 7488, 7545, 7592, 7879. Per-column light accumulation, 8-light cap, ambient + region torches feed into the loop.
+- Gate result: smoke + visual capture stable; perf budget on Low preset preserved.
 
 **B3. Raycaster column loop in WebAssembly.**
 - Why: the inner column loop is the main FPS ceiling. Rust → wasm gives 5–20× headroom, which is what pays for B1+B2 once both ship.

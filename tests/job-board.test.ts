@@ -362,7 +362,7 @@ describe("jobBoard", () => {
     expect(pickedUp.ok).toBe(true);
     expect(pickedUp.progress?.count).toBe(1);
     expect(wrongDelivery.ok).toBe(false);
-    expect(getActiveJobSummary(state)?.progressLine).toBe("Deliver to Elder Nira");
+    expect(getActiveJobSummary(state)?.progressLine).toBe("Deliver to Mayor Clem");
 
     const deliveryMarker = resolveJobRouteMarker({
       jobState: state,
@@ -374,7 +374,7 @@ describe("jobBoard", () => {
 
     expect(deliveryMarker).toMatchObject({
       kind: "job_delivery",
-      label: "Deliver to Elder Nira",
+      label: "Deliver to Mayor Clem",
       x: 9,
       y: 8,
       distanceLine: "1m",
@@ -916,6 +916,76 @@ describe("jobBoard", () => {
       });
       expect(result.ok).toBe(true);
       expect(result.job?.id).toBe("frontier_guild_pressure");
+    });
+  });
+
+  // End-to-end join — proves the player-facing path works:
+  // pick quest outcome → narrative flag set → job board re-queries → new job appears.
+  // Both halves had unit coverage; this binds them so a regression in either
+  // surface (decisionEngine flag emit, jobBoard gate read) breaks the test.
+  describe("quest outcome → flag → job board (end-to-end)", () => {
+    it("Boone surfaces Council Fallout the moment surveySuppressed is committed", async () => {
+      const { applyQuestOutcome } = await import("../src/decisionEngine.js");
+      const { createInitialNarrativeState } = await import("../src/decisionEngine.js");
+      const narrative = createInitialNarrativeState();
+      const board = createInitialJobBoardState();
+
+      const before = getJobBoardChoices({
+        regionId: "frontier",
+        playerLevel: 1,
+        jobState: board,
+        npcId: "warden",
+        narrative,
+      }).map((c) => c.id);
+      expect(before).not.toContain("frontier_council_fallout");
+
+      const applied = applyQuestOutcome(narrative, "crystal", "comfort");
+      expect(applied?.id).toBe("comfort");
+      expect(narrative.globalFlags.surveySuppressed).toBe(true);
+
+      const after = getJobBoardChoices({
+        regionId: "frontier",
+        playerLevel: 1,
+        jobState: board,
+        npcId: "warden",
+        narrative,
+      }).map((c) => c.id);
+      expect(after).toContain("frontier_council_fallout");
+    });
+
+    it("Boone surfaces Guild Pressure Run the moment surveyPublished is committed", async () => {
+      const { applyQuestOutcome, createInitialNarrativeState } = await import("../src/decisionEngine.js");
+      const narrative = createInitialNarrativeState();
+      const board = createInitialJobBoardState();
+      applyQuestOutcome(narrative, "crystal", "truth");
+      expect(narrative.globalFlags.surveyPublished).toBe(true);
+
+      const ids = getJobBoardChoices({
+        regionId: "frontier",
+        playerLevel: 1,
+        jobState: board,
+        npcId: "warden",
+        narrative,
+      }).map((c) => c.id);
+      expect(ids).toContain("frontier_guild_pressure");
+      expect(ids).not.toContain("frontier_council_fallout");
+    });
+
+    it("Archive Stragglers appears after the archive quest outcome is sealed", async () => {
+      const { applyQuestOutcome, createInitialNarrativeState } = await import("../src/decisionEngine.js");
+      const narrative = createInitialNarrativeState();
+      const board = createInitialJobBoardState();
+      applyQuestOutcome(narrative, "archive", "comfort");
+      expect(narrative.globalFlags.archiveSealed).toBe(true);
+
+      const ids = getJobBoardChoices({
+        regionId: "frontier",
+        playerLevel: 1,
+        jobState: board,
+        npcId: "warden",
+        narrative,
+      }).map((c) => c.id);
+      expect(ids).toContain("frontier_archive_quiet");
     });
   });
 });

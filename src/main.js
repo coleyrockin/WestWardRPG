@@ -390,7 +390,7 @@ const canvas = document.getElementById("game");
   const LANGUAGE_PACKS = {
     en: {
       menu: {
-        title: "🏜️ DUSTWARD",
+        title: "🏜️ WESTWARD",
         subtitle: "A dusty western sandbox RPG. Revolver vibes, sword fights, and lawless pig stampedes.",
         controls: [
           "🎮 Move: WASD or Arrow keys",
@@ -474,7 +474,7 @@ const canvas = document.getElementById("game");
     },
     es: {
       menu: {
-        title: "🏜️ DUSTWARD",
+        title: "🏜️ WESTWARD",
         subtitle: "Un RPG sandbox 3D cómicamente realista. Espadas, slimes y decisiones dudosas.",
         controls: [
           "🎮 Moverse: WASD o flechas",
@@ -544,7 +544,7 @@ const canvas = document.getElementById("game");
     },
     pt: {
       menu: {
-        title: "🏜️ DUSTWARD",
+        title: "🏜️ WESTWARD",
         subtitle: "Um RPG sandbox 3D com realismo cômico. Espadas, slimes e escolhas duvidosas.",
         controls: [
           "🎮 Mover: WASD ou setas",
@@ -614,7 +614,7 @@ const canvas = document.getElementById("game");
     },
     fr: {
       menu: {
-        title: "🏜️ DUSTWARD",
+        title: "🏜️ WESTWARD",
         subtitle: "Un RPG sandbox 3D au réalisme comique. Épées, slimes et choix discutables.",
         controls: [
           "🎮 Déplacement : WASD ou flèches",
@@ -684,7 +684,7 @@ const canvas = document.getElementById("game");
     },
     de: {
       menu: {
-        title: "🏜️ DUSTWARD",
+        title: "🏜️ WESTWARD",
         subtitle: "Ein komisch-realistisches 3D-Sandbox-RPG. Schwerter, Slimes und fragwürdige Entscheidungen.",
         controls: [
           "🎮 Bewegen: WASD oder Pfeiltasten",
@@ -754,7 +754,7 @@ const canvas = document.getElementById("game");
     },
     it: {
       menu: {
-        title: "🏜️ DUSTWARD",
+        title: "🏜️ WESTWARD",
         subtitle: "Un RPG sandbox 3D dal realismo comico. Spade, slime e scelte discutibili.",
         controls: [
           "🎮 Muovi: WASD o frecce",
@@ -824,7 +824,7 @@ const canvas = document.getElementById("game");
     },
     ja: {
       menu: {
-        title: "🏜️ DUSTWARD",
+        title: "🏜️ WESTWARD",
         subtitle: "コミカルでリアル寄りな3DサンドボックスRPG。剣、スライム、そして微妙な人生選択。",
         controls: [
           "🎮 移動: WASD または 矢印キー",
@@ -894,7 +894,7 @@ const canvas = document.getElementById("game");
     },
     tr: {
       menu: {
-        title: "🏜️ DUSTWARD",
+        title: "🏜️ WESTWARD",
         subtitle: "Komik gerçekçiliğe sahip bir 3D sandbox RPG. Kılıçlar, slime'lar ve şüpheli hayat kararları.",
         controls: [
           "🎮 Hareket: WASD veya ok tuşları",
@@ -4191,12 +4191,12 @@ const canvas = document.getElementById("game");
         if (q.status === "locked") {
           q.status = "active";
           q.progress = 0;
-          logMsg("Elder Nira: Bring me 4 Crystal Shards to map this frontier. I'd ride out myself, but my knees retired.");
+          logMsg("Mayor Clem: Bring me 4 Crystal Shards to map this frontier. I'd ride out myself, but my knees retired.");
           sfx.npcChat();
           return;
         }
         if (q.status === "active") {
-          logMsg(`Elder Nira: Crystal Shards ${q.progress}/${q.need}. I'm counting. Very slowly.`);
+          logMsg(`Mayor Clem: Crystal Shards ${q.progress}/${q.need}. I'm counting. Very slowly.`);
           sfx.npcChat();
           return;
         }
@@ -4205,12 +4205,12 @@ const canvas = document.getElementById("game");
           state.inventory["Crystal Shard"] = Math.max(0, state.inventory["Crystal Shard"] - q.need);
           grantXp(q.reward.xp);
           state.player.gold += q.reward.gold;
-          logMsg(`Quest done: ${q.title}. +${q.reward.xp} XP, +${q.reward.gold} gold. Elder Nira nods approvingly.`);
+          logMsg(`Quest done: ${q.title}. +${q.reward.xp} XP, +${q.reward.gold} gold. Mayor Clem nods approvingly.`);
           sfx.questDone();
           spawnParticles(canvas.width / 2, canvas.height / 2, 15, "#8fd0ff", 3, 1.2, { decorative: true });
           if (state.quests.slime.status === "locked") {
             state.quests.slime.status = "active";
-            logMsg("Elder Nira: Marshal Boone needs the marsh cleared.");
+            logMsg("Mayor Clem: Marshal Boone needs the marsh cleared.");
           }
           if (!openQuestOutcomeChoice("crystal")) {
             const decision = applyMajorDecision(state.narrative, "elder");

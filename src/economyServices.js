@@ -16,7 +16,7 @@ const VENDOR_SERVICES = {
   apothecary: {
     id: "apothecary",
     role: "apothecary",
-    title: "Elder Nira's Remedies",
+    title: "Mayor Clem's Remedies",
     baseLine: "Trades potion, tonic, and field remedy work tied to local resources.",
   },
   warden: {
@@ -44,8 +44,8 @@ export function getVendorServiceProfile(vendorId, {
 } = {}) {
   const profile = VENDOR_SERVICES[vendorId] || VENDOR_SERVICES.merchant;
   const regionHint = getRegionVisualIdentity(regionId).label;
-  const craft = attributeValue(identity, "Craft");
-  const speech = attributeValue(identity, "Speech");
+  const craft = attributeValue(identity, "craft");
+  const speech = attributeValue(identity, "speech");
   const level = workstationLevel(house);
   const craftLine = profile.id === "smith"
     ? ` Craft ${craft} and Workbench ${level} should make repair/refine prep easier to read.`
@@ -72,8 +72,8 @@ export function buildEconomySnapshot({
   activeJob = null,
 } = {}) {
   const regionHint = getRegionVisualIdentity(regionId).label;
-  const craft = attributeValue(identity, "Craft");
-  const speech = attributeValue(identity, "Speech");
+  const craft = attributeValue(identity, "craft");
+  const speech = attributeValue(identity, "speech");
   const level = workstationLevel(house);
   const vendorServices = ["merchant", "smith", "apothecary", "warden"]
     .map((id) => getVendorServiceProfile(id, { regionId, identity, house }));

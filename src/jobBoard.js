@@ -68,7 +68,7 @@ export const JOB_DEFINITIONS = {
     threat: "Low",
     minLevel: 1,
     priority: 30,
-    hint: "Pick up sealed orders near Boone's board and deliver them to Elder Nira.",
+    hint: "Pick up sealed orders near Boone's board and deliver them to Mayor Clem.",
     boardNote: "The Elder wants sealed orders carried by hand, not shouted across the street.",
     objective: {
       type: "delivery",
@@ -76,7 +76,7 @@ export const JOB_DEFINITIONS = {
       label: "sealed orders delivered",
       pickup: { id: "frontier_orders_cache", label: "Sealed Orders", x: 12.85, y: 8.25 },
       deliveryNpcId: "elder",
-      deliveryLabel: "Elder Nira",
+      deliveryLabel: "Mayor Clem",
     },
     bonus: {
       type: "time_limit",
@@ -354,7 +354,7 @@ export const JOB_DEFINITIONS = {
     threat: "Low",
     minLevel: 1,
     priority: 14,
-    hint: "Hand-deliver the workers' answer to Elder Nira so the published survey lands with weight.",
+    hint: "Hand-deliver the workers' answer to Mayor Clem so the published survey lands with weight.",
     boardNote: "Now that the survey is public, the guild wants it pushed past pleasantries.",
     narrativeGate: { requiresFlag: "surveyPublished" },
     objective: {
@@ -363,7 +363,7 @@ export const JOB_DEFINITIONS = {
       label: "guild reply delivered",
       pickup: { id: "frontier_guild_reply_cache", label: "Guild Reply", x: 12.95, y: 8.45 },
       deliveryNpcId: "elder",
-      deliveryLabel: "Elder Nira",
+      deliveryLabel: "Mayor Clem",
     },
     bonus: {
       type: "time_limit",
