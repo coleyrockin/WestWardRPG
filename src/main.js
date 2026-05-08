@@ -1363,7 +1363,7 @@ const canvas = document.getElementById("game");
   function openDialogueChoiceFor(npcId, npcName) {
     if (!state.narrative) return false;
     ensureDialogueChoiceState(state.narrative);
-    const choices = getAvailableDialogueChoices(state.narrative, npcId);
+    const choices = getAvailableDialogueChoices(state.narrative, npcId, state.progression?.identity);
     if (!choices || choices.length === 0) return false;
     pendingDialogue = { npcId, npcName: npcName || npcId, choices };
     dialogueSelection = 0;

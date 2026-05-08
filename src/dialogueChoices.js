@@ -32,6 +32,20 @@ export const DIALOGUE_CHOICES = {
         response: "Elder Nira: Good. The line is older than most of us, and it pays.",
         effects: { factionRep: { civicCouncil: 3 }, axes: { controlVsFreedom: 1 } },
       },
+      {
+        id: "elder_ch1_marshal_pitch",
+        prompt: "[Exiled Marshal] I've worn that badge. Let me work the seam, not the script.",
+        response: "Elder Nira: A returning marshal who knows where the seams open. I'll write you in.",
+        gate: { origin: "exiled_marshal" },
+        effects: { factionRep: { civicCouncil: 5 }, npcAffinity: { elder: 4 } },
+      },
+      {
+        id: "elder_ch1_lantern_truth",
+        prompt: "[Lantern Defector] I've read the council minutes you don't print. Want help reading them again?",
+        response: "Elder Nira: A defector with our handwriting. Quietly. Walk with me at dusk.",
+        gate: { origin: "lantern_defector" },
+        effects: { axes: { truthVsComfort: 3 }, npcAffinity: { elder: 3 } },
+      },
     ],
     2: [
       {
@@ -76,6 +90,13 @@ export const DIALOGUE_CHOICES = {
         prompt: "I owe you a drink for the warning shots.",
         response: "Warden Boone: I owe you a clean bounty. Even trade.",
         effects: { npcAffinity: { warden: 5 } },
+      },
+      {
+        id: "warden_ch1_speech_persuade",
+        prompt: "[Speech 4] Boone, sign the deputy mark on me. Your board moves faster, your nights end earlier.",
+        response: "Warden Boone: Pretty argument. I'll countersign it before I think it through.",
+        gate: { attribute: { speech: 4 } },
+        effects: { factionRep: { civicCouncil: 5 }, npcAffinity: { warden: 6 }, axes: { controlVsFreedom: 1 } },
       },
     ],
     2: [
@@ -122,6 +143,13 @@ export const DIALOGUE_CHOICES = {
         response: "Smith Hale: Generous mouth. I'll remember it next time the Cartel asks who's loyal.",
         effects: { factionRep: { marketCartel: 2 }, npcAffinity: { smith: 1 } },
       },
+      {
+        id: "smith_ch1_salvager_pitch",
+        prompt: "[Ash Salvager] I can read your scrap pile. I'll sort the heat-bent from the salvageable before sundown.",
+        response: "Smith Hale: A salvager who works for room. Bring it to the back door — and watch the cartel's eyes.",
+        gate: { origin: "ash_salvager" },
+        effects: { factionRep: { workersGuild: 5 }, npcAffinity: { smith: 6 } },
+      },
     ],
     2: [
       {
@@ -160,6 +188,20 @@ export const DIALOGUE_CHOICES = {
         prompt: "I'll buy here whether the prices fall or not.",
         response: "Trader Nyx: Loyalty is the only inventory I never restock. Welcome to the ledger.",
         effects: { factionRep: { marketCartel: 3 }, npcAffinity: { merchant: 4 } },
+      },
+      {
+        id: "merchant_ch1_errandhand_pitch",
+        prompt: "[Guild Errandhand] I run between three districts. Slot me into your hard-to-move shelf.",
+        response: "Trader Nyx: An errandhand with my color of dust. Take a tin off the high shelf — call it sample.",
+        gate: { origin: "guild_errandhand" },
+        effects: { factionRep: { marketCartel: 6 }, npcAffinity: { merchant: 5 } },
+      },
+      {
+        id: "merchant_ch1_cunning_haggle",
+        prompt: "[Cunning 4] Your second-cut prices show on the receipt seam. I want the first cut.",
+        response: "Trader Nyx: Sharp eye. Sharp tongue. Fine — first cut, but you don't tell anyone how you got it.",
+        gate: { attribute: { cunning: 4 } },
+        effects: { factionRep: { marketCartel: -3 }, axes: { truthVsComfort: 2 }, npcAffinity: { merchant: 3 } },
       },
     ],
     2: [
@@ -216,22 +258,52 @@ function chapterKeysAtOrBelow(chapterIndex) {
   return [1, 2, 3].filter((c) => c <= chapterIndex + 1);
 }
 
-export function getAvailableDialogueChoices(narrative, npcId) {
+// Identity gating — gives a player's build choice teeth in dialogue.
+// gate may specify: { origin: id|[ids], attribute: { id: min }, factionLean: id }.
+// Missing gate = always available. Missing identity = treat as no gate matched
+// for selective gates (origin/factionLean) and as zero for attribute thresholds.
+export function passesIdentityGate(choice, identity = {}) {
+  const gate = choice?.gate;
+  if (!gate || typeof gate !== "object") return true;
+  if (gate.origin) {
+    const required = Array.isArray(gate.origin) ? gate.origin : [gate.origin];
+    if (!identity.originId || !required.includes(identity.originId)) return false;
+  }
+  if (gate.factionLean) {
+    if (identity.factionLean !== gate.factionLean) return false;
+  }
+  if (gate.attribute && typeof gate.attribute === "object") {
+    const attrs = identity.attributes || {};
+    for (const [attr, min] of Object.entries(gate.attribute)) {
+      const value = Number.isFinite(attrs[attr]) ? attrs[attr] : 0;
+      if (value < (Number.isFinite(min) ? min : 0)) return false;
+    }
+  }
+  return true;
+}
+
+export function getAvailableDialogueChoices(narrative, npcId, identity = {}) {
   const lib = DIALOGUE_CHOICES[npcId];
   if (!lib) return [];
   const chapterIndex = chapterIndexFromNarrative(narrative);
   // Walk chapters newest-first so high-chapter entries are surfaced before
-  // backlogged ch1 prompts. Cap to 3 visible.
+  // backlogged ch1 prompts. Identity-gated choices that pass the gate are
+  // promoted ahead of ungated ones so a player's build always shows up
+  // among the 3 visible options when applicable.
   const keys = chapterKeysAtOrBelow(chapterIndex).slice().reverse();
-  const out = [];
+  const gated = [];
+  const ungated = [];
   for (const k of keys) {
     const list = lib[k] || [];
     for (const choice of list) {
-      if (!isChoiceTaken(narrative, choice.id)) out.push({ ...choice, chapter: k });
-      if (out.length >= 3) return out;
+      if (isChoiceTaken(narrative, choice.id)) continue;
+      if (!passesIdentityGate(choice, identity)) continue;
+      const decorated = { ...choice, chapter: k };
+      if (choice.gate) gated.push(decorated);
+      else ungated.push(decorated);
     }
   }
-  return out;
+  return [...gated, ...ungated].slice(0, 3);
 }
 
 export function applyDialogueChoice(narrative, npcId, choiceId) {

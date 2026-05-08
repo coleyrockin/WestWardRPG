@@ -6,6 +6,7 @@ import {
   getAvailableDialogueChoices,
   applyDialogueChoice,
   dialogueChoiceCount,
+  passesIdentityGate,
 } from "../src/dialogueChoices.js";
 import { createInitialNarrativeState } from "../src/decisionEngine.js";
 
@@ -150,5 +151,69 @@ describe("dialogueChoices — state lifecycle", () => {
     applyDialogueChoice(n, "elder", "elder_ch1_offer_help");
     applyDialogueChoice(n, "warden", "warden_ch1_share_drink");
     expect(dialogueChoiceCount(n)).toBe(2);
+  });
+});
+
+describe("dialogueChoices — identity gates", () => {
+  it("ungated choices pass any identity", () => {
+    expect(passesIdentityGate({ id: "x" } as any, {})).toBe(true);
+    expect(passesIdentityGate({ id: "x", gate: null } as any, {})).toBe(true);
+  });
+
+  it("origin gate requires matching originId", () => {
+    const choice = { id: "x", gate: { origin: "exiled_marshal" } } as any;
+    expect(passesIdentityGate(choice, { originId: "exiled_marshal" })).toBe(true);
+    expect(passesIdentityGate(choice, { originId: "ash_salvager" })).toBe(false);
+    expect(passesIdentityGate(choice, {})).toBe(false);
+  });
+
+  it("origin gate accepts an array of allowed origins", () => {
+    const choice = { id: "x", gate: { origin: ["exiled_marshal", "lantern_defector"] } } as any;
+    expect(passesIdentityGate(choice, { originId: "exiled_marshal" })).toBe(true);
+    expect(passesIdentityGate(choice, { originId: "lantern_defector" })).toBe(true);
+    expect(passesIdentityGate(choice, { originId: "ash_salvager" })).toBe(false);
+  });
+
+  it("attribute gate requires every attribute >= the threshold", () => {
+    const choice = { id: "x", gate: { attribute: { speech: 4 } } } as any;
+    expect(passesIdentityGate(choice, { attributes: { speech: 4 } })).toBe(true);
+    expect(passesIdentityGate(choice, { attributes: { speech: 3 } })).toBe(false);
+    expect(passesIdentityGate(choice, {})).toBe(false);
+  });
+
+  it("factionLean gate matches identity factionLean", () => {
+    const choice = { id: "x", gate: { factionLean: "workersGuild" } } as any;
+    expect(passesIdentityGate(choice, { factionLean: "workersGuild" })).toBe(true);
+    expect(passesIdentityGate(choice, { factionLean: "marketCartel" })).toBe(false);
+  });
+
+  it("getAvailableDialogueChoices hides gated entries unless the identity matches", () => {
+    const n = makeNarrative(0);
+    const noIdentity = getAvailableDialogueChoices(n, "warden", {}).map((c) => c.id);
+    expect(noIdentity).not.toContain("warden_ch1_speech_persuade");
+
+    const persuasive = getAvailableDialogueChoices(n, "warden", { attributes: { speech: 4 } }).map((c) => c.id);
+    expect(persuasive).toContain("warden_ch1_speech_persuade");
+  });
+
+  it("surfaces origin-flavored choices for matching origins", () => {
+    const n = makeNarrative(0);
+    const marshal = getAvailableDialogueChoices(n, "elder", { originId: "exiled_marshal" }).map((c) => c.id);
+    expect(marshal).toContain("elder_ch1_marshal_pitch");
+
+    const defector = getAvailableDialogueChoices(n, "elder", { originId: "lantern_defector" }).map((c) => c.id);
+    expect(defector).toContain("elder_ch1_lantern_truth");
+
+    const salvager = getAvailableDialogueChoices(n, "smith", { originId: "ash_salvager" }).map((c) => c.id);
+    expect(salvager).toContain("smith_ch1_salvager_pitch");
+
+    const errand = getAvailableDialogueChoices(n, "merchant", { originId: "guild_errandhand" }).map((c) => c.id);
+    expect(errand).toContain("merchant_ch1_errandhand_pitch");
+  });
+
+  it("cap of 3 visible choices still applies after gating", () => {
+    const n = makeNarrative(0);
+    const marshalElder = getAvailableDialogueChoices(n, "elder", { originId: "exiled_marshal" });
+    expect(marshalElder.length).toBeLessThanOrEqual(3);
   });
 });
