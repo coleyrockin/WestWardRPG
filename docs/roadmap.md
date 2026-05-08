@@ -348,7 +348,7 @@ Three deep audits ran on the engine, the system coupling, and the test suite. Fi
   8. **`LanguageManager`** — `LANGUAGE_PACKS` (~360 lines of inline locale strings, lines 339–700) → JSON files, lazy-loaded per language.
 - `src/jobBoard.js` is 1,434 lines and crosses concerns: `JOB_BOARD_PROPS` belongs in `poiSystem.js`; `JOB_BOARD_PRESENTATION` belongs in `storyContent.js`; `COMPLETED_JOB_BOARD_LINES` belongs in `npcMemory.js`.
 - `index.html` has 600+ lines of inline menu CSS (`<style>` block, ~lines 26–641). Extract to `menu.css`; lazy-load on title.
-- ~~`atmosphere.js` is loaded in `index.html` but never called from `main.js`~~ — **correction (2026-05-05)**: the initial audit was wrong; `main.js:322` reads `window.WestWardTS.computeAtmosphere` and `main.js:5583` calls it. The IIFE is live. As of A1 it lives in `public/atmosphere.js` and is served as-is by Vite.
+- ~~`atmosphere.js` is loaded in `index.html` but never called from `main.js`~~ — **resolved 2026-05-07:** consolidated to a single source. `src/atmosphere.ts` is now the only implementation — imported directly by `main.js` and bundled by Vite. The IIFE shim, the window bridge, and `public/atmosphere.js` were all deleted to kill the drift class.
 - Per-frame allocations in the render hot path: `new Float32Array(width)` allocated every frame for the depth buffer; per-pixel `rgba(...)` template-string interpolation in the inner column loop. Pre-allocate the depth buffer once; pool color strings or pre-compute lighting LUTs.
 - `update()` runs full physics / AI / weather while modals are open. Gate non-essential update on `state.mode === "playing" && !modalStack.any()`.
 - No gamepad support. No update-while-paused gating. No music tracks loaded (the `music` audio bus exists at `audio.js:21` but is never populated).
@@ -383,7 +383,7 @@ Cross-checked against `decisionEngine`, `factionEffects`, `economyServices`, `np
 ### Quick-win cleanup (each is < 1 day, do them this week)
 
 1. ~~README: update test count `337 / 35` → `457 / 44`.~~ **Shipped 2026-05-07:** README now reads 566 / 52, matching reality.
-2. ~~Delete or wire `atmosphere.js`~~ — already wired (corrected 2026-05-05); served from `public/atmosphere.js` by Vite.
+2. ~~Delete or wire `atmosphere.js`~~ — **consolidated 2026-05-07:** single source at `src/atmosphere.ts`; runtime imports it directly via Vite; `public/atmosphere.js` and the window bridge deleted.
 3. Wire or delete `economyServices.buildEconomySnapshot`.
 4. ~~Add codex-unlock HUD ping (small floating-text + icon flash).~~ **Shipped:** `unlockCodexAndPing` already fires `showHudNotice(createCodexUnlockNotice(...))`.
 5. ~~Add price-shift HUD ribbon when faction rep crosses ±10 / ±25 / ±50.~~ **Shipped:** `tickFactionRepBands` fires `showHudNotice(createFactionRepNotice(...))` on band crossings (with Market Cartel price-line variant).

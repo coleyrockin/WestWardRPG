@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clamp, lerp, toChannel, computeAtmosphere } from "../atmosphere.ts";
+import { clamp, lerp, toChannel, computeAtmosphere } from "../src/atmosphere.ts";
 
 describe("clamp", () => {
   it("returns value when inside range", () => {

@@ -176,8 +176,7 @@ WestWardRPG/
 │   ├── graphicsSettings.js  # presets, auto-detect, accessibility
 │   ├── saveMigration.js     # v1/v2 -> v3 save migration
 │   └── storyContent.js      # flagship dialogue and narrative flavor text
-├── atmosphere.ts            # typed atmosphere source (test-only — runtime serves public/atmosphere.js)
-├── public/atmosphere.js     # browser-served IIFE atmosphere build
+│   └── atmosphere.ts        # typed atmosphere model (single source — bundled by Vite)
 ├── tests/                   # vitest system tests
 ├── test-actions/            # deterministic scripted behavior checks
 ├── docs/                    # flagship diagrams/screenshots

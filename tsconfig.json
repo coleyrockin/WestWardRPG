@@ -9,7 +9,7 @@
     "allowImportingTsExtensions": true
   },
   "include": [
-    "atmosphere.ts",
+    "src/atmosphere.ts",
     "tests/**/*.ts"
   ]
 }

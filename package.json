@@ -6,7 +6,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "dev:py": "ln -sf public/atmosphere.js atmosphere.js && python3 -m http.server 5173",
+    "dev:py": "echo 'dev:py removed; atmosphere is bundled via Vite. Use \"npm run dev\" or \"npm run preview\" instead.' && exit 1",
     "build": "vite build",
     "build:itch": "vite build --base=./ --outDir dist-itch",
     "package:itch": "bash scripts/itch_package.sh",

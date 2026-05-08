@@ -351,6 +351,7 @@ import {
   applyCompanionThreat,
   tickCompanionRecovery,
 } from "./companion.js";
+import { computeAtmosphere } from "./atmosphere.ts";
 
 const OPENING_CACHE_SEED = resolveFirstMinuteCache({
   mode: "playing",
@@ -370,11 +371,6 @@ const canvas = document.getElementById("game");
   const originPicker = document.getElementById("origin-picker");
   const langSelect = document.getElementById("lang-select");
   const langLabel = document.getElementById("lang-label");
-  const tsAtmosphere = window.WestWardTS && typeof window.WestWardTS.computeAtmosphere === "function"
-    ? window.WestWardTS
-    : (window.DustwardTS && typeof window.DustwardTS.computeAtmosphere === "function"
-      ? window.DustwardTS
-      : null);
 
   const LANGUAGE_OPTIONS = {
     en: "English",
@@ -5906,24 +5902,7 @@ const canvas = document.getElementById("game");
     const weather = state.weather;
     const normalizedDay = clamp(day, 0, 1);
     const horizon = Math.floor(height * 0.5);
-    const atmosphere = tsAtmosphere
-      ? tsAtmosphere.computeAtmosphere(normalizedDay, weather.rain, weather.fog)
-      : null;
-    const stormShade = atmosphere ? atmosphere.stormShade : weather.rain * 0.28 + weather.fog * 0.24;
-    const skyTop = atmosphere
-      ? atmosphere.skyTop
-      : {
-        r: Math.floor(lerp(9, 109, day) * (1 - stormShade)),
-        g: Math.floor(lerp(16, 164, normalizedDay) * (1 - stormShade * 0.9)),
-        b: Math.floor(lerp(32, 220, normalizedDay) * (1 - stormShade * 0.7)),
-      };
-    const skyBottom = atmosphere
-      ? atmosphere.skyBottom
-      : {
-        r: Math.floor(lerp(40, 182, normalizedDay) * (1 - stormShade * 0.9)),
-        g: Math.floor(lerp(62, 204, normalizedDay) * (1 - stormShade * 0.82)),
-        b: Math.floor(lerp(94, 235, normalizedDay) * (1 - stormShade * 0.65)),
-      };
+    const { stormShade, skyTop, skyBottom } = computeAtmosphere(normalizedDay, weather.rain, weather.fog);
 
     const skyGrad = ctx.createLinearGradient(0, 0, 0, horizon);
     skyGrad.addColorStop(0, `rgb(${skyTop.r}, ${skyTop.g}, ${skyTop.b})`);

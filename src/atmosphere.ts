@@ -39,19 +39,3 @@ export function computeAtmosphere(day: number, rain: number, fog: number): Atmos
 
   return { stormShade, skyTop, skyBottom };
 }
-
-declare global {
-  interface Window {
-    WestWardTS?: {
-      computeAtmosphere: (day: number, rain: number, fog: number) => AtmosphereResult;
-    };
-    DustwardTS?: {
-      computeAtmosphere: (day: number, rain: number, fog: number) => AtmosphereResult;
-    };
-  }
-}
-
-if (typeof window !== "undefined") {
-  window.WestWardTS = { computeAtmosphere };
-  window.DustwardTS = window.WestWardTS;
-}
