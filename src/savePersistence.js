@@ -13,6 +13,7 @@ const SAVE_STORE = "saves";
 const BACKUP_STORE = "backups";
 
 export const DEFAULT_SLOT = "slot-1";
+export const KNOWN_SLOTS = ["slot-1", "slot-2", "slot-3"];
 export const STORAGE_VERSION = 1;
 export const MAX_BACKUPS_PER_SLOT = 3;
 
@@ -401,6 +402,69 @@ export async function migrateFromLocalStorage(slot) {
     return { ok: true, payload: parsed, fromKey: key, slot: slotKey };
   }
   return null;
+}
+
+// Returns one entry per slot in KNOWN_SLOTS (always 3) so the title-screen
+// picker always renders the full grid. Each entry reports whether the slot
+// is empty, whether the stored envelope passes hash validation, and (when
+// valid) the payload + savedAt for summary rendering.
+export async function listSlots() {
+  const out = [];
+  for (const slot of KNOWN_SLOTS) {
+    let result;
+    try {
+      result = await readSave(slot);
+    } catch (err) {
+      out.push({ slot, empty: true, valid: false, payload: null, savedAt: null, error: err });
+      continue;
+    }
+    if (!result.ok) {
+      if (result.reason === "missing") {
+        out.push({ slot, empty: true, valid: true, payload: null, savedAt: null });
+      } else {
+        out.push({ slot, empty: false, valid: false, payload: null, savedAt: null, reason: result.reason });
+      }
+      continue;
+    }
+    out.push({
+      slot,
+      empty: false,
+      valid: true,
+      payload: result.payload,
+      savedAt: result.savedAt,
+    });
+  }
+  return out;
+}
+
+// Compact summary used by the title-screen slot picker. Pulls just the
+// fields the player needs to identify a save: character level, current
+// region, elapsed in-session time, and victory/ending state. Stays defensive
+// because we read from raw payloads that may pre-date later schema fields.
+const SUMMARY_DEFAULTS = {
+  level: 1,
+  regionId: "frontier",
+  timePlayedSeconds: 0,
+  victory: false,
+  endingId: null,
+};
+
+export function summarizeSavePayload(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  const level = Number.isFinite(payload?.player?.level)
+    ? Math.max(1, Math.floor(payload.player.level))
+    : SUMMARY_DEFAULTS.level;
+  const regionId = typeof payload?.regions?.activeRegion === "string"
+    ? payload.regions.activeRegion
+    : SUMMARY_DEFAULTS.regionId;
+  const timePlayedSeconds = Number.isFinite(payload?.time)
+    ? Math.max(0, Math.floor(payload.time))
+    : SUMMARY_DEFAULTS.timePlayedSeconds;
+  const victory = Boolean(payload?.world?.runStats?.victory);
+  const endingId = typeof payload?.world?.runStats?.endingId === "string"
+    ? payload.world.runStats.endingId
+    : null;
+  return { level, regionId, timePlayedSeconds, victory, endingId };
 }
 
 // Helper for the corruption-recovery path: walks backups newest-first and

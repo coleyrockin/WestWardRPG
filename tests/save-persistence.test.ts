@@ -5,6 +5,7 @@ import {
   validateEnvelope,
   writeSave,
   readSave,
+  listSlots,
   listBackups,
   readBackup,
   restoreFromBackup,
@@ -13,6 +14,8 @@ import {
   importSaveFromText,
   migrateFromLocalStorage,
   findMostRecentValidBackup,
+  summarizeSavePayload,
+  KNOWN_SLOTS,
   DEFAULT_SLOT,
   STORAGE_VERSION,
   MAX_BACKUPS_PER_SLOT,
@@ -324,5 +327,116 @@ describe("legacy localStorage migration", () => {
     if (idb.ok) {
       expect((idb.payload as any).player.x).toBe(33);
     }
+  });
+});
+
+describe("KNOWN_SLOTS + listSlots", () => {
+  it("KNOWN_SLOTS exposes exactly three stable slot ids", () => {
+    expect(Array.isArray(KNOWN_SLOTS)).toBe(true);
+    expect(KNOWN_SLOTS.length).toBe(3);
+    expect(KNOWN_SLOTS).toEqual(["slot-1", "slot-2", "slot-3"]);
+  });
+
+  it("listSlots returns one entry per known slot when none have been written", async () => {
+    __resetSavePersistenceForTests();
+    const slots = await listSlots();
+    expect(slots.length).toBe(3);
+    expect(slots.map((s) => s.slot)).toEqual(["slot-1", "slot-2", "slot-3"]);
+    for (const entry of slots) {
+      expect(entry.empty).toBe(true);
+      expect(entry.payload).toBeNull();
+    }
+  });
+
+  it("listSlots reports written slots with payload + savedAt", async () => {
+    __resetSavePersistenceForTests();
+    await writeSave("slot-2", samplePayload({ player: { x: 5, y: 5, hp: 50, level: 4 } }));
+    const slots = await listSlots();
+    const slot1 = slots.find((s) => s.slot === "slot-1");
+    const slot2 = slots.find((s) => s.slot === "slot-2");
+    const slot3 = slots.find((s) => s.slot === "slot-3");
+    expect(slot1?.empty).toBe(true);
+    expect(slot3?.empty).toBe(true);
+    expect(slot2?.empty).toBe(false);
+    expect(slot2?.payload).toBeTruthy();
+    expect(slot2?.savedAt).toBeGreaterThan(0);
+  });
+
+  it("listSlots reports a corrupted slot as empty=false, valid=false", async () => {
+    __resetSavePersistenceForTests();
+    await writeSave("slot-1", samplePayload());
+    // Direct DB tamper: open the same DB and overwrite the envelope hash with garbage.
+    const idb = (globalThis as any).indexedDB;
+    const db: IDBDatabase = await new Promise((resolve, reject) => {
+      const req = idb.open("westward", 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(["saves"], "readwrite");
+      const store = tx.objectStore("saves");
+      const getReq = store.get("slot-1");
+      getReq.onsuccess = () => {
+        const record = getReq.result;
+        record.envelope.hash = "deadbeef";
+        const putReq = store.put(record);
+        putReq.onsuccess = () => resolve();
+        putReq.onerror = () => reject(putReq.error);
+      };
+      getReq.onerror = () => reject(getReq.error);
+    });
+    db.close();
+    __resetSavePersistenceForTests();
+
+    const slots = await listSlots();
+    const slot1 = slots.find((s) => s.slot === "slot-1");
+    expect(slot1?.empty).toBe(false);
+    expect(slot1?.valid).toBe(false);
+  });
+});
+
+describe("summarizeSavePayload", () => {
+  it("returns null for null/undefined input", () => {
+    expect(summarizeSavePayload(null)).toBeNull();
+    expect(summarizeSavePayload(undefined)).toBeNull();
+  });
+
+  it("extracts level, region, time, and victory from a v3 payload", () => {
+    const summary = summarizeSavePayload({
+      version: 3,
+      time: 372.5,
+      mode: "playing",
+      player: { level: 5 },
+      regions: { activeRegion: "ashfall" },
+      world: { runStats: { victory: false } },
+    });
+    expect(summary).toMatchObject({
+      level: 5,
+      regionId: "ashfall",
+      victory: false,
+    });
+    expect(summary?.timePlayedSeconds).toBeGreaterThanOrEqual(372);
+  });
+
+  it("flags victory when runStats.victory is true", () => {
+    const summary = summarizeSavePayload({
+      version: 3,
+      time: 1200,
+      player: { level: 9 },
+      regions: { activeRegion: "ironlantern" },
+      world: { runStats: { victory: true, endingId: "solidarity" } },
+    });
+    expect(summary?.victory).toBe(true);
+    expect(summary?.endingId).toBe("solidarity");
+  });
+
+  it("falls back to safe defaults on malformed payloads", () => {
+    const summary = summarizeSavePayload({ version: 3 } as any);
+    expect(summary).toMatchObject({
+      level: 1,
+      regionId: "frontier",
+      victory: false,
+      timePlayedSeconds: 0,
+    });
   });
 });

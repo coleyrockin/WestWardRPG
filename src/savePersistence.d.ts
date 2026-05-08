@@ -1,7 +1,26 @@
 export const DEFAULT_SLOT: string;
+export const KNOWN_SLOTS: readonly string[];
 export const STORAGE_VERSION: number;
 export const MAX_BACKUPS_PER_SLOT: number;
 export const LEGACY_LOCAL_STORAGE_KEYS: readonly string[];
+
+export interface SlotMeta {
+  slot: string;
+  empty: boolean;
+  valid: boolean;
+  payload: any | null;
+  savedAt: number | null;
+  reason?: string;
+  error?: unknown;
+}
+
+export interface SavePayloadSummary {
+  level: number;
+  regionId: string;
+  timePlayedSeconds: number;
+  victory: boolean;
+  endingId: string | null;
+}
 
 export interface SaveEnvelope {
   storageVersion: number;
@@ -49,4 +68,6 @@ export function exportSaveJson(slot?: string, options?: { savedAt?: number }): P
 export function importSaveFromText(slot: string | undefined, text: string): Promise<ImportResult>;
 export function migrateFromLocalStorage(slot?: string): Promise<MigrateResult>;
 export function findMostRecentValidBackup(slot?: string): Promise<ReadResult | null>;
+export function listSlots(): Promise<SlotMeta[]>;
+export function summarizeSavePayload(payload: any): SavePayloadSummary | null;
 export function __resetSavePersistenceForTests(): void;
