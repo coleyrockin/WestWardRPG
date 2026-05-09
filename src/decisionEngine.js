@@ -265,6 +265,44 @@ const ENDING_RULES = [
       Math.abs(axes.truthVsComfort) <= 8 &&
       Math.abs(axes.solidarityVsStatus) <= 8,
   },
+  // Companion-modulated variants — same axis outcome, different human weight
+  {
+    id: "solidarity_with_witness",
+    title: "Solidarity With Witness",
+    summary: "The commons rose — and someone who mattered was still standing to see it.",
+    test: ({ axes, rep, companion }) =>
+      axes.solidarityVsStatus > 15 &&
+      rep.workersGuild > 10 &&
+      companion?.active === true,
+  },
+  {
+    id: "ledger_without_bearer",
+    title: "Ledger Without Bearer",
+    summary: "The truth spread, but the one who carried it paid a price the record won't show.",
+    test: ({ axes, flags, companion }) =>
+      flags.ledgerPublished === true &&
+      axes.truthVsComfort > 10 &&
+      companion?.downed === true,
+  },
+  // Quest-outcome gated endings
+  {
+    id: "mercy_at_the_threshold",
+    title: "Mercy at the Threshold",
+    summary: "The old power bent but did not break — because you chose to leave it breathing.",
+    test: ({ questOutcomes, axes }) =>
+      questOutcomes.ashfall_boss === "mercy" &&
+      questOutcomes.lantern_revolt === "mercy" &&
+      axes.controlVsFreedom < 5,
+  },
+  {
+    id: "ash_and_archive",
+    title: "Ash and Archive",
+    summary: "Both the records and the basin reshaped. The old valley is gone. Something else begins.",
+    test: ({ questOutcomes, flags }) =>
+      questOutcomes.ashfall_boss !== undefined &&
+      questOutcomes.archive !== undefined &&
+      flags.ledgerPublished === true,
+  },
   {
     id: "elite_rotation",
     title: "Elite Rotation",
@@ -273,10 +311,11 @@ const ENDING_RULES = [
   },
 ];
 
-export function resolveNarrativeEnding(narrativeState) {
+export function resolveNarrativeEnding(narrativeState, companionRuntime = null) {
   const axes = narrativeState?.thematicAxes || {};
   const rep = narrativeState?.factionRep || {};
   const flags = narrativeState?.globalFlags || {};
+  const questOutcomes = narrativeState?.questOutcomes || {};
   const ctx = {
     axes: {
       controlVsFreedom: Number(axes.controlVsFreedom) || 0,
@@ -289,6 +328,8 @@ export function resolveNarrativeEnding(narrativeState) {
       marketCartel: Number(rep.marketCartel) || 0,
     },
     flags,
+    questOutcomes,
+    companion: companionRuntime || null,
   };
   for (const rule of ENDING_RULES) {
     if (rule.test(ctx)) {

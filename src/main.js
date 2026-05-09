@@ -83,6 +83,12 @@ import { resolveInfluenceSpawnMult } from "./influenceMap.js";
 import { createFogGrid, normalizeFogGrid, revealAroundPlayer, isCellDiscovered, FOG_GRID_SIZE } from "./fogOfWar.js";
 import { createPostProcessor } from "./postProcess.js";
 import { LANGUAGE_PACKS as LANG_PACKS, LANGUAGE_OPTIONS as LANG_OPTIONS } from "./languagePacks.js";
+import { updateWeather as tickWeather } from "./weatherSystem.js";
+import { createDevMetrics, tickDevMetrics, drawDevOverlay } from "./devOverlay.js";
+import { resolveNgPlusHpMult } from "./newGamePlus.js";
+import { todaysSeedString, computeDailyScore, submitDailyScore, getTodaysPersonalBest, resolveScoreMultiplier } from "./dailySeedMode.js";
+import { getLetterByPoiId } from "./journalLetters.js";
+import { resolvePatrolDensityMult } from "./patrolSystem.js";
 import { resolveDiscoveryRewardFeedback } from "./discoveryRewardFeedback.js";
 import {
   ORIGINS,
@@ -831,7 +837,7 @@ const canvas = document.getElementById("game");
 
   function completeFinalBeat() {
     if (state.mode === "victory") return;
-    const ending = resolveNarrativeEnding(state.narrative);
+    const ending = resolveNarrativeEnding(state.narrative, state.companion);
     state.narrative.ending = ending;
     completeVictoryRun(state.world, state.narrative, ending, state.time);
     state.mode = "victory";
@@ -2344,7 +2350,7 @@ const canvas = document.getElementById("game");
   }
 
   function captureSaveData() {
-    state.narrative.ending = resolveNarrativeEnding(state.narrative);
+    state.narrative.ending = resolveNarrativeEnding(state.narrative, state.companion);
     ensureRunStats(state.world, state.time);
     syncQuestOutcomeCount(state.world, state.narrative);
     state.progression.identity = normalizeCharacterIdentity(state.progression.identity);
@@ -3937,6 +3943,12 @@ const canvas = document.getElementById("game");
         } else {
           codexUnlock = null;
         }
+        // Unlock any handcrafted letters tied to this POI id
+        for (const letter of getLetterByPoiId(poi.id || "")) {
+          if (unlockCodexAndPing("letters", letter.id)) {
+            logMsg(`${letter.title} — added to codex.`);
+          }
+        }
         if (poi.loot?.gold) {
           state.player.gold += poi.loot.gold;
           discoveryReward.gold += poi.loot.gold;
@@ -4144,7 +4156,7 @@ const canvas = document.getElementById("game");
           } else {
             state.narrative.factionRep.civicCouncil = clamp(state.narrative.factionRep.civicCouncil + 6, -100, 100);
           }
-          state.narrative.ending = resolveNarrativeEnding(state.narrative);
+          state.narrative.ending = resolveNarrativeEnding(state.narrative, state.companion);
           logMsg(`Quest done: ${archiveQuest.title}. +${archiveQuest.reward.xp} XP, +${archiveQuest.reward.gold} gold.`);
           logMsg(`Ending trajectory: ${state.narrative.ending.title} - ${state.narrative.ending.summary}`);
           sfx.questDone();
@@ -4665,7 +4677,8 @@ const canvas = document.getElementById("game");
         const spawnMods = getActiveRegionEventModifiers();
         const phaseMods = state.world ? resolveSpawnModifier(state.world.timeOfDay || 0) : { hostileMult: 1 };
         const influenceMult = resolveInfluenceSpawnMult(state.regions?.activeRegion || "frontier", state.narrative?.factionRep);
-        const totalDensity = Math.max(0.4, spawnMods.spawnDensityMult * phaseMods.hostileMult * influenceMult);
+        const patrolMult = resolvePatrolDensityMult(state.regions?.activeRegion || "frontier", state.narrative?.factionRep);
+        const totalDensity = Math.max(0.4, spawnMods.spawnDensityMult * phaseMods.hostileMult * influenceMult * patrolMult);
         enemy.respawn = (22 + Math.random() * 8) / totalDensity;
         state.inventory["Slime Core"] += 1;
         const civicBounty = state.narrative.globalFlags.curfewNormalized ? 3 : 0;
@@ -4884,73 +4897,7 @@ const canvas = document.getElementById("game");
   }
 
   function updateWeather(dt) {
-    const weather = state.weather;
-    weather.timer -= dt;
-
-    if (weather.timer <= 0) {
-      const roll = Math.random();
-      const region = state.regions.activeRegion;
-      if (region === "ashfall") {
-        if (roll < 0.36) weather.kind = "sandstorm";
-        else if (roll < 0.62) weather.kind = "heatwave";
-        else if (roll < 0.82) weather.kind = "mist";
-        else weather.kind = "clear";
-      } else if (region === "ironlantern") {
-        if (roll < 0.34) weather.kind = "neon_rain";
-        else if (roll < 0.62) weather.kind = "mist";
-        else if (roll < 0.84) weather.kind = "storm";
-        else weather.kind = "clear";
-      } else if (roll < 0.45) {
-        weather.kind = "clear";
-      } else if (roll < 0.67) {
-        weather.kind = "mist";
-      } else if (roll < 0.9) {
-        weather.kind = "rain";
-      } else {
-        weather.kind = "storm";
-      }
-      weather.timer = 16 + Math.random() * 26;
-    }
-
-    let targetRain = 0;
-    let targetFog = 0.11;
-    let targetWind = 0.2;
-
-    if (weather.kind === "mist") {
-      targetRain = 0;
-      targetFog = 0.32;
-      targetWind = 0.12;
-    } else if (weather.kind === "rain") {
-      targetRain = 0.48;
-      targetFog = 0.22;
-      targetWind = 0.32;
-    } else if (weather.kind === "neon_rain") {
-      targetRain = 0.58;
-      targetFog = 0.27;
-      targetWind = 0.35;
-    } else if (weather.kind === "sandstorm") {
-      targetRain = 0.1;
-      targetFog = 0.52;
-      targetWind = 0.72;
-    } else if (weather.kind === "heatwave") {
-      targetRain = 0;
-      targetFog = 0.2;
-      targetWind = 0.48;
-    } else if (weather.kind === "storm") {
-      targetRain = 0.86;
-      targetFog = 0.36;
-      targetWind = 0.56;
-    }
-
-    const blend = clamp(dt * 0.65, 0, 1);
-    weather.rain = lerp(weather.rain, targetRain, blend);
-    weather.fog = lerp(weather.fog, targetFog, blend);
-    weather.wind = lerp(weather.wind, targetWind, blend * 0.8);
-    weather.lightning = Math.max(0, weather.lightning - dt * 1.7);
-
-    if (weather.kind === "storm" && weather.lightning <= 0 && Math.random() < dt * 0.08) {
-      weather.lightning = 1;
-    }
+    tickWeather(state.weather, state.regions.activeRegion, dt);
   }
 
   function updateNPCs(dt) {
@@ -8798,7 +8745,7 @@ const canvas = document.getElementById("game");
     }
 
     if (state.mode === "victory") {
-      const ending = state.narrative.ending || resolveNarrativeEnding(state.narrative);
+      const ending = state.narrative.ending || resolveNarrativeEnding(state.narrative, state.companion);
       const houseProgress = resolveHouseProgressDisplay({
         inventory: state.inventory,
         jobState: state.world.jobs,
@@ -9334,6 +9281,8 @@ const canvas = document.getElementById("game");
   }
 
   const postProcessor = createPostProcessor(canvas);
+  const devMetrics = createDevMetrics();
+  let devOverlayEnabled = false;
 
   function render() {
     render3D();
@@ -9349,6 +9298,7 @@ const canvas = document.getElementById("game");
     if (postProcessor) {
       postProcessor.render(Boolean(state.graphics.performance?.postFx));
     }
+    if (devOverlayEnabled) drawDevOverlay(ctx, devMetrics);
   }
 
   function resize() {
@@ -9749,6 +9699,11 @@ const canvas = document.getElementById("game");
       performChargedAttack();
     }
 
+    if (event.code === "KeyP") {
+      devOverlayEnabled = !devOverlayEnabled;
+      logMsg(`Dev overlay: ${devOverlayEnabled ? "ON" : "OFF"}.`);
+    }
+
     if (event.code === "Digit1") setQuickUtility("smoke");
     if (event.code === "Digit2") setQuickUtility("flare");
     if (event.code === "Digit3") setQuickUtility("tonic");
@@ -9838,6 +9793,7 @@ const canvas = document.getElementById("game");
     if (!frame.last) frame.last = now;
     const dt = Math.min(0.05, (now - frame.last) / 1000);
     frame.last = now;
+    if (devOverlayEnabled) tickDevMetrics(devMetrics, dt);
     update(dt);
     render();
     requestAnimationFrame(frame);
@@ -10155,7 +10111,7 @@ const canvas = document.getElementById("game");
         decisions: state.narrative.decisions,
         questOutcomes: state.narrative.questOutcomes,
         npcMemory: state.narrative.npcMemory,
-        ending: resolveNarrativeEnding(state.narrative),
+        ending: resolveNarrativeEnding(state.narrative, state.companion),
       },
       codex: {
         progress: totalCodexProgress(state),
