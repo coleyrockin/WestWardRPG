@@ -177,6 +177,9 @@ import {
   createHudNotice,
 } from "./hudNotice.js";
 import {
+  resolveInteractionPrompt,
+} from "./interactionPrompt.js";
+import {
   buildJobObjective,
   buildQuestHudLines,
   resolveLiveObjectiveLine,
@@ -3745,6 +3748,98 @@ const canvas = document.getElementById("game");
       }
     }
     return nearest;
+  }
+
+  function getInteractionPrompt() {
+    if (state.mode !== "playing") return null;
+    const candidates = [];
+    const player = state.player;
+    const addCandidate = (kind, label, target, options = {}) => {
+      const distance = target && Number.isFinite(target.x) && Number.isFinite(target.y)
+        ? dist(player, target)
+        : 0;
+      candidates.push({ kind, label, distance, ...options });
+    };
+
+    const roadSignPrompt = getRoadSignPrompt();
+    if (roadSignPrompt) {
+      addCandidate("road-sign", roadSignPrompt.targetLabel || "Road sign", roadSignPrompt, {
+        line: roadSignPrompt.line || roadSignPrompt.targetLabel,
+        color: roadSignPrompt.color || "#ffde91",
+      });
+    }
+
+    if (!player.inHouse && state.regions?.activeRegion) {
+      const poi = poiUnderInteraction(state.regions, state.regions.activeRegion, player.x, player.y);
+      if (poi) {
+        const kind = POI_KINDS[poi.kind] || POI_KINDS.cache;
+        addCandidate("poi", poi.label, poi, {
+          line: `${kind.label}: ${poi.returnReason || poi.mysteryLine || "search for a useful find"}`,
+          color: kind.color,
+        });
+      }
+    }
+
+    if (player.regionInterior) {
+      const interior = REGION_INTERIORS[player.regionInterior];
+      if (interior && dist(player, interior.exit) < 1.7) {
+        addCandidate("interior-exit", "Exit", interior.exit, { line: "Return to the open road" });
+      }
+      return resolveInteractionPrompt(candidates);
+    }
+
+    if (player.inHouse) {
+      if (dist(player, state.house.interiorDoor) < 1.7) addCandidate("house-exit", "Door", state.house.interiorDoor);
+      if (dist(player, state.house.bed) < 1.7) addCandidate("bed", "Bed", state.house.bed, { line: "Recover HP and stamina" });
+      if (dist(player, state.house.stash) < 1.7) addCandidate("workbench", "Stash workbench", state.house.stash, { line: "Craft, repair, refine" });
+      const trophy = resolveHouseTrophyInspection({
+        player,
+        inventory: state.inventory,
+        jobState: state.world.jobs,
+        house: state.house,
+      });
+      if (trophy) addCandidate("trophy", trophy.label, { x: player.x, y: player.y }, { line: trophy.planningLine || trophy.line });
+      return resolveInteractionPrompt(candidates);
+    }
+
+    if (dist(player, state.house.outsideDoor) < 1.8) {
+      addCandidate("house-door", "House door", state.house.outsideDoor, {
+        line: state.house.unlocked ? "Enter your home" : "Locked until Smith Varo's house quest",
+      });
+    }
+
+    const regionInterior = getRegionInteriorByRegion(state.regions.activeRegion);
+    if (regionInterior && dist(player, REGION_INTERIOR_ENTRANCE) < 1.8) {
+      addCandidate("region-interior", regionInterior.label, REGION_INTERIOR_ENTRANCE, { line: regionInterior.entryLog });
+    }
+
+    const boardProp = getActiveJobBoardProp();
+    if (boardProp && dist(player, boardProp) < 1.85) {
+      addCandidate("job-board", "Boone's job board", boardProp, { line: "Pick up paid road work", color: boardProp.color });
+    }
+
+    const jobMarker = getJobRouteMarker();
+    if (jobMarker && dist(player, jobMarker) < 1.65) {
+      addCandidate("job-route", jobMarker.label || "Job marker", jobMarker, {
+        line: jobMarker.objectiveLine || jobMarker.actionLine || "Advance the active job",
+        color: jobMarker.color,
+      });
+    }
+
+    const npc = nearestEntity(state.npcs, () => true, 1.95);
+    if (npc) addCandidate("npc", npc.name, npc, { line: npc.role || "Talk" });
+
+    const pig = nearestEntity(state.pigs, () => true, 1.7);
+    if (pig) addCandidate("pig", pig.name, pig, { line: pig.role || "Frontier pig" });
+
+    const resource = nearestEntity(state.resources, (r) => !r.harvested, 1.6);
+    if (resource) {
+      addCandidate("resource", resource.label || resource.item || resource.type, resource, {
+        line: resource.item || resource.label || "Gather resource",
+      });
+    }
+
+    return resolveInteractionPrompt(candidates);
   }
 
   function updateQuestProgressFromInventory() {
@@ -8931,6 +9026,31 @@ const canvas = document.getElementById("game");
     return h + 6;
   }
 
+  function drawInteractionPrompt(prompt, bottomHudY, margin) {
+    if (!prompt || state.mode !== "playing") return;
+    const compact = canvas.width < 560;
+    const w = Math.min(compact ? canvas.width - margin * 2 : 360, canvas.width - margin * 2);
+    const h = compact ? 40 : 44;
+    const x = Math.round((canvas.width - w) / 2);
+    const y = Math.max(margin + 92, Math.round(bottomHudY - h - 8));
+    const urgent = prompt.urgency === "high" || prompt.urgency === "urgent";
+    const color = prompt.color || "#ffd77b";
+
+    drawSoftPanel(x, y, w, h, {
+      top: urgent ? "rgba(54, 38, 18, 0.86)" : "rgba(16, 24, 24, 0.82)",
+      bottom: urgent ? "rgba(24, 15, 8, 0.82)" : "rgba(8, 13, 15, 0.76)",
+      border: hexToRgba(color, urgent ? 0.62 : 0.46),
+      shadowBlur: 10,
+      shadowOffsetY: 4,
+    });
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 10, y + 8, 3, h - 16);
+    ctx.font = "bold 12px Georgia";
+    drawClippedText(prompt.title || "E: Use", x + 22, y + 18, w - 34, color);
+    ctx.font = "10px Georgia";
+    drawClippedText(prompt.line || prompt.label || "", x + 22, y + 33, w - 34, "#f1e5c8");
+  }
+
   function drawHud() {
     const activeJob = getActiveJobSummary(state.world.jobs);
     const questLines = buildQuestHudLines({
@@ -9107,6 +9227,7 @@ const canvas = document.getElementById("game");
         drawClippedText(liveObjective.secondaryLine, strip.x + 10, strip.secondaryY, strip.w - 20, "#f1e5c8");
       }
     }
+    drawInteractionPrompt(getInteractionPrompt(), hudY, margin);
     drawDiscoveryBanner(hudY, margin);
 
     if (state.mode === "gameover") {
