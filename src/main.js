@@ -90,6 +90,14 @@ import { resolveNgPlusHpMult } from "./newGamePlus.js";
 import { todaysSeedString, computeDailyScore, submitDailyScore, getTodaysPersonalBest, resolveScoreMultiplier } from "./dailySeedMode.js";
 import { getLetterByPoiId } from "./journalLetters.js";
 import { resolvePatrolDensityMult } from "./patrolSystem.js";
+import { advanceCalendarDay, resolveCurrentSeason, resolveSeasonModifiers, resolveSeasonLabel } from "./seasonalEvents.js";
+import { getTodaysOverlays } from "./regionOverlays.js";
+import { createMinimapCache, bakeMinimapLayer, getMinimapLayerCanvas, invalidateMinimapCache } from "./minimapCache.js";
+import { createReplaySession, recordInputEvent, finalizeReplay, saveReplayLocally } from "./replayRecorder.js";
+import { resolvePlayerArchetype, ARCHETYPE_NPC_REACTIONS } from "./characterIdentity.js";
+import { resolveActiveCurseEffects, resolveCurseNpcReaction } from "./cursedItems.js";
+import { getUnlockedCapstonePerkIds } from "./progressionSystem.js";
+import { generateSideJobs } from "./sideJobGenerator.js";
 import { resolveDiscoveryRewardFeedback } from "./discoveryRewardFeedback.js";
 import {
   ORIGINS,
@@ -860,6 +868,10 @@ const canvas = document.getElementById("game");
     saveGame({ silent: true });
     const victorySummary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time, null);
     appendRunRecord(victorySummary, state.world.runStats || {});
+    if (activeReplaySession) {
+      saveReplayLocally(finalizeReplay(activeReplaySession, { ...state.world.runStats, victory: true }));
+      activeReplaySession = null;
+    }
   }
 
   let skillScreenOpen = false;
@@ -1677,6 +1689,8 @@ const canvas = document.getElementById("game");
       loot: createInitialLootState(),
       jobs: createInitialJobBoardState(),
       roadRoute: null,
+      calendarDay: 0,
+      calendarDayTimer: 0,
     },
     companion: createInitialCompanionRuntime(),
     ui: { modals: createInitialUiModalState() },
@@ -2434,6 +2448,8 @@ const canvas = document.getElementById("game");
         loot: state.world.loot,
         jobs: state.world.jobs,
         roadRoute: state.world.roadRoute,
+        calendarDay: state.world.calendarDay || 0,
+        calendarDayTimer: state.world.calendarDayTimer || 0,
       },
       narrative: state.narrative,
       codex: state.codex,
@@ -2511,6 +2527,8 @@ const canvas = document.getElementById("game");
       loot: normalizeLootState(save.world?.loot),
       jobs: normalizeJobBoardState(save.world?.jobs),
       roadRoute: normalizeRoadRouteState(save.world?.roadRoute),
+      calendarDay: typeof save.world?.calendarDay === "number" ? save.world.calendarDay : 0,
+      calendarDayTimer: typeof save.world?.calendarDayTimer === "number" ? save.world.calendarDayTimer : 0,
     };
     ensureDifficultyDefaults(state.world);
     state.mode = save.mode === "victory" || state.world.runStats?.victory ? "victory" : state.mode;
@@ -2685,6 +2703,7 @@ const canvas = document.getElementById("game");
       logMsg("Welcome to Dustward, drifter. Talk to townsfolk, duel slimes, and avoid being trampled by outlaw pigs.");
       ensureAudio();
     }
+    activeReplaySession = createReplaySession(Date.now());
     syncAmbientForRegion(state.regions?.activeRegion || "frontier");
     if (pendingSaveCorruptionMsg) {
       logMsg(pendingSaveCorruptionMsg);
@@ -2806,6 +2825,15 @@ const canvas = document.getElementById("game");
     state.progression.equipment = normalizeGearState(state.progression.equipment);
     const modifiers = buildProgressionModifiers(state.progression);
     const gearSummary = buildGearSummary(state.progression.equipment, state.progression.identity);
+    // Merge capstone perk effects into progressionMods
+    const activeCapstones = getUnlockedCapstonePerkIds(state.progression, state.narrative.factionRep);
+    if (activeCapstones.includes("iron_constitution")) {
+      modifiers.maxHpBonus = (modifiers.maxHpBonus || 0) + 30;
+      modifiers.guardBreakRecoveryMult = 0.6;
+    }
+    if (activeCapstones.includes("perfect_form")) {
+      modifiers.perfectWindowBonus = (modifiers.perfectWindowBonus || 0) + 0.05;
+    }
     state.player.progressionMods = modifiers;
     state.player.loadout.weapon = gearSummary.weaponName;
     state.player.quickUtility = state.player.quickUtility || {
@@ -2997,6 +3025,7 @@ const canvas = document.getElementById("game");
     unlockRegion(state.regions, next);
     const name = REGIONS[next]?.name || next;
     logMsg(`Travelled to region: ${name}.`);
+    invalidateMinimapCache(minimapTileCache);
     syncAmbientForRegion(next);
     emitCompanionBark("region_entry");
   }
@@ -3522,15 +3551,23 @@ const canvas = document.getElementById("game");
   }
 
   function getBooneJobChoices() {
-    return getJobBoardChoices({
+    const handcrafted = getJobBoardChoices({
       regionId: state.regions.activeRegion,
       playerLevel: state.player.level,
       jobState: state.world.jobs,
       npcId: "warden",
       inventory: state.inventory,
       narrative: state.narrative,
-      limit: 7,
+      limit: 5,
     });
+    const generated = generateSideJobs({
+      regionId: state.regions.activeRegion,
+      factionRep: state.narrative.factionRep,
+      questOutcomes: state.narrative.questOutcomes,
+      dailySeed: todaysSeedString(),
+      count: 2,
+    });
+    return [...handcrafted, ...generated].slice(0, 7);
   }
 
   function getJobRouteMarker() {
@@ -3746,6 +3783,18 @@ const canvas = document.getElementById("game");
     if (affinity <= -10) {
       return `${state.npcs.find((npc) => npc.id === npcId)?.name || "NPC"}: You talk reform, then negotiate like an accountant with a knife.`;
     }
+    // Archetype recognition — NPCs react to recognized player build type
+    const archetype = resolvePlayerArchetype(
+      state.progression.identity,
+      state.player.curses || [],
+      state.narrative.factionRep,
+    );
+    if (archetype && ARCHETYPE_NPC_REACTIONS[archetype.id]) {
+      return ARCHETYPE_NPC_REACTIONS[archetype.id];
+    }
+    // Curse NPC reaction — if player carries a curse, certain NPCs notice
+    const curseReaction = resolveCurseNpcReaction(npcId, state.player.curses || []);
+    if (curseReaction) return curseReaction.line;
     return null;
   }
 
@@ -4698,7 +4747,8 @@ const canvas = document.getElementById("game");
         const phaseMods = state.world ? resolveSpawnModifier(state.world.timeOfDay || 0) : { hostileMult: 1 };
         const influenceMult = resolveInfluenceSpawnMult(state.regions?.activeRegion || "frontier", state.narrative?.factionRep);
         const patrolMult = resolvePatrolDensityMult(state.regions?.activeRegion || "frontier", state.narrative?.factionRep);
-        const totalDensity = Math.max(0.4, spawnMods.spawnDensityMult * phaseMods.hostileMult * influenceMult * patrolMult);
+        const seasonMods = resolveSeasonModifiers(resolveCurrentSeason(state.world.calendarDay || 0), state.regions?.activeRegion || "frontier");
+        const totalDensity = Math.max(0.4, spawnMods.spawnDensityMult * phaseMods.hostileMult * influenceMult * patrolMult * seasonMods.spawnMult);
         enemy.respawn = (22 + Math.random() * 8) / totalDensity;
         state.inventory["Slime Core"] += 1;
         const civicBounty = state.narrative.globalFlags.curfewNormalized ? 3 : 0;
@@ -5258,7 +5308,10 @@ const canvas = document.getElementById("game");
     updateWeather(dt);
 
     if (state.mode !== "playing" || anyModalOpen()) return;
-    if (state.world) advanceTimeOfDay(state.world, dt);
+    if (state.world) {
+      advanceTimeOfDay(state.world, dt);
+      advanceCalendarDay(state.world, dt);
+    }
     rollRegionEvent(state.regions, dt);
     applyDynamicRegionProgression();
     if (tickChargedAttack(player, dt)) {
@@ -5552,6 +5605,10 @@ const canvas = document.getElementById("game");
               state.mode = "gameover";
               logMsg(choice(deathMessages) + " Press R to recover.");
               sfx.death();
+              if (activeReplaySession) {
+                saveReplayLocally(finalizeReplay(activeReplaySession, state.world.runStats || {}));
+                activeReplaySession = null;
+              }
               const deathStats = ensureRunStats(state.world, state.time);
               if (!deathStats.deathCause) {
                 deathStats.deathCause = `${enemy.behavior || "enemy"} in ${state.regions?.activeRegion || "frontier"}`;
@@ -8428,6 +8485,25 @@ const canvas = document.getElementById("game");
     ctx.lineTo(playerX + Math.cos(state.player.angle) * 10, playerY + Math.sin(state.player.angle) * 10);
     ctx.stroke();
 
+    // Daily overlay encounter markers (ambush, wandering trader, etc.)
+    if (!state.player.inHouse) {
+      const overlays = getTodaysOverlays(state.regions?.activeRegion || "frontier");
+      ctx.save();
+      ctx.font = "10px monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const overlay of overlays) {
+        const op = worldToMap(overlay.wx, overlay.wy);
+        const distFromCenter = Math.sqrt((op.x - cx) ** 2 + (op.y - cy) ** 2);
+        if (distFromCenter > mapRadius - 4) continue;
+        ctx.fillStyle = overlay.meta?.color || "#ffffff";
+        ctx.globalAlpha = 0.8;
+        ctx.fillText(overlay.meta?.symbol || "?", op.x, op.y);
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+    }
+
     ctx.restore(); // end clip
 
     // Gradient ring border
@@ -9313,6 +9389,8 @@ const canvas = document.getElementById("game");
   const postProcessor = createPostProcessor(canvas);
   const devMetrics = createDevMetrics();
   let devOverlayEnabled = false;
+  let activeReplaySession = null;
+  const minimapTileCache = createMinimapCache();
 
   function render() {
     render3D();
@@ -9379,6 +9457,7 @@ const canvas = document.getElementById("game");
 
   document.addEventListener("keydown", (event) => {
     state.keys[event.code] = true;
+    if (activeReplaySession && state.mode === "playing") recordInputEvent(activeReplaySession, "keydown", event.code);
 
     /* Dialogue choice modal controls */
     if (dialogueOpen && pendingDialogue) {

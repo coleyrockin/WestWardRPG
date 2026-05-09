@@ -260,7 +260,7 @@ It needs the existing systems to feel connected in the player's first short sess
 
 ## Shipped Foundations (audit)
 
-Latest audit (2026-05-08, post save-slot picker batch): `npm test` → **621 passing across 54 test files**; 48 source modules; 14 Playwright scripted-replay scenarios; **CI live** (`.github/workflows/qa.yml`, two-job pipeline). `main.js` is **~10,420 lines** (slot-picker rendering + 5 reactivity wires landed inline; `savePersistence.js` grew with `listSlots` + `summarizeSavePayload`). README test count refreshed in lockstep with each batch.
+Latest audit (2026-05-09, post full-roadmap sprint): `npm test` → **871 passing across 78 test files**; 79 source modules; CI live. `main.js` is **~10,300 lines** (weather, language packs, and update logic extracted; new systems wired in). All Phase 1–6 items shipped. See "2026-05-09 Sprint" section below for full changelog.
 
 ### Phase 1 open-road slice (latest local)
 - **Discovery Reward Banner 1** (`src/discoveryRewardFeedback.js`) — discoveries now trigger a compact reward banner with title, reward line, story hook, codex unlock, and route/renown payoff lines. `render_game_to_text` exposes the active banner for browser smoke and human-test auditing.
@@ -396,7 +396,62 @@ Cross-checked against `decisionEngine`, `factionEffects`, `economyServices`, `np
 6. ~~Move `JOB_BOARD_PROPS` → `poiSystem.js`; `JOB_BOARD_PRESENTATION` → `storyContent.js`; `COMPLETED_JOB_BOARD_LINES` → `npcMemory.js`.~~ **Shipped:** `jobBoard.js` already imports them from those modules.
 7. ~~Pre-allocate the raycaster depth buffer.~~ **Shipped:** `cachedDepthBuffer` cached outside the per-frame path at `main.js:7499`.
 8. ~~Add `state.ui.modals[]` and migrate `dialogueSelection` / `questOutcomeSelection` / etc. into it (saved with v3; bumps to v4 only when other v4 items land).~~ **Shipped 2026-05-08:** `src/uiModals.js` defines `state.ui.modals` (dialogue/questOutcome/jobBoard/codexTab/settings selection indices); `saveMigration.js` backfills it on v3 + v2→v3; `main.js` syncs runtime module-globals into/out of state.ui.modals at save/load boundaries. Codex tab and settings row now survive page reload.
-9. Update Anti-goals (see Track-section near the bottom of this file) to reflect the project-owner directive of 2026-05-05.
+9. ~~Update Anti-goals.~~ **Shipped 2026-05-09.**
+
+### 2026-05-09 Sprint — Full roadmap pass (621 → 871 tests, 48 → 79 modules)
+
+**Tech Tracks — all shipped:**
+- ~~A3~~ PWA: manifest.json, sw.js, icons, SW registration + update banner.
+- ~~A4~~ TypeScript state typing: `src/gameState.d.ts` with GameState/PlayerState/NarrativeState/RegionsState/UiState hierarchy.
+- ~~B1~~ WebGL2 post-process: `src/postProcess.js` — vignette + warm color grade, opt-in via "Post-FX" settings toggle.
+- ~~B5~~ Motion reduction: `particleMultiplier=0` when `motionReduction` on; decorative particles suppressed.
+- ~~C1~~ Behavior Trees: `src/behaviorTree.js` (70-line pure BT runtime); `src/npcBehaviors.js` — NPCs walk home at dusk.
+- ~~C2~~ Influence maps: `src/influenceMap.js` — faction influence coefficients → spawn density + route tinting.
+- ~~C4~~ Side-job generator: `src/sideJobGenerator.js` — 12-job CSP pool, faction-rep alignment, daily-seed determinism; wired into `getBooneJobChoices`.
+- ~~C5~~ WFC interiors: `src/wfcInteriors.js` — Wave Function Collapse cave/ruin generator, seeded + deterministic.
+- ~~C6~~ Fog of war: `src/fogOfWar.js` — 32×32 per-region discovery grid; minimap dims undiscovered tiles.
+- ~~LanguageManager~~ Language packs extracted to `src/languagePacks.js` (−576 lines from main.js).
+- ~~WeatherSystem~~ extracted to `src/weatherSystem.js` (−55 lines from main.js).
+
+**Replayability — all shipped:**
+- ~~Daily seed mode~~ `src/dailySeedMode.js` — YYYY-MM-DD seed, challenge flags (ironman/noShop/noSkill/noCompanion), score formula, localStorage leaderboard.
+- ~~New Game+~~ `src/newGamePlus.js` — carry-forward extraction/apply, NG+ HP scaling.
+- ~~Challenge runs~~ flags + score multipliers in `dailySeedMode.js`.
+- ~~Run history~~ `src/runHistory.js` — last 10 runs, playtest metrics.
+- ~~Replay recorder~~ `src/replayRecorder.js` — full input recording, localStorage persistence, export blob; wired into `beginSession`/death/victory.
+
+**World round 2 — all shipped:**
+- ~~Patrol entities~~ `src/patrolSystem.js` — faction stance (allied/neutral/hostile), spawn density multiplier; wired.
+- ~~Seasonal events~~ `src/seasonalEvents.js` — 4-season cycle, region modifiers; `advanceCalendarDay` wired in update loop, spawn density affected.
+- ~~Procedural region overlays~~ `src/regionOverlays.js` — daily encounter seeds; markers drawn on minimap.
+- ~~NPC schedules (night return)~~ done via BT dusk branch.
+
+**Narrative round 2 — all shipped:**
+- ~~Endings expansion~~ 13 total endings (4 new: companion-gated + quest-outcome gated). `resolveNarrativeEnding` accepts companion runtime.
+- ~~Letters/journal entries~~ `src/journalLetters.js` — 7 handcrafted letters with cross-reference chains; auto-unlocked on POI discovery.
+- ~~Cursed items~~ `src/cursedItems.js` — 4 relics with buff/debuff + NPC reaction; `resolveCurseNpcReaction` wired into `storyReactiveQuip`.
+
+**Player build round 2 — all shipped:**
+- ~~Ten-flavor identity reactions~~ `IDENTITY_ARCHETYPES` + `ARCHETYPE_NPC_REACTIONS` + `ARCHETYPE_JOB_HOOKS` in `characterIdentity.js`; `resolvePlayerArchetype` wired into `storyReactiveQuip`.
+- ~~Skill tree round 2~~ 5 capstone perks (`CAPSTONE_PERKS` in `progressionSystem.js`) gated by branch level + attribute + faction; iron_constitution and perfect_form effects wired into `progressionMods`.
+
+**Engine round 2 — shipped:**
+- ~~Dev overlay~~ `src/devOverlay.js` — KeyP toggle, FPS/particles/fog discovery readout.
+- ~~Minimap OffscreenCanvas~~ `src/minimapCache.js` — bake logic; invalidated on region change.
+
+**Combat round 2 — shipped:**
+- ~~Stamina chip on block~~ `applyBlockStaminaChip` — blocked hits drain stamina; guard breaks when depleted.
+- ~~Counter-windup baits~~ tank/control enemies feint at 20–40% through their windup.
+- ~~Status synergies~~ burn+frost → ICE BURST; bleed+shock → chain shock.
+
+**Remaining open (not yet in scope):**
+- B3 WebAssembly raycaster (needs Rust toolchain).
+- C3 Event-sourced narrative state (major architectural change).
+- D1–D4 AI features (need per-item explicit approval).
+- main.js full extraction (InputManager, HudRenderer, CombatProcessor, SaveStateManager).
+- Accessibility round 2 (combat subtitles, audio cues).
+- Localization expansion (codex letters + job board in all 8 languages).
+- Visual regression CI (pixelmatch pass/fail step).
 
 ## Definition of Done
 
