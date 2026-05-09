@@ -64,7 +64,7 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, and early Phase A open-world pressure/dressing work.
 
-Latest local fast gate: `npm test` reports **690 passing tests across 60 files**. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **722 passing tests across 63 files**. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
@@ -185,6 +185,10 @@ WestWardRPG/
 │   ├── npcBehaviors.js      # townsperson day-wander / dusk-return-home tree
 │   ├── influenceMap.js      # faction influence coefficients → spawn density + tint
 │   ├── runHistory.js        # localStorage-backed run history + playtest metrics
+│   ├── fogOfWar.js          # 32×32 per-region fog grid; minimap reveals on movement
+│   ├── sideJobGenerator.js  # CSP side-job generator seeded by region + faction state
+│   ├── wfcInteriors.js      # Wave Function Collapse cave/mine/ruin interior generator
+│   ├── languagePacks.js     # 8-language locale strings (extracted from main.js)
 │   ├── gameState.d.ts       # GameState type hierarchy (PlayerState, NarrativeState…)
 │   ├── saveMigration.js     # v1/v2 -> v3 save migration
 │   └── storyContent.js      # flagship dialogue and narrative flavor text
