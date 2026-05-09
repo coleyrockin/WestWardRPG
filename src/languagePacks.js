@@ -65,6 +65,14 @@ export const LANGUAGE_PACKS = {
       affixPrefixName: "Inscribe Prefix", affixPrefixDesc: "80g + 2 Cipher Lens. Random prefix affix on your weapon.",
       affixSuffixName: "Inscribe Suffix", affixSuffixDesc: "80g + 2 Cipher Lens. Random suffix affix on your weapon.",
     },
+    season: { spring: "Primavera", summer: "Verano", fall: "Otoño", winter: "Invierno", dayLabel: "Día" },
+    combat: {
+      hit: "HIT", crit: "CRITICAL HIT", block: "BLOCK",
+      perfect_parry: "PERFECT PARRY", perfect_dodge: "PERFECT DODGE",
+      guard_break: "GUARD BREAK", low_hp: "LOW HEALTH",
+      enemy_death: "ENEMY DOWN", regen: "HP RESTORED",
+    },
+    season: { spring: "Spring", summer: "Summer", fall: "Fall", winter: "Winter", dayLabel: "Day" },
   },
   es: {
     menu: {
@@ -106,6 +114,13 @@ export const LANGUAGE_PACKS = {
       mysteryBoxName: "Caja misteriosa", mysteryBoxDesc: "¡Puede ser cualquier cosa! (Casi siempre son rocas.)",
       sellCoresName: "Vender núcleos slime", sellCoresDesc: "Vende 1 núcleo por 15 de oro.",
     },
+    combat: {
+      hit: "GOLPE", crit: "GOLPE CRÍTICO", block: "BLOQUEO",
+      perfect_parry: "PARADA PERFECTA", perfect_dodge: "ESQUIVA PERFECTA",
+      guard_break: "GUARDIA ROTA", low_hp: "VIDA BAJA",
+      enemy_death: "ENEMIGO CAÍDO", regen: "HP RESTAURADO",
+    },
+    season: { spring: "Primavera", summer: "Verano", fall: "Otoño", winter: "Invierno", dayLabel: "Día" },
   },
   pt: {
     menu: {
@@ -142,6 +157,13 @@ export const LANGUAGE_PACKS = {
       mysteryBoxName: "Caixa misteriosa", mysteryBoxDesc: "Pode ser qualquer coisa! (Normalmente pedras.)",
       sellCoresName: "Vender núcleos slime", sellCoresDesc: "Venda 1 núcleo por 15 de ouro.",
     },
+    combat: {
+      hit: "ACERTO", crit: "ACERTO CRÍTICO", block: "BLOQUEIO",
+      perfect_parry: "APARO PERFEITO", perfect_dodge: "ESQUIVA PERFEITA",
+      guard_break: "GUARDA QUEBRADA", low_hp: "VIDA BAIXA",
+      enemy_death: "INIMIGO ABATIDO", regen: "HP RESTAURADO",
+    },
+    season: { spring: "Primavera", summer: "Verão", fall: "Outono", winter: "Inverno", dayLabel: "Dia" },
   },
   fr: {
     menu: {
@@ -178,6 +200,13 @@ export const LANGUAGE_PACKS = {
       mysteryBoxName: "Boîte mystère", mysteryBoxDesc: "Ça peut être n'importe quoi ! (Souvent des pierres.)",
       sellCoresName: "Vendre des noyaux de slime", sellCoresDesc: "Vendez 1 noyau pour 15 or.",
     },
+    combat: {
+      hit: "TOUCHÉ", crit: "COUP CRITIQUE", block: "PARADE",
+      perfect_parry: "PARADE PARFAITE", perfect_dodge: "ESQUIVE PARFAITE",
+      guard_break: "GARDE BRISÉE", low_hp: "VIE BASSE",
+      enemy_death: "ENNEMI ABATTU", regen: "PV RESTAURÉS",
+    },
+    season: { spring: "Printemps", summer: "Été", fall: "Automne", winter: "Hiver", dayLabel: "Jour" },
   },
   de: {
     menu: {
@@ -214,6 +243,13 @@ export const LANGUAGE_PACKS = {
       mysteryBoxName: "Mysteriöse Kiste", mysteryBoxDesc: "Kann alles sein! (Meistens Steine.)",
       sellCoresName: "Slime-Kerne verkaufen", sellCoresDesc: "Verkaufe 1 Kern für 15 Gold.",
     },
+    combat: {
+      hit: "TREFFER", crit: "KRITISCHER TREFFER", block: "BLOCK",
+      perfect_parry: "PERFEKTE PARADE", perfect_dodge: "PERFEKTES AUSWEICHEN",
+      guard_break: "GUARD GEBROCHEN", low_hp: "WENIG LEBEN",
+      enemy_death: "FEIND BESIEGT", regen: "LP WIEDERHERGESTELLT",
+    },
+    season: { spring: "Frühling", summer: "Sommer", fall: "Herbst", winter: "Winter", dayLabel: "Tag" },
   },
   it: {
     menu: {
@@ -250,6 +286,13 @@ export const LANGUAGE_PACKS = {
       mysteryBoxName: "Scatola misteriosa", mysteryBoxDesc: "Può essere qualsiasi cosa! (Di solito pietre.)",
       sellCoresName: "Vendi nuclei slime", sellCoresDesc: "Vendi 1 nucleo per 15 oro.",
     },
+    combat: {
+      hit: "COLPO", crit: "COLPO CRITICO", block: "PARATA",
+      perfect_parry: "PARATA PERFETTA", perfect_dodge: "SCHIVATA PERFETTA",
+      guard_break: "GUARDIA ROTTA", low_hp: "VITA BASSA",
+      enemy_death: "NEMICO ABBATTUTO", regen: "PS RIPRISTINATI",
+    },
+    season: { spring: "Primavera", summer: "Estate", fall: "Autunno", winter: "Inverno", dayLabel: "Giorno" },
   },
   ja: {
     menu: {
@@ -286,6 +329,13 @@ export const LANGUAGE_PACKS = {
       mysteryBoxName: "ミステリーボックス", mysteryBoxDesc: "何が出るかな！（だいたい石）",
       sellCoresName: "スライムコアを売る", sellCoresDesc: "コア1個を15ゴールドで売却。",
     },
+    combat: {
+      hit: "ヒット", crit: "クリティカル", block: "ブロック",
+      perfect_parry: "完璧なパリィ", perfect_dodge: "完璧な回避",
+      guard_break: "ガード崩壊", low_hp: "HP低下",
+      enemy_death: "敵を撃破", regen: "HP回復",
+    },
+    season: { spring: "春", summer: "夏", fall: "秋", winter: "冬", dayLabel: "日" },
   },
   tr: {
     menu: {
@@ -322,5 +372,12 @@ export const LANGUAGE_PACKS = {
       mysteryBoxName: "Gizem kutusu", mysteryBoxDesc: "Her şey çıkabilir! (Genelde taş çıkar.)",
       sellCoresName: "Slime çekirdeği sat", sellCoresDesc: "1 çekirdeği 15 altına sat.",
     },
+    combat: {
+      hit: "VURUŞ", crit: "KRİTİK VURUŞ", block: "BLOK",
+      perfect_parry: "MÜKEMMEL PARILAMA", perfect_dodge: "MÜKEMMEL KAÇIŞ",
+      guard_break: "SAVUNMA KIRILDI", low_hp: "DÜŞÜK CAN",
+      enemy_death: "DÜŞMAN YIKILDI", regen: "CP YENİLENDİ",
+    },
+    season: { spring: "İlkbahar", summer: "Yaz", fall: "Sonbahar", winter: "Kış", dayLabel: "Gün" },
   },
 };

@@ -98,6 +98,10 @@ import { resolvePlayerArchetype, ARCHETYPE_NPC_REACTIONS } from "./characterIden
 import { resolveActiveCurseEffects, resolveCurseNpcReaction } from "./cursedItems.js";
 import { getUnlockedCapstonePerkIds } from "./progressionSystem.js";
 import { generateSideJobs } from "./sideJobGenerator.js";
+import { createCombatSubtitleState, recordCombatEvent, tickCombatSubtitles, drawCombatSubtitles, playCombatAudioCue } from "./combatAccessibility.js";
+import { createInputManager } from "./inputManager.js";
+import { createSaveStateManager } from "./saveStateManager.js";
+import { canAttack, canDodge, resolveNextComboStep, resolveStaminaRegenRate, isInSwingArc, resolveEnemyStagger, BASE_COMBOS, DODGE_STAMINA_COST, DODGE_COOLDOWN } from "./combatProcessor.js";
 import { resolveDiscoveryRewardFeedback } from "./discoveryRewardFeedback.js";
 import {
   ORIGINS,
@@ -3121,6 +3125,8 @@ const canvas = document.getElementById("game");
       state.floatingTexts.push({ wx: state.player.x, wy: state.player.y, text: "PERFECT", life: 0.7, maxLife: 0.7, color: "#cce4ff" });
       logMsg("Perfect dodge!");
       emitCompanionBark("perfect_dodge");
+      recordCombatEvent(combatSubtitles, "perfect_dodge");
+      playCombatAudioCue(audioBuses?.ctx, "perfect_dodge");
     } else {
       logMsg("Dodge step executed.");
     }
@@ -4552,24 +4558,14 @@ const canvas = document.getElementById("game");
 
   function attack() {
     if (state.mode !== "playing") return;
-    if (state.player.chargeAttackWindup > 0) return;
-    if (state.player.attackCooldown > 0) return;
-    if (state.player.stamina < 8) {
-      logMsg("Too exhausted to swing.");
+    if (!canAttack(state.player)) {
+      if (state.player.stamina < 8) logMsg("Too exhausted to swing.");
       return;
     }
 
     const stance = getStanceModifiers();
-    const combos = [
-      { duration: 0.31, cooldown: 0.24, reach: 1.95, arc: 0.85, damage: 16, stamina: 9, lunge: 0.12, knock: 0.18 },
-      { duration: 0.29, cooldown: 0.22, reach: 2.1, arc: 0.92, damage: 19, stamina: 10, lunge: 0.16, knock: 0.24 },
-      { duration: 0.37, cooldown: 0.32, reach: 2.35, arc: 1.08, damage: 28, stamina: 14, lunge: 0.2, knock: 0.36 },
-    ];
-
-    if (state.player.comboWindow <= 0) {
-      state.player.comboStep = 0;
-    }
-    state.player.comboStep = (state.player.comboStep % combos.length) + 1;
+    const combos = BASE_COMBOS;
+    state.player.comboStep = resolveNextComboStep(state.player.comboStep, state.player.comboWindow);
 
     const affixMods = buildAffixModifiers(state.progression.equipment?.affixes);
     const swingBase = applySwingLoadout(combos[state.player.comboStep - 1], state.player.combatProfile, {
@@ -5344,8 +5340,8 @@ const canvas = document.getElementById("game");
       speedFactor = 1.42 * getSprintModifier(state.player.combatProfile) * stance.sprintMult;
       player.stamina = Math.max(0, player.stamina - dt * 24);
     } else {
-      const regenBonus = state.player.progressionMods?.staminaRegenBonus || 0;
-      player.stamina = Math.min(100, player.stamina + dt * ((player.blocking ? 5 : 8.6) + regenBonus));
+      const regenRate = resolveStaminaRegenRate(player, state.player.progressionMods);
+      player.stamina = Math.min(100, player.stamina + dt * regenRate);
     }
 
     if (player.blocking) speedFactor *= 0.62;
@@ -5573,6 +5569,8 @@ const canvas = document.getElementById("game");
                 logMsg(parry.chained ? "Parry chain! Enemy interrupted." : "Perfect parry! Riposte primed.");
                 sfx.blockHit();
                 emitCompanionBark("perfect_parry");
+                recordCombatEvent(combatSubtitles, "perfect_parry");
+                playCombatAudioCue(audioBuses?.ctx, "perfect_parry");
               } else if (facingDiff < 1.12 && player.stamina > 10) {
                 damage = Math.max(mitigated.chip, Math.floor(mitigated.blocked * stance.blockPenalty * (1 - blockBonus)));
                 const guardBroke = applyBlockStaminaChip(player, mitigated.staminaChip);
@@ -5580,6 +5578,8 @@ const canvas = document.getElementById("game");
                   player.blocking = false;
                   state.floatingTexts.push({ wx: player.x, wy: player.y, text: "GUARD BREAK", life: 0.85, maxLife: 0.85, color: "#ffcf8a" });
                   logMsg("Guard broken! Stamina depleted by sustained blocking. Recover before defending again.");
+                  recordCombatEvent(combatSubtitles, "guard_break");
+                  playCombatAudioCue(audioBuses?.ctx, "guard_break");
                 } else {
                   logMsg(`Block absorbed most of the hit. ${mitigated.chip} chip damage slipped through. (−${mitigated.staminaChip} stamina)`);
                 }
@@ -5598,6 +5598,8 @@ const canvas = document.getElementById("game");
             sfx.playerHurt();
             if (player.hp > 0 && player.hp / Math.max(1, player.maxHp) <= 0.25) {
               emitCompanionBark("low_hp");
+              recordCombatEvent(combatSubtitles, "low_hp");
+              playCombatAudioCue(audioBuses?.ctx, "low_hp");
             }
 
             if (player.hp <= 0) {
@@ -9391,6 +9393,8 @@ const canvas = document.getElementById("game");
   let devOverlayEnabled = false;
   let activeReplaySession = null;
   const minimapTileCache = createMinimapCache();
+  const combatSubtitles = createCombatSubtitleState();
+  const saveManager = createSaveStateManager({ interval: 90 });
 
   function render() {
     render3D();
@@ -9403,6 +9407,12 @@ const canvas = document.getElementById("game");
     drawParticles();
     drawMiniMap();
     drawHud();
+    if (state.graphics.accessibility?.motionReduction !== true) {
+      tickCombatSubtitles(combatSubtitles, 0.016);
+    }
+    if (state.graphics.accessibility?.combatSubtitles !== false) {
+      drawCombatSubtitles(ctx, combatSubtitles, canvas.width, canvas.height);
+    }
     if (postProcessor) {
       postProcessor.render(Boolean(state.graphics.performance?.postFx));
     }

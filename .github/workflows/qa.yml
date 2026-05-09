@@ -84,3 +84,39 @@ jobs:
           path: output
           retention-days: 14
           if-no-files-found: ignore
+
+  visual-regression:
+    name: Visual regression (pixelmatch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: smoke
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture visual regression screenshots
+        run: npm run test:smoke
+
+      - name: Run pixelmatch diff
+        run: npm run test:visual
+
+      - name: Upload diff images on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-diff-failures
+          path: output/visual-regression/diff_*.png
+          retention-days: 14
+          if-no-files-found: ignore
