@@ -186,11 +186,37 @@ export function recordNpcMemoryEvent(memory, npcId, event = {}) {
   return entry;
 }
 
+// Two-track NPC relationship system:
+//   narrative.npcAffinity[npcId]  — sentiment score (-100..100) driven by
+//     dialogue choices, quest outcomes, companion events. Authoritative for
+//     "how does this NPC feel about the player." Read here for warmth/tone.
+//   npcMemory.byNpc[npcId].greetings — visit count, incremented each E-key
+//     interaction. Authoritative for "has the player met this NPC before."
+//     Read here for first-meeting vs returning-player dialogue gating.
+const HIGH_AFFINITY_THRESHOLD = 40;
+
+const FIRST_MEETING_LINES = {
+  elder: (name) => `${name}: A new face. I'm Mayor Clem. This town has more history than it looks — ask around before you judge it.`,
+  warden: (name) => `${name}: Marshal Boone. You're not from here, I can tell. Stay on the posted roads and we'll get along fine.`,
+  smith: (name) => `${name}: Professor Cogwheel. Don't let the title fool you — I fix things, not ideas. Need gear looked at?`,
+  merchant: (name) => `${name}: Reverend Quill, at your service. Commerce is my congregation. What are you hauling and where are you headed?`,
+  innkeeper: (name) => `${name}: Nora Knuckles. Rooms, meals, and no questions after dark. You look like you could use all three.`,
+};
+
+const HIGH_AFFINITY_LINES = {
+  elder: (name) => `${name}: Good to see you again. This town's got more friends than it did yesterday — that's your doing as much as mine.`,
+  warden: (name) => `${name}: You've earned some trust in this county. That's not nothing. Watch your back out there.`,
+  smith: (name) => `${name}: Come back for more? Good. A craftsman works better knowing who's carrying the work.`,
+  merchant: (name) => `${name}: Ah, someone worth talking to. What do you need? I'll find it if you're the one asking.`,
+  innkeeper: (name) => `${name}: Always glad to see a face that isn't trouble. Your usual corner's open if you want it.`,
+};
+
 export function resolveNpcReactiveLine(npcId, memory, context = {}) {
   const safe = normalizeNpcMemoryState(memory);
   const entry = normalizeEntry(safe.byNpc[npcId]);
   const name = NPC_NAMES[npcId] || "NPC";
   const rep = context.factionRep || {};
+  const affinity = (context.npcAffinity || {})[npcId] ?? 0;
   const completedJobIds = Array.isArray(context.completedJobIds) ? context.completedJobIds : [];
   const completedJobReaction = (COMPLETED_JOB_REACTIONS[npcId] || [])
     .find((reaction) => completedJobIds.includes(reaction.jobId));
@@ -223,6 +249,17 @@ export function resolveNpcReactiveLine(npcId, memory, context = {}) {
   if (entry.lastRegionId === "ashfall") {
     return `${name}: Ashfall dust is still on you. That place keeps receipts in soot.`;
   }
+
+  // First meeting: greetings count is 0 before recordNpcMemoryEvent increments it
+  if (entry.greetings === 0 && FIRST_MEETING_LINES[npcId]) {
+    return FIRST_MEETING_LINES[npcId](name);
+  }
+
+  // High affinity fallback: player has invested meaningfully in this relationship
+  if (affinity >= HIGH_AFFINITY_THRESHOLD && HIGH_AFFINITY_LINES[npcId]) {
+    return HIGH_AFFINITY_LINES[npcId](name);
+  }
+
   return null;
 }
 

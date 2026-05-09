@@ -8,6 +8,12 @@ export function createInitialRunStats(startedAt = 0) {
     miniBossKills: 0,
     resourcesHarvested: 0,
     questOutcomesCount: 0,
+    // Playtest metrics
+    timeToFirstKill: null,
+    timeToFirstJobAccepted: null,
+    deathCause: null,
+    chapterReached: 1,
+    settingChanges: 0,
   };
 }
 
@@ -26,6 +32,11 @@ export function ensureRunStats(world, now = 0) {
   stats.questOutcomesCount = Math.max(0, Math.floor(stats.questOutcomesCount || 0));
   stats.victory = Boolean(stats.victory);
   stats.endingId = typeof stats.endingId === "string" ? stats.endingId : null;
+  stats.timeToFirstKill = Number.isFinite(stats.timeToFirstKill) ? stats.timeToFirstKill : null;
+  stats.timeToFirstJobAccepted = Number.isFinite(stats.timeToFirstJobAccepted) ? stats.timeToFirstJobAccepted : null;
+  stats.deathCause = typeof stats.deathCause === "string" ? stats.deathCause : null;
+  stats.chapterReached = Number.isFinite(stats.chapterReached) ? Math.max(1, stats.chapterReached) : 1;
+  stats.settingChanges = Math.max(0, Math.floor(stats.settingChanges || 0));
   world.runStats = stats;
   return stats;
 }

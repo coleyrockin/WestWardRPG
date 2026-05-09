@@ -64,7 +64,7 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, and early Phase A open-world pressure/dressing work.
 
-Latest local fast gate: `npm test` reports **635 passing tests across 55 files**. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **690 passing tests across 60 files**. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
@@ -87,7 +87,13 @@ The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the
 - **Utilities**
   - Quick utility slot with `smoke`, `flare`, and `tonic`; dodge step; charged attack; block/parry tools.
 - **Accessibility/graphics**
-  - Graphics presets, colorblind palettes, motion/camera shake settings, high contrast support, font scaling, and render helpers.
+  - Graphics presets, colorblind palettes, motion/camera shake settings, high contrast support, font scaling, render helpers, and opt-in WebGL2 post-process layer (vignette + color grade).
+- **NPC AI**
+  - Townspeople driven by a minimal behavior-tree runtime (day: wander; dusk/night: return home). BT nodes are plain objects — JSON-safe, hot-reloadable.
+- **Faction influence maps**
+  - Per-region, per-faction influence coefficients derived from rep scores modulate hostile spawn density and route-marker tinting.
+- **Run history + playtest metrics**
+  - Last 10 completed runs persisted locally. Tracks time-to-first-kill, time-to-first-job-accepted, chapter reached, death cause, and setting changes per run.
 - **Automation**
   - Unit tests, TypeScript checks, syntax checks, smoke actions, visual-regression capture scripts, and `render_game_to_text()` for deterministic browser/state inspection.
 
@@ -173,7 +179,13 @@ WestWardRPG/
 │   ├── runSummary.js        # kill/resource/victory summary helpers
 │   ├── progressionSystem.js # skill branches, weapon tiers, armor mods, traits
 │   ├── regionSystem.js      # regions, weather pools, region events
-│   ├── graphicsSettings.js  # presets, auto-detect, accessibility
+│   ├── graphicsSettings.js  # presets, auto-detect, accessibility, postFx toggle
+│   ├── postProcess.js       # WebGL2 post-process layer (vignette + color grade)
+│   ├── behaviorTree.js      # minimal BT runtime (sequence/selector/action/condition)
+│   ├── npcBehaviors.js      # townsperson day-wander / dusk-return-home tree
+│   ├── influenceMap.js      # faction influence coefficients → spawn density + tint
+│   ├── runHistory.js        # localStorage-backed run history + playtest metrics
+│   ├── gameState.d.ts       # GameState type hierarchy (PlayerState, NarrativeState…)
 │   ├── saveMigration.js     # v1/v2 -> v3 save migration
 │   └── storyContent.js      # flagship dialogue and narrative flavor text
 │   └── atmosphere.ts        # typed atmosphere model (single source — bundled by Vite)
@@ -209,7 +221,11 @@ WESTWARD_PORT=5183 scripts/visual_regression_capture.sh
 
 ## Save Format & Migration
 
-Saves live in `localStorage` under the `westward-save-v3` key. Legacy keys (`westward-save-v2`, `westward-save-v1`, `dustward-save-v1`) are read and migrated forward. The on-disk schema version field tracks compatibility:
+Saves live in **IndexedDB** (primary), with automatic backup rotation (last 3 backups per slot) and a one-time localStorage migration on first load. The storage envelope wraps every payload with a version, timestamp, and FNV-1a hash for corruption detection.
+
+Three save slots are available on the title screen. Each slot shows level, region, time played, and difficulty. Export (↓) and import (Import Save…) buttons are on the slot picker. Corrupted saves are auto-restored from the most recent valid backup.
+
+The on-disk payload schema version field tracks compatibility:
 
 | Version | Adds                                                                     |
 | ------- | ------------------------------------------------------------------------ |
@@ -217,7 +233,7 @@ Saves live in `localStorage` under the `westward-save-v3` key. Legacy keys (`wes
 | `2`     | Narrative state (chapters, axes, decisions, NPC reactions).              |
 | `3`     | Progression, regions, graphics, quick utility, expansion quests, gear, workstations, jobs, and NPC memory backfills. |
 
-`migrateSaveToV3` upgrades v1/v2 payloads on load — old saves remain playable. Unknown or malformed payloads currently fall back to a fresh world; the roadmap tracks future corruption-recovery UI, backup rotation, and export/import work.
+`migrateSaveToV3` upgrades v1/v2 payloads on load — old saves remain playable.
 
 ## Troubleshooting
 

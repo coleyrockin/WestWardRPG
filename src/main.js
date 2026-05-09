@@ -77,6 +77,10 @@ import {
   recordRunKill,
   syncQuestOutcomeCount,
 } from "./runSummary.js";
+import { appendRunRecord, getRunHistory, formatRunRecord } from "./runHistory.js";
+import { tickNpc } from "./npcBehaviors.js";
+import { resolveInfluenceSpawnMult } from "./influenceMap.js";
+import { createPostProcessor } from "./postProcess.js";
 import { resolveDiscoveryRewardFeedback } from "./discoveryRewardFeedback.js";
 import {
   ORIGINS,
@@ -1428,6 +1432,8 @@ const canvas = document.getElementById("game");
     spawnParticles(canvas.width / 2, canvas.height * 0.42, 30, "#ffc490", 4.5, 1.4, { decorative: true });
     sfx.questDone();
     saveGame({ silent: true });
+    const victorySummary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time, null);
+    appendRunRecord(victorySummary, state.world.runStats || {});
   }
 
   let skillScreenOpen = false;
@@ -1539,6 +1545,10 @@ const canvas = document.getElementById("game");
       state.weather.quality = state.graphics.preset === "high" ? "cinematic" : state.graphics.preset === "low" ? "performance" : "balanced";
     }
     logMsg(`${row.label}: ${typeof next === "boolean" ? (next ? "ON" : "OFF") : next}`);
+    if (state.mode === "playing") {
+      const settingsStats = ensureRunStats(state.world, state.time);
+      settingsStats.settingChanges += 1;
+    }
     return next;
   }
 
@@ -2632,6 +2642,33 @@ const canvas = document.getElementById("game");
       row.appendChild(action);
 
       if (!meta.empty) {
+        if (meta.valid) {
+          const exp = document.createElement("button");
+          exp.type = "button";
+          exp.className = "save-slot-export";
+          exp.setAttribute("aria-label", `Export ${slotDisplayLabel(meta.slot)}`);
+          exp.textContent = "↓";
+          exp.title = "Export save";
+          exp.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            try {
+              const blob = await idbExportSaveBlob(meta.slot);
+              if (!blob) return;
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `westward-${meta.slot}-${Date.now()}.json`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            } catch (err) {
+              console.warn("[westward] exportSave failed:", err);
+            }
+          });
+          row.appendChild(exp);
+        }
+
         const del = document.createElement("button");
         del.type = "button";
         del.className = "save-slot-delete";
@@ -2692,6 +2729,58 @@ const canvas = document.getElementById("game");
       });
 
       saveSlotsContainer.appendChild(row);
+    }
+
+    // Import save — always shown at the bottom of the slot picker
+    const importRow = document.createElement("div");
+    importRow.className = "save-slot-import-row";
+    const importBtn = document.createElement("button");
+    importBtn.type = "button";
+    importBtn.className = "save-slot-import-btn";
+    importBtn.textContent = "Import Save…";
+    importBtn.addEventListener("click", () => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json,application/json";
+      input.addEventListener("change", async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const result = await idbImportSaveFromText(currentSaveSlot, text);
+          if (!result?.ok) {
+            logMsg("Import failed: save file was invalid or corrupted.");
+            return;
+          }
+          await refreshSlotsAndPickActive();
+          renderSaveSlots();
+          logMsg(`Save imported to ${slotDisplayLabel(result.slot)}.`);
+        } catch (err) {
+          console.warn("[westward] importSave failed:", err);
+          logMsg("Import failed: could not read the file.");
+        }
+      });
+      input.click();
+    });
+    importRow.appendChild(importBtn);
+    saveSlotsContainer.appendChild(importRow);
+
+    // Past run history — last 3 completed runs
+    const history = getRunHistory().slice(0, 3);
+    if (history.length > 0) {
+      const histSection = document.createElement("div");
+      histSection.className = "run-history";
+      const histLabel = document.createElement("div");
+      histLabel.className = "run-history-label";
+      histLabel.textContent = "Past Runs";
+      histSection.appendChild(histLabel);
+      for (const record of history) {
+        const entry = document.createElement("div");
+        entry.className = "run-history-entry" + (record.victory ? " is-victory" : "");
+        entry.textContent = formatRunRecord(record) || "Unknown run";
+        histSection.appendChild(entry);
+      }
+      saveSlotsContainer.appendChild(histSection);
     }
   }
 
@@ -3364,6 +3453,8 @@ const canvas = document.getElementById("game");
     if (state.narrative.chapter !== previousChapter) {
       const chapterInfo = STORY_CHAPTERS[state.narrative.chapterIndex] || STORY_CHAPTERS[0];
       logMsg(`Story chapter advanced: ${chapterInfo.title}.`);
+      const chapterStats = ensureRunStats(state.world, state.time);
+      chapterStats.chapterReached = Math.max(chapterStats.chapterReached, state.narrative.chapter || 1);
     }
   }
 
@@ -4104,6 +4195,10 @@ const canvas = document.getElementById("game");
         logMsg(`Job accepted: ${accepted.job.title}. ${accepted.job.hint} Reward ${accepted.job.rewardLine}.${condition ? ` ${condition}` : ""}`);
         sfx.shopBuy();
         jobBoardOpen = false;
+        const jobStats = ensureRunStats(state.world, state.time);
+        if (jobStats.timeToFirstJobAccepted === null) {
+          jobStats.timeToFirstJobAccepted = Math.max(0, state.time - (jobStats.startedAt || 0));
+        }
       } else {
         logMsg(accepted.message);
       }
@@ -4187,6 +4282,7 @@ const canvas = document.getElementById("game");
   function storyReactiveQuip(npcId) {
     const memoryLine = resolveNpcReactiveLine(npcId, state.narrative.npcMemory, {
       factionRep: state.narrative.factionRep,
+      npcAffinity: state.narrative.npcAffinity,
       recentQuestOutcome: Object.values(state.narrative.questOutcomes || {}).slice(-1)[0] || null,
       questOutcomes: state.narrative.questOutcomes || {},
       inventory: state.inventory,
@@ -5134,13 +5230,17 @@ const canvas = document.getElementById("game");
 
       if (isKill) {
         enemy.alive = false;
-        recordRunKill(state.world, enemy);
+        const killStats = recordRunKill(state.world, enemy);
+        if (killStats.kills === 1 && killStats.timeToFirstKill === null) {
+          killStats.timeToFirstKill = Math.max(0, state.time - (killStats.startedAt || 0));
+        }
         recordKillForJobs(enemy);
         unlockCodexAndPing("enemies", enemy.behavior === "balanced" ? "slime" : enemy.behavior);
         unlockCodexAndPing("regions", "frontier");
         const spawnMods = getActiveRegionEventModifiers();
         const phaseMods = state.world ? resolveSpawnModifier(state.world.timeOfDay || 0) : { hostileMult: 1 };
-        const totalDensity = Math.max(0.4, spawnMods.spawnDensityMult * phaseMods.hostileMult);
+        const influenceMult = resolveInfluenceSpawnMult(state.regions?.activeRegion || "frontier", state.narrative?.factionRep);
+        const totalDensity = Math.max(0.4, spawnMods.spawnDensityMult * phaseMods.hostileMult * influenceMult);
         enemy.respawn = (22 + Math.random() * 8) / totalDensity;
         state.inventory["Slime Core"] += 1;
         const civicBounty = state.narrative.globalFlags.curfewNormalized ? 3 : 0;
@@ -5430,31 +5530,16 @@ const canvas = document.getElementById("game");
 
   function updateNPCs(dt) {
     if (state.player.inHouse) return;
-
+    const npcCtx = {
+      dt,
+      timeOfDay: state.world.timeOfDay || 0,
+      isBlocking,
+      dist,
+      player: state.player,
+      TAU,
+    };
     for (const npc of state.npcs) {
-      npc.wanderTimer -= dt;
-      if (npc.wanderTimer <= 0) {
-        npc.wanderAngle = Math.random() * TAU;
-        npc.wanderTimer = 1.8 + Math.random() * 2.2;
-      }
-
-      const tx = npc.homeX + Math.cos(npc.wanderAngle) * npc.wanderRadius;
-      const ty = npc.homeY + Math.sin(npc.wanderAngle) * npc.wanderRadius;
-      const dx = tx - npc.x;
-      const dy = ty - npc.y;
-      const d = Math.hypot(dx, dy);
-      if (d < 0.05) continue;
-
-      const speed = 0.42;
-      const nx = npc.x + (dx / d) * speed * dt;
-      const ny = npc.y + (dy / d) * speed * dt;
-
-      if (!isBlocking(nx, npc.y) && dist({ x: nx, y: npc.y }, state.player) > 0.9) {
-        npc.x = nx;
-      }
-      if (!isBlocking(npc.x, ny) && dist({ x: npc.x, y: ny }, state.player) > 0.9) {
-        npc.y = ny;
-      }
+      tickNpc(npc, npcCtx);
     }
   }
 
@@ -6059,6 +6144,10 @@ const canvas = document.getElementById("game");
               state.mode = "gameover";
               logMsg(choice(deathMessages) + " Press R to recover.");
               sfx.death();
+              const deathStats = ensureRunStats(state.world, state.time);
+              if (!deathStats.deathCause) {
+                deathStats.deathCause = `${enemy.behavior || "enemy"} in ${state.regions?.activeRegion || "frontier"}`;
+              }
             }
           }
         }
@@ -9794,14 +9883,22 @@ const canvas = document.getElementById("game");
     }
   }
 
+  const postProcessor = createPostProcessor(canvas);
+
   function render() {
     render3D();
-    if (state.mode === "menu") return;
+    if (state.mode === "menu") {
+      if (postProcessor) postProcessor.render(false);
+      return;
+    }
     drawWeaponOverlay();
     drawWeatherOverlay();
     drawParticles();
     drawMiniMap();
     drawHud();
+    if (postProcessor) {
+      postProcessor.render(Boolean(state.graphics.performance?.postFx));
+    }
   }
 
   function resize() {
@@ -9811,6 +9908,7 @@ const canvas = document.getElementById("game");
     canvas.height = h;
     canvas.style.width = `${w}px`;
     canvas.style.height = `${h}px`;
+    if (postProcessor) postProcessor.resize(w, h);
     clearGradientCache();
   }
 

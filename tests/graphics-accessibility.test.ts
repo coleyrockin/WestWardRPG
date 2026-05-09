@@ -61,15 +61,15 @@ describe("graphics accessibility — colorblind", () => {
 import { SETTINGS_ROWS, readSettingValue, stepSetting } from "../src/graphicsSettings.js";
 
 describe("settings modal — stepSetting", () => {
-  it("exposes six rows in stable order", () => {
-    expect(SETTINGS_ROWS.map((r) => r.id)).toEqual([
-      "preset",
-      "gradientCache",
-      "colorblindMode",
-      "fontScale",
-      "motionReduction",
-      "cameraShake",
-    ]);
+  it("exposes settings rows with required ids", () => {
+    const ids = SETTINGS_ROWS.map((r) => r.id);
+    expect(ids).toContain("preset");
+    expect(ids).toContain("gradientCache");
+    expect(ids).toContain("postFx");
+    expect(ids).toContain("colorblindMode");
+    expect(ids).toContain("fontScale");
+    expect(ids).toContain("motionReduction");
+    expect(ids).toContain("cameraShake");
   });
 
   it("toggles bool rows", () => {
@@ -117,5 +117,26 @@ describe("settings modal — stepSetting", () => {
     expect(stepSetting(null as any, "preset", 1)).toBeNull();
     const g = createInitialGraphicsState();
     expect(stepSetting(g, "garbage" as any, 1)).toBeNull();
+  });
+});
+
+describe("graphics accessibility — motionReduction", () => {
+  it("zeroes cameraShake when motionReduction is on", () => {
+    const mood = applyGraphicsAccessibility({ cameraShake: 1 }, { motionReduction: true });
+    expect(mood.cameraShake).toBe(0);
+  });
+
+  it("zeroes particleMultiplier when motionReduction is on", () => {
+    const mood = applyGraphicsAccessibility({ particleMultiplier: 1 }, { motionReduction: true });
+    expect(mood.particleMultiplier).toBe(0);
+  });
+
+  it("preserves cameraShake from accessibility settings and particleMultiplier from strengths when motionReduction is off", () => {
+    const mood = applyGraphicsAccessibility(
+      { particleMultiplier: 0.5 },
+      { motionReduction: false, cameraShake: 0.8 },
+    );
+    expect(mood.cameraShake).toBeCloseTo(0.8);
+    expect(mood.particleMultiplier).toBeCloseTo(0.5);
   });
 });

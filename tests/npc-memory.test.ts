@@ -220,5 +220,56 @@ describe("npcMemory", () => {
       });
       expect(line).toContain("Old Well");
     });
+
+    it("returns first-meeting line when greetings count is 0", () => {
+      const memory = createInitialNpcMemoryState();
+      const line = resolveNpcReactiveLine("elder", memory, {});
+      expect(line).toBeTruthy();
+      expect(line).toMatch(/mayor clem/i);
+    });
+
+    it("returns first-meeting line for warden before any interaction", () => {
+      const memory = createInitialNpcMemoryState();
+      const line = resolveNpcReactiveLine("warden", memory, {});
+      expect(line).toMatch(/marshal boone/i);
+    });
+
+    it("does not return first-meeting line after a greeting has been recorded", () => {
+      const memory = createInitialNpcMemoryState();
+      recordNpcMemoryEvent(memory, "elder", { type: "greeting", regionId: "frontier" });
+      const line = resolveNpcReactiveLine("elder", memory, {});
+      expect(line).toBeNull();
+    });
+
+    it("returns high-affinity line when npcAffinity >= 40 and not first meeting", () => {
+      const memory = createInitialNpcMemoryState();
+      recordNpcMemoryEvent(memory, "smith", { type: "greeting", regionId: "frontier" });
+      const line = resolveNpcReactiveLine("smith", memory, {
+        npcAffinity: { smith: 40 },
+      });
+      expect(line).toBeTruthy();
+      expect(line).toMatch(/professor cogwheel/i);
+    });
+
+    it("does not return high-affinity line when affinity is below threshold", () => {
+      const memory = createInitialNpcMemoryState();
+      recordNpcMemoryEvent(memory, "merchant", { type: "greeting", regionId: "frontier" });
+      const line = resolveNpcReactiveLine("merchant", memory, {
+        npcAffinity: { merchant: 39 },
+      });
+      expect(line).toBeNull();
+    });
+
+    it("specific reactions beat high-affinity fallback", () => {
+      const memory = createInitialNpcMemoryState();
+      recordNpcMemoryEvent(memory, "warden", { type: "greeting", regionId: "frontier" });
+      const line = resolveNpcReactiveLine("warden", memory, {
+        npcAffinity: { warden: 80 },
+        questOutcomes: { ashfall_boss: "mercy" },
+      });
+      expect(line).toBeTruthy();
+      expect(line).not.toMatch(/earned some trust/i);
+      expect(line).not.toMatch(/marshal boone.*trust/i);
+    });
   });
 });

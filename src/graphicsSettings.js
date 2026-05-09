@@ -63,6 +63,7 @@ export function applyGraphicsAccessibility(strengths, accessibility) {
   }
   next.hitMarkerStrength = safeAccessibility.hitMarkerStrength ?? 1;
   next.cameraShake = safeAccessibility.motionReduction ? 0 : (safeAccessibility.cameraShake ?? 1);
+  if (safeAccessibility.motionReduction) next.particleMultiplier = 0;
   next.fontScale = clampFontScale(safeAccessibility.fontScale);
   next.motionReduction = !!safeAccessibility.motionReduction;
   next.colorblindMode = COLORBLIND_MODES.includes(safeAccessibility.colorblindMode) ? safeAccessibility.colorblindMode : "none";
@@ -88,6 +89,7 @@ export function getColorblindPalette(mode) {
 export const SETTINGS_ROWS = [
   { id: "preset", label: "Graphics Preset", kind: "enum", options: ["low", "balanced", "high"] },
   { id: "gradientCache", label: "Gradient Cache", kind: "bool" },
+  { id: "postFx", label: "Post-FX", kind: "bool" },
   { id: "colorblindMode", label: "Colorblind Mode", kind: "enum", options: COLORBLIND_MODES },
   { id: "fontScale", label: "Font Scale", kind: "range", min: 0.8, max: 1.6, step: 0.1, format: (v) => `${v.toFixed(2)}x` },
   { id: "motionReduction", label: "Motion Reduction", kind: "bool" },
@@ -99,6 +101,7 @@ export function readSettingValue(graphics, id) {
   switch (id) {
     case "preset": return graphics.preset;
     case "gradientCache": return Boolean(graphics.performance?.gradientCache);
+    case "postFx": return Boolean(graphics.performance?.postFx);
     case "colorblindMode": return graphics.accessibility?.colorblindMode ?? "none";
     case "fontScale": return Number(graphics.accessibility?.fontScale ?? 1);
     case "motionReduction": return Boolean(graphics.accessibility?.motionReduction);
@@ -116,6 +119,7 @@ export function stepSetting(graphics, id, dir) {
   const current = readSettingValue(graphics, id);
   if (row.kind === "bool") {
     if (id === "gradientCache") graphics.performance.gradientCache = !current;
+    else if (id === "postFx") graphics.performance.postFx = !current;
     else if (id === "motionReduction") graphics.accessibility.motionReduction = !current;
     return readSettingValue(graphics, id);
   }
