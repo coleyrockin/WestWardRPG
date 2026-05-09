@@ -183,6 +183,10 @@ import {
   selectLiveObjective,
 } from "./hudObjectives.js";
 import {
+  resolveHorizontalStepKey,
+  resolveVerticalMenuKey,
+} from "./modalInput.js";
+import {
   resolveMinimapDotStyle,
   resolveMinimapMarkerStyle,
   resolveMinimapPolylineStyle,
@@ -9726,22 +9730,14 @@ const canvas = document.getElementById("game");
     /* Dialogue choice modal controls */
     if (dialogueOpen && pendingDialogue) {
       const len = pendingDialogue.choices.length || 1;
-      if (event.code === "ArrowUp" || event.code === "KeyW") {
-        dialogueSelection = (dialogueSelection - 1 + len) % len;
-        event.preventDefault();
-        return;
-      }
-      if (event.code === "ArrowDown" || event.code === "KeyS") {
-        dialogueSelection = (dialogueSelection + 1) % len;
-        event.preventDefault();
-        return;
-      }
-      if (event.code === "Enter" || event.code === "Space") {
+      const control = resolveVerticalMenuKey(event.code, dialogueSelection, len, { blockUnhandled: true });
+      dialogueSelection = control.selection;
+      if (control.action === "confirm") {
         confirmDialogueChoice();
         event.preventDefault();
         return;
       }
-      if (event.code === "Escape") {
+      if (control.action === "close") {
         closeDialogueChoice();
         event.preventDefault();
         return;
@@ -9753,17 +9749,13 @@ const canvas = document.getElementById("game");
     /* Quest outcome modal controls */
     if (questOutcomeOpen && pendingQuestOutcome) {
       const len = pendingQuestOutcome.outcomes.length || 1;
-      if (event.code === "ArrowUp" || event.code === "KeyW" || event.code === "ArrowLeft" || event.code === "KeyA") {
-        questOutcomeSelection = (questOutcomeSelection - 1 + len) % len;
-        event.preventDefault();
-        return;
-      }
-      if (event.code === "ArrowDown" || event.code === "KeyS" || event.code === "ArrowRight" || event.code === "KeyD") {
-        questOutcomeSelection = (questOutcomeSelection + 1) % len;
-        event.preventDefault();
-        return;
-      }
-      if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
+      const control = resolveVerticalMenuKey(event.code, questOutcomeSelection, len, {
+        blockUnhandled: true,
+        confirmCodes: ["Enter", "KeyE", "Space"],
+        horizontal: true,
+      });
+      questOutcomeSelection = control.selection;
+      if (control.action === "confirm") {
         confirmQuestOutcomeChoice();
         event.preventDefault();
         return;
@@ -9776,22 +9768,17 @@ const canvas = document.getElementById("game");
     if (jobBoardOpen) {
       const choices = getBooneJobChoices();
       const len = choices.length || 1;
-      if (event.code === "ArrowUp" || event.code === "KeyW") {
-        jobBoardSelection = (jobBoardSelection - 1 + len) % len;
-        event.preventDefault();
-        return;
-      }
-      if (event.code === "ArrowDown" || event.code === "KeyS") {
-        jobBoardSelection = (jobBoardSelection + 1) % len;
-        event.preventDefault();
-        return;
-      }
-      if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
+      const control = resolveVerticalMenuKey(event.code, jobBoardSelection, len, {
+        blockUnhandled: true,
+        confirmCodes: ["Enter", "KeyE", "Space"],
+      });
+      jobBoardSelection = control.selection;
+      if (control.action === "confirm") {
         confirmJobBoardChoice();
         event.preventDefault();
         return;
       }
-      if (event.code === "Escape") {
+      if (control.action === "close") {
         jobBoardOpen = false;
         event.preventDefault();
         return;
@@ -9815,22 +9802,17 @@ const canvas = document.getElementById("game");
     if (workbenchOpen) {
       const actions = getWorkbenchActions();
       const len = actions.length || 1;
-      if (event.code === "ArrowUp" || event.code === "KeyW") {
-        workbenchSelection = (workbenchSelection - 1 + len) % len;
-        event.preventDefault();
-        return;
-      }
-      if (event.code === "ArrowDown" || event.code === "KeyS") {
-        workbenchSelection = (workbenchSelection + 1) % len;
-        event.preventDefault();
-        return;
-      }
-      if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
+      const control = resolveVerticalMenuKey(event.code, workbenchSelection, len, {
+        blockUnhandled: true,
+        confirmCodes: ["Enter", "KeyE", "Space"],
+      });
+      workbenchSelection = control.selection;
+      if (control.action === "confirm") {
         confirmWorkbenchAction();
         event.preventDefault();
         return;
       }
-      if (event.code === "Escape") {
+      if (control.action === "close") {
         workbenchOpen = false;
         event.preventDefault();
         return;
@@ -9841,29 +9823,23 @@ const canvas = document.getElementById("game");
 
     /* Codex modal controls */
     if (codexOpen) {
-      if (event.code === "ArrowLeft" || event.code === "KeyA") {
-        codexTab = (codexTab - 1 + CODEX_TABS.length) % CODEX_TABS.length;
+      const tabStep = resolveHorizontalStepKey(event.code);
+      if (tabStep !== 0) {
+        codexTab = (codexTab + tabStep + CODEX_TABS.length) % CODEX_TABS.length;
         codexEntrySel = 0;
         event.preventDefault(); return;
       }
-      if (event.code === "ArrowRight" || event.code === "KeyD") {
-        codexTab = (codexTab + 1) % CODEX_TABS.length;
-        codexEntrySel = 0;
+      const tab = CODEX_TABS[codexTab];
+      const len = (listEntriesForTab(state, tab) || []).length || 1;
+      const control = resolveVerticalMenuKey(event.code, codexEntrySel, len, {
+        closeCodes: ["Escape", "KeyZ"],
+        confirmCodes: [],
+      });
+      codexEntrySel = control.selection;
+      if (control.action === "move") {
         event.preventDefault(); return;
       }
-      if (event.code === "ArrowUp" || event.code === "KeyW") {
-        const tab = CODEX_TABS[codexTab];
-        const len = (listEntriesForTab(state, tab) || []).length || 1;
-        codexEntrySel = (codexEntrySel - 1 + len) % len;
-        event.preventDefault(); return;
-      }
-      if (event.code === "ArrowDown" || event.code === "KeyS") {
-        const tab = CODEX_TABS[codexTab];
-        const len = (listEntriesForTab(state, tab) || []).length || 1;
-        codexEntrySel = (codexEntrySel + 1) % len;
-        event.preventDefault(); return;
-      }
-      if (event.code === "Escape" || event.code === "KeyZ") {
+      if (control.action === "close") {
         codexOpen = false;
         event.preventDefault(); return;
       }
@@ -9872,24 +9848,23 @@ const canvas = document.getElementById("game");
     /* Settings modal controls */
     if (settingsOpen) {
       const rows = getCombinedSettingsRows();
-      if (event.code === "ArrowUp" || event.code === "KeyW") {
-        settingsSelection = (settingsSelection - 1 + rows.length) % rows.length;
+      const control = resolveVerticalMenuKey(event.code, settingsSelection, rows.length, {
+        closeCodes: ["Escape", "KeyO"],
+        confirmCodes: [],
+      });
+      settingsSelection = control.selection;
+      if (control.action === "move") {
         event.preventDefault();
         return;
       }
-      if (event.code === "ArrowDown" || event.code === "KeyS") {
-        settingsSelection = (settingsSelection + 1) % rows.length;
-        event.preventDefault();
-        return;
-      }
-      if (event.code === "ArrowLeft" || event.code === "ArrowRight" || event.code === "Enter" || event.code === "Space" || event.code === "KeyA" || event.code === "KeyD") {
+      const settingsStep = resolveHorizontalStepKey(event.code);
+      if (settingsStep !== 0 || event.code === "Enter" || event.code === "Space") {
         const row = rows[settingsSelection];
-        const dir = (event.code === "ArrowLeft" || event.code === "KeyA") ? -1 : 1;
-        stepSettingsRow(row, dir);
+        stepSettingsRow(row, settingsStep || 1);
         event.preventDefault();
         return;
       }
-      if (event.code === "Escape" || event.code === "KeyO") {
+      if (control.action === "close") {
         settingsOpen = false;
         event.preventDefault();
         return;
@@ -9898,17 +9873,16 @@ const canvas = document.getElementById("game");
 
     /* Skill screen controls */
     if (skillScreenOpen) {
-      if (event.code === "ArrowUp" || event.code === "KeyW") {
-        skillSelection = (skillSelection - 1 + SKILL_BRANCH_LABELS.length) % SKILL_BRANCH_LABELS.length;
+      const control = resolveVerticalMenuKey(event.code, skillSelection, SKILL_BRANCH_LABELS.length, {
+        closeCodes: ["Escape", "KeyT"],
+        confirmCodes: ["Enter", "KeyE", "Space"],
+      });
+      skillSelection = control.selection;
+      if (control.action === "move") {
         event.preventDefault();
         return;
       }
-      if (event.code === "ArrowDown" || event.code === "KeyS") {
-        skillSelection = (skillSelection + 1) % SKILL_BRANCH_LABELS.length;
-        event.preventDefault();
-        return;
-      }
-      if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
+      if (control.action === "confirm") {
         const branch = SKILL_BRANCH_LABELS[skillSelection].id;
         if (canUnlockSkill(state.progression, branch)) {
           unlockSkill(state.progression, branch);
@@ -9920,7 +9894,7 @@ const canvas = document.getElementById("game");
         event.preventDefault();
         return;
       }
-      if (event.code === "Escape" || event.code === "KeyT") {
+      if (control.action === "close") {
         skillScreenOpen = false;
         event.preventDefault();
         return;
@@ -9929,17 +9903,15 @@ const canvas = document.getElementById("game");
 
     /* Shop controls */
     if (shopOpen) {
-      if (event.code === "ArrowUp" || event.code === "KeyW") {
-        shopSelection = (shopSelection - 1 + shopItems.length) % shopItems.length;
+      const control = resolveVerticalMenuKey(event.code, shopSelection, shopItems.length || 1, {
+        confirmCodes: ["Enter", "KeyE", "Space"],
+      });
+      shopSelection = control.selection;
+      if (control.action === "move") {
         event.preventDefault();
         return;
       }
-      if (event.code === "ArrowDown" || event.code === "KeyS") {
-        shopSelection = (shopSelection + 1) % shopItems.length;
-        event.preventDefault();
-        return;
-      }
-      if (event.code === "Enter" || event.code === "KeyE" || event.code === "Space") {
+      if (control.action === "confirm") {
         const item = shopItems[shopSelection];
         const adjustedCost = resolveShopItemCost(item);
         if (item.cost < 0) {
@@ -9960,7 +9932,7 @@ const canvas = document.getElementById("game");
         event.preventDefault();
         return;
       }
-      if (event.code === "Escape") {
+      if (control.action === "close") {
         shopOpen = false;
         logMsg("Reverend Quill: Come back anytime! I'm always here. Literally. I live here.");
         event.preventDefault();
