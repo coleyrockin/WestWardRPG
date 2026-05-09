@@ -11,6 +11,7 @@ import {
   normalizeJobBoardState,
   passesNarrativeGate,
   recordJobEvent,
+  resolveLatestCompletedJobBoardLine,
   resolveJobRouteMarker,
 } from "../src/jobBoard.js";
 
@@ -142,6 +143,14 @@ describe("jobBoard", () => {
       rewardLine: "+38g, +18 XP, +1 Potion",
       regionHint: "Dustward Frontier",
     });
+  });
+
+  it("surfaces the latest completed story job board reaction", () => {
+    expect(resolveLatestCompletedJobBoardLine([
+      "frontier_badge_return",
+      "frontier_map_survey",
+    ], "frontier")).toContain("old-road survey");
+    expect(resolveLatestCompletedJobBoardLine(["frontier_map_survey"], "ashfall")).toBe("");
   });
 
   it("builds region-aware job-board presentation copy", () => {

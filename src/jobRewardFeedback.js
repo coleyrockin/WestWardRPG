@@ -53,3 +53,22 @@ export function resolveJobRewardFeedback({
     trophyId,
   };
 }
+
+export function createJobLoopNotice({ job = {}, feedback = {}, house = {} } = {}) {
+  const title = typeof job.title === "string" && job.title.trim() ? job.title.trim() : "Road job";
+  const rewardLine = typeof feedback.rewardLine === "string" && feedback.rewardLine.trim()
+    ? feedback.rewardLine.trim()
+    : "reward paid";
+  const hasHouseProof = Boolean(feedback.trophyId);
+  const houseLine = hasHouseProof
+    ? (house?.unlocked ? "home proof updated" : "home proof remembered")
+    : "board updated";
+  const bonusLine = feedback.bonusLine ? " bonus paid" : "";
+  return {
+    kind: "job-loop",
+    title: "Road loop complete",
+    line: `${title}: ${rewardLine}; ${houseLine}${bonusLine}.`,
+    color: hasHouseProof ? "#ffe16a" : "#9bd3ff",
+    ttl: 6.4,
+  };
+}

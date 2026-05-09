@@ -118,7 +118,10 @@ import {
   recordJobEvent,
   resolveJobRouteMarker,
 } from "./jobBoard.js";
-import { resolveJobRewardFeedback } from "./jobRewardFeedback.js";
+import {
+  createJobLoopNotice,
+  resolveJobRewardFeedback,
+} from "./jobRewardFeedback.js";
 import {
   buildEconomySnapshot,
   getVendorServiceProfile,
@@ -4086,6 +4089,7 @@ const canvas = document.getElementById("game");
           });
           logMsg(feedback.logLine);
           if (feedback.housePromptLine) logMsg(feedback.housePromptLine);
+          showHudNotice(createJobLoopNotice({ job: paid.job, feedback, house: state.house }));
           sfx.questDone();
           spawnParticles(canvas.width / 2, canvas.height / 2, 14, "#ffd36b", 3.4, 1.1, { decorative: true });
         }

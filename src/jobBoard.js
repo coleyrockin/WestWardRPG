@@ -674,6 +674,10 @@ function resolveCompletedJobBoardLine(completedJobIds = [], regionId = "frontier
   return match?.line || "";
 }
 
+export function resolveLatestCompletedJobBoardLine(completedJobIds = [], regionId = "frontier") {
+  return resolveCompletedJobBoardLine(completedJobIds, regionId);
+}
+
 function payableReward(job, progress = {}) {
   const base = cloneReward(job.reward);
   if (job.bonus && progress.bonusEligible === true) return combineRewards(base, job.bonus.reward);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createJobLoopNotice,
   formatJobRewardLine,
   resolveJobRewardFeedback,
 } from "../src/jobRewardFeedback.js";
@@ -62,5 +63,29 @@ describe("jobRewardFeedback", () => {
 
     expect(feedback.trophyId).toBe("road_map");
     expect(feedback.housePromptLine).toBe("House proof remembered: unlock your house to display this job's story trophy.");
+  });
+
+  it("creates a visible road-loop notice for completed jobs", () => {
+    const feedback = resolveJobRewardFeedback({
+      job: { id: "frontier_map_survey", title: "Old Road Survey" },
+      reward: { gold: 18, xp: 12, items: { "Map Scrap": 1 } },
+      inventory: { "Map Scrap": 1 },
+      house: { unlocked: true },
+      jobState: { completedJobIds: ["frontier_map_survey"] },
+    });
+    const notice = createJobLoopNotice({
+      job: { id: "frontier_map_survey", title: "Old Road Survey" },
+      feedback,
+      house: { unlocked: true },
+    });
+
+    expect(notice).toMatchObject({
+      kind: "job-loop",
+      title: "Road loop complete",
+      color: "#ffe16a",
+    });
+    expect(notice.line).toContain("Old Road Survey");
+    expect(notice.line).toContain("+18 gold, +12 XP, +1 Map Scrap");
+    expect(notice.line).toContain("home proof updated");
   });
 });
