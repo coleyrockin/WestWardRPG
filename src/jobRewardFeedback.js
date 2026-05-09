@@ -1,6 +1,7 @@
 import { resolveHouseProgressDisplay } from "./houseProgress.js";
 
 const STORY_JOB_TROPHIES = {
+  frontier_slime_bounty: "marsh_bounty_notice",
   frontier_badge_return: "deputy_badge",
   frontier_map_survey: "road_map",
   frontier_quiet_note_trace: "sealed_note",

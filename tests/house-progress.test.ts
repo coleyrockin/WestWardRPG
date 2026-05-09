@@ -66,12 +66,17 @@ describe("houseProgress", () => {
   it("can display completed job proof even after the item is gone", () => {
     const display = resolveHouseProgressDisplay({
       inventory: {},
-      jobState: { completedJobIds: ["frontier_badge_return"] },
+      jobState: { completedJobIds: ["frontier_badge_return", "frontier_slime_bounty"] },
       house: { unlocked: true },
     });
 
-    expect(display.trophies).toHaveLength(1);
+    expect(display.trophies).toHaveLength(2);
     expect(display.trophies[0]).toMatchObject({
+      id: "marsh_bounty_notice",
+      status: "completed",
+      line: "Marsh Slime Bounty notice pinned with Boone's first route marks",
+    });
+    expect(display.trophies[1]).toMatchObject({
       id: "deputy_badge",
       status: "completed",
       line: "Deputy Badge returned, name plate polished",
@@ -116,11 +121,11 @@ describe("houseProgress", () => {
   it("places visible trophies on open house floor tiles", () => {
     const display = resolveHouseProgressDisplay({
       inventory: { "Worn Badge": 1, "Map Scrap": 1, "Sealed Note": 1, "Miner Helmet": 1 },
-      jobState: { completedJobIds: ["frontier_badge_return", "frontier_map_survey", "frontier_quiet_note_trace"] },
+      jobState: { completedJobIds: ["frontier_slime_bounty", "frontier_badge_return", "frontier_map_survey", "frontier_quiet_note_trace"] },
       house: { unlocked: true },
     });
 
-    expect(display.trophies).toHaveLength(4);
+    expect(display.trophies).toHaveLength(5);
     expect(display.trophies.every((trophy: any) => isHouseInteriorOpen(trophy.x, trophy.y))).toBe(true);
   });
 

@@ -141,6 +141,7 @@ import {
   getJobListings,
   normalizeJobBoardState,
   recordJobEvent,
+  resolveGoldenPathStatus,
   resolveJobRouteMarker,
 } from "./jobBoard.js";
 import {
@@ -3669,6 +3670,15 @@ const canvas = document.getElementById("game");
       if (accepted.ok) {
         const condition = [accepted.job.bonusLine, accepted.job.failureLine].filter(Boolean).join(" ");
         logMsg(`Job accepted: ${accepted.job.title}. ${accepted.job.hint} Reward ${accepted.job.rewardLine}.${condition ? ` ${condition}` : ""}`);
+        if (accepted.job.goldenPath?.starter) {
+          showHudNotice({
+            kind: "golden-path",
+            title: "First road loop",
+            line: `${accepted.job.goldenPath.routeLine} ${accepted.job.goldenPath.rewardUseLine}`,
+            color: "#ffd77b",
+            ttl: 6.8,
+          });
+        }
         sfx.shopBuy();
         jobBoardOpen = false;
         const jobStats = ensureRunStats(state.world, state.time);
@@ -10019,6 +10029,12 @@ const canvas = document.getElementById("game");
     });
     const jobRouteMarker = getJobRouteMarker();
     const boardProp = getActiveJobBoardProp();
+    const goldenPath = resolveGoldenPathStatus({
+      jobState: state.world.jobs,
+      inventory: state.inventory,
+      house: state.house,
+      regionId: state.regions.activeRegion,
+    });
     const openingFightCue = resolveOpeningFightCue({
       mode: state.mode,
       time: state.time,
@@ -10123,6 +10139,7 @@ const canvas = document.getElementById("game");
           : null,
         road_sign_prompt: roadSignPrompt,
         road_route_objective: roadRouteObjective,
+        golden_path: goldenPath,
         first_minute_pressure: firstMinutePressure,
         first_reward_cache: firstMinuteCache
           ? {
@@ -10183,6 +10200,7 @@ const canvas = document.getElementById("game");
       loot: state.world.loot,
       job_board: {
         state: normalizeJobBoardState(state.world.jobs),
+        golden_path: goldenPath,
         active_job: activeJob,
         listings: jobListings,
         route_marker: jobRouteMarker,

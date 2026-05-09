@@ -61,20 +61,21 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - **Gear loop foundation**: weapon families, armor slots, deterministic loot tables, POI/mini-boss gear finds, earned gear visibility, and crafting-relevant resources.
 - **Housing/workbench**: save-safe house workstation state, workbench levels, Workbench II potion/refine benefits, Workbench III map-table project, and selectable workbench actions.
 - **Jobs/economy foundation**: Marshal Boone offers deterministic bounty, salvage, courier, patrol, supply-run, rescue, and escort work through in-world regional job boards with timed bonuses, failure/report-back states, regional job depth, route markers, minimap/HUD/debug visibility, progress tracking, and reward payout.
+- **Golden path starter loop**: Marsh Slime Bounty is the canonical Boone road loop, surfacing route, landmark, threat, crafting reward, NPC/board reaction, and house proof.
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
-- **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, and early Phase A open-world pressure/dressing work.
+- **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, and early open-world pressure/dressing work.
 
-Latest local fast gate: `npm test` reports **918 passing tests across 82 files**. All Phase 1–6 roadmap items shipped. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **918 passing tests across 82 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
 The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the single source of truth. The active build order is:
 
-1. **Phase A: Visual open-world feel + first-minute pressure** — landmarks, roads, props, readable enemy intent, HUD clarity, nearby early reward/threat.
-2. **Phase B: Narrative payoff + visible consequence** — quest outcome smoke, companion barks, NPC/town reactions, visible service changes.
-3. **Phase C: RPG loops** — deeper gear choices, crafting stations, housing utility, economy jobs, bounties, and route-marker polish.
-4. **Phase D: NPC life + local conversation** — handcrafted memory-aware dialogue first; optional LLM boundary later with offline fallback.
-5. **Phase E: Playtest readiness** — pause/save slots/recovery, replay hooks, local metrics, and distribution packaging.
+1. **Golden Path 1** — one complete Boone road-job loop from town to road to reward to consequence.
+2. **Hardcore visual readability** — stronger roads, landmarks, near-wall treatment, combat tells, interactable silhouettes, and visual regression gates.
+3. **Core RPG loop fusion** — jobs, loot, gear, crafting, housing, economy, and consequences feeding one repeatable loop.
+4. **Playtest hardening** — per-slot recovery/export UI, stronger browser assertions, feedback capture, and clean run history.
+5. **Architecture finish** — extract HUD, input, modal, save, combat, and renderer runtime from the remaining `main.js` pressure.
 
 ## Core Systems
 
@@ -120,12 +121,6 @@ For an offline-playable ZIP (itch.io style — runs by double-clicking
 
 ```bash
 npm run package:itch  # writes releases/westward-rpg-offline-v<version>.zip
-```
-
-Fallback static server (no build, no HMR — useful for quick spot-checks):
-
-```bash
-npm run dev:py       # python3 -m http.server 5173 (serves project root)
 ```
 
 If port `5173` is already used on your machine, Vite will automatically pick the next available port.
@@ -204,10 +199,9 @@ WestWardRPG/
 ```bash
 # Local run
 npm run dev          # Vite dev server (HMR)
-npm run dev:py       # Static-server fallback (python3, no build, no HMR)
 
 # Build
-npm run build        # Production bundle → dist/
+npm run build        # Production bundle -> dist/
 npm run preview      # Serve the built bundle locally
 
 # Verification (also runs in CI on every PR)

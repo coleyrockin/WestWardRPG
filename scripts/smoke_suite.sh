@@ -145,6 +145,46 @@ run_scenario() {
   echo "[SUCCESS] $name passed"
 }
 
+assert_golden_path_state() {
+  local out_dir="$OUT_ROOT/golden-path"
+  node - "$out_dir" <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+
+const dir = process.argv[2];
+const files = fs.readdirSync(dir)
+  .filter((file) => /^state-\d+\.json$/.test(file))
+  .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
+
+if (!files.length) {
+  throw new Error("golden-path smoke did not write state JSON");
+}
+
+const state = JSON.parse(fs.readFileSync(path.join(dir, files[files.length - 1]), "utf8"));
+const goldenPath = state.gameplay_feel && state.gameplay_feel.golden_path;
+const listings = state.job_board && Array.isArray(state.job_board.listings)
+  ? state.job_board.listings
+  : [];
+const firstListing = listings[0] || {};
+
+if (!goldenPath || goldenPath.jobId !== "frontier_slime_bounty") {
+  throw new Error("golden-path smoke missing canonical starter job");
+}
+if (goldenPath.phase !== "available" || !goldenPath.routeLine || !goldenPath.threatLine) {
+  throw new Error("golden-path smoke missing route/threat guidance");
+}
+if (!String(goldenPath.rewardUseLine || "").includes("Slime Core")) {
+  throw new Error("golden-path smoke missing crafting-relevant reward copy");
+}
+if (firstListing.id !== "frontier_slime_bounty" || !firstListing.goldenPath || firstListing.goldenPath.starter !== true) {
+  throw new Error("golden-path smoke starter listing is not first and marked as starter");
+}
+NODE
+  echo "[SUCCESS] golden-path assertions passed"
+}
+
+run_scenario "golden-path" "test-actions/golden_path_start.json" 1
+assert_golden_path_state
 run_scenario "smoke" "test-actions/realism_smoke.json" 3
 run_scenario "quest" "test-actions/quest_flow.json" 2
 run_scenario "combat" "test-actions/combat_block_flow.json" 2

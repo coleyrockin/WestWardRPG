@@ -2,6 +2,20 @@ import { normalizeInventoryState } from "./inventoryState.js";
 
 const STORY_TROPHIES = [
   {
+    id: "marsh_bounty_notice",
+    itemName: null,
+    completedJobId: "frontier_slime_bounty",
+    label: "Marsh Bounty Notice",
+    carriedLine: "",
+    completedLine: "Marsh Slime Bounty notice pinned with Boone's first route marks",
+    planningLine: "The marshal road is safer, and the first paid loop has proof.",
+    openLead: "Clear Marsh Slime Bounty from Boone's board.",
+    completedLead: "Boone's first road loop is complete.",
+    x: 9.05,
+    y: 6.25,
+    color: "#9bdc7a",
+  },
+  {
     id: "deputy_badge",
     itemName: "Worn Badge",
     completedJobId: "frontier_badge_return",
@@ -65,11 +79,11 @@ function completedSet(jobState = {}) {
 
 export function resolveHouseProgressDisplay({ inventory = {}, jobState = {}, house = {} } = {}) {
   const normalizedInventory = normalizeInventoryState(inventory);
-  const completed = completedSet(jobState);
-  const unlocked = Boolean(house?.unlocked);
-  const trophies = unlocked ? STORY_TROPHIES
+    const completed = completedSet(jobState);
+    const unlocked = Boolean(house?.unlocked);
+    const trophies = unlocked ? STORY_TROPHIES
     .map((trophy) => {
-      const hasItem = (normalizedInventory[trophy.itemName] || 0) > 0;
+      const hasItem = trophy.itemName ? (normalizedInventory[trophy.itemName] || 0) > 0 : false;
       const completedJob = trophy.completedJobId ? completed.has(trophy.completedJobId) : false;
       if (!hasItem && !completedJob) return null;
       return {

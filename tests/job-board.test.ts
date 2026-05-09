@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   acceptJob,
+  CANONICAL_STARTER_JOB_ID,
   claimJobReward,
   createInitialJobBoardState,
   getActiveJobSummary,
@@ -11,6 +12,7 @@ import {
   normalizeJobBoardState,
   passesNarrativeGate,
   recordJobEvent,
+  resolveGoldenPathStatus,
   resolveLatestCompletedJobBoardLine,
   resolveJobRouteMarker,
 } from "../src/jobBoard.js";
@@ -48,6 +50,7 @@ describe("jobBoard", () => {
 
     expect(frontierListings.map((job) => job.id)).toContain("frontier_slime_bounty");
     expect(frontierListings.find((job) => job.id === "frontier_slime_bounty")?.reward.gold).toBe(38);
+    expect(frontierListings.find((job) => job.id === "frontier_slime_bounty")?.goldenPath?.starter).toBe(true);
     expect(ashfallListings.map((job) => job.id)).toContain("ashfall_scrap_warrant");
     expect(frontierListings.map((job) => job.id)).toContain("frontier_road_salvage");
     expect(frontierListings.map((job) => job.id)).toContain("frontier_courier_orders");
@@ -140,12 +143,50 @@ describe("jobBoard", () => {
       boardState: "available",
       selectable: true,
       threat: "Low",
-      rewardLine: "+38g, +18 XP, +1 Potion",
+      rewardLine: "+38g, +18 XP, +1 Potion, +1 Slime Core, +1 Stone",
       regionHint: "Dustward Frontier",
     });
   });
 
+  it("identifies the canonical Boone golden-path job and its payoff", () => {
+    const state = createInitialJobBoardState();
+    const before = resolveGoldenPathStatus({ jobState: state, regionId: "frontier" });
+
+    expect(CANONICAL_STARTER_JOB_ID).toBe("frontier_slime_bounty");
+    expect(before).toMatchObject({
+      available: true,
+      phase: "available",
+      jobTitle: "Marsh Slime Bounty",
+    });
+    expect(before.nextStep).toContain("Accept Marsh Slime Bounty");
+    expect(before.routeLine).toContain("Broken Wagon");
+    expect(before.threatLine).toContain("slime");
+
+    acceptJob(state, CANONICAL_STARTER_JOB_ID, { time: 3 });
+    const active = resolveGoldenPathStatus({ jobState: state, regionId: "frontier" });
+
+    expect(active.phase).toBe("active");
+    expect(active.rewardUseLine).toContain("Slime Core");
+
+    recordJobEvent(state, { type: "kill", enemyType: "slime", behavior: "balanced", time: 10 });
+    recordJobEvent(state, { type: "kill", enemyType: "slime", behavior: "balanced", time: 15 });
+    recordJobEvent(state, { type: "kill", enemyType: "slime", behavior: "balanced", time: 20 });
+    expect(resolveGoldenPathStatus({ jobState: state, regionId: "frontier" }).phase).toBe("return");
+
+    const paid = claimJobReward(state, CANONICAL_STARTER_JOB_ID);
+    const completed = resolveGoldenPathStatus({ jobState: state, house: { unlocked: true }, regionId: "frontier" });
+
+    expect(paid.reward).toEqual({ gold: 38, xp: 18, items: { Potion: 1, "Slime Core": 1, Stone: 1 } });
+    expect(completed).toMatchObject({
+      phase: "completed",
+      completed: true,
+      houseProofLine: "Home proof visible: Marsh Bounty Notice.",
+    });
+    expect(completed.consequenceLine).toContain("house can display");
+  });
+
   it("surfaces the latest completed story job board reaction", () => {
+    expect(resolveLatestCompletedJobBoardLine(["frontier_slime_bounty"], "frontier")).toContain("marshal road");
     expect(resolveLatestCompletedJobBoardLine([
       "frontier_badge_return",
       "frontier_map_survey",
@@ -311,6 +352,13 @@ describe("jobBoard", () => {
   it("records matching kill events and marks the active bounty ready", () => {
     const state = createInitialJobBoardState();
     acceptJob(state, "frontier_slime_bounty");
+    const marker = resolveJobRouteMarker({
+      jobState: state,
+      player: { x: 12, y: 8.5 },
+      resources: [],
+      enemies: [{ type: "slime", behavior: "balanced", alive: true, x: 14.2, y: 9.8 }],
+      npcs: [],
+    });
 
     const missed = recordJobEvent(state, { type: "kill", enemyType: "brute", behavior: "tank" });
     const first = recordJobEvent(state, { type: "kill", enemyType: "slime", behavior: "balanced" });
@@ -323,6 +371,13 @@ describe("jobBoard", () => {
     expect(third.completed).toBe(true);
     expect(state.progressByJobId.frontier_slime_bounty).toMatchObject({ status: "ready", count: 3 });
     expect(getActiveJobSummary(state)?.status).toBe("ready");
+    expect(marker).toMatchObject({
+      kind: "job_bounty",
+      action: "hunt",
+      routeHint: "Town circle -> Broken Wagon roadmark -> marsh fence -> return to Boone.",
+    });
+    expect(marker?.landmarkLine).toContain("North Watchtower");
+    expect(marker?.rewardUseLine).toContain("Slime Core");
   });
 
   it("records matching collection events for salvage jobs", () => {
@@ -653,7 +708,7 @@ describe("jobBoard", () => {
     const secondClaim = claimJobReward(state, "frontier_slime_bounty");
 
     expect(claimed.ok).toBe(true);
-    expect(claimed.reward).toEqual({ gold: 38, xp: 18, items: { Potion: 1 } });
+    expect(claimed.reward).toEqual({ gold: 38, xp: 18, items: { Potion: 1, "Slime Core": 1, Stone: 1 } });
     expect(state.activeJobId).toBe(null);
     expect(state.completedJobIds).toEqual(["frontier_slime_bounty"]);
     expect(state.progressByJobId.frontier_slime_bounty.rewardClaimed).toBe(true);

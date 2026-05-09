@@ -7,6 +7,8 @@ import { COMPLETED_JOB_BOARD_LINES } from "./npcMemory.js";
 
 const JOB_STATUS = new Set(["active", "ready", "completed", "failed"]);
 
+export const CANONICAL_STARTER_JOB_ID = "frontier_slime_bounty";
+
 export const JOB_DEFINITIONS = {
   frontier_slime_bounty: {
     id: "frontier_slime_bounty",
@@ -18,8 +20,19 @@ export const JOB_DEFINITIONS = {
     threat: "Low",
     minLevel: 1,
     priority: 10,
-    hint: "Clear the marsh slimes harassing the town road.",
-    boardNote: "Boone needs the marsh road cleared before traders will risk the town circle.",
+    hint: "Follow Boone's marsh road past the broken wagon and clear the slimes crowding the first watch route.",
+    boardNote: "Starter road loop: Boone needs the marsh road cleared, the broken wagon checked, and the watchtower approach made safe.",
+    goldenPath: {
+      starter: true,
+      routeLine: "Town circle -> Broken Wagon roadmark -> marsh fence -> return to Boone.",
+      landmarkLine: "North Watchtower should stay in view as the first big road silhouette.",
+      discoveryId: "frontier_broken_wagon",
+      discoveryLine: "The Broken Wagon is the optional detour that teaches roads can hide loot and story hooks.",
+      threatLine: "Fresh marsh slime tracks mark the first readable combat threat.",
+      rewardUseLine: "Slime Core and Stone feed early crafting while the payout funds repairs or workbench prep.",
+      consequenceLine: "Boone will mark the first road loop as safer once the bounty is paid.",
+      completedConsequenceLine: "Boone's board now treats the marshal road as watched, and your house can display the first bounty notice.",
+    },
     objective: {
       type: "kill",
       enemyType: "slime",
@@ -30,7 +43,7 @@ export const JOB_DEFINITIONS = {
     reward: {
       gold: 38,
       xp: 18,
-      items: { Potion: 1 },
+      items: { Potion: 1, "Slime Core": 1, Stone: 1 },
     },
   },
   frontier_road_salvage: {
@@ -697,6 +710,21 @@ function cloneObjective(objective = {}) {
   };
 }
 
+function cloneGoldenPath(goldenPath = null) {
+  if (!goldenPath || typeof goldenPath !== "object") return null;
+  return {
+    starter: Boolean(goldenPath.starter),
+    routeLine: typeof goldenPath.routeLine === "string" ? goldenPath.routeLine : "",
+    landmarkLine: typeof goldenPath.landmarkLine === "string" ? goldenPath.landmarkLine : "",
+    discoveryId: typeof goldenPath.discoveryId === "string" ? goldenPath.discoveryId : "",
+    discoveryLine: typeof goldenPath.discoveryLine === "string" ? goldenPath.discoveryLine : "",
+    threatLine: typeof goldenPath.threatLine === "string" ? goldenPath.threatLine : "",
+    rewardUseLine: typeof goldenPath.rewardUseLine === "string" ? goldenPath.rewardUseLine : "",
+    consequenceLine: typeof goldenPath.consequenceLine === "string" ? goldenPath.consequenceLine : "",
+    completedConsequenceLine: typeof goldenPath.completedConsequenceLine === "string" ? goldenPath.completedConsequenceLine : "",
+  };
+}
+
 function regionHint(regionId) {
   return getRegionVisualIdentity(regionId).label;
 }
@@ -883,6 +911,7 @@ function decorateJob(job, progress = null, context = {}) {
   return {
     ...job,
     objective: cloneObjective(job.objective),
+    goldenPath: cloneGoldenPath(job.goldenPath),
     reward,
     bonus: job.bonus ? { ...job.bonus, reward: cloneReward(job.bonus.reward) } : null,
     failure: job.failure ? { ...job.failure } : null,
@@ -906,6 +935,73 @@ function decorateJob(job, progress = null, context = {}) {
     baseRewardLine: formatRewardLine(reward),
     bonusLine: job.bonus ? `${job.bonus.line} ${formatRewardLine(job.bonus.reward)}` : "",
     failureLine: job.failure?.line || "",
+  };
+}
+
+export function resolveGoldenPathStatus({
+  jobState = createInitialJobBoardState(),
+  inventory = {},
+  house = {},
+  regionId = "frontier",
+} = {}) {
+  const state = normalizeJobBoardState(jobState);
+  const job = knownJob(CANONICAL_STARTER_JOB_ID);
+  const progress = state.progressByJobId[CANONICAL_STARTER_JOB_ID] || null;
+  const completed = state.completedJobIds.includes(CANONICAL_STARTER_JOB_ID);
+  const active = state.activeJobId === CANONICAL_STARTER_JOB_ID;
+  const decorated = job ? decorateJob(job, progress, {
+    inventory,
+    completedJobIds: state.completedJobIds,
+  }) : null;
+  const goldenPath = cloneGoldenPath(decorated?.goldenPath);
+  if (!job || !goldenPath || regionId !== job.regionId) {
+    return {
+      available: false,
+      jobId: CANONICAL_STARTER_JOB_ID,
+      phase: "unavailable",
+      completed: false,
+      active: false,
+    };
+  }
+
+  const phase = completed
+    ? "completed"
+    : active
+      ? (progress?.status === "ready" ? "return" : "active")
+      : "available";
+  const nextStep = completed
+    ? "Inspect Boone's board, talk to town NPCs, or bring the proof home."
+    : active
+      ? buildProgressLine(job, progress)
+      : "Accept Marsh Slime Bounty from Boone's job board.";
+  const consequenceLine = completed
+    ? goldenPath.completedConsequenceLine
+    : goldenPath.consequenceLine;
+  const houseProofLine = completed
+    ? (house?.unlocked
+      ? "Home proof visible: Marsh Bounty Notice."
+      : "Home proof banked: unlock the house to display the Marsh Bounty Notice.")
+    : "";
+
+  return {
+    available: true,
+    jobId: job.id,
+    title: "Golden Path 1",
+    jobTitle: job.title,
+    phase,
+    active,
+    completed,
+    progressLine: decorated.progressLine,
+    rewardLine: decorated.rewardLine,
+    routeLine: goldenPath.routeLine,
+    landmarkLine: goldenPath.landmarkLine,
+    discoveryId: goldenPath.discoveryId,
+    discoveryLine: goldenPath.discoveryLine,
+    threatLine: goldenPath.threatLine,
+    rewardUseLine: goldenPath.rewardUseLine,
+    consequenceLine,
+    houseProofLine,
+    nextStep,
   };
 }
 
@@ -1318,6 +1414,11 @@ function routeBase(activeJob, target, player, extra = {}) {
     distanceLine: markerDistanceLine(resolved.distance),
     regionId: activeJob.regionId,
     regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
+    routeHint: activeJob.goldenPath?.routeLine || "",
+    landmarkLine: activeJob.goldenPath?.landmarkLine || "",
+    threatLine: activeJob.goldenPath?.threatLine || "",
+    rewardUseLine: activeJob.goldenPath?.rewardUseLine || "",
+    goldenPath: cloneGoldenPath(activeJob.goldenPath),
     ...extra,
   });
 }
@@ -1343,6 +1444,11 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       distanceLine: markerDistanceLine(npc.distance),
       regionId: activeJob.regionId,
       regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
+      routeHint: activeJob.goldenPath?.routeLine || "",
+      landmarkLine: activeJob.goldenPath?.landmarkLine || "",
+      threatLine: activeJob.goldenPath?.threatLine || "",
+      rewardUseLine: activeJob.goldenPath?.rewardUseLine || "",
+      goldenPath: cloneGoldenPath(activeJob.goldenPath),
       action: "fail_turn_in",
       returnTarget: activeJob.npcId,
     });
@@ -1364,6 +1470,11 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       distanceLine: markerDistanceLine(npc.distance),
       regionId: activeJob.regionId,
       regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
+      routeHint: activeJob.goldenPath?.routeLine || "",
+      landmarkLine: activeJob.goldenPath?.landmarkLine || "",
+      threatLine: activeJob.goldenPath?.threatLine || "",
+      rewardUseLine: activeJob.goldenPath?.rewardUseLine || "",
+      goldenPath: cloneGoldenPath(activeJob.goldenPath),
       action: "turn_in",
       returnTarget: activeJob.npcId,
     });
@@ -1400,6 +1511,11 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       distanceLine: markerDistanceLine(npc.distance),
       regionId: activeJob.regionId,
       regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
+      routeHint: activeJob.goldenPath?.routeLine || "",
+      landmarkLine: activeJob.goldenPath?.landmarkLine || "",
+      threatLine: activeJob.goldenPath?.threatLine || "",
+      rewardUseLine: activeJob.goldenPath?.rewardUseLine || "",
+      goldenPath: cloneGoldenPath(activeJob.goldenPath),
       action: "deliver",
       npcId: objective.deliveryNpcId,
       checkpointIndex: 2,
@@ -1526,6 +1642,11 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       distanceLine: markerDistanceLine(resource.distance),
       regionId: activeJob.regionId,
       regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
+      routeHint: activeJob.goldenPath?.routeLine || "",
+      landmarkLine: activeJob.goldenPath?.landmarkLine || "",
+      threatLine: activeJob.goldenPath?.threatLine || "",
+      rewardUseLine: activeJob.goldenPath?.rewardUseLine || "",
+      goldenPath: cloneGoldenPath(activeJob.goldenPath),
       action: "collect",
       checkpointIndex: Math.min((activeJob.progress?.count || 0) + 1, objective.count),
       checkpointTotal: objective.count,
@@ -1552,6 +1673,11 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       distanceLine: markerDistanceLine(enemy.distance),
       regionId: activeJob.regionId,
       regionHint: activeJob.regionHint || regionHint(activeJob.regionId),
+      routeHint: activeJob.goldenPath?.routeLine || "",
+      landmarkLine: activeJob.goldenPath?.landmarkLine || "",
+      threatLine: activeJob.goldenPath?.threatLine || "",
+      rewardUseLine: activeJob.goldenPath?.rewardUseLine || "",
+      goldenPath: cloneGoldenPath(activeJob.goldenPath),
       action: "hunt",
       checkpointIndex: Math.min((activeJob.progress?.count || 0) + 1, objective.count),
       checkpointTotal: objective.count,

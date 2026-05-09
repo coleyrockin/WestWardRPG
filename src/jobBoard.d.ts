@@ -1,10 +1,12 @@
 export const JOB_DEFINITIONS: Record<string, any>;
+export const CANONICAL_STARTER_JOB_ID: string;
 export function getJobBoardPresentation(options?: any): any;
 export function getJobBoardProp(options?: any): any;
 export function createInitialJobBoardState(): any;
 export function normalizeJobBoardState(source?: any): any;
 export function getJobListings(options?: any): any[];
 export function getJobDefinition(jobId: string): any;
+export function resolveGoldenPathStatus(options?: any): any;
 export function getJobBoardChoices(options?: any): any[];
 export function resolveLatestCompletedJobBoardLine(completedJobIds?: any[], regionId?: string): string;
 export function acceptJob(jobState: any, jobId: string, options?: { time?: number; inventory?: Record<string, number>; narrative?: any }): any;

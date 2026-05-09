@@ -113,6 +113,17 @@ describe("npcMemory", () => {
     expect(quill).toContain("Reverend Quill");
   });
 
+  it("reacts to the completed canonical starter road loop", () => {
+    const memory = createInitialNpcMemoryState();
+
+    const line = resolveNpcReactiveLine("warden", memory, {
+      completedJobIds: ["frontier_slime_bounty"],
+    });
+
+    expect(line).toContain("First road loop");
+    expect(line).toContain("watchtower");
+  });
+
   it("reacts to completed Ashfall helmet salvage work", () => {
     const memory = createInitialNpcMemoryState();
 

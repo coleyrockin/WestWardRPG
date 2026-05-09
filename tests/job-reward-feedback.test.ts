@@ -16,11 +16,11 @@ describe("jobRewardFeedback", () => {
 
   it("keeps generic jobs focused on the payout", () => {
     const feedback = resolveJobRewardFeedback({
-      job: { id: "frontier_slime_bounty", title: "Slime Bounty" },
+      job: { id: "frontier_road_salvage", title: "Roadside Salvage" },
       reward: { gold: 16, xp: 8, items: { Tonic: 1 } },
     });
 
-    expect(feedback.logLine).toBe("Job paid: Slime Bounty. +16 gold, +8 XP, +1 Tonic");
+    expect(feedback.logLine).toBe("Job paid: Roadside Salvage. +16 gold, +8 XP, +1 Tonic");
     expect(feedback.bonusLine).toBe("");
     expect(feedback.housePromptLine).toBe("");
     expect(feedback.trophyId).toBe("");
@@ -50,6 +50,20 @@ describe("jobRewardFeedback", () => {
     expect(feedback.housePromptLine).toContain("House proof updated");
     expect(feedback.housePromptLine).toContain("Deputy Badge returned");
     expect(feedback.housePromptLine).toContain("Boone trusts you");
+  });
+
+  it("turns the canonical starter bounty into visible house proof", () => {
+    const feedback = resolveJobRewardFeedback({
+      job: { id: "frontier_slime_bounty", title: "Marsh Slime Bounty" },
+      reward: { gold: 38, xp: 18, items: { Potion: 1, "Slime Core": 1, Stone: 1 } },
+      house: { unlocked: true },
+      jobState: { completedJobIds: ["frontier_slime_bounty"] },
+    });
+
+    expect(feedback.trophyId).toBe("marsh_bounty_notice");
+    expect(feedback.rewardLine).toBe("+38 gold, +18 XP, +1 Potion, +1 Slime Core, +1 Stone");
+    expect(feedback.housePromptLine).toContain("Marsh Slime Bounty notice");
+    expect(feedback.housePromptLine).toContain("marshal road is safer");
   });
 
   it("remembers story proof when the house is still locked", () => {

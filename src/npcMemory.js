@@ -89,6 +89,10 @@ function resolveQuestOutcomeReaction(npcId, questOutcomes) {
 const COMPLETED_JOB_REACTIONS = {
   warden: [
     {
+      jobId: "frontier_slime_bounty",
+      line: "Marshal Boone: First road loop held. Slime tracks are off the wagon ruts, and folks can see the watchtower again without sprinting.",
+    },
+    {
       jobId: "ashfall_miner_helmet_salvage",
       line: "Marshal Boone: Ashfall crews heard that helmet lamp made it back lit. That is the kind of rumor that gets people paid.",
     },
@@ -268,6 +272,10 @@ export function resolveNpcReactiveLine(npcId, memory, context = {}) {
 // content lives alongside the rest of NPC memory. jobBoard.js looks these up
 // in resolveCompletedJobBoardLine().
 export const COMPLETED_JOB_BOARD_LINES = {
+  frontier_slime_bounty: {
+    regionId: "frontier",
+    line: "Boone has marked the marshal road as watched after your first slime bounty.",
+  },
   frontier_badge_return: {
     regionId: "frontier",
     line: "The returned badge has Boone posting deputy work with fewer whispers around it.",
