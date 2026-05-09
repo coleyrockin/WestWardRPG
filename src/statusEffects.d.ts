@@ -41,3 +41,5 @@ export function updateStatuses<T extends StatusEntity>(
 export function getStatusSpeedMult<T extends StatusEntity>(entity: T): number;
 export function hasStatus<T extends StatusEntity>(entity: T, kind: string): boolean;
 export function getStatusMagnitude<T extends StatusEntity>(entity: T, kind: string): number;
+
+export function checkStatusSynergies(entity: any): Array<{ type: string; burst: number }>;

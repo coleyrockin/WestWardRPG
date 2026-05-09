@@ -172,11 +172,26 @@ export function resolveIncomingDamage(baseDamage, combatProgression, context = {
   const blockedMult = clamp(0.35 - mitigationBonus, 0.15, 0.4);
   const glancingMult = clamp(0.85 - mitigationBonus * 0.4, 0.55, 0.92);
   const chip = Math.max(1, Math.floor(baseDamage * 0.08));
+  // Stamina chip: blocked hits drain stamina (12% of base damage, reduced by mitigation)
+  const staminaChip = Math.max(2, Math.floor(baseDamage * clamp(0.12 - mitigationBonus * 0.05, 0.05, 0.18)));
   return {
     blocked: Math.max(chip, Math.floor(baseDamage * blockedMult)),
     chip,
+    staminaChip,
     glancing: Math.max(1, Math.floor(baseDamage * glancingMult)),
   };
+}
+
+// Apply staminaChip to the player on a successful block. Returns true if
+// guard was broken as a result (stamina hit zero).
+export function applyBlockStaminaChip(player, staminaChip) {
+  player.stamina = Math.max(0, (player.stamina || 0) - staminaChip);
+  if (player.stamina <= 0) {
+    player.guardBroken = true;
+    player.guardBrokenTimer = Math.max(player.guardBrokenTimer || 0, 1.4);
+    return true;
+  }
+  return false;
 }
 
 export function resolveGuardBreakState(player, dt = 0) {

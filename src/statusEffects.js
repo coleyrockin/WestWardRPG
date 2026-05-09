@@ -101,3 +101,26 @@ export function getStatusMagnitude(entity, kind) {
   for (const s of entity.statuses) if (s.kind === kind) return s.magnitude;
   return 0;
 }
+
+// Status synergies. Call after applying a new status to check for combos.
+// Returns an array of synergy events { type, burst } for the caller to handle.
+export function checkStatusSynergies(entity) {
+  if (!entity.statuses || entity.statuses.length < 2) return [];
+  const synergies = [];
+  const hasBurn  = hasStatus(entity, "burn");
+  const hasFrost = hasStatus(entity, "frost");
+  const hasBleed = hasStatus(entity, "bleed");
+  const hasShock = hasStatus(entity, "shock");
+
+  // Burn + Frost → ice burst AOE (clear both, deal burst damage)
+  if (hasBurn && hasFrost) {
+    entity.statuses = entity.statuses.filter((s) => s.kind !== "burn" && s.kind !== "frost");
+    synergies.push({ type: "ice_burst", burst: 14 });
+  }
+  // Bleed + Shock → chain jump (shock leaps to nearest other enemy)
+  if (hasBleed && hasShock) {
+    entity.statuses = entity.statuses.filter((s) => s.kind !== "shock");
+    synergies.push({ type: "bleed_chain", burst: 6 });
+  }
+  return synergies;
+}

@@ -77,6 +77,80 @@ export function unlockSkill(progression, branch) {
   return true;
 }
 
+// Capstone perks — gated by attribute threshold + faction allegiance.
+// These unlock at level 5 of a skill branch AND a secondary condition.
+export const CAPSTONE_PERKS = [
+  {
+    id: "iron_constitution",
+    label: "Iron Constitution",
+    description: "+30 max HP. Guard-break recovery 40% faster.",
+    branch: "survival",
+    branchLevel: 5,
+    attributeReq: { grit: 7 },
+    factionReq: null,
+    effects: { maxHpBonus: 30, guardBreakRecoveryMult: 0.6 },
+  },
+  {
+    id: "perfect_form",
+    label: "Perfect Form",
+    description: "Perfect parry and perfect dodge windows +50ms.",
+    branch: "combat",
+    branchLevel: 5,
+    attributeReq: { might: 6 },
+    factionReq: null,
+    effects: { perfectWindowBonus: 0.05 },
+  },
+  {
+    id: "guild_network",
+    label: "Guild Network",
+    description: "Workers Guild prices -20%. Bonus XP from all jobs.",
+    branch: "influence",
+    branchLevel: 5,
+    attributeReq: { speech: 6 },
+    factionReq: { workersGuild: 20 },
+    effects: { guildDiscountMult: 0.8, jobXpBonus: 0.25 },
+  },
+  {
+    id: "cartel_leverage",
+    label: "Cartel Leverage",
+    description: "Market Cartel prices -25%. Gold from kills +10%.",
+    branch: "influence",
+    branchLevel: 5,
+    attributeReq: { cunning: 6 },
+    factionReq: { marketCartel: 20 },
+    effects: { cartelDiscountMult: 0.75, killGoldBonus: 0.1 },
+  },
+  {
+    id: "dust_runner",
+    label: "Dust Runner",
+    description: "Movement speed +15% in Ashfall. Status effect durations -20% when imposed on you.",
+    branch: "survival",
+    branchLevel: 4,
+    attributeReq: { grit: 6, cunning: 5 },
+    factionReq: null,
+    effects: { ashfallSpeedBonus: 0.15, statusDurationReduction: 0.2 },
+  },
+];
+
+export function getUnlockedCapstonePerkIds(progression, factionRep = {}) {
+  if (!progression) return [];
+  const tree = progression.skillTree || {};
+  const identity = progression.identity || {};
+  const attrs = identity.attributes || {};
+  return CAPSTONE_PERKS
+    .filter((p) => {
+      if ((tree[p.branch] || 0) < p.branchLevel) return false;
+      for (const [attr, min] of Object.entries(p.attributeReq || {})) {
+        if ((attrs[attr] || 0) < min) return false;
+      }
+      for (const [faction, min] of Object.entries(p.factionReq || {})) {
+        if ((factionRep[faction] || 0) < min) return false;
+      }
+      return true;
+    })
+    .map((p) => p.id);
+}
+
 export function upgradeWeaponTier(progression) {
   progression.equipment = normalizeGearState(progression.equipment);
   const idx = WEAPON_TIERS.indexOf(progression.equipment.weaponTier);

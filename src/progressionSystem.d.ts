@@ -12,3 +12,6 @@ export function equipWeaponFamily(progression: any, familyId: string): boolean;
 export function equipArmorPiece(progression: any, pieceId: string): boolean;
 export function resolveIdeologyTraits(narrativeState: any): string[];
 export function buildProgressionModifiers(progression: any): any;
+
+export declare const CAPSTONE_PERKS: any[];
+export function getUnlockedCapstonePerkIds(progression: any, factionRep?: Record<string, number>): string[];

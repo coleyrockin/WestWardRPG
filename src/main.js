@@ -55,6 +55,7 @@ import {
   resolveGuardBreakState,
   getSprintModifier,
   applyMovesetGeometry,
+  applyBlockStaminaChip,
 } from "./combatLoadout.js";
 import {
   applyMiniBossPhaseTransition,
@@ -326,6 +327,7 @@ import {
   clearStatuses,
   getStatusSpeedMult,
   hasStatus,
+  checkStatusSynergies,
 } from "./statusEffects.js";
 import {
   advanceTimeOfDay,
@@ -4632,6 +4634,24 @@ const canvas = document.getElementById("game");
         for (const entry of affixMods.statusOnHit) {
           applyStatus(enemy, entry.kind, { magnitude: entry.magnitude, sourceTier: tier });
         }
+        // Status synergies — check for combo triggers after applying all effects.
+        const synergies = checkStatusSynergies(enemy);
+        for (const syn of synergies) {
+          if (syn.type === "ice_burst") {
+            const burstDmg = syn.burst;
+            enemy.hp = Math.max(0, (enemy.hp || 1) - burstDmg);
+            spawnParticles(canvas.width / 2, canvas.height * 0.45, 14, "#b0e8ff", 4.5, 0.55, { decorative: false });
+            state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: `ICE BURST −${burstDmg}`, life: 0.8, maxLife: 0.8, color: "#b0e8ff" });
+            logMsg("Burn + Frost — ice burst!");
+          } else if (syn.type === "bleed_chain") {
+            // Spread shock to the nearest other alive enemy
+            const nearest = state.enemies.find((e) => e !== enemy && e.alive);
+            if (nearest) {
+              applyStatus(nearest, "shock", { magnitude: 1, sourceTier: tier });
+              state.floatingTexts.push({ wx: nearest.x, wy: nearest.y, text: "CHAIN SHOCK", life: 0.7, maxLife: 0.7, color: "#ffe16a" });
+            }
+          }
+        }
       }
       // Affix lifesteal — heals a percentage of dealt damage, capped at maxHp.
       if (affixMods.lifestealPct > 0 && damage > 0) {
@@ -5450,7 +5470,20 @@ const canvas = document.getElementById("game");
         }
         if ((enemy.windupTimer || 0) > 0) {
           enemy.windupTimer = Math.max(0, enemy.windupTimer - dt);
-          if (enemy.windupTimer <= 0) enemy.windupConsumed = true;
+          // Counter-windup bait: elite enemies occasionally cancel mid-windup and re-commit.
+          // Only applies to tank/control archetypes at 20-40% of windup elapsed.
+          if (!enemy.windupBaitUsed && (enemy.behavior === "tank" || enemy.behavior === "control")) {
+            const elapsed = 1 - (enemy.windupTimer / Math.max(0.01, enemy.windupMax || 1));
+            if (elapsed >= 0.2 && elapsed <= 0.4 && Math.random() < dt * 0.55) {
+              enemy.windupTimer = enemy.windupMax;
+              enemy.windupBaitUsed = true;
+              state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: "FEINT", life: 0.55, maxLife: 0.55, color: "#ffcf5a" });
+            }
+          }
+          if (enemy.windupTimer <= 0) {
+            enemy.windupConsumed = true;
+            enemy.windupBaitUsed = false;
+          }
         }
         const heavyReady = heavyTelegraph && enemy.windupConsumed;
         const lightReady = !heavyTelegraph;
@@ -5489,16 +5522,13 @@ const canvas = document.getElementById("game");
                 emitCompanionBark("perfect_parry");
               } else if (facingDiff < 1.12 && player.stamina > 10) {
                 damage = Math.max(mitigated.chip, Math.floor(mitigated.blocked * stance.blockPenalty * (1 - blockBonus)));
-                player.stamina = Math.max(0, player.stamina - 11 * (1 - blockBonus * 0.5));
-                if (player.stamina <= 0) {
-                  const guard = resolveGuardBreakState(player, 0);
-                  player.guardBroken = guard.guardBroken;
-                  player.guardBrokenTimer = guard.guardBrokenTimer;
+                const guardBroke = applyBlockStaminaChip(player, mitigated.staminaChip);
+                if (guardBroke) {
                   player.blocking = false;
-                  state.floatingTexts.push({ wx: player.x, wy: player.y, text: "CRACK", life: 0.75, maxLife: 0.75, color: "#ffcf8a" });
-                  logMsg("Guard broken! Recover stamina before blocking again.");
+                  state.floatingTexts.push({ wx: player.x, wy: player.y, text: "GUARD BREAK", life: 0.85, maxLife: 0.85, color: "#ffcf8a" });
+                  logMsg("Guard broken! Stamina depleted by sustained blocking. Recover before defending again.");
                 } else {
-                  logMsg(`Block absorbed most of the hit. ${mitigated.chip} chip damage slipped through.`);
+                  logMsg(`Block absorbed most of the hit. ${mitigated.chip} chip damage slipped through. (−${mitigated.staminaChip} stamina)`);
                 }
                 sfx.blockHit();
               } else {

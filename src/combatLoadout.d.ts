@@ -13,3 +13,5 @@ export const MOVESET_DEFINITIONS: Record<string, {
 }>;
 export function resolveMovesetForWeapon(weaponTier: string): string;
 export function applyMovesetGeometry(baseSwing: any, weaponTier: string): any;
+
+export function applyBlockStaminaChip(player: any, staminaChip: number): boolean;
