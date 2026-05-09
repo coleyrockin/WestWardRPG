@@ -253,8 +253,40 @@ class ConsoleErrorTracker {
   }
 }
 
+const SMOKE_API_METHODS = new Set([
+  "unlockHouse",
+  "acceptStarter",
+  "simulateStarterKills",
+  "claimStarter",
+]);
+
 async function doChoreography(page, canvas, steps) {
   for (const step of steps) {
+    if (typeof step.smoke === "string") {
+      if (!SMOKE_API_METHODS.has(step.smoke)) {
+        throw new Error(`Unknown smoke method: ${step.smoke}`);
+      }
+      const args = Array.isArray(step.smoke_args) ? step.smoke_args : [];
+      await page.evaluate(
+        ({ method, args }) => {
+          const api = window.__westwardSmoke;
+          if (!api || typeof api[method] !== "function") {
+            throw new Error(`window.__westwardSmoke.${method} not available`);
+          }
+          return api[method](...args);
+        },
+        { method: step.smoke, args }
+      );
+      const evalFrames = Math.max(0, Math.floor(step.frames || 0));
+      if (evalFrames > 0) {
+        await page.evaluate(async (durationMs) => {
+          if (typeof window.advanceTime === "function") {
+            await window.advanceTime(durationMs);
+          }
+        }, evalFrames * (1000 / 60));
+      }
+      continue;
+    }
     const buttons = new Set(step.buttons || []);
     for (const button of buttons) {
       if (button === "left_mouse_button" || button === "right_mouse_button") {

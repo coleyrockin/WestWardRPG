@@ -9939,6 +9939,46 @@ const canvas = document.getElementById("game");
     render();
   };
 
+  window.__westwardSmoke = {
+    unlockHouse() {
+      state.house.unlocked = true;
+      state.house.built = true;
+      return { unlocked: true };
+    },
+    acceptStarter() {
+      state.world.jobs = normalizeJobBoardState(state.world.jobs);
+      const accepted = acceptJob(state.world.jobs, "frontier_slime_bounty", {
+        time: state.time,
+        inventory: state.inventory,
+        narrative: state.narrative,
+      });
+      return { ok: !!accepted?.ok, jobId: accepted?.job?.id || null };
+    },
+    simulateStarterKills(count = 3) {
+      state.world.jobs = normalizeJobBoardState(state.world.jobs);
+      let recorded = 0;
+      for (let i = 0; i < Math.max(1, count); i++) {
+        const result = recordJobEvent(state.world.jobs, {
+          type: "kill",
+          enemyType: "slime",
+          behavior: "balanced",
+          regionId: "frontier",
+          time: state.time + i,
+        });
+        if (result.ok) recorded += 1;
+      }
+      return { recorded, status: state.world.jobs.progressByJobId?.frontier_slime_bounty?.status || null };
+    },
+    claimStarter() {
+      state.world.jobs = normalizeJobBoardState(state.world.jobs);
+      const paid = claimJobReward(state.world.jobs, "frontier_slime_bounty");
+      if (paid.ok && !paid.failed) {
+        grantJobReward(paid.reward);
+      }
+      return { ok: !!paid?.ok, failed: !!paid?.failed, reward: paid?.reward || null };
+    },
+  };
+
   window.render_game_to_text = () => {
     const activeEnemies = state.enemies.filter((e) => e.alive);
     const activeResources = state.resources.filter((r) => !r.harvested);

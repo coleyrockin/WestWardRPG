@@ -183,8 +183,52 @@ NODE
   echo "[SUCCESS] golden-path assertions passed"
 }
 
+assert_golden_path_full_state() {
+  local out_dir="$OUT_ROOT/golden-path-full"
+  node - "$out_dir" <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+
+const dir = process.argv[2];
+const files = fs.readdirSync(dir)
+  .filter((file) => /^state-\d+\.json$/.test(file))
+  .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
+if (!files.length) {
+  throw new Error("golden-path-full smoke did not write state JSON");
+}
+
+const state = JSON.parse(fs.readFileSync(path.join(dir, files[files.length - 1]), "utf8"));
+const goldenPath = state.gameplay_feel && state.gameplay_feel.golden_path;
+if (!goldenPath || goldenPath.phase !== "completed" || goldenPath.completed !== true) {
+  throw new Error(`golden-path-full expected completed phase, got ${goldenPath?.phase}`);
+}
+if (!String(goldenPath.houseProofLine || "").includes("Marsh Bounty Notice")) {
+  throw new Error("golden-path-full missing Marsh Bounty Notice house proof line");
+}
+
+const completedJobIds = state.job_board?.state?.completedJobIds || [];
+if (!completedJobIds.includes("frontier_slime_bounty")) {
+  throw new Error("golden-path-full did not record completed bounty");
+}
+
+const trophies = state.house?.progress_display?.trophies || [];
+const notice = trophies.find((t) => t.id === "marsh_bounty_notice");
+if (!notice || notice.status !== "completed") {
+  throw new Error("golden-path-full missing marsh_bounty_notice trophy on house display");
+}
+
+const inventory = state.inventory || {};
+if ((inventory["Slime Core"] || 0) < 1 || (inventory.Stone || 0) < 1) {
+  throw new Error("golden-path-full reward did not surface Slime Core + Stone in inventory");
+}
+NODE
+  echo "[SUCCESS] golden-path-full assertions passed"
+}
+
 run_scenario "golden-path" "test-actions/golden_path_start.json" 1
 assert_golden_path_state
+run_scenario "golden-path-full" "test-actions/golden_path_full.json" 1
+assert_golden_path_full_state
 run_scenario "smoke" "test-actions/realism_smoke.json" 3
 run_scenario "quest" "test-actions/quest_flow.json" 2
 run_scenario "combat" "test-actions/combat_block_flow.json" 2

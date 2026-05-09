@@ -1,0 +1,8 @@
+{
+  "steps": [
+    { "smoke": "unlockHouse", "frames": 2 },
+    { "smoke": "acceptStarter", "frames": 4 },
+    { "smoke": "simulateStarterKills", "smoke_args": [3], "frames": 4 },
+    { "smoke": "claimStarter", "frames": 4 }
+  ]
+}
