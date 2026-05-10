@@ -335,6 +335,11 @@ import {
   resolveWallProjection,
 } from "./render.js";
 import {
+  createHudRenderer,
+  resolveDiscoveryBannerLayout,
+  resolveInteractionPromptLayout,
+} from "./hudRenderer.js";
+import {
   applyStatus,
   updateStatuses,
   clearStatuses,
@@ -5774,6 +5779,15 @@ const canvas = document.getElementById("game");
   const fitText = _renderHelpers.fitText;
   const drawClippedText = _renderHelpers.drawClippedText;
   const drawPillLabel = _renderHelpers.drawPillLabel;
+  const _hudRenderer = createHudRenderer({
+    ctx,
+    helpers: _renderHelpers,
+    hexToRgba: hexToRgbaUtil,
+  });
+  const drawHudBar = _hudRenderer.drawHudBar;
+  const drawHudNoticePanel = _hudRenderer.drawHudNoticePanel;
+  const drawDiscoveryBannerPanel = _hudRenderer.drawDiscoveryBannerPanel;
+  const drawInteractionPromptPanel = _hudRenderer.drawInteractionPromptPanel;
   const _spriteLightHelpers = createSpriteLightHelpers(ctx, { hexToRgba: hexToRgbaUtil });
   const drawSpriteGlow = _spriteLightHelpers.drawSpriteGlow;
   const drawSpritePulseRing = _spriteLightHelpers.drawSpritePulseRing;
@@ -8218,21 +8232,7 @@ const canvas = document.getElementById("game");
   }
 
   function drawBar(x, y, w, h, ratio, bg, fg, label) {
-    fillRoundedRect(x, y, w, h, Math.min(6, h / 2), bg);
-    const safeRatio = clamp(ratio, 0, 1);
-    if (safeRatio > 0) {
-      const fillW = Math.max(h * 0.35, w * safeRatio);
-      fillRoundedRect(x, y, fillW, h, Math.min(6, h / 2), fg);
-    }
-    const shine = ctx.createLinearGradient(x, y, x, y + h);
-    shine.addColorStop(0, "rgba(255, 255, 255, 0.28)");
-    shine.addColorStop(0.45, "rgba(255, 255, 255, 0.05)");
-    shine.addColorStop(1, "rgba(0, 0, 0, 0.18)");
-    fillRoundedRect(x, y, w, h, Math.min(6, h / 2), shine);
-    strokeRoundedRect(x + 0.5, y + 0.5, w - 1, h - 1, Math.min(6, h / 2), "rgba(255, 245, 216, 0.18)", 1);
-    ctx.fillStyle = "#fff4d8";
-    ctx.font = "bold 11px Georgia";
-    ctx.fillText(fitText(label, w - 12), x + 6, y + h - 4);
+    drawHudBar(x, y, w, h, clamp(ratio, 0, 1), bg, fg, label);
   }
 
   function drawMiniMap() {
@@ -8667,95 +8667,27 @@ const canvas = document.getElementById("game");
   function drawDiscoveryBanner(bottomHudY, margin) {
     if (!discoveryBanner) return;
     const lines = Array.isArray(discoveryBanner.lines) ? discoveryBanner.lines.slice(0, 3) : [];
-    const compact = canvas.width < 560;
-    const w = Math.min(compact ? canvas.width - margin * 2 : 520, canvas.width - margin * 2);
-    const h = 54 + Math.max(1, lines.length) * 14;
-    const x = Math.round((canvas.width - w) / 2);
-    const y = Math.max(margin + 98, Math.round(bottomHudY - h - 10));
-    const color = discoveryBanner.color || "#d8bc6a";
-    const alpha = clamp(discoveryBanner.ttl / 0.45, 0, 1);
-
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    drawSoftPanel(x, y, w, h, {
-      top: "rgba(30, 26, 18, 0.86)",
-      bottom: "rgba(10, 14, 16, 0.82)",
-      border: "rgba(255, 226, 150, 0.5)",
-      shadowBlur: 18,
-      shadowOffsetY: 8,
+    const layout = resolveDiscoveryBannerLayout({
+      canvasWidth: canvas.width,
+      margin,
+      bottomHudY,
+      lineCount: Math.max(1, lines.length),
     });
-    ctx.fillStyle = color;
-    ctx.globalAlpha = alpha * 0.85;
-    ctx.fillRect(x + 10, y + 12, 4, h - 24);
-    ctx.beginPath();
-    ctx.arc(x + 24, y + 25, 6, 0, TAU);
-    ctx.fill();
-    ctx.globalAlpha = alpha;
-
-    ctx.font = "bold 14px Georgia";
-    drawClippedText(discoveryBanner.title || "Discovery found", x + 38, y + 23, w - 52, "#fff1d0");
-    ctx.font = "10px Georgia";
-    drawClippedText(discoveryBanner.subtitle || "Roadside discovery", x + 38, y + 38, w - 52, "#d8c7a2");
-
-    let lineY = y + 56;
-    for (const line of lines.length ? lines : [discoveryBanner.rewardLine || "New clue recorded"]) {
-      ctx.font = lineY === y + 56 ? "bold 11px Georgia" : "10px Georgia";
-      drawClippedText(line, x + 18, lineY, w - 34, lineY === y + 56 ? "#ffd77b" : "#f1e5c8");
-      lineY += 14;
-    }
-    ctx.restore();
+    drawDiscoveryBannerPanel(discoveryBanner, layout);
   }
 
   function drawHudNotice(x, y, w) {
-    if (!hudNotice) return 0;
-    const color = hudNotice.color || "#ffd77b";
-    const alpha = clamp(hudNotice.ttl / 0.45, 0, 1);
-    const h = 28;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    drawSoftPanel(x, y, w, h, {
-      top: "rgba(35, 28, 42, 0.86)",
-      bottom: "rgba(10, 14, 18, 0.78)",
-      border: hexToRgba(color, 0.5),
-      shadowBlur: 9,
-      shadowOffsetY: 3,
-    });
-    ctx.fillStyle = color;
-    ctx.fillRect(x + 8, y + 7, 3, h - 14);
-    ctx.beginPath();
-    ctx.arc(x + 19, y + 14, 4.5, 0, TAU);
-    ctx.fill();
-    ctx.font = "bold 10px Georgia";
-    drawClippedText(hudNotice.title || "Notice", x + 31, y + 11, w - 42, "#fff1d0");
-    ctx.font = "10px Georgia";
-    drawClippedText(hudNotice.line || "", x + 31, y + 23, w - 42, "#f1e5c8");
-    ctx.restore();
-    return h + 6;
+    return drawHudNoticePanel(hudNotice, x, y, w);
   }
 
   function drawInteractionPrompt(prompt, bottomHudY, margin) {
     if (!prompt || state.mode !== "playing") return;
-    const compact = canvas.width < 560;
-    const w = Math.min(compact ? canvas.width - margin * 2 : 360, canvas.width - margin * 2);
-    const h = compact ? 40 : 44;
-    const x = Math.round((canvas.width - w) / 2);
-    const y = Math.max(margin + 92, Math.round(bottomHudY - h - 8));
-    const urgent = prompt.urgency === "high" || prompt.urgency === "urgent";
-    const color = prompt.color || "#ffd77b";
-
-    drawSoftPanel(x, y, w, h, {
-      top: urgent ? "rgba(54, 38, 18, 0.86)" : "rgba(16, 24, 24, 0.82)",
-      bottom: urgent ? "rgba(24, 15, 8, 0.82)" : "rgba(8, 13, 15, 0.76)",
-      border: hexToRgba(color, urgent ? 0.62 : 0.46),
-      shadowBlur: 10,
-      shadowOffsetY: 4,
+    const layout = resolveInteractionPromptLayout({
+      canvasWidth: canvas.width,
+      margin,
+      bottomHudY,
     });
-    ctx.fillStyle = color;
-    ctx.fillRect(x + 10, y + 8, 3, h - 16);
-    ctx.font = "bold 12px Georgia";
-    drawClippedText(prompt.title || "E: Use", x + 22, y + 18, w - 34, color);
-    ctx.font = "10px Georgia";
-    drawClippedText(prompt.line || prompt.label || "", x + 22, y + 33, w - 34, "#f1e5c8");
+    drawInteractionPromptPanel(prompt, layout);
   }
 
   function drawHud() {
