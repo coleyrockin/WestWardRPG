@@ -165,6 +165,13 @@ function backfillNarrativeDefaults(narrative) {
   return next;
 }
 
+export const MAX_SUPPORTED_SAVE_VERSION = 3;
+
+export function isFutureSchemaPayload(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  return Number.isFinite(payload.version) && payload.version > MAX_SUPPORTED_SAVE_VERSION;
+}
+
 export function migrateSaveToV3(save) {
   if (!save || typeof save !== "object") return null;
   if (save.version === 3) {

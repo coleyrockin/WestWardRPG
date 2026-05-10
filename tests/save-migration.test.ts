@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { migrateSaveToV3 } from "../src/saveMigration.js";
+import {
+  migrateSaveToV3,
+  isFutureSchemaPayload,
+  MAX_SUPPORTED_SAVE_VERSION,
+} from "../src/saveMigration.js";
 
 describe("saveMigration", () => {
   it("migrates v2 save payloads to v3 defaults", () => {
@@ -309,6 +313,29 @@ describe("saveMigration", () => {
       jobBoard: 0,
       codexTab: 0,
       settings: 0,
+    });
+  });
+
+  describe("future-schema detection", () => {
+    it("exposes the supported ceiling", () => {
+      expect(MAX_SUPPORTED_SAVE_VERSION).toBe(3);
+    });
+
+    it("flags payloads written by a newer game version", () => {
+      expect(isFutureSchemaPayload({ version: 4 })).toBe(true);
+      expect(isFutureSchemaPayload({ version: 99 })).toBe(true);
+    });
+
+    it("does not flag supported or missing versions", () => {
+      expect(isFutureSchemaPayload({ version: 3 })).toBe(false);
+      expect(isFutureSchemaPayload({ version: 1 })).toBe(false);
+      expect(isFutureSchemaPayload({})).toBe(false);
+      expect(isFutureSchemaPayload(null)).toBe(false);
+      expect(isFutureSchemaPayload(undefined)).toBe(false);
+    });
+
+    it("declines to migrate future-schema payloads", () => {
+      expect(migrateSaveToV3({ version: 4, savedAt: 1 })).toBe(null);
     });
   });
 });

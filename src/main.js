@@ -265,7 +265,7 @@ import {
   markInteriorVisited,
   ensureInteriorVisitState,
 } from "./regionInteriors.js";
-import { migrateSaveToV3 } from "./saveMigration.js";
+import { migrateSaveToV3, isFutureSchemaPayload, MAX_SUPPORTED_SAVE_VERSION } from "./saveMigration.js";
 import { createInitialUiModalState, normalizeUiModalState } from "./uiModals.js";
 import { resolveQuestOutcomeEcho } from "./questOutcomeEchoes.js";
 import {
@@ -2027,10 +2027,30 @@ const canvas = document.getElementById("game");
     return rem > 0 ? `${h}h ${rem}m` : `${h}h`;
   }
 
+  function isFutureSchemaSlot(meta) {
+    return Boolean(meta && meta.valid && isFutureSchemaPayload(meta.payload));
+  }
+
+  function formatBackupAge(savedAt) {
+    if (!Number.isFinite(savedAt)) return "moments ago";
+    const ageMs = Math.max(0, Date.now() - savedAt);
+    const minutes = Math.floor(ageMs / 60000);
+    if (minutes < 1) return "moments ago";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+
   function buildSlotSummaryText(meta) {
     if (!meta) return "Empty";
     if (meta.empty) return "Empty";
     if (!meta.valid) return "Save corrupted (use ↺ to attempt recovery)";
+    if (isFutureSchemaSlot(meta)) {
+      const v = meta.payload?.version || "?";
+      return `Newer save (v${v}) — update game to load (v${MAX_SUPPORTED_SAVE_VERSION} supported)`;
+    }
     const summary = summarizeSavePayload(meta.payload);
     if (!summary) return "Save present";
     const region = REGION_DISPLAY_NAMES[summary.regionId] || summary.regionId;
@@ -2079,13 +2099,58 @@ const canvas = document.getElementById("game");
       summary.className = "save-slot-summary";
       summary.textContent = buildSlotSummaryText(meta);
 
+      const futureSchema = isFutureSchemaSlot(meta);
+      if (futureSchema) row.classList.add("is-future-schema");
+
       const action = document.createElement("span");
       action.className = "save-slot-action";
-      action.textContent = meta.empty ? "New" : (meta.valid ? "Continue" : "Recover");
+      action.textContent = meta.empty
+        ? "New"
+        : futureSchema
+          ? "Locked"
+          : meta.valid
+            ? "Continue"
+            : "Recover";
 
       row.appendChild(label);
       row.appendChild(summary);
       row.appendChild(action);
+
+      const importToSlot = (e) => {
+        if (e) e.stopPropagation();
+        if (!meta.empty && !confirm(`Overwrite ${slotDisplayLabel(meta.slot)} with an imported save?`)) return;
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json,application/json";
+        input.addEventListener("change", async () => {
+          const file = input.files?.[0];
+          if (!file) return;
+          try {
+            const text = await file.text();
+            const result = await idbImportSaveFromText(meta.slot, text);
+            if (!result?.ok) {
+              logMsg("Import failed: save file was invalid or corrupted.");
+              return;
+            }
+            await refreshSlotsAndPickActive();
+            renderSaveSlots();
+            logMsg(`Save imported to ${slotDisplayLabel(result.slot)}.`);
+          } catch (err) {
+            console.warn("[westward] importSave failed:", err);
+            logMsg("Import failed: could not read the file.");
+          }
+        });
+        input.click();
+      };
+
+      const imp = document.createElement("button");
+      imp.type = "button";
+      imp.className = "save-slot-import";
+      imp.setAttribute("aria-label", `Import into ${slotDisplayLabel(meta.slot)}`);
+      imp.textContent = "↑";
+      imp.title = meta.empty ? "Import save into this slot" : "Import save (replaces this slot)";
+      imp.addEventListener("click", importToSlot);
+      row.appendChild(imp);
 
       if (!meta.empty) {
         if (meta.valid) {
@@ -2094,7 +2159,7 @@ const canvas = document.getElementById("game");
           exp.className = "save-slot-export";
           exp.setAttribute("aria-label", `Export ${slotDisplayLabel(meta.slot)}`);
           exp.textContent = "↓";
-          exp.title = "Export save";
+          exp.title = futureSchema ? "Export newer save (forward-compatible backup)" : "Export save";
           exp.addEventListener("click", async (e) => {
             e.stopPropagation();
             try {
@@ -2113,6 +2178,36 @@ const canvas = document.getElementById("game");
             }
           });
           row.appendChild(exp);
+        }
+
+        if (!meta.valid) {
+          const rec = document.createElement("button");
+          rec.type = "button";
+          rec.className = "save-slot-recover";
+          rec.setAttribute("aria-label", `Recover ${slotDisplayLabel(meta.slot)} from latest backup`);
+          rec.textContent = "↺";
+          rec.title = "Recover from latest valid backup";
+          rec.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            try {
+              const recovered = await idbFindMostRecentValidBackup(meta.slot);
+              if (!recovered || !recovered.ok) {
+                logMsg(`No valid backup found for ${slotDisplayLabel(meta.slot)}.`);
+                return;
+              }
+              await idbRestoreFromBackup(meta.slot, recovered.savedAt);
+              if (currentSaveSlot === meta.slot) {
+                setCachedSave(recovered.payload, recovered.savedAt);
+              }
+              await refreshSlotsAndPickActive();
+              renderSaveSlots();
+              logMsg(`${slotDisplayLabel(meta.slot)} restored from a backup saved ${formatBackupAge(recovered.savedAt)}.`);
+            } catch (err) {
+              console.warn("[westward] manual recovery failed:", err);
+              logMsg(`Recovery failed for ${slotDisplayLabel(meta.slot)}.`);
+            }
+          });
+          row.appendChild(rec);
         }
 
         const del = document.createElement("button");
@@ -2139,6 +2234,10 @@ const canvas = document.getElementById("game");
         // Otherwise a click during the init window reads stale empty=true and
         // overwrites a real save.
         if (!savesLoaded) return;
+        if (futureSchema) {
+          logMsg(`${slotDisplayLabel(meta.slot)} was written by a newer game version (v${meta.payload?.version}). Update WestWardRPG to load it. The slot is preserved and exportable.`);
+          return;
+        }
         ensureAudio();
         const switched = await setCurrentSaveSlot(meta.slot);
         if (!switched) return;
