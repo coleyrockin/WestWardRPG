@@ -178,6 +178,7 @@ import {
   buildRegionRoutePolyline,
   buildRegionWorldPresentation,
   getRegionVisualIdentity,
+  resolveRegionReadabilityCues,
   resolveRoadSignPrompt,
 } from "./regionVisualIdentity.js";
 import {
@@ -265,7 +266,7 @@ import {
   markInteriorVisited,
   ensureInteriorVisitState,
 } from "./regionInteriors.js";
-import { migrateSaveToV3, isFutureSchemaPayload, MAX_SUPPORTED_SAVE_VERSION } from "./saveMigration.js";
+import { migrateSaveToV3, MAX_SUPPORTED_SAVE_VERSION } from "./saveMigration.js";
 import { createInitialUiModalState, normalizeUiModalState } from "./uiModals.js";
 import { resolveQuestOutcomeEcho } from "./questOutcomeEchoes.js";
 import {
@@ -339,6 +340,7 @@ import {
   resolveDiscoveryBannerLayout,
   resolveInteractionPromptLayout,
 } from "./hudRenderer.js";
+import { createModalController } from "./modalController.js";
 import {
   applyStatus,
   updateStatuses,
@@ -1407,11 +1409,18 @@ const canvas = document.getElementById("game");
         } else if (kind === "plaster") {
           const crack = (x + y) % 17 === 0 || (x * 3 + y * 2) % 31 === 0;
           const grime = noise2D(x * 0.07, y * 0.09, 93.1);
+          const course = y % 18 < 2;
+          const upright = x % 28 < 2;
+          const wornBase = y > TEXTURE_SIZE * 0.72;
           const tone = 0.82 + n * 0.2 - grime * 0.08;
           r = 182 * tone;
           g = 168 * tone;
           b = 152 * tone;
-          if (crack) {
+          if (course || upright) {
+            r *= course ? 0.76 : 0.68;
+            g *= course ? 0.74 : 0.66;
+            b *= course ? 0.68 : 0.62;
+          } else if (crack) {
             r *= 0.7;
             g *= 0.7;
             b *= 0.7;
@@ -1419,6 +1428,11 @@ const canvas = document.getElementById("game");
             r *= 0.88;
             g *= 0.9;
             b *= 0.86;
+          }
+          if (wornBase) {
+            r *= 0.82;
+            g *= 0.78;
+            b *= 0.72;
           }
         } else if (kind === "neon") {
           const stripe = (x + y) % 18 < 4;
@@ -2032,8 +2046,20 @@ const canvas = document.getElementById("game");
     return rem > 0 ? `${h}h ${rem}m` : `${h}h`;
   }
 
-  function isFutureSchemaSlot(meta) {
-    return Boolean(meta && meta.valid && isFutureSchemaPayload(meta.payload));
+  function isSupportedSchemaPayload(payload) {
+    return (
+      payload &&
+      typeof payload === "object" &&
+      Number.isFinite(payload.version) &&
+      payload.version >= 1 &&
+      payload.version <= MAX_SUPPORTED_SAVE_VERSION
+    );
+  }
+  function canAutoLoadSlot(meta) {
+    return Boolean(meta && !meta.empty && meta.valid && isSupportedSchemaPayload(meta.payload));
+  }
+  function isUnsupportedSchemaSlot(meta) {
+    return Boolean(meta && meta.valid && !isSupportedSchemaPayload(meta.payload));
   }
 
   function formatBackupAge(savedAt) {
@@ -2052,9 +2078,9 @@ const canvas = document.getElementById("game");
     if (!meta) return "Empty";
     if (meta.empty) return "Empty";
     if (!meta.valid) return "Save corrupted (use ↺ to attempt recovery)";
-    if (isFutureSchemaSlot(meta)) {
-      const v = meta.payload?.version || "?";
-      return `Newer save (v${v}) — update game to load (v${MAX_SUPPORTED_SAVE_VERSION} supported)`;
+    if (isUnsupportedSchemaSlot(meta)) {
+      const v = Number.isFinite(meta.payload?.version) ? `v${meta.payload.version}` : "unsupported";
+      return `${v} — update game to load (v${MAX_SUPPORTED_SAVE_VERSION} supported)`;
     }
     const summary = summarizeSavePayload(meta.payload);
     if (!summary) return "Save present";
@@ -2104,14 +2130,14 @@ const canvas = document.getElementById("game");
       summary.className = "save-slot-summary";
       summary.textContent = buildSlotSummaryText(meta);
 
-      const futureSchema = isFutureSchemaSlot(meta);
-      if (futureSchema) row.classList.add("is-future-schema");
+      const schemaUnsupported = isUnsupportedSchemaSlot(meta);
+      if (schemaUnsupported) row.classList.add("is-future-schema");
 
       const action = document.createElement("span");
       action.className = "save-slot-action";
       action.textContent = meta.empty
         ? "New"
-        : futureSchema
+        : schemaUnsupported
           ? "Locked"
           : meta.valid
             ? "Continue"
@@ -2164,7 +2190,7 @@ const canvas = document.getElementById("game");
           exp.className = "save-slot-export";
           exp.setAttribute("aria-label", `Export ${slotDisplayLabel(meta.slot)}`);
           exp.textContent = "↓";
-          exp.title = futureSchema ? "Export newer save (forward-compatible backup)" : "Export save";
+          exp.title = schemaUnsupported ? "Export newer save (forward-compatible backup)" : "Export save";
           exp.addEventListener("click", async (e) => {
             e.stopPropagation();
             try {
@@ -2239,8 +2265,8 @@ const canvas = document.getElementById("game");
         // Otherwise a click during the init window reads stale empty=true and
         // overwrites a real save.
         if (!savesLoaded) return;
-        if (futureSchema) {
-          logMsg(`${slotDisplayLabel(meta.slot)} was written by a newer game version (v${meta.payload?.version}). Update WestWard to load it. The slot is preserved and exportable.`);
+        if (schemaUnsupported) {
+          logMsg(`${slotDisplayLabel(meta.slot)} uses an unsupported schema (v${meta.payload?.version ?? "?"}). Update WestWard to load it. The slot is preserved and exportable.`);
           return;
         }
         ensureAudio();
@@ -2399,7 +2425,7 @@ const canvas = document.getElementById("game");
     }
     savesLoaded = true;
     const validWritten = cachedSlotMetas
-      .filter((m) => !m.empty && m.valid && m.savedAt)
+      .filter((m) => canAutoLoadSlot(m) && m.savedAt)
       .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
     if (validWritten.length > 0) {
       const top = validWritten[0];
@@ -2436,7 +2462,7 @@ const canvas = document.getElementById("game");
     // Re-read the chosen slot's primary so Continue uses its payload.
     try {
       const result = await idbReadSave(slot);
-      if (result.ok) {
+      if (result.ok && isSupportedSchemaPayload(result.payload)) {
         setCachedSave(result.payload, result.savedAt);
       } else {
         setCachedSave(null, null);
@@ -5788,6 +5814,11 @@ const canvas = document.getElementById("game");
   const drawHudNoticePanel = _hudRenderer.drawHudNoticePanel;
   const drawDiscoveryBannerPanel = _hudRenderer.drawDiscoveryBannerPanel;
   const drawInteractionPromptPanel = _hudRenderer.drawInteractionPromptPanel;
+  const _modalController = createModalController({
+    ctx,
+    helpers: _renderHelpers,
+    skillBranches: SKILL_BRANCH_LABELS,
+  });
   const _spriteLightHelpers = createSpriteLightHelpers(ctx, { hexToRgba: hexToRgbaUtil });
   const drawSpriteGlow = _spriteLightHelpers.drawSpriteGlow;
   const drawSpritePulseRing = _spriteLightHelpers.drawSpritePulseRing;
@@ -5853,7 +5884,7 @@ const canvas = document.getElementById("game");
   let cachedCloudGradient = null;
   let lastCloudOpacity = -1;
 
-  function drawRegionHorizonAccents(regionId, regionProfile, horizon, width, normalizedDay, weather) {
+  function drawRegionHorizonAccents(regionId, regionProfile, horizon, width, height, normalizedDay, weather) {
     const baseAlpha = 0.16 + normalizedDay * 0.12 + weather.fog * 0.06;
     if (regionId === "ashfall") {
       ctx.fillStyle = hexToRgba(regionProfile.groundPalette[1], 0.42 + weather.fog * 0.12);
@@ -5914,30 +5945,74 @@ const canvas = document.getElementById("game");
       return;
     }
 
-    ctx.fillStyle = hexToRgba(regionProfile.groundPalette[0], 0.24 + baseAlpha * 0.3);
-    for (let i = 0; i < 6; i++) {
-      const baseX = width * (0.08 + i * 0.15);
-      const roofY = horizon - 18 - (i % 2) * 8;
-      ctx.fillRect(baseX, roofY, 16 + (i % 3) * 4, 22 + (i % 2) * 8);
+    const townAlpha = 0.3 + baseAlpha * 0.35;
+    const roofColor = hexToRgba(regionProfile.roadEdgeColor || "#8d6c43", townAlpha);
+    const wallColor = hexToRgba(regionProfile.groundPalette[0], townAlpha * 0.85);
+    for (let i = 0; i < 8; i++) {
+      const baseX = width * (0.05 + i * 0.105);
+      const roofY = horizon - 18 - (i % 3) * 7;
+      const bodyW = 14 + (i % 3) * 5;
+      const bodyH = 19 + (i % 2) * 8;
+      ctx.fillStyle = wallColor;
+      ctx.fillRect(baseX, roofY, bodyW, bodyH);
+      ctx.fillStyle = roofColor;
       ctx.beginPath();
-      ctx.moveTo(baseX - 4, roofY);
-      ctx.lineTo(baseX + 8, roofY - 12);
-      ctx.lineTo(baseX + 22, roofY);
+      ctx.moveTo(baseX - 5, roofY + 1);
+      ctx.lineTo(baseX + bodyW * 0.5, roofY - 12 - (i % 2) * 3);
+      ctx.lineTo(baseX + bodyW + 5, roofY + 1);
       ctx.closePath();
       ctx.fill();
+      ctx.fillStyle = `rgba(255, 215, 123, ${0.07 + normalizedDay * 0.05})`;
+      ctx.fillRect(baseX + bodyW * 0.62, roofY + bodyH * 0.42, 3, 4);
     }
-    ctx.fillStyle = hexToRgba(regionProfile.roadEdgeColor || "#8d6c43", 0.48);
-    ctx.fillRect(width * 0.78, horizon - 52, 12, 64);
-    ctx.fillRect(width * 0.76, horizon - 48, 16, 8);
-    ctx.strokeStyle = hexToRgba(regionProfile.roadEdgeColor || "#8d6c43", 0.26);
+
+    const towerX = width * 0.78;
+    const towerBase = horizon + 14;
+    const towerTop = horizon - 68;
+    ctx.fillStyle = hexToRgba(regionProfile.roadEdgeColor || "#8d6c43", 0.58);
+    ctx.fillRect(towerX, towerTop + 12, 12, towerBase - towerTop);
+    ctx.fillRect(towerX - 10, towerTop + 18, 32, 7);
+    ctx.beginPath();
+    ctx.moveTo(towerX - 9, towerTop + 12);
+    ctx.lineTo(towerX + 6, towerTop - 4);
+    ctx.lineTo(towerX + 21, towerTop + 12);
+    ctx.closePath();
+    ctx.fill();
+    const beaconPulse = 0.5 + Math.sin(state.time * 2.7) * 0.5;
+    const beacon = ctx.createRadialGradient(towerX + 6, towerTop + 8, 2, towerX + 6, towerTop + 8, 54 + beaconPulse * 16);
+    beacon.addColorStop(0, `rgba(255, 215, 123, ${0.22 + beaconPulse * 0.14})`);
+    beacon.addColorStop(1, "rgba(255, 215, 123, 0)");
+    ctx.fillStyle = beacon;
+    ctx.fillRect(towerX - 60, towerTop - 52, 132, 112);
+
+    ctx.strokeStyle = hexToRgba(regionProfile.roadEdgeColor || "#8d6c43", 0.34);
     ctx.lineWidth = 2;
-    for (let i = 0; i < 9; i++) {
-      const x = width * (0.06 + i * 0.1);
+    for (let side = -1; side <= 1; side += 2) {
       ctx.beginPath();
-      ctx.moveTo(x, horizon + 14);
-      ctx.lineTo(x, horizon - 4 - (i % 2) * 6);
+      ctx.moveTo(width * 0.5 + side * width * 0.035, horizon + 5);
+      ctx.bezierCurveTo(width * (0.5 + side * 0.18), horizon + 30, width * (0.5 + side * 0.34), horizon + 72, width * (0.5 + side * 0.47), height + 10);
       ctx.stroke();
     }
+    for (let i = 0; i < 11; i++) {
+      const t = i / 10;
+      const x = width * (0.11 + i * 0.078);
+      const postH = 16 + (1 - t) * 16 + (i % 2) * 5;
+      const y0 = horizon + 18 + Math.pow(t, 1.8) * 32;
+      ctx.strokeStyle = hexToRgba(regionProfile.roadEdgeColor || "#8d6c43", 0.24 + (1 - t) * 0.12);
+      ctx.beginPath();
+      ctx.moveTo(x, y0 + postH);
+      ctx.lineTo(x, y0);
+      ctx.stroke();
+      if (i % 3 === 1) {
+        ctx.fillStyle = `rgba(255, 216, 128, ${0.12 + (1 - t) * 0.08})`;
+        ctx.fillRect(x - 2, y0 - 4, 4, 3);
+      }
+    }
+
+    ctx.fillStyle = "rgba(105, 73, 43, 0.28)";
+    ctx.fillRect(width * 0.59, horizon + 16, 34, 8);
+    ctx.fillRect(width * 0.585, horizon + 21, 8, 11);
+    ctx.fillRect(width * 0.635, horizon + 21, 8, 11);
   }
 
   function drawRegionRoadSurface(regionId, regionProfile, horizon, width, height, trailCenter, normalizedDay) {
@@ -6000,31 +6075,58 @@ const canvas = document.getElementById("game");
     }
 
     const trail = ctx.createLinearGradient(0, horizon, 0, height);
-    trail.addColorStop(0, hexToRgba(roadColor, 0.05 + normalizedDay * 0.04));
-    trail.addColorStop(1, hexToRgba(roadColor, 0.18 + normalizedDay * 0.08));
+    trail.addColorStop(0, hexToRgba(roadColor, 0.1 + normalizedDay * 0.06));
+    trail.addColorStop(0.42, hexToRgba(roadColor, 0.2 + normalizedDay * 0.08));
+    trail.addColorStop(1, hexToRgba(roadColor, 0.34 + normalizedDay * 0.12));
     ctx.fillStyle = trail;
     ctx.beginPath();
-    ctx.moveTo(trailCenter - width * 0.03, horizon + 4);
-    ctx.bezierCurveTo(width * 0.38, horizon + groundDepth * 0.36, width * 0.24, height * 0.82, width * 0.12, height + 18);
-    ctx.lineTo(width * 0.9, height + 18);
-    ctx.bezierCurveTo(width * 0.74, height * 0.82, width * 0.62, horizon + groundDepth * 0.36, trailCenter + width * 0.03, horizon + 4);
+    ctx.moveTo(trailCenter - width * 0.04, horizon + 4);
+    ctx.bezierCurveTo(width * 0.36, horizon + groundDepth * 0.34, width * 0.22, height * 0.78, width * 0.08, height + 18);
+    ctx.lineTo(width * 0.94, height + 18);
+    ctx.bezierCurveTo(width * 0.78, height * 0.78, width * 0.64, horizon + groundDepth * 0.34, trailCenter + width * 0.04, horizon + 4);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = hexToRgba(edgeColor, 0.18 + normalizedDay * 0.08);
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(trailCenter - width * 0.025, horizon + 2);
-    ctx.bezierCurveTo(width * 0.4, horizon + groundDepth * 0.36, width * 0.28, height * 0.82, width * 0.2, height + 8);
-    ctx.moveTo(trailCenter + width * 0.025, horizon + 2);
-    ctx.bezierCurveTo(width * 0.6, horizon + groundDepth * 0.36, width * 0.72, height * 0.82, width * 0.8, height + 8);
-    ctx.stroke();
-    for (let i = 0; i < 11; i++) {
-      const t = i / 10;
-      const y = horizon + Math.pow(t, 1.45) * groundDepth;
-      const spread = lerp(width * 0.015, width * 0.09, t);
-      ctx.fillStyle = `rgba(79, 61, 39, ${0.05 + (1 - t) * 0.06})`;
-      ctx.fillRect(trailCenter - spread, y, width * 0.012, 1.8);
-      ctx.fillRect(trailCenter + spread - width * 0.012, y + 1.5, width * 0.012, 1.8);
+    ctx.strokeStyle = hexToRgba(edgeColor, 0.28 + normalizedDay * 0.12);
+    ctx.lineWidth = 2.2;
+    for (let side = -1; side <= 1; side += 2) {
+      ctx.beginPath();
+      ctx.moveTo(trailCenter + side * width * 0.035, horizon + 2);
+      ctx.bezierCurveTo(width * (0.5 + side * 0.11), horizon + groundDepth * 0.26, width * (0.5 + side * 0.26), height * 0.74, width * (0.5 + side * 0.42), height + 8);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < 16; i++) {
+      const t = i / 15;
+      const y = horizon + Math.pow(t, 1.38) * groundDepth;
+      const spread = lerp(width * 0.015, width * 0.14, t);
+      const rutW = lerp(width * 0.007, width * 0.02, t);
+      ctx.fillStyle = `rgba(70, 50, 31, ${0.08 + (1 - t) * 0.08})`;
+      ctx.fillRect(trailCenter - spread, y, rutW, 2.2 + t * 2.4);
+      ctx.fillRect(trailCenter + spread - rutW, y + 1.5, rutW, 2.2 + t * 2.4);
+      if (i % 2 === 0) {
+        ctx.fillStyle = `rgba(255, 226, 160, ${0.05 + (1 - t) * 0.08})`;
+        ctx.fillRect(trailCenter - rutW * 0.5, y + 2, rutW, 1.8);
+      }
+    }
+
+    for (let i = 0; i < 9; i++) {
+      const t = i / 8;
+      const y = horizon + Math.pow(t, 1.55) * groundDepth;
+      const leftX = lerp(trailCenter - width * 0.045, width * 0.11, t);
+      const rightX = lerp(trailCenter + width * 0.045, width * 0.89, t);
+      const postH = lerp(8, 42, t);
+      ctx.strokeStyle = `rgba(92, 64, 38, ${0.18 + t * 0.18})`;
+      ctx.lineWidth = lerp(1, 3, t);
+      ctx.beginPath();
+      ctx.moveTo(leftX, y);
+      ctx.lineTo(leftX, y + postH);
+      ctx.moveTo(rightX, y);
+      ctx.lineTo(rightX, y + postH);
+      ctx.stroke();
+      if (i % 3 === 1) {
+        ctx.fillStyle = `rgba(255, 216, 128, ${0.12 + t * 0.16})`;
+        ctx.fillRect(rightX - 3, y - 4, 6, 4);
+      }
     }
   }
 
@@ -6149,7 +6251,7 @@ const canvas = document.getElementById("game");
     ctx.lineTo(0, horizon + 38);
     ctx.closePath();
     ctx.fill();
-    drawRegionHorizonAccents(regionProfile.id, regionProfile, horizon, width, normalizedDay, weather);
+    drawRegionHorizonAccents(regionProfile.id, regionProfile, horizon, width, height, normalizedDay, weather);
 
     const groundGrad = ctx.createLinearGradient(0, horizon, 0, height);
     groundGrad.addColorStop(
@@ -7679,6 +7781,37 @@ const canvas = document.getElementById("game");
         const grain = (Math.sin(state.time * 21 + x * 0.42) * 0.5 + 0.5) * nearWall.grainAlpha;
         ctx.fillStyle = `rgba(255, 235, 190, ${grain})`;
         ctx.fillRect(x, Math.max(0, y), 1, Math.min(height, wallHeight));
+        const visibleTop = Math.max(0, y);
+        const visibleBottom = Math.min(height, y + wallHeight);
+        const visibleH = Math.max(0, visibleBottom - visibleTop);
+        if (visibleH > 0) {
+          ctx.fillStyle = `rgba(0, 0, 0, ${nearWall.contactAlpha})`;
+          ctx.fillRect(x, visibleBottom - Math.max(3, visibleH * 0.13), 1, Math.max(3, visibleH * 0.13));
+          ctx.fillStyle = `rgba(255, 218, 148, ${nearWall.highlightAlpha})`;
+          ctx.fillRect(x, visibleTop, 1, Math.max(2, visibleH * 0.035));
+          const trimY = visibleTop + visibleH * 0.32 + Math.sin(x * 0.13) * 1.5;
+          ctx.fillStyle = `rgba(255, 205, 132, ${nearWall.trimAlpha})`;
+          ctx.fillRect(x, trimY, 1, Math.max(1, visibleH * 0.012));
+          const decalY = visibleTop + visibleH * (0.56 + Math.sin(x * 0.037 + state.time * 0.4) * 0.04);
+          ctx.fillStyle = `rgba(33, 24, 18, ${nearWall.decalAlpha})`;
+          ctx.fillRect(x, decalY, 1, Math.max(1, visibleH * 0.018));
+          const supportPhase = x % 112;
+          if (supportPhase < 2 || supportPhase > 109) {
+            ctx.fillStyle = `rgba(28, 19, 13, ${nearWall.supportAlpha})`;
+            ctx.fillRect(x, visibleTop, 1, visibleH);
+            ctx.fillStyle = `rgba(255, 219, 150, ${nearWall.highlightAlpha * 0.65})`;
+            ctx.fillRect(x + 1, visibleTop, 1, visibleH);
+          }
+          const courseLines = [0.18, 0.44, 0.7];
+          for (const course of courseLines) {
+            const courseY = visibleTop + visibleH * course + Math.sin(x * 0.06 + course * 12) * 1.2;
+            ctx.fillStyle = `rgba(35, 24, 16, ${nearWall.courseAlpha})`;
+            ctx.fillRect(x, courseY, 1, Math.max(1, visibleH * 0.01));
+          }
+          const baseboardH = Math.max(6, visibleH * 0.07);
+          ctx.fillStyle = `rgba(37, 25, 16, ${nearWall.baseboardAlpha})`;
+          ctx.fillRect(x, visibleBottom - baseboardH, 1, baseboardH);
+        }
         if (x < 3 || x > width - 4) {
           ctx.fillStyle = `rgba(0, 0, 0, ${nearWall.edgeAlpha})`;
           ctx.fillRect(x, 0, 1, height);
@@ -8870,548 +9003,133 @@ const canvas = document.getElementById("game");
     drawDiscoveryBanner(hudY, margin);
 
     if (state.mode === "gameover") {
-      ctx.fillStyle = "rgba(18, 4, 5, 0.78)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const panelW = Math.min(500, canvas.width - margin * 2);
-      const panelH = 150;
-      const px = (canvas.width - panelW) / 2;
-      const py = canvas.height * 0.38;
-      drawSoftPanel(px, py, panelW, panelH, {
-        top: "rgba(48, 18, 18, 0.9)",
-        bottom: "rgba(18, 8, 9, 0.88)",
-        border: "rgba(255, 166, 138, 0.36)",
+      _modalController.drawGameOverPanel({
+        canvasWidth: canvas.width, canvasHeight: canvas.height, margin,
+        deaths: state.player.deaths, t,
       });
-      ctx.textAlign = "center";
-      ctx.fillStyle = "#ffe3d8";
-      ctx.font = `bold ${compact ? 28 : 38}px Georgia`;
-      ctx.fillText(t("labels.defeatedTitle"), canvas.width * 0.5, py + 48);
-      ctx.font = "20px Georgia";
-      ctx.fillText(t("labels.recover"), canvas.width * 0.5, py + 83);
-      ctx.font = "italic 16px Georgia";
-      ctx.fillStyle = "#ffa0a0";
-      ctx.fillText(fitText(t("labels.deathsLine", { deaths: state.player.deaths + 1 }), panelW - 36), canvas.width * 0.5, py + 112);
-      ctx.textAlign = "left";
     }
 
     if (state.mode === "victory") {
       const ending = state.narrative.ending || resolveNarrativeEnding(state.narrative, state.companion);
-      const houseProgress = resolveHouseProgressDisplay({
+      const victoryHouseProgress = resolveHouseProgressDisplay({
         inventory: state.inventory,
         jobState: state.world.jobs,
         house: state.house,
       });
-      const summary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time, houseProgress);
-      ctx.fillStyle = "rgba(8, 11, 16, 0.8)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const panelW = Math.min(620, canvas.width - margin * 2);
-      const decisions = summary.latestDecisions.length ? summary.latestDecisions : ["No major decisions recorded."];
-      const decisionsCount = Math.min(3, decisions.length);
-      const trophyHighlights = (summary.houseTrophyHighlights || []).slice(0, 3);
-      const trophyDisplay = trophyHighlights.length
-        ? trophyHighlights
-        : [summary.houseTrophyLine || "No house trophies recorded yet."];
-      const trophyCap = compact ? 2 : 3;
-      const trophyCount = Math.min(trophyCap, trophyDisplay.length);
-      const decisionLineH = 18;
-      const trophyLineH = 18;
-      const decisionsBlockBottom = 287 + (decisionsCount - 1) * decisionLineH;
-      const trophyHeaderY = decisionsBlockBottom + 25;
-      const trophyFirstY = trophyHeaderY + 21;
-      const trophyBlockBottom = trophyFirstY + (trophyCount - 1) * trophyLineH;
-      const footerY = trophyBlockBottom + 22;
-      const panelH = footerY + 14;
-      const px = Math.floor((canvas.width - panelW) / 2);
-      const py = Math.max(margin, Math.floor((canvas.height - panelH) / 2));
-      drawSoftPanel(px, py, panelW, panelH, {
-        top: "rgba(34, 28, 42, 0.95)",
-        bottom: "rgba(8, 12, 18, 0.94)",
-        border: "rgba(255, 196, 144, 0.58)",
+      const victorySummary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time, victoryHouseProgress);
+      _modalController.drawVictoryPanel({
+        summary: victorySummary, ending,
+        canvasWidth: canvas.width, canvasHeight: canvas.height, margin,
       });
-
-      ctx.textAlign = "left";
-      ctx.font = `bold ${compact ? 26 : 34}px Georgia`;
-      drawClippedText(ending.title || "Lantern Revolt Complete", px + 22, py + 46, panelW - 44, "#ffc490");
-      ctx.font = "14px Georgia";
-      drawClippedText(ending.summary || "Dustward will remember what you changed.", px + 22, py + 72, panelW - 44, "#f3ecd8");
-
-      ctx.font = "bold 13px Georgia";
-      drawClippedText("Run Summary", px + 22, py + 110, panelW - 44, "#ffe16a");
-      ctx.font = "12px Georgia";
-      const leftX = px + 22;
-      const rightX = px + Math.floor(panelW * 0.52);
-      const rows = [
-        [`Time`, summary.durationLabel],
-        [`Kills`, String(summary.kills)],
-        [`Mini-bosses`, String(summary.miniBossKills)],
-        [`Resources`, String(summary.resourcesHarvested)],
-        [`Quest outcomes`, String(summary.questOutcomesCount)],
-        [`Dialogue picks`, String(summary.dialogueChoicesCount || 0)],
-        [`Gold`, String(summary.gold)],
-        [`Level`, String(summary.level)],
-        [`Home proof`, String(summary.houseTrophyCount || 0)],
-        [`Companion`, summary.companion],
-      ];
-      for (let i = 0; i < rows.length; i++) {
-        const x = i < 5 ? leftX : rightX;
-        const y = py + 135 + (i % 5) * 23;
-        drawClippedText(`${rows[i][0]}: ${rows[i][1]}`, x, y, panelW * 0.44, "#e6d8bd");
-      }
-
-      const axes = summary.axes || {};
-      ctx.font = "12px Georgia";
-      drawClippedText(
-        `Axes: Control/Freedom ${axes.controlVsFreedom || 0}, Truth/Comfort ${axes.truthVsComfort || 0}, Solidarity/Status ${axes.solidarityVsStatus || 0}`,
-        px + 22,
-        py + 238,
-        panelW - 44,
-        "#cbb6a2",
-      );
-      ctx.font = "bold 12px Georgia";
-      drawClippedText("Latest Decisions", px + 22, py + 266, panelW - 44, "#ffe16a");
-      ctx.font = "11px Georgia";
-      for (let i = 0; i < decisionsCount; i++) {
-        drawClippedText(`- ${decisions[i]}`, px + 22, py + 287 + i * decisionLineH, panelW - 44, "#e6d8bd");
-      }
-      ctx.font = "bold 12px Georgia";
-      drawClippedText("Home Trophies", px + 22, py + trophyHeaderY, panelW - 44, "#ffe16a");
-      ctx.font = "11px Georgia";
-      for (let i = 0; i < trophyCount; i++) {
-        drawClippedText(`- ${trophyDisplay[i]}`, px + 22, py + trophyFirstY + i * trophyLineH, panelW - 44, "#e6d8bd");
-      }
-      ctx.font = "italic 11px Georgia";
-      drawClippedText("Progress is saved. Load this ending from the title screen later.", px + 22, py + footerY, panelW - 44, "#b8a792");
     }
 
-    /* Dialogue choice overlay (lite) */
     if (dialogueOpen && pendingDialogue && state.mode === "playing") {
-      const choices = pendingDialogue.choices;
-      const sw = Math.min(520, canvas.width - margin * 2);
-      const sh = 122 + choices.length * 64;
-      const sx = Math.floor((canvas.width - sw) / 2);
-      const sy = Math.floor((canvas.height - sh) / 2);
-      drawSoftPanel(sx, sy, sw, sh, {
-        top: "rgba(18, 24, 32, 0.95)",
-        bottom: "rgba(8, 12, 18, 0.94)",
-        border: "rgba(168, 215, 255, 0.56)",
+      _modalController.drawDialoguePanel({
+        npcName: pendingDialogue.npcName,
+        choices: pendingDialogue.choices,
+        selection: dialogueSelection,
+        canvasWidth: canvas.width, canvasHeight: canvas.height, margin,
+        describeChoiceEffectTags,
       });
-      ctx.font = "bold 18px Georgia";
-      drawClippedText(`Speaking with ${pendingDialogue.npcName}`, sx + 18, sy + 30, sw - 36, "#cce4ff");
-      ctx.font = "12px Georgia";
-      drawClippedText("↑/↓ select  Enter say it  Esc back", sx + 18, sy + 50, sw - 36, "#a9b8d0");
-      for (let i = 0; i < choices.length; i++) {
-        const c = choices[i];
-        const iy = sy + 68 + i * 64;
-        const selected = i === dialogueSelection;
-        fillRoundedRect(sx + 10, iy, sw - 20, 56, 7, selected ? "rgba(168, 215, 255, 0.22)" : "rgba(255,255,255,0.06)");
-        if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 55, 7, "#cce4ff", 1);
-        ctx.font = "bold 13px Georgia";
-        drawClippedText(`> ${c.prompt}`, sx + 22, iy + 20, sw - 44, selected ? "#cce4ff" : "#f3ecd8");
-        ctx.font = "italic 11px Georgia";
-        const tags = describeChoiceEffectTags(c);
-        drawClippedText(tags || `Chapter ${c.chapter || 1}`, sx + 22, iy + 40, sw - 44, "#9aa6bf");
-      }
     }
 
-    /* Quest outcome overlay */
     if (questOutcomeOpen && pendingQuestOutcome && state.mode === "playing") {
-      const outcomes = pendingQuestOutcome.outcomes;
-      const sw = Math.min(520, canvas.width - margin * 2);
-      const sh = 132 + outcomes.length * 76;
-      const sx = Math.floor((canvas.width - sw) / 2);
-      const sy = Math.floor((canvas.height - sh) / 2);
-      drawSoftPanel(sx, sy, sw, sh, {
-        top: "rgba(24, 18, 31, 0.95)",
-        bottom: "rgba(10, 8, 16, 0.94)",
-        border: "rgba(255, 196, 144, 0.56)",
+      _modalController.drawQuestOutcomePanel({
+        outcomes: pendingQuestOutcome.outcomes,
+        selection: questOutcomeSelection,
+        canvasWidth: canvas.width, canvasHeight: canvas.height, margin,
       });
-      ctx.font = "bold 20px Georgia";
-      drawClippedText("Quest Outcome", sx + 18, sy + 30, sw - 36, "#ffc490");
-      ctx.font = "12px Georgia";
-      drawClippedText("Choose the consequence. ↑/↓ select  Enter confirm", sx + 18, sy + 52, sw - 36, "#cbb6a2");
-      for (let i = 0; i < outcomes.length; i++) {
-        const outcome = outcomes[i];
-        const iy = sy + 72 + i * 76;
-        const selected = i === questOutcomeSelection;
-        fillRoundedRect(sx + 10, iy, sw - 20, 66, 7, selected ? "rgba(255, 196, 144, 0.2)" : "rgba(255, 255, 255, 0.055)");
-        if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 65, 7, "#ffc490", 1);
-        ctx.font = "bold 14px Georgia";
-        drawClippedText(outcome.label, sx + 22, iy + 20, sw - 44, selected ? "#ffc490" : "#f3ecd8");
-        ctx.font = "italic 12px Georgia";
-        drawClippedText(outcome.summary, sx + 22, iy + 42, sw - 44, "#b8a792");
-      }
     }
 
-    /* Character sheet overlay */
     if (characterSheetOpen && state.mode === "playing") {
-      const identity = normalizeCharacterIdentity(state.progression.identity);
-      const summary = buildCharacterIdentitySummary(identity);
-      const gearSummary = buildGearSummary(state.progression.equipment, identity);
-      const inventorySummary = buildGearInventorySummary(state.progression.equipment);
-      const workstationSummary = describeWorkstationState(state.house.workstation);
-      const houseProgress = resolveHouseProgressDisplay({
-        inventory: state.inventory,
-        jobState: state.world.jobs,
+      const csIdentity = normalizeCharacterIdentity(state.progression.identity);
+      const csSummary = buildCharacterIdentitySummary(csIdentity);
+      _modalController.drawCharacterSheetPanel({
+        summary: csSummary,
+        gearSummary: buildGearSummary(state.progression.equipment, csIdentity),
+        inventorySummary: buildGearInventorySummary(state.progression.equipment),
+        workstationSummary: describeWorkstationState(state.house.workstation),
+        houseProgress: resolveHouseProgressDisplay({ inventory: state.inventory, jobState: state.world.jobs, house: state.house }),
+        regionProfile: getRegionVisualIdentity(state.regions.activeRegion),
+        explorationRenown: resolveExplorationRenownStatus(state.regions.poisDiscovered?.length || 0),
+        factionRep: state.narrative.factionRep,
+        companion: state.companion,
         house: state.house,
+        playerStance: state.player.loadout.stance,
+        canvasWidth: canvas.width, canvasHeight: canvas.height, margin,
       });
-      const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
-      const explorationRenown = resolveExplorationRenownStatus(state.regions.poisDiscovered?.length || 0);
-      const effects = summary.effects || {};
-      const sw = Math.min(620, canvas.width - margin * 2);
-      const sh = Math.min(canvas.height - margin * 2, canvas.height < 380 ? canvas.height - margin * 2 : 382);
-      const sx = Math.floor((canvas.width - sw) / 2);
-      const sy = Math.max(margin, Math.floor((canvas.height - sh) / 2));
-      drawSoftPanel(sx, sy, sw, sh, {
-        top: "rgba(21, 25, 32, 0.96)",
-        bottom: "rgba(8, 11, 16, 0.94)",
-        border: "rgba(216, 188, 106, 0.55)",
-      });
-
-      ctx.font = "bold 22px Georgia";
-      drawClippedText(`${summary.originLabel} ${summary.roleLabel}`, sx + 20, sy + 34, sw - 40, "#ffd77b");
-      ctx.font = "12px Georgia";
-      drawClippedText(summary.originSummary, sx + 20, sy + 56, sw - 40, "#d8c7a8");
-
-      const factionLine = Object.entries(state.narrative.factionRep || {})
-        .map(([id, value]) => `${FACTION_NAMES[id] || id} ${value}`)
-        .join(" / ");
-      const sheetLines = [
-        { text: `Attributes: ${summary.attributeLine}`, color: "#e6d8bd" },
-        { text: `Hooks: HP +${effects.maxHpBonus || 0}, Stamina +${effects.staminaReserveBonus || 0}, Barter +${effects.barterBonusPct || 0}%, Craft +${effects.craftingYieldPct || 0}%`, color: "#d8c7a8" },
-        { text: `Weapon: ${gearSummary.weaponLine} - ${gearSummary.handlingLine}`, color: "#e6d8bd" },
-        { text: `Weapon branch: ${gearSummary.branchLine}`, color: "#d8c7a8" },
-        { text: `Armor: ${gearSummary.armorLine} - weight ${gearSummary.armorWeight}`, color: "#d8c7a8" },
-        { text: `Earned gear: ${inventorySummary.ownedArmorLine}`, color: "#d8c7a8" },
-        { text: `Weapon tokens: ${inventorySummary.weaponTokenLine}`, color: "#d8c7a8" },
-        { text: `Crafting: ${gearSummary.economyLine}`, color: "#d8c7a8" },
-        { text: `Station: ${workstationSummary.benefitLine}`, color: "#d8c7a8" },
-        { text: `Projects: ${workstationSummary.projectsLine}`, color: "#cbb6a2" },
-        { text: `Home proof: ${houseProgress.trophyLine}`, color: "#ffe16a" },
-        { text: `Exploration: ${explorationRenown.progressLine}`, color: "#ffe16a" },
-        { text: `Region: ${regionProfile.label} - ${regionProfile.mood}`, color: "#ffe16a" },
-        { text: `Landmarks: ${regionProfile.landmarkHints.slice(0, 4).join(", ")}`, color: "#cbb6a2" },
-        { text: `Danger: ${regionProfile.dangerIdentity}`, color: "#cbb6a2" },
-        { text: `Stance: ${state.player.loadout.stance}`, color: "#e6d8bd" },
-        { text: `Faction lean: ${FACTION_NAMES[summary.factionLean] || summary.factionLean}`, color: "#d8c7a8" },
-        { text: `Rep: ${factionLine}`, color: "#cbb6a2" },
-        { text: `Companion: ${state.companion.active ? state.companion.name : state.companion.downed ? `${state.companion.name} recovering` : "none"} / House: ${state.house.unlocked ? `owned / workbench ${workstationSummary.level}` : "locked"}`, color: "#b8a792" },
-      ];
-      ctx.font = "12px Georgia";
-      let lineY = sy + 88;
-      const lineGap = sh < 300 ? 16 : 20;
-      for (const line of sheetLines) {
-        if (lineY > sy + sh - 24) break;
-        drawClippedText(line.text, sx + 20, lineY, sw - 40, line.color);
-        lineY += lineGap;
-      }
-      ctx.font = "italic 11px Georgia";
-      drawClippedText("Press I or Esc to close.", sx + 20, sy + sh - 14, sw - 40, "#9d927d");
     }
 
-    /* Skill screen overlay */
     if (skillScreenOpen && state.mode === "playing") {
-      const sw = Math.min(440, canvas.width - margin * 2);
-      const sh = SKILL_BRANCH_LABELS.length * 64 + 110;
-      const sx = Math.floor((canvas.width - sw) / 2);
-      const sy = Math.floor((canvas.height - sh) / 2);
-      drawSoftPanel(sx, sy, sw, sh, {
-        top: "rgba(20, 22, 36, 0.94)",
-        bottom: "rgba(8, 10, 18, 0.92)",
-        border: "rgba(186, 168, 255, 0.55)",
+      _modalController.drawSkillScreenPanel({
+        skillTree: state.progression.skillTree,
+        upgradePoints: state.progression.upgradePoints,
+        selection: skillSelection,
+        canvasWidth: canvas.width, canvasHeight: canvas.height, margin,
       });
-      ctx.font = "bold 20px Georgia";
-      drawClippedText("Skill Tree", sx + 16, sy + 30, sw - 32, "#cdb8ff");
-      ctx.font = "12px Georgia";
-      drawClippedText(`Upgrade points: ${state.progression.upgradePoints}   (T to close)`, sx + 16, sy + 50, sw - 32, "#b9aedf");
-      for (let i = 0; i < SKILL_BRANCH_LABELS.length; i++) {
-        const branch = SKILL_BRANCH_LABELS[i];
-        const ranks = state.progression.skillTree?.[branch.id] || 0;
-        const iy = sy + 70 + i * 64;
-        const selected = i === skillSelection;
-        fillRoundedRect(sx + 8, iy, sw - 16, 56, 7, selected ? "rgba(186, 168, 255, 0.22)" : "rgba(255, 255, 255, 0.05)");
-        if (selected) strokeRoundedRect(sx + 8.5, iy + 0.5, sw - 17, 55, 7, "#cdb8ff", 1);
-        ctx.font = "bold 14px Georgia";
-        drawClippedText(`${branch.label}  ${ranks}/5`, sx + 20, iy + 18, sw - 40, selected ? "#cdb8ff" : "#f3ecd8");
-        ctx.font = "italic 12px Georgia";
-        drawClippedText(branch.desc, sx + 20, iy + 36, sw - 40, "#a09cba");
-      }
-      ctx.font = "10px Georgia";
-      drawClippedText("↑/↓ select   Enter unlock   Esc close", sx + 16, sy + sh - 14, sw - 32, "#9088b0");
     }
 
-    /* Settings overlay */
     if (settingsOpen && state.mode === "playing") {
-      const rows = getCombinedSettingsRows();
-      const sw = Math.min(440, canvas.width - margin * 2);
-      const sh = rows.length * 44 + 110;
-      const sx = Math.floor((canvas.width - sw) / 2);
-      const sy = Math.floor((canvas.height - sh) / 2);
-      drawSoftPanel(sx, sy, sw, sh, {
-        top: "rgba(20, 26, 36, 0.94)",
-        bottom: "rgba(8, 12, 18, 0.92)",
-        border: "rgba(168, 215, 255, 0.55)",
+      _modalController.drawSettingsPanel({
+        rows: getCombinedSettingsRows(),
+        selection: settingsSelection,
+        canvasWidth: canvas.width, canvasHeight: canvas.height, margin,
+        readSettingsRowValue,
       });
-      ctx.font = "bold 20px Georgia";
-      drawClippedText("Settings", sx + 16, sy + 30, sw - 32, "#cce4ff");
-      ctx.font = "12px Georgia";
-      drawClippedText("↑/↓ select  ←/→ change  Esc close", sx + 16, sy + 50, sw - 32, "#a9b8d0");
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const iy = sy + 70 + i * 44;
-        const selected = i === settingsSelection;
-        fillRoundedRect(sx + 8, iy, sw - 16, 38, 7, selected ? "rgba(168, 215, 255, 0.22)" : "rgba(255, 255, 255, 0.05)");
-        if (selected) strokeRoundedRect(sx + 8.5, iy + 0.5, sw - 17, 37, 7, "#cce4ff", 1);
-        ctx.font = "bold 14px Georgia";
-        drawClippedText(row.label, sx + 20, iy + 16, sw * 0.55, selected ? "#cce4ff" : "#f3ecd8");
-        ctx.font = "13px Georgia";
-        ctx.textAlign = "right";
-        ctx.fillStyle = selected ? "#cce4ff" : "#f3ecd8";
-        if (row.kind === "action") {
-          ctx.fillText("Enter ▶", sx + sw - 20, iy + 24);
-        } else {
-          const value = readSettingsRowValue(row);
-          let valueText;
-          if (row.kind === "bool") valueText = value ? "ON" : "OFF";
-          else if (row.kind === "range") valueText = row.format ? row.format(value) : String(value);
-          else valueText = String(value);
-          ctx.fillText(`◀ ${valueText} ▶`, sx + sw - 20, iy + 24);
-        }
-        ctx.textAlign = "left";
-      }
     }
 
-    /* Codex overlay */
     if (codexOpen && state.mode === "playing") {
       ensureCodexState(state);
-      const sw = Math.min(560, canvas.width - margin * 2);
-      const sh = Math.min(420, canvas.height - margin * 2);
-      const sx = Math.floor((canvas.width - sw) / 2);
-      const sy = Math.floor((canvas.height - sh) / 2);
-      drawSoftPanel(sx, sy, sw, sh, {
-        top: "rgba(20, 22, 32, 0.94)",
-        bottom: "rgba(8, 10, 16, 0.92)",
-        border: "rgba(186, 168, 255, 0.55)",
+      _modalController.drawCodexPanel({
+        codexTabs: CODEX_TABS,
+        entries: listEntriesForTab(state, CODEX_TABS[codexTab]),
+        progress: totalCodexProgress(state),
+        codexTab,
+        codexEntrySel,
+        canvasWidth: canvas.width, canvasHeight: canvas.height, margin,
       });
-      const progress = totalCodexProgress(state);
-      ctx.font = "bold 20px Georgia";
-      drawClippedText(`Codex (${progress.unlocked}/${progress.total})`, sx + 16, sy + 28, sw - 32, "#cdb8ff");
-      ctx.font = "11px Georgia";
-      drawClippedText("Tab: ←/→  Entry: ↑/↓  Esc close", sx + 16, sy + 46, sw - 32, "#a09cba");
-
-      // Tab strip
-      const tabH = 26;
-      const tabW = (sw - 32) / CODEX_TABS.length;
-      for (let i = 0; i < CODEX_TABS.length; i++) {
-        const tx = sx + 16 + i * tabW;
-        const ty = sy + 56;
-        const isActive = i === codexTab;
-        fillRoundedRect(tx + 2, ty, tabW - 4, tabH, 6, isActive ? "rgba(186,168,255,0.32)" : "rgba(255,255,255,0.05)");
-        if (isActive) strokeRoundedRect(tx + 2.5, ty + 0.5, tabW - 5, tabH - 1, 6, "#cdb8ff", 1);
-        ctx.font = "bold 12px Georgia";
-        ctx.textAlign = "center";
-        ctx.fillStyle = isActive ? "#cdb8ff" : "#a09cba";
-        ctx.fillText(CODEX_TABS[i].toUpperCase(), tx + tabW / 2, ty + 17);
-        ctx.textAlign = "left";
-      }
-
-      const tab = CODEX_TABS[codexTab];
-      const entries = listEntriesForTab(state, tab);
-      const listY = sy + 92;
-      const listH = sh - 100;
-      const rowH = 24;
-      const visibleRows = Math.floor(listH / rowH);
-      const startIdx = Math.max(0, Math.min(entries.length - visibleRows, codexEntrySel - Math.floor(visibleRows / 2)));
-      for (let i = 0; i < visibleRows && startIdx + i < entries.length; i++) {
-        const idx = startIdx + i;
-        const entry = entries[idx];
-        const iy = listY + i * rowH;
-        const sel = idx === codexEntrySel;
-        if (sel) fillRoundedRect(sx + 16, iy, sw - 32, rowH - 2, 5, "rgba(186,168,255,0.2)");
-        ctx.font = "bold 12px Georgia";
-        const titleColor = entry.unlocked ? (sel ? "#cdb8ff" : "#f3ecd8") : "#6e6890";
-        drawClippedText(entry.unlocked ? entry.title : "???", sx + 24, iy + 16, sw * 0.32, titleColor);
-        if (entry.unlocked) {
-          ctx.font = "italic 11px Georgia";
-          drawClippedText(entry.body, sx + 24 + sw * 0.32, iy + 16, sw * 0.55, "#a09cba");
-        } else {
-          ctx.font = "italic 11px Georgia";
-          drawClippedText("(undiscovered)", sx + 24 + sw * 0.32, iy + 16, sw * 0.55, "#5a5478");
-        }
-      }
     }
 
-    /* Shop overlay */
     if (shopOpen && state.mode === "playing") {
-      const merchantService = vendorServiceProfile("merchant");
-      const sw = Math.min(420, canvas.width - margin * 2);
-      const shopWindow = resolveScrollableRowWindow({
-        itemCount: shopItems.length,
-        selectedIndex: shopSelection,
-        canvasHeight: canvas.height,
-        margin,
-        rowHeight: 52,
-        headerHeight: 110,
-        minRows: 5,
-        maxRows: shopItems.length || 1,
-        emptyRows: 0,
+      _modalController.drawShopPanel({
+        items: shopItems,
+        selection: shopSelection,
+        gold: state.player.gold,
+        priceNote: vendorServiceProfile("merchant").priceNote,
+        t,
+        canvasWidth: canvas.width, canvasHeight: canvas.height, margin,
+        resolveShopItemCost,
+        shopItemName,
+        shopItemDesc,
       });
-      const visibleShopRows = shopWindow.visibleRows;
-      const firstShopRow = shopWindow.firstIndex;
-      const sh = shopWindow.height;
-      const sx = Math.floor((canvas.width - sw) / 2);
-      const sy = Math.floor((canvas.height - sh) / 2);
-
-      drawSoftPanel(sx, sy, sw, sh, {
-        top: "rgba(18, 28, 31, 0.94)",
-        bottom: "rgba(8, 14, 18, 0.92)",
-        border: "rgba(255, 215, 123, 0.5)",
-      });
-
-      ctx.fillStyle = "#ffd77b";
-      ctx.font = "bold 20px Georgia";
-      drawClippedText(t("labels.shopTitle"), sx + 16, sy + 30, sw - 32, "#ffd77b");
-      ctx.font = "12px Georgia";
-      drawClippedText(`${t("labels.shopHeader", { gold: state.player.gold })}  ${shopSelection + 1}/${shopItems.length}`, sx + 16, sy + 50, sw - 32, "#c9b889");
-      ctx.font = "11px Georgia";
-      drawClippedText(merchantService.priceNote, sx + 16, sy + 68, sw - 32, "#aebfa5");
-
-      for (let visible = 0; visible < visibleShopRows; visible++) {
-        const i = firstShopRow + visible;
-        const item = shopItems[i];
-        const iy = sy + 80 + visible * 52;
-        const selected = i === shopSelection;
-
-        fillRoundedRect(sx + 8, iy, sw - 16, 46, 7, selected ? "rgba(216, 188, 106, 0.24)" : "rgba(255, 255, 255, 0.05)");
-
-        if (selected) {
-          strokeRoundedRect(sx + 8.5, iy + 0.5, sw - 17, 45, 7, "#ffd77b", 1);
-        }
-
-        ctx.font = "bold 14px Georgia";
-        drawClippedText(shopItemName(item), sx + 20, iy + 18, sw - 112, selected ? "#ffd77b" : "#f3ecd8");
-
-        const __displayCost = resolveShopItemCost(item);
-        ctx.fillStyle = item.cost < 0 ? "#5fe0b5" : (state.player.gold >= __displayCost ? "#ffd77b" : "#ff6b6b");
-        ctx.font = "14px Georgia";
-        ctx.textAlign = "right";
-        ctx.fillText(item.cost < 0 ? `+${Math.abs(item.cost)}g` : `${__displayCost}g`, sx + sw - 20, iy + 18);
-        ctx.textAlign = "left";
-
-        ctx.font = "italic 12px Georgia";
-        drawClippedText(shopItemDesc(item), sx + 20, iy + 36, sw - 40, "#a09880");
-      }
     }
 
-    /* Job board overlay */
     if (jobBoardOpen && state.mode === "playing") {
-      const choices = getBooneJobChoices();
-      const boardCopy = getJobBoardPresentation({ regionId: state.regions.activeRegion });
-      if (jobBoardSelection >= choices.length) jobBoardSelection = Math.max(0, choices.length - 1);
-      const sw = Math.min(540, canvas.width - margin * 2);
-      const jobWindow = resolveScrollableRowWindow({
-        itemCount: choices.length,
-        selectedIndex: jobBoardSelection,
-        canvasHeight: canvas.height,
-        margin,
-        rowHeight: 78,
-        headerHeight: 108,
-        minRows: 3,
-        maxRows: 7,
-        emptyRows: 1,
+      const jbChoices = getBooneJobChoices();
+      if (jobBoardSelection >= jbChoices.length) jobBoardSelection = Math.max(0, jbChoices.length - 1);
+      _modalController.drawJobBoardPanel({
+        choices: jbChoices,
+        selection: jobBoardSelection,
+        boardCopy: getJobBoardPresentation({ regionId: state.regions.activeRegion }),
+        canvasWidth: canvas.width, canvasHeight: canvas.height, margin,
       });
-      const rows = jobWindow.visibleRows;
-      const firstJobRow = jobWindow.firstIndex;
-      const sh = jobWindow.height;
-      const sx = Math.floor((canvas.width - sw) / 2);
-      const sy = Math.floor((canvas.height - sh) / 2);
-      drawSoftPanel(sx, sy, sw, sh, {
-        top: "rgba(20, 27, 24, 0.96)",
-        bottom: "rgba(9, 13, 12, 0.94)",
-        border: "rgba(255, 211, 107, 0.55)",
-      });
-      ctx.font = "bold 20px Georgia";
-      drawClippedText(boardCopy.title, sx + 16, sy + 30, sw - 32, "#ffd77b");
-      ctx.font = "12px Georgia";
-      drawClippedText(`${boardCopy.subtitle}  ${Math.min(jobBoardSelection + 1, choices.length || 1)}/${choices.length || 0}`, sx + 16, sy + 52, sw - 32, "#c9b889");
-      if (choices.length === 0) {
-        fillRoundedRect(sx + 10, sy + 72, sw - 20, 54, 7, "rgba(255, 255, 255, 0.055)");
-        ctx.font = "italic 13px Georgia";
-        drawClippedText(boardCopy.emptyLine, sx + 22, sy + 104, sw - 44, "#b8a792");
-      } else {
-        for (let visible = 0; visible < Math.min(rows, choices.length); visible++) {
-          const i = firstJobRow + visible;
-          const job = choices[i];
-          const iy = sy + 68 + visible * 78;
-          const selected = i === jobBoardSelection;
-          fillRoundedRect(sx + 10, iy, sw - 20, 70, 7, selected ? "rgba(216, 188, 106, 0.24)" : "rgba(255, 255, 255, 0.055)");
-          if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 69, 7, "#ffd77b", 1);
-          ctx.font = "bold 14px Georgia";
-          drawClippedText(`${job.title}  [${job.threat}]`, sx + 22, iy + 19, sw - 168, selected ? "#ffd77b" : "#f3ecd8");
-          ctx.font = "12px Georgia";
-          ctx.textAlign = "right";
-          const statusLabel = job.status === "ready" ? "CLAIM" : (job.status === "failed" ? "REPORT" : job.kind.toUpperCase());
-          ctx.fillStyle = job.status === "ready" ? "#5fe0b5" : (job.status === "failed" ? "#ff8f6d" : "#ffd77b");
-          ctx.fillText(statusLabel, sx + sw - 22, iy + 19);
-          ctx.textAlign = "left";
-          ctx.font = "italic 12px Georgia";
-          drawClippedText(job.status === "ready" ? `Ready: ${job.rewardLine}` : (job.status === "failed" ? job.progressLine : job.boardNote || job.hint), sx + 22, iy + 38, sw - 44, "#a09880");
-          ctx.font = "11px Georgia";
-          drawClippedText(`${job.availabilityLine || job.regionHint}  ${job.progressLine}  ${job.rewardLine}${job.bonusLine && job.status === "available" ? `  ${job.bonusLine}` : ""}`, sx + 22, iy + 58, sw - 44, "#c9b889");
-        }
-      }
     }
 
-    /* Workbench overlay */
     if (workbenchOpen && state.mode === "playing") {
-      const actions = getWorkbenchActions();
-      const catalog = getWorkbenchActionCatalog();
-      const blocked = catalog.filter((action) => !action.available);
-      if (workbenchSelection >= actions.length) workbenchSelection = Math.max(0, actions.length - 1);
-      const sw = Math.min(500, canvas.width - margin * 2);
-      const rows = Math.max(3, Math.min(6, actions.length || 1));
-      const sh = rows * 58 + 124;
-      const sx = Math.floor((canvas.width - sw) / 2);
-      const sy = Math.floor((canvas.height - sh) / 2);
-      const gear = normalizeGearState(state.progression.equipment);
-      const inventorySummary = buildGearInventorySummary(gear);
-      const workstationSummary = describeWorkstationState(state.house.workstation);
-      const houseProgress = resolveHouseProgressDisplay({
-        inventory: state.inventory,
-        jobState: state.world.jobs,
-        house: state.house,
+      const wbActions = getWorkbenchActions();
+      if (workbenchSelection >= wbActions.length) workbenchSelection = Math.max(0, wbActions.length - 1);
+      const wbGear = normalizeGearState(state.progression.equipment);
+      _modalController.drawWorkbenchPanel({
+        actions: wbActions,
+        catalog: getWorkbenchActionCatalog(),
+        selection: workbenchSelection,
+        inventorySummary: buildGearInventorySummary(wbGear),
+        workstationSummary: describeWorkstationState(state.house.workstation),
+        houseProgress: resolveHouseProgressDisplay({ inventory: state.inventory, jobState: state.world.jobs, house: state.house }),
+        craftsCompleted: state.house.workstation?.craftsCompleted,
+        preparedUpgrade: state.house.workstation?.preparedUpgrade,
+        canvasWidth: canvas.width, canvasHeight: canvas.height, margin,
       });
-      drawSoftPanel(sx, sy, sw, sh, {
-        top: "rgba(24, 23, 17, 0.96)",
-        bottom: "rgba(10, 12, 10, 0.94)",
-        border: "rgba(216, 188, 106, 0.58)",
-      });
-      ctx.font = "bold 20px Georgia";
-      drawClippedText("Workbench", sx + 16, sy + 30, sw - 32, "#ffd77b");
-      ctx.font = "12px Georgia";
-      drawClippedText(`${workstationSummary.stationLine}  Enter/E craft  ↑/↓ select  Esc close`, sx + 16, sy + 52, sw - 32, "#c9b889");
-      ctx.font = "11px Georgia";
-      drawClippedText(`Gear: ${inventorySummary.ownedArmorLine} | Home: ${houseProgress.planningLine}`, sx + 16, sy + 68, sw - 32, "#b8a792");
-
-      if (actions.length === 0) {
-        fillRoundedRect(sx + 10, sy + 86, sw - 20, 54, 7, "rgba(255, 255, 255, 0.055)");
-        ctx.font = "italic 13px Georgia";
-        drawClippedText("Bring 2 Wood + 1 Stone, gear finds, or refine materials.", sx + 22, sy + 117, sw - 44, "#b8a792");
-      } else {
-        for (let i = 0; i < Math.min(rows, actions.length); i++) {
-          const action = actions[i];
-          const iy = sy + 86 + i * 58;
-          const selected = i === workbenchSelection;
-          fillRoundedRect(sx + 10, iy, sw - 20, 50, 7, selected ? "rgba(216, 188, 106, 0.24)" : "rgba(255, 255, 255, 0.055)");
-          if (selected) strokeRoundedRect(sx + 10.5, iy + 0.5, sw - 21, 49, 7, "#ffd77b", 1);
-          ctx.font = "bold 14px Georgia";
-          drawClippedText(action.label, sx + 22, iy + 19, sw - 44, selected ? "#ffd77b" : "#f3ecd8");
-          ctx.font = "italic 12px Georgia";
-          drawClippedText(action.description, sx + 22, iy + 38, sw - 44, "#a09880");
-        }
-      }
-      ctx.font = "italic 11px Georgia";
-      const blockedLine = blocked.length ? `Blocked: ${blocked[0].label} (${blocked[0].blockedReason})` : `Benefits: ${workstationSummary.benefitLine}`;
-      drawClippedText(blockedLine, sx + 16, sy + sh - 30, sw - 32, "#9d927d");
-      drawClippedText(`Crafts completed: ${state.house.workstation?.craftsCompleted || 0}  Prepared: ${state.house.workstation?.preparedUpgrade || "none"}`, sx + 16, sy + sh - 16, sw - 32, "#9d927d");
     }
 
     const hintSpace = canvas.width - hudW - margin * 3;
@@ -9976,6 +9694,15 @@ const canvas = document.getElementById("game");
       state.house.built = true;
       return { unlocked: true };
     },
+    setRegion(regionId = "frontier") {
+      if (!REGIONS[regionId]) return { ok: false, regionId: state.regions.activeRegion };
+      unlockRegion(state.regions, regionId);
+      state.regions.activeRegion = regionId;
+      ensureRegionMiniBosses(regionId);
+      invalidateMinimapCache(minimapTileCache);
+      syncAmbientForRegion(regionId);
+      return { ok: true, regionId };
+    },
     acceptStarter() {
       state.world.jobs = normalizeJobBoardState(state.world.jobs);
       const accepted = acceptJob(state.world.jobs, "frontier_slime_bounty", {
@@ -10064,6 +9791,7 @@ const canvas = document.getElementById("game");
       : [];
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const worldPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
+    const regionReadability = resolveRegionReadabilityCues(state.regions.activeRegion);
     const textVisualMoodBase = buildVisualMood({
       weather: state.weather,
       chapterIndex: state.narrative.chapterIndex,
@@ -10288,6 +10016,7 @@ const canvas = document.getElementById("game");
       region_visual_identity: {
         ...regionProfile,
         identity_line: buildRegionIdentityLine(state.regions.activeRegion),
+        readability: regionReadability,
         world_presentation: worldPresentation,
       },
       dynamic_lighting: {
