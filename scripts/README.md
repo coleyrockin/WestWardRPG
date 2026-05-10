@@ -1,6 +1,6 @@
 # Scripts & Utilities
 
-This directory contains various utility scripts written in different programming languages to support the WestWardRPG project.
+This directory contains various utility scripts written in different programming languages to support the WestWard project.
 
 ## Overview
 

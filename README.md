@@ -1,4 +1,4 @@
-# WestWardRPG
+# WestWard
 
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=flat&logo=javascript&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Atmosphere-3178C6?style=flat&logo=typescript&logoColor=white)
@@ -14,9 +14,9 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 
 ## Preview
 
-▶ **Play in your browser:** [westward-rpg.vercel.app](https://westward-rpg.vercel.app) — runs entirely client-side, no install, no account.
+▶ **Play in your browser:** [westward.vercel.app](https://westward.vercel.app) — runs entirely client-side, no install, no account.
 
-📦 **Download the offline build:** [latest release](https://github.com/coleyrockin/WestWardRPG/releases/latest) — unzip and double-click `index.html`, no server required.
+📦 **Download the offline build:** [latest release](https://github.com/coleyrockin/WestWard/releases/latest) — unzip and double-click `index.html`, no server required.
 
 ![Opening view: Dustward town, route guide, HUD, and minimap](docs/images/launch-opening.png)
 ![Town dusk: signs, lanterns, props, and NPC silhouettes — region identity work](docs/images/launch-town-dusk.png)
@@ -102,7 +102,7 @@ The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the
 
 ```bash
 git clone https://github.com/coleyrockin/WestWardRPG.git
-cd WestWardRPG
+cd WestWard
 npm install
 npm run dev          # Vite dev server with HMR on port 5173
 ```
@@ -120,7 +120,7 @@ For an offline-playable ZIP (itch.io style — runs by double-clicking
 `index.html`, no server, no install):
 
 ```bash
-npm run package:itch  # writes releases/westward-rpg-offline-v<version>.zip
+npm run package:itch  # writes releases/westward-offline-v<version>.zip
 ```
 
 If port `5173` is already used on your machine, Vite will automatically pick the next available port.
@@ -150,7 +150,7 @@ If port `5173` is already used on your machine, Vite will automatically pick the
 ## Architecture
 
 ```text
-WestWardRPG/
+WestWard/
 ├── index.html
 ├── src/
 │   ├── main.js              # orchestration loop + rendering + input

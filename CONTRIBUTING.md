@@ -1,4 +1,4 @@
-# Contributing to WestWardRPG
+# Contributing to WestWard
 
 Thanks for contributing.
 

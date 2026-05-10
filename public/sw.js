@@ -1,4 +1,4 @@
-// WestWardRPG service worker — cache-first for assets, network-first for navigation.
+// WestWard service worker — cache-first for assets, network-first for navigation.
 // Version bumps clear old caches and trigger an update toast in the game.
 
 const CACHE = "westward-v1";

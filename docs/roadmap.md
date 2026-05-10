@@ -1,15 +1,15 @@
-# WestWardRPG Finished Product Roadmap
+# WestWard Finished Product Roadmap
 
 A compact Elder Scrolls inspired frontier RPG built in the browser.
 
 This roadmap is the single source of truth for what remains before
-WestWardRPG feels like a finished product instead of a systems prototype.
+WestWard feels like a finished product instead of a systems prototype.
 Do not create parallel TODO, PLAN, or extra roadmap files. Update this file
 when scope changes.
 
 ## Creative North Star
 
-WestWardRPG should feel like a dense handcrafted frontier RPG that runs in a
+WestWard should feel like a dense handcrafted frontier RPG that runs in a
 browser and punches above its weight.
 
 The target is not a giant Skyrim clone. The target is a tight 20 to 40 minute
@@ -107,7 +107,7 @@ Latest local facts:
 
 ## Product Completion Definition
 
-WestWardRPG is 100 percent product-finished when a fresh tester can play
+WestWard is 100 percent product-finished when a fresh tester can play
 without developer help and say all of the following:
 
 1. I understood where to go in the first minute.

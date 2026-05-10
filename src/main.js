@@ -2240,7 +2240,7 @@ const canvas = document.getElementById("game");
         // overwrites a real save.
         if (!savesLoaded) return;
         if (futureSchema) {
-          logMsg(`${slotDisplayLabel(meta.slot)} was written by a newer game version (v${meta.payload?.version}). Update WestWardRPG to load it. The slot is preserved and exportable.`);
+          logMsg(`${slotDisplayLabel(meta.slot)} was written by a newer game version (v${meta.payload?.version}). Update WestWard to load it. The slot is preserved and exportable.`);
           return;
         }
         ensureAudio();

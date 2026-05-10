@@ -1,5 +1,5 @@
 {
-  "name": "westward-rpg",
+  "name": "westward",
   "version": "1.0.0",
   "description": "Story-first open-world frontier RPG with raycast combat, regional identity, gear progression, housing, and deterministic job-board systems.",
   "main": "src/main.js",
