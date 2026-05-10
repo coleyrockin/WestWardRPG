@@ -205,7 +205,7 @@ export function createModalController({ ctx, helpers, skillBranches }) {
     const sw = Math.min(620, canvasWidth - margin * 2);
     const sh = Math.min(
       canvasHeight - margin * 2,
-      canvasHeight < 380 ? canvasHeight - margin * 2 : 382,
+      canvasHeight < 460 ? canvasHeight - margin * 2 : 480,
     );
     const sx = Math.floor((canvasWidth - sw) / 2);
     const sy = Math.max(margin, Math.floor((canvasHeight - sh) / 2));
@@ -295,9 +295,9 @@ export function createModalController({ ctx, helpers, skillBranches }) {
 
   function drawSettingsPanel({ rows, selection, canvasWidth, canvasHeight, margin, readSettingsRowValue }) {
     const sw = Math.min(440, canvasWidth - margin * 2);
-    const sh = rows.length * 44 + 110;
+    const sh = Math.min(rows.length * 44 + 110, canvasHeight - margin * 2);
     const sx = Math.floor((canvasWidth - sw) / 2);
-    const sy = Math.floor((canvasHeight - sh) / 2);
+    const sy = Math.max(margin, Math.floor((canvasHeight - sh) / 2));
     drawSoftPanel(sx, sy, sw, sh, {
       top: "rgba(20, 26, 36, 0.94)",
       bottom: "rgba(8, 12, 18, 0.92)",
@@ -489,7 +489,7 @@ export function createModalController({ ctx, helpers, skillBranches }) {
         drawClippedText(`${job.title}  [${job.threat}]`, sx + 22, iy + 19, sw - 168, selected ? "#ffd77b" : "#f3ecd8");
         ctx.font = "12px Georgia";
         ctx.textAlign = "right";
-        const statusLabel = job.status === "ready" ? "CLAIM" : (job.status === "failed" ? "REPORT" : job.kind.toUpperCase());
+        const statusLabel = job.status === "ready" ? "CLAIM" : (job.status === "failed" ? "REPORT" : (job.kind || job.type || "job").toUpperCase());
         ctx.fillStyle = job.status === "ready" ? "#5fe0b5" : (job.status === "failed" ? "#ff8f6d" : "#ffd77b");
         ctx.fillText(statusLabel, sx + sw - 22, iy + 19);
         ctx.textAlign = "left";

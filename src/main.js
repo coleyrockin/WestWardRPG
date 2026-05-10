@@ -1662,6 +1662,7 @@ const canvas = document.getElementById("game");
       xp: 0,
       nextXp: 80,
       stamina: 100,
+      maxStamina: 100,
       gold: 25,
       attackCooldown: 0,
       hurtCooldown: 0,
@@ -2621,7 +2622,7 @@ const canvas = document.getElementById("game");
     state.player.xp = Math.max(0, Math.floor(numberOr(player.xp, state.player.xp)));
     state.player.nextXp = Math.max(50, Math.floor(numberOr(player.nextXp, state.player.nextXp)));
     state.player.hp = clamp(numberOr(player.hp, state.player.maxHp), 0, state.player.maxHp);
-    state.player.stamina = clamp(numberOr(player.stamina, 100), 0, 100);
+    state.player.stamina = clamp(numberOr(player.stamina, state.player.maxStamina), 0, state.player.maxStamina);
     state.player.gold = Math.max(0, Math.floor(numberOr(player.gold, state.player.gold)));
     state.player.deaths = Math.max(0, Math.floor(numberOr(player.deaths, state.player.deaths)));
     const allowedStances = new Set(["balanced", "aggressive", "defensive"]);
@@ -2970,6 +2971,10 @@ const canvas = document.getElementById("game");
       modifiers.perfectWindowBonus = (modifiers.perfectWindowBonus || 0) + 0.05;
     }
     state.player.progressionMods = modifiers;
+    state.player.maxHp = PLAYER_MAX_HP + (modifiers.maxHpBonus || 0);
+    state.player.hp = Math.min(state.player.hp, state.player.maxHp);
+    state.player.maxStamina = 100 + (modifiers.staminaReserveBonus || 0);
+    state.player.stamina = Math.min(state.player.stamina, state.player.maxStamina);
     state.player.loadout.weapon = gearSummary.weaponName;
     state.player.quickUtility = state.player.quickUtility || {
       active: "smoke",
@@ -3038,7 +3043,7 @@ const canvas = document.getElementById("game");
       state.player.nextXp = Math.round(state.player.nextXp * 1.34 + 28);
       state.player.maxHp += 14;
       state.player.hp = Math.min(state.player.maxHp, state.player.hp + 28);
-      state.player.stamina = 100;
+      state.player.stamina = state.player.maxStamina;
       logMsg(`Level up! You reached level ${state.player.level}. The valley trembles!`);
       sfx.levelUp();
       spawnParticles(canvas.width / 2, canvas.height / 2, 20, "#ffd700", 4, 1.5, { decorative: true });
@@ -3188,7 +3193,7 @@ const canvas = document.getElementById("game");
   function applyTonicHoT() {
     state.player.tonicTimer = 5.0;
     state.player.tonicTickAccum = 0;
-    state.player.stamina = Math.min(100, state.player.stamina + 12);
+    state.player.stamina = Math.min(state.player.maxStamina, state.player.stamina + 12);
   }
 
   function useQuickUtility() {
@@ -3248,7 +3253,7 @@ const canvas = document.getElementById("game");
       if (imminent) { perfect = true; break; }
     }
     if (perfect) {
-      state.player.stamina = Math.min(100, state.player.stamina + 12 * freedomBonus);
+      state.player.stamina = Math.min(state.player.maxStamina, state.player.stamina + 12 * freedomBonus);
       state.player.perfectDodgeFlash = 0.4;
       state.player.timeScale = 0.45;
       state.player.timeScaleTimer = 0.32;
@@ -4165,7 +4170,7 @@ const canvas = document.getElementById("game");
           summary += `. +${poi.buff.hp} HP`;
         }
         if (poi.buff?.stamina) {
-          state.player.stamina = Math.min(100, state.player.stamina + poi.buff.stamina);
+          state.player.stamina = Math.min(state.player.maxStamina, state.player.stamina + poi.buff.stamina);
           discoveryReward.stamina += poi.buff.stamina;
           summary += `. +${poi.buff.stamina} stamina`;
         }
@@ -4213,7 +4218,7 @@ const canvas = document.getElementById("game");
 
       if (dist(state.player, state.house.bed) < 1.7) {
         state.player.hp = state.player.maxHp;
-        state.player.stamina = 100;
+        state.player.stamina = state.player.maxStamina;
         state.player.hurtCooldown = 0;
         logMsg(choice(["You rest and recover fully. Ah, the sweet embrace of a mediocre mattress.", "Full health restored! The bed was slightly lumpy but did the job.", "You nap like a champion. All HP restored."]));
         sfx.potionUse();
@@ -5379,7 +5384,35 @@ const canvas = document.getElementById("game");
 
   function anyModalOpen() {
     return dialogueOpen || jobBoardOpen || codexOpen || questOutcomeOpen
-      || shopOpen || settingsOpen || skillScreenOpen || characterSheetOpen;
+      || shopOpen || settingsOpen || skillScreenOpen || characterSheetOpen
+      || workbenchOpen;
+  }
+
+  function grantEnemyKillRewards(enemy) {
+    const civicBounty = state.narrative.globalFlags.curfewNormalized ? 3 : 0;
+    const truthBonusXp = state.narrative.globalFlags.ledgerPublished ? 4 : 0;
+    const rewardMult = getRewardMultiplier(state.world);
+    state.player.gold += Math.max(1, Math.round((10 + civicBounty) * rewardMult));
+    grantXp(Math.max(1, Math.round((22 + truthBonusXp) * rewardMult)));
+    state.inventory["Slime Core"] += 1;
+    const spawnMods = getActiveRegionEventModifiers();
+    const phaseMods = state.world ? resolveSpawnModifier(state.world.timeOfDay || 0) : { hostileMult: 1 };
+    const influenceMult = resolveInfluenceSpawnMult(state.regions?.activeRegion || "frontier", state.narrative?.factionRep);
+    const patrolMult = resolvePatrolDensityMult(state.regions?.activeRegion || "frontier", state.narrative?.factionRep);
+    const seasonMods = resolveSeasonModifiers(resolveCurrentSeason(state.world.calendarDay || 0), state.regions?.activeRegion || "frontier");
+    const totalDensity = Math.max(0.4, spawnMods.spawnDensityMult * phaseMods.hostileMult * influenceMult * patrolMult * seasonMods.spawnMult);
+    enemy.respawn = (22 + Math.random() * 8) / totalDensity;
+    if (enemy.miniBossId) {
+      const def = MINI_BOSS_DEFS[enemy.miniBossId];
+      if (def) {
+        if (state.regions.miniBosses[enemy.miniBossId]) state.regions.miniBosses[enemy.miniBossId].defeated = true;
+        state.player.gold += def.rewardGold;
+        state.inventory[def.rewardResource.item] = (state.inventory[def.rewardResource.item] || 0) + def.rewardResource.count;
+        state.progression.upgradePoints += 1;
+        grantXp(120);
+        enemy.respawn = 1e9;
+      }
+    }
   }
 
   function update(dt) {
@@ -5481,7 +5514,7 @@ const canvas = document.getElementById("game");
       player.stamina = Math.max(0, player.stamina - dt * 24);
     } else {
       const regenRate = resolveStaminaRegenRate(player, state.player.progressionMods);
-      player.stamina = Math.min(100, player.stamina + dt * regenRate);
+      player.stamina = Math.min(state.player.maxStamina, player.stamina + dt * regenRate);
     }
 
     if (player.blocking) speedFactor *= 0.62;
@@ -5605,7 +5638,8 @@ const canvas = document.getElementById("game");
               ent.alive = false;
               recordRunKill(state.world, ent);
               recordKillForJobs(ent);
-              ent.respawn = 22 + Math.random() * 8;
+              grantEnemyKillRewards(ent);
+              emitCompanionBark("first_kill");
             }
           },
           spawnShatter: (ent) => {
@@ -5702,7 +5736,7 @@ const canvas = document.getElementById("game");
                 if (parry.chained) {
                   enemy.attackCooldown = Math.max(enemy.attackCooldown || 0, 0.85);
                 }
-                player.stamina = Math.min(100, player.stamina + parry.staminaRefund);
+                player.stamina = Math.min(state.player.maxStamina, player.stamina + parry.staminaRefund);
                 player.parryChainTimer = parry.nextTimer;
                 state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: parry.text, life: 0.7, maxLife: 0.7, color: parry.chained ? "#ffe16a" : "#9be0ff" });
                 spawnParticles(canvas.width / 2, canvas.height * 0.45, 12, "#cce4ff", 4, 0.45, { decorative: false });
@@ -9359,9 +9393,12 @@ const canvas = document.getElementById("game");
         return;
       }
       const settingsStep = resolveHorizontalStepKey(event.code);
-      if (settingsStep !== 0 || event.code === "Enter" || event.code === "Space") {
+      const settingsConfirm = event.code === "Enter" || event.code === "Space";
+      if (settingsStep !== 0 || settingsConfirm) {
         const row = rows[settingsSelection];
-        stepSettingsRow(row, settingsStep || 1);
+        if (row.kind !== "action" || settingsConfirm) {
+          stepSettingsRow(row, settingsStep || 1);
+        }
         event.preventDefault();
         return;
       }
