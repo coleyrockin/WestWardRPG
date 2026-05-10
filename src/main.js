@@ -9538,6 +9538,14 @@ const canvas = document.getElementById("game");
       if (settingsOpen) logMsg("Settings opened.");
     }
 
+    if (event.code === "Escape" && state.mode === "playing" && !anyModalOpen()) {
+      settingsOpen = true;
+      characterSheetOpen = false;
+      workbenchOpen = false;
+      logMsg("Settings opened.");
+      event.preventDefault();
+    }
+
     if (event.code === "KeyZ" && state.mode === "playing" && !shopOpen && !skillScreenOpen && !settingsOpen && !jobBoardOpen) {
       codexOpen = !codexOpen;
       if (codexOpen) characterSheetOpen = false;
@@ -9586,11 +9594,11 @@ const canvas = document.getElementById("game");
     if (event.code === "Digit2") setQuickUtility("flare");
     if (event.code === "Digit3") setQuickUtility("tonic");
 
-    if (event.code === "KeyU") {
+    if (event.code === "KeyU" && state.mode === "playing" && !anyModalOpen()) {
       useQuickUtility();
     }
 
-    if (event.code === "KeyZ") {
+    if (event.code === "KeyZ" && state.mode === "playing" && !codexOpen && !shopOpen && !skillScreenOpen && !settingsOpen && !jobBoardOpen) {
       const stances = ["balanced", "aggressive", "defensive"];
       const idx = stances.indexOf(state.player.loadout.stance);
       state.player.loadout.stance = stances[(idx + 1) % stances.length];
