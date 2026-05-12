@@ -545,9 +545,46 @@
       color: hsl(36 96% 76%);
     }
 
+    .save-slot-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
     .save-slot-summary {
       font-size: 13px;
       color: var(--cream);
+    }
+
+    .save-slot-detail {
+      max-width: 100%;
+      color: var(--cream-soft);
+      font-size: 11px;
+      line-height: 1.25;
+      opacity: 0.72;
+      overflow-wrap: anywhere;
+    }
+
+    .save-slot-detail.is-corrupt,
+    .save-slot-detail.is-invalid {
+      color: hsl(0 70% 76%);
+    }
+
+    .save-slot-detail.is-newer {
+      color: hsl(40 80% 75%);
+    }
+
+    .save-slot-backup-detail {
+      color: hsl(180 50% 72%);
+      font-size: 10px;
+      line-height: 1.2;
+      opacity: 0.74;
+      overflow-wrap: anywhere;
+    }
+
+    .save-slot-backup-detail.is-none-valid {
+      color: hsl(0 70% 76%);
     }
 
     .save-slot.is-empty .save-slot-summary {

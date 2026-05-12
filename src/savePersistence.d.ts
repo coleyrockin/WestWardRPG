@@ -23,6 +23,29 @@ export interface SavePayloadSummary {
   difficulty: string;
 }
 
+export interface SaveSlotRecoveryDescription {
+  state: "unknown" | "empty" | "corrupt" | "invalid" | "newer" | "valid";
+  line: string;
+  actionLine: string;
+}
+
+export interface SaveBackupChoice {
+  index: number;
+  slot: string;
+  savedAt: number;
+  payloadVersion: number | null;
+  hash: string | null;
+  label: string;
+}
+
+export interface SaveBackupChoiceDescription {
+  state: "none" | "none-valid" | "available";
+  line: string;
+  validCount: number;
+  totalCount: number;
+  choices: SaveBackupChoice[];
+}
+
 export interface SaveEnvelope {
   storageVersion: number;
   payloadVersion: number | null;
@@ -71,4 +94,6 @@ export function migrateFromLocalStorage(slot?: string): Promise<MigrateResult>;
 export function findMostRecentValidBackup(slot?: string): Promise<ReadResult | null>;
 export function listSlots(): Promise<SlotMeta[]>;
 export function summarizeSavePayload(payload: any): SavePayloadSummary | null;
+export function describeSaveSlotRecovery(meta: Partial<SlotMeta> | null | undefined, options?: { maxSupportedVersion?: number }): SaveSlotRecoveryDescription;
+export function describeSaveBackupChoices(backups?: BackupMeta[]): SaveBackupChoiceDescription;
 export function __resetSavePersistenceForTests(): void;

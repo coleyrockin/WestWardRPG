@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   resolveBossPhaseVfx,
+  resolveCombatEncounterReadability,
   resolveEnemyDeathVfx,
   resolveEnemyDefeatCallout,
   resolveEnemyReadabilityCue,
@@ -61,6 +62,67 @@ describe("combatReadability", () => {
       actionLine: "Safe opening: press the attack.",
       silhouette: "opened",
     });
+  });
+
+  it("summarizes the most urgent encounter cue for text smoke output", () => {
+    const summary = resolveCombatEncounterReadability({
+      player: { x: 5, y: 5 },
+      enemies: [
+        { id: "near", label: "Road Slime", alive: true, x: 6, y: 5, alerted: true },
+        { id: "windup", label: "Shield Brute", alive: true, x: 9, y: 5, windupTimer: 0.4, windupMax: 0.8 },
+      ],
+      recentEvent: { kind: "enemy_alert", title: "Enemy noticed you", line: "Road Slime has aggro.", ttl: 1.2 },
+      subtitlesEnabled: true,
+    });
+
+    expect(summary).toMatchObject({
+      active: true,
+      activeCount: 2,
+      highestUrgency: "high",
+      primary: {
+        id: "windup",
+        state: "windup",
+        labelCue: "WINDUP",
+        responseLine: "Interrupt, block, or backstep now.",
+      },
+    });
+    expect(summary.threatLine).toContain("Shield Brute");
+    expect(summary.threatLine).toContain("4.0 tiles");
+    expect(summary.states).toMatchObject({ windup: 1, aggro: 1 });
+  });
+
+  it("keeps reward drops visible after combat ends", () => {
+    const summary = resolveCombatEncounterReadability({
+      player: { x: 5, y: 5 },
+      enemies: [],
+      recentEvent: {
+        kind: "reward_drop",
+        title: "Reward dropped",
+        line: "Road Slime down: +10g, +22 XP, +1 Slime Core.",
+        rewardLine: "+10g +22XP +1 Slime Core",
+        ttl: 2.4,
+      },
+    });
+
+    expect(summary).toMatchObject({
+      active: false,
+      highestUrgency: "none",
+      rewardLine: "+10g +22XP +1 Slime Core",
+      responseLine: "Collect the reward and check the next objective.",
+    });
+  });
+
+  it("does not call distant idle enemies active combat pressure", () => {
+    const summary = resolveCombatEncounterReadability({
+      player: { x: 5, y: 5 },
+      enemies: [
+        { id: "far", label: "Distant Slime", alive: true, x: 30, y: 30 },
+      ],
+      maxDistance: 10,
+    });
+
+    expect(summary.active).toBe(false);
+    expect(summary.threatLine).toBe("No hostile pressure nearby.");
   });
 
   it("builds readable defeat reward callouts", () => {

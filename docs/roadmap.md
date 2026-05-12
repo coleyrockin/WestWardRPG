@@ -49,7 +49,7 @@ Date: 2026-05-12.
 Latest local facts:
 
 1. Branch target: `main`, tracking `origin/main`.
-2. Test gate: `npm test` reports 949 passing tests across 84 test files.
+2. Test gate: `npm test` reports 959 passing tests across 84 test files.
 3. `src/main.js` is over 10.5k lines. This is still the biggest technical drag.
 4. `docs/roadmap.md` had stale historical counts and mixed shipped work with
    future scope. This rewrite replaces that clutter with the finish path.
@@ -208,6 +208,9 @@ Acceptance test:
 Status: active. Dustward pass 1 shipped locally: stronger road-pull data, more
 watchtower/town/wagon silhouettes, denser route props, brighter road ruts,
 repeated mileposts, and improved near-wall contact/trim/decal treatment.
+Combat readability pass 1 shipped locally: aggro, windup, stagger, boss phase,
+death, and reward-drop cues now feed subtitle/audio events, floating combat
+text, and `render_game_to_text` combat-readability state.
 
 Goal: Make the game look and read more like an open-world RPG while staying on
 the current canvas raycaster.
@@ -330,6 +333,12 @@ Acceptance test:
 
 Goal: A non-developer should be able to test the game without anyone standing
 over their shoulder.
+
+Status: active. Save slot clarity pass 1 shipped locally: title-screen slots now
+show explicit empty, valid, corrupted, invalid, or newer-schema guidance with
+recover/import/export language. Backup picker pass 1 also shipped locally:
+slots cache backup metadata, show whether valid backups exist, and let a
+player choose which valid backup to restore when more than one is available.
 
 Required work:
 
@@ -502,17 +511,19 @@ Allowed optional ideas:
 
 Use this order for the next implementation chunks:
 
-1. Fix README/roadmap truth mismatches.
-2. Keep `gameplay_feel.next_step` visible in HUD/debug output so testers always
-   know the intended next action and why it matters.
-3. Expand the golden-path browser smoke from visibility assertions to a full
-   accept/fight/return/pay assertion.
-4. Commit visual baselines after human review of the Dustward road/near-wall
-   captures, then add the capture/diff pair to CI.
-5. Add per-slot save recovery and export/import UI.
-6. Extract HUD rendering from `main.js`.
-7. Extract modal input/drawing from `main.js`.
-8. Add combat subtitles and audio cues.
+1. Run the full verification gate for combat-readability pass 1.
+2. Expand the golden-path browser smoke from helper-driven reward assertions to
+   a fuller start, accept, fight, return, reward, house, NPC-memory, and
+   `gameplay_feel.next_step` proof.
+3. Human-review current visual captures, commit approved baselines, and then
+   make strict `npm run test:visual` part of the release gate.
+4. Finish save recovery proof with browser smoke coverage for corrupt primary,
+   chosen-backup restore, export, and import.
+5. Extract HUD and objective rendering from `src/main.js` without changing the
+   renderer.
+6. Extract modal input and modal drawing from `src/main.js`.
+7. Build the release proof package: `npm run build`, `npm run build:itch`,
+   README screenshots, known limits, and launch instructions.
 
 ## Verification Gates
 
@@ -544,6 +555,31 @@ npm run test:visual # strict mode after baselines are committed
 Latest local verification snapshot:
 
 ```bash
+git diff --check
+# clean
+
 npm test
-# 949 passing across 84 test files
+# 959 passing across 84 test files
+
+npm run typecheck:ts
+# clean
+
+npm run test:syntax
+# clean
+
+npm run dev:lint
+# clean
+
+npm run build
+# passed with existing Vite chunk-size warning
+
+WESTWARD_PORT=5201 WESTWARD_URL=http://127.0.0.1:5201/index.html npm run test:smoke
+# clean; an earlier localhost:5173 attempt was rejected as environment-contaminated
+# after another app/service-worker appeared on that origin
+
+WESTWARD_URL=http://127.0.0.1:5198/index.html npm run test:visual:capture
+# clean
+
+npm run test:visual:review
+# clean in review mode; 18 captures skipped because no committed baselines exist
 ```

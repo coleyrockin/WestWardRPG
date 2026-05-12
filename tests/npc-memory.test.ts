@@ -115,11 +115,21 @@ describe("npcMemory", () => {
 
   it("reacts to the completed canonical starter road loop", () => {
     const memory = createInitialNpcMemoryState();
+    recordNpcMemoryEvent(memory, "warden", {
+      type: "job_completed",
+      jobId: "frontier_slime_bounty",
+      jobTitle: "Marsh Slime Bounty",
+      regionId: "frontier",
+      at: 42,
+    });
 
     const line = resolveNpcReactiveLine("warden", memory, {
       completedJobIds: ["frontier_slime_bounty"],
     });
 
+    expect(memory.byNpc.warden.recentJobId).toBe("frontier_slime_bounty");
+    expect(memory.byNpc.warden.recentJobTitle).toBe("Marsh Slime Bounty");
+    expect(memory.recentEvents[0]).toMatchObject({ npcId: "warden", type: "job_completed" });
     expect(line).toContain("First road loop");
     expect(line).toContain("watchtower");
   });

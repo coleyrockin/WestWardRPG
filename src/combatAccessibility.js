@@ -9,11 +9,16 @@ export const COMBAT_EVENTS = {
   hit:          { label: "HIT",          color: "#ff9060", duration: 0.7 },
   crit:         { label: "CRITICAL HIT", color: "#ffcf5a", duration: 0.9 },
   block:        { label: "BLOCK",        color: "#8fd0ff", duration: 0.55 },
+  enemy_alert:  { label: "ENEMY ALERTED", color: "#92f0a3", duration: 0.8 },
+  windup:       { label: "WINDUP",       color: "#ff6048", duration: 0.85 },
+  stagger:      { label: "STAGGER",      color: "#ffe16a", duration: 0.75 },
   perfect_parry:{ label: "PERFECT PARRY",color: "#9be0ff", duration: 0.9 },
   perfect_dodge:{ label: "PERFECT DODGE",color: "#b0e8ff", duration: 0.9 },
   guard_break:  { label: "GUARD BREAK",  color: "#ffcf8a", duration: 1.0 },
   low_hp:       { label: "LOW HEALTH",   color: "#ff5050", duration: 1.2 },
   enemy_death:  { label: "ENEMY DOWN",   color: "#6be873", duration: 0.7 },
+  boss_phase:   { label: "BOSS PHASE",   color: "#ffc490", duration: 1.0 },
+  reward_drop:  { label: "REWARD DROP",  color: "#ffd77b", duration: 0.8 },
   regen:        { label: "HP RESTORED",  color: "#6be873", duration: 0.6 },
 };
 
@@ -60,10 +65,15 @@ export function drawCombatSubtitles(ctx, subtitleState, canvasWidth, canvasHeigh
 // Short Web Audio tones for combat events. Disabled when audioBuses is null
 // or when the accessibility audio flag is off.
 const AUDIO_CUES = {
+  enemy_alert:   { freq: 360, dur: 0.08, vol: 0.11 },
+  windup:        { freq: 240, dur: 0.16, vol: 0.14 },
+  stagger:       { freq: 520, dur: 0.09, vol: 0.12 },
   perfect_parry: { freq: 880, dur: 0.12, vol: 0.18 },
   perfect_dodge: { freq: 660, dur: 0.10, vol: 0.15 },
   guard_break:   { freq: 200, dur: 0.20, vol: 0.22 },
   crit:          { freq: 440, dur: 0.08, vol: 0.12 },
+  boss_phase:    { freq: 150, dur: 0.24, vol: 0.2 },
+  reward_drop:   { freq: 720, dur: 0.08, vol: 0.1 },
   low_hp:        { freq: 180, dur: 0.30, vol: 0.25 },
 };
 

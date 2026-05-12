@@ -223,6 +223,13 @@ const firstListing = listings[0] || {};
 if (!goldenPath || goldenPath.jobId !== "frontier_slime_bounty") {
   throw new Error("golden-path smoke missing canonical starter job");
 }
+if (!state.gameplay_feel?.next_step) {
+  throw new Error("golden-path smoke missing first-session next step");
+}
+const combatReadability = state.gameplay_feel?.combat_readability || state.combat_readability;
+if (!combatReadability || typeof combatReadability.threatLine !== "string" || typeof combatReadability.responseLine !== "string") {
+  throw new Error("golden-path smoke missing combat readability summary");
+}
 if (goldenPath.phase !== "available" || !goldenPath.routeLine || !goldenPath.threatLine) {
   throw new Error("golden-path smoke missing route/threat guidance");
 }
@@ -263,6 +270,10 @@ const completedJobIds = state.job_board?.state?.completedJobIds || [];
 if (!completedJobIds.includes("frontier_slime_bounty")) {
   throw new Error("golden-path-full did not record completed bounty");
 }
+const starterProgress = state.job_board?.state?.progressByJobId?.frontier_slime_bounty;
+if (!starterProgress || starterProgress.rewardClaimed !== true) {
+  throw new Error("golden-path-full did not mark starter reward claimed");
+}
 
 const trophies = state.house?.progress_display?.trophies || [];
 const notice = trophies.find((t) => t.id === "marsh_bounty_notice");
@@ -273,6 +284,14 @@ if (!notice || notice.status !== "completed") {
 const inventory = state.inventory || {};
 if ((inventory["Slime Core"] || 0) < 1 || (inventory.Stone || 0) < 1) {
   throw new Error("golden-path-full reward did not surface Slime Core + Stone in inventory");
+}
+
+const memory = state.narrative?.npcMemory;
+if (memory?.byNpc?.warden?.recentJobId !== "frontier_slime_bounty") {
+  throw new Error("golden-path-full did not record Boone memory for completed starter job");
+}
+if (!state.gameplay_feel?.next_step) {
+  throw new Error("golden-path-full missing gameplay_feel.next_step after completion");
 }
 NODE
   echo "[SUCCESS] golden-path-full assertions passed"

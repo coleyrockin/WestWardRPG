@@ -15,6 +15,8 @@ import {
   migrateFromLocalStorage,
   findMostRecentValidBackup,
   summarizeSavePayload,
+  describeSaveSlotRecovery,
+  describeSaveBackupChoices,
   KNOWN_SLOTS,
   DEFAULT_SLOT,
   STORAGE_VERSION,
@@ -504,5 +506,96 @@ describe("summarizeSavePayload", () => {
       world: { difficulty: "nightmare" },
     });
     expect(summary?.difficulty).toBe("standard");
+  });
+});
+
+describe("describeSaveSlotRecovery", () => {
+  it("explains empty slots as new-run or import targets", () => {
+    expect(describeSaveSlotRecovery({ slot: "slot-1", empty: true, valid: true, payload: null, savedAt: null })).toMatchObject({
+      state: "empty",
+      actionLine: "New run or import.",
+    });
+  });
+
+  it("explains corrupted slots with restore/import guidance", () => {
+    const description = describeSaveSlotRecovery({
+      slot: "slot-1",
+      empty: false,
+      valid: false,
+      payload: null,
+      savedAt: null,
+      reason: "hash-mismatch",
+    });
+
+    expect(description.state).toBe("corrupt");
+    expect(description.line).toContain("hash-mismatch");
+    expect(description.actionLine).toContain("Recover");
+  });
+
+  it("explains newer schema slots as preserved and exportable", () => {
+    const description = describeSaveSlotRecovery({
+      slot: "slot-2",
+      empty: false,
+      valid: true,
+      payload: { version: 9 },
+      savedAt: 123,
+    }, { maxSupportedVersion: 3 });
+
+    expect(description.state).toBe("newer");
+    expect(description.line).toContain("v9");
+    expect(description.actionLine).toBe("Export only.");
+  });
+
+  it("explains valid slots with continue/export/import/delete choices", () => {
+    const description = describeSaveSlotRecovery({
+      slot: "slot-2",
+      empty: false,
+      valid: true,
+      payload: { version: 3 },
+      savedAt: 123,
+    }, { maxSupportedVersion: 3 });
+
+    expect(description.state).toBe("valid");
+    expect(description.line).toContain("Continue");
+    expect(description.line).toContain("export");
+  });
+});
+
+describe("describeSaveBackupChoices", () => {
+  it("explains slots with no backups", () => {
+    expect(describeSaveBackupChoices([])).toMatchObject({
+      state: "none",
+      validCount: 0,
+      totalCount: 0,
+      choices: [],
+    });
+  });
+
+  it("sorts valid backups newest-first with numbered labels", () => {
+    const older = 1700000000000;
+    const newer = 1700003600000;
+    const description = describeSaveBackupChoices([
+      { slot: "slot-1", savedAt: older, payloadVersion: 3, hash: "aaaaaaaa", valid: true },
+      { slot: "slot-1", savedAt: newer, payloadVersion: 3, hash: "bbbbbbbb", valid: true },
+      { slot: "slot-1", savedAt: newer + 1, payloadVersion: 3, hash: "cccccccc", valid: false },
+    ]);
+
+    expect(description).toMatchObject({
+      state: "available",
+      validCount: 2,
+      totalCount: 3,
+    });
+    expect(description.choices.map((choice) => choice.savedAt)).toEqual([newer, older]);
+    expect(description.choices[0].label).toContain("Backup 1");
+    expect(description.choices[0].label).toContain("(v3)");
+  });
+
+  it("explains when backups exist but none are valid", () => {
+    const description = describeSaveBackupChoices([
+      { slot: "slot-1", savedAt: 1700000000000, payloadVersion: 3, hash: "aaaaaaaa", valid: false },
+    ]);
+
+    expect(description.state).toBe("none-valid");
+    expect(description.line).toContain("none pass validation");
   });
 });

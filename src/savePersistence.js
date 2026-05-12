@@ -500,6 +500,95 @@ export function summarizeSavePayload(payload) {
   return { level, regionId, timePlayedSeconds, victory, endingId, difficulty };
 }
 
+export function describeSaveSlotRecovery(meta, options = {}) {
+  const maxSupportedVersion = Number.isFinite(options.maxSupportedVersion)
+    ? Math.max(1, Math.floor(options.maxSupportedVersion))
+    : 3;
+  if (!meta || typeof meta !== "object") {
+    return {
+      state: "unknown",
+      line: "Save status unavailable. Refresh the title screen before loading.",
+      actionLine: "Refresh saves.",
+    };
+  }
+  if (meta.empty) {
+    return {
+      state: "empty",
+      line: "Empty slot. Start a new run or import a save here.",
+      actionLine: "New run or import.",
+    };
+  }
+  if (!meta.valid) {
+    const reason = typeof meta.reason === "string" ? meta.reason : "integrity check failed";
+    return {
+      state: "corrupt",
+      line: `Corrupt primary save (${reason}). Restore a valid backup or import over this slot.`,
+      actionLine: "Recover backup or import.",
+    };
+  }
+  const version = meta.payload?.version;
+  if (!Number.isFinite(version)) {
+    return {
+      state: "invalid",
+      line: "Save payload is missing its schema version. Export it before replacing the slot.",
+      actionLine: "Export or replace.",
+    };
+  }
+  if (version > maxSupportedVersion) {
+    return {
+      state: "newer",
+      line: `Newer save schema v${Math.floor(version)}. This build supports v${maxSupportedVersion}; preserve or export it.`,
+      actionLine: "Export only.",
+    };
+  }
+  return {
+    state: "valid",
+    line: "Valid save. Continue, export a backup, import over it, or delete it.",
+    actionLine: "Continue or export.",
+  };
+}
+
+export function describeSaveBackupChoices(backups = []) {
+  const all = Array.isArray(backups) ? backups : [];
+  const validBackups = all.filter((backup) => backup?.valid && Number.isFinite(backup.savedAt));
+  if (all.length === 0) {
+    return {
+      state: "none",
+      line: "No backups stored for this slot yet.",
+      validCount: 0,
+      totalCount: 0,
+      choices: [],
+    };
+  }
+  const choices = validBackups
+    .slice()
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .map((backup, index) => ({
+      index: index + 1,
+      slot: backup.slot,
+      savedAt: backup.savedAt,
+      payloadVersion: Number.isFinite(backup.payloadVersion) ? backup.payloadVersion : null,
+      hash: typeof backup.hash === "string" ? backup.hash : null,
+      label: `Backup ${index + 1}: ${new Date(backup.savedAt).toLocaleString()}${Number.isFinite(backup.payloadVersion) ? ` (v${backup.payloadVersion})` : ""}`,
+    }));
+  if (choices.length === 0) {
+    return {
+      state: "none-valid",
+      line: `${all.length} backup${all.length === 1 ? "" : "s"} stored, but none pass validation.`,
+      validCount: 0,
+      totalCount: all.length,
+      choices,
+    };
+  }
+  return {
+    state: "available",
+    line: `${choices.length} valid backup${choices.length === 1 ? "" : "s"} available; latest can be restored manually.`,
+    validCount: choices.length,
+    totalCount: all.length,
+    choices,
+  };
+}
+
 // Helper for the corruption-recovery path: walks backups newest-first and
 // returns the first valid one (or null). Caller decides whether to auto-restore.
 export async function findMostRecentValidBackup(slot) {

@@ -151,6 +151,8 @@ function normalizeEntry(source = {}) {
     discoveredPoiCount: Number.isFinite(source?.discoveredPoiCount) ? Math.max(0, Math.floor(source.discoveredPoiCount)) : 0,
     recentPoiId: typeof source?.recentPoiId === "string" ? source.recentPoiId : null,
     recentPoiLabel: typeof source?.recentPoiLabel === "string" ? source.recentPoiLabel : null,
+    recentJobId: typeof source?.recentJobId === "string" ? source.recentJobId : null,
+    recentJobTitle: typeof source?.recentJobTitle === "string" ? source.recentJobTitle : null,
   };
 }
 
@@ -184,6 +186,10 @@ export function recordNpcMemoryEvent(memory, npcId, event = {}) {
     entry.discoveredPoiCount += 1;
     if (typeof event.poiId === "string") entry.recentPoiId = event.poiId;
     if (typeof event.poiLabel === "string") entry.recentPoiLabel = event.poiLabel;
+  }
+  if (event.type === "job_completed") {
+    if (typeof event.jobId === "string") entry.recentJobId = event.jobId;
+    if (typeof event.jobTitle === "string") entry.recentJobTitle = event.jobTitle;
   }
   memory.recentEvents.unshift({ npcId, type: event.type || "memory", at: event.at || 0 });
   memory.recentEvents = memory.recentEvents.slice(0, 8);

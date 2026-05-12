@@ -153,6 +153,7 @@ import {
   getVendorServiceProfile,
 } from "./economyServices.js";
 import {
+  resolveCombatEncounterReadability,
   resolveBossPhaseVfx,
   resolveEnemyDeathVfx,
   resolveEnemyDefeatCallout,
@@ -276,11 +277,14 @@ import {
   migrateFromLocalStorage as idbMigrateFromLocalStorage,
   findMostRecentValidBackup as idbFindMostRecentValidBackup,
   restoreFromBackup as idbRestoreFromBackup,
+  listBackups as idbListBackups,
   exportSaveBlob as idbExportSaveBlob,
   importSaveFromText as idbImportSaveFromText,
   deleteSave as idbDeleteSave,
   listSlots as idbListSlots,
   summarizeSavePayload,
+  describeSaveSlotRecovery,
+  describeSaveBackupChoices,
   KNOWN_SLOTS as IDB_KNOWN_SLOTS,
   DEFAULT_SLOT as IDB_DEFAULT_SLOT,
 } from "./savePersistence.js";
@@ -904,6 +908,7 @@ const canvas = document.getElementById("game");
   let pendingDialogue = null; // { npcId, npcName, choices: DialogueChoice[] }
   let discoveryBanner = null;
   let hudNotice = null;
+  let combatReadabilityNotice = null;
 
   function openDialogueChoiceFor(npcId, npcName) {
     if (!state.narrative) return false;
@@ -2108,6 +2113,19 @@ const canvas = document.getElementById("game");
     while (el.firstChild) el.removeChild(el.firstChild);
   }
 
+  function chooseBackupToRestore(slot, backups) {
+    const info = describeSaveBackupChoices(backups);
+    if (info.choices.length === 0) return null;
+    if (info.choices.length === 1) return info.choices[0];
+    const menu = info.choices
+      .map((choice) => `${choice.index}. ${choice.label}`)
+      .join("\n");
+    const raw = prompt(`Choose backup to restore for ${slotDisplayLabel(slot)}:\n${menu}`, "1");
+    if (raw === null) return null;
+    const selected = Number.parseInt(raw, 10);
+    return info.choices.find((choice) => choice.index === selected) || null;
+  }
+
   function renderSaveSlots() {
     if (!saveSlotsContainer) return;
     const metas = getSlotMetas();
@@ -2123,15 +2141,33 @@ const canvas = document.getElementById("game");
       if (!savesLoaded) row.classList.add("is-loading");
       row.disabled = !savesLoaded;
       row.dataset.slot = meta.slot;
-      row.setAttribute("aria-label", `${slotDisplayLabel(meta.slot)}: ${buildSlotSummaryText(meta)}`);
+      const summaryText = buildSlotSummaryText(meta);
+      const recovery = describeSaveSlotRecovery(meta, { maxSupportedVersion: MAX_SUPPORTED_SAVE_VERSION });
+      const backupInfo = describeSaveBackupChoices(cachedBackupMetasBySlot[meta.slot] || []);
+      row.setAttribute("aria-label", `${slotDisplayLabel(meta.slot)}: ${summaryText}. ${recovery.line}`);
 
       const label = document.createElement("span");
       label.className = "save-slot-label";
       label.textContent = slotDisplayLabel(meta.slot);
 
+      const copy = document.createElement("span");
+      copy.className = "save-slot-copy";
+
       const summary = document.createElement("span");
       summary.className = "save-slot-summary";
-      summary.textContent = buildSlotSummaryText(meta);
+      summary.textContent = summaryText;
+
+      const detail = document.createElement("span");
+      detail.className = `save-slot-detail is-${recovery.state}`;
+      detail.textContent = recovery.line;
+      copy.appendChild(summary);
+      copy.appendChild(detail);
+      if (!meta.empty && backupInfo.totalCount > 0) {
+        const backupDetail = document.createElement("span");
+        backupDetail.className = `save-slot-backup-detail is-${backupInfo.state}`;
+        backupDetail.textContent = backupInfo.line;
+        copy.appendChild(backupDetail);
+      }
 
       const schemaUnsupported = isUnsupportedSchemaSlot(meta);
       if (schemaUnsupported) row.classList.add("is-future-schema");
@@ -2147,7 +2183,7 @@ const canvas = document.getElementById("game");
             : "Recover";
 
       row.appendChild(label);
-      row.appendChild(summary);
+      row.appendChild(copy);
       row.appendChild(action);
 
       const importToSlot = (e) => {
@@ -2218,24 +2254,27 @@ const canvas = document.getElementById("game");
           const rec = document.createElement("button");
           rec.type = "button";
           rec.className = "save-slot-recover";
-          rec.setAttribute("aria-label", `Recover ${slotDisplayLabel(meta.slot)} from latest backup`);
+          rec.setAttribute("aria-label", `Recover ${slotDisplayLabel(meta.slot)} from backup`);
           rec.textContent = "↺";
-          rec.title = "Recover from latest valid backup";
+          rec.title = backupInfo.validCount > 1 ? "Choose a backup to restore" : "Recover from latest valid backup";
           rec.addEventListener("click", async (e) => {
             e.stopPropagation();
             try {
-              const recovered = await idbFindMostRecentValidBackup(meta.slot);
-              if (!recovered || !recovered.ok) {
+              const backups = (cachedBackupMetasBySlot[meta.slot] || []).length > 0
+                ? cachedBackupMetasBySlot[meta.slot]
+                : await idbListBackups(meta.slot);
+              const target = chooseBackupToRestore(meta.slot, backups);
+              if (!target) {
                 logMsg(`No valid backup found for ${slotDisplayLabel(meta.slot)}.`);
                 return;
               }
-              await idbRestoreFromBackup(meta.slot, recovered.savedAt);
+              const restoredPayload = await idbRestoreFromBackup(meta.slot, target.savedAt);
               if (currentSaveSlot === meta.slot) {
-                setCachedSave(recovered.payload, recovered.savedAt);
+                setCachedSave(restoredPayload, target.savedAt);
               }
               await refreshSlotsAndPickActive();
               renderSaveSlots();
-              logMsg(`${slotDisplayLabel(meta.slot)} restored from a backup saved ${formatBackupAge(recovered.savedAt)}.`);
+              logMsg(`${slotDisplayLabel(meta.slot)} restored from backup ${target.index} saved ${formatBackupAge(target.savedAt)}.`);
             } catch (err) {
               console.warn("[westward] manual recovery failed:", err);
               logMsg(`Recovery failed for ${slotDisplayLabel(meta.slot)}.`);
@@ -2419,12 +2458,23 @@ const canvas = document.getElementById("game");
   // Falls through to backup recovery for the active slot if the primary is
   // corrupted (existing behavior, now slot-aware).
   let cachedSlotMetas = [];
+  let cachedBackupMetasBySlot = {};
   async function refreshSlotsAndPickActive() {
     try {
       cachedSlotMetas = await idbListSlots();
+      const backupEntries = await Promise.all(IDB_KNOWN_SLOTS.map(async (slot) => {
+        try {
+          return [slot, await idbListBackups(slot)];
+        } catch (err) {
+          console.warn(`[westward] listBackups failed for ${slot}:`, err);
+          return [slot, []];
+        }
+      }));
+      cachedBackupMetasBySlot = Object.fromEntries(backupEntries);
     } catch (err) {
       console.warn("[westward] listSlots failed:", err);
       cachedSlotMetas = IDB_KNOWN_SLOTS.map((slot) => ({ slot, empty: true, valid: true, payload: null, savedAt: null }));
+      cachedBackupMetasBySlot = {};
     }
     savesLoaded = true;
     const validWritten = cachedSlotMetas
@@ -2871,6 +2921,18 @@ const canvas = document.getElementById("game");
     };
   }
 
+  function showCombatReadabilityNotice(notice) {
+    if (!notice) return;
+    combatReadabilityNotice = {
+      kind: notice.kind || "combat",
+      title: notice.title || "Combat",
+      line: notice.line || "",
+      rewardLine: notice.rewardLine || null,
+      state: notice.state || null,
+      ttl: Number.isFinite(notice.ttl) ? notice.ttl : 2.8,
+    };
+  }
+
   // Wraps unlockCodexEntry: surfaces a player-visible message on first unlock.
   // Returns whatever unlockCodexEntry returned so callers can chain conditional logic.
   function unlockCodexAndPing(tab, id) {
@@ -3086,6 +3148,15 @@ const canvas = document.getElementById("game");
     spawnParticles(canvas.width / 2, canvas.height * 0.38, vfx.particleBurst, vfx.particleColor, vfx.particleSpeed, vfx.particleLife, { decorative: false });
     state.player.screenShake = clamp(state.player.screenShake + vfx.screenShake, 0, 0.95);
     logMsg(`${def?.label || enemy.label || "Mini-boss"} enters Phase 2: ${transition.phaseLabel}.`);
+    showCombatReadabilityNotice({
+      kind: "boss_phase",
+      title: "Boss phase transition",
+      line: `${def?.label || enemy.label || "Mini-boss"} changed pattern: ${transition.phaseLabel}.`,
+      state: "phase",
+      ttl: 4.2,
+    });
+    recordCombatEvent(combatSubtitles, "boss_phase");
+    playCombatAudioCue(audioBuses?.ctx, "boss_phase");
     sfx.thunder();
     return true;
   }
@@ -3606,6 +3677,19 @@ const canvas = document.getElementById("game");
     updateQuestProgressFromInventory();
   }
 
+  function recordJobCompletionMemory(job) {
+    if (!job?.id) return;
+    state.narrative.npcMemory = normalizeNpcMemoryState(state.narrative.npcMemory);
+    recordNpcMemoryEvent(state.narrative.npcMemory, job.npcId || "warden", {
+      type: "job_completed",
+      at: Math.round(state.time),
+      jobId: job.id,
+      jobTitle: job.title || job.id,
+      regionId: job.regionId || state.regions.activeRegion,
+      houseUnlocked: state.house.unlocked,
+    });
+  }
+
   function recordKillForJobs(enemy) {
     state.world.jobs = normalizeJobBoardState(state.world.jobs);
     const result = recordJobEvent(state.world.jobs, {
@@ -3784,6 +3868,7 @@ const canvas = document.getElementById("game");
           spawnParticles(canvas.width / 2, canvas.height / 2, 10, "#ff8f6d", 2.4, 0.8, { decorative: true });
         } else {
           grantJobReward(paid.reward);
+          recordJobCompletionMemory(paid.job);
           const feedback = resolveJobRewardFeedback({
             job: paid.job,
             reward: paid.reward,
@@ -4869,6 +4954,23 @@ const canvas = document.getElementById("game");
         interrupted: interruptedHit,
       });
       state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: isKill ? "SLAIN" : `-${damage}`, life: hitFeedback.floatingTextLife, maxLife: hitFeedback.floatingTextLife, color: isKill ? "#ff5555" : damage >= 24 ? "#ff9f3a" : "#ffe84e" });
+      if (!isKill) {
+        if (interruptedHit || enemy.stagger >= 0.75) {
+          state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: "STAGGER", life: 0.62, maxLife: 0.62, color: "#ffe16a" });
+          showCombatReadabilityNotice({
+            kind: "stagger",
+            title: "Enemy staggered",
+            line: `${enemy.label || "Enemy"} is open. Press the attack while it recovers.`,
+            state: "stagger",
+            ttl: 2.4,
+          });
+          recordCombatEvent(combatSubtitles, "stagger");
+          playCombatAudioCue(audioBuses?.ctx, "stagger");
+        } else {
+          recordCombatEvent(combatSubtitles, damage >= 24 ? "crit" : "hit");
+          if (damage >= 24) playCombatAudioCue(audioBuses?.ctx, "crit");
+        }
+      }
 
       const eDx = enemy.x - state.player.x;
       const eDy = enemy.y - state.player.y;
@@ -4930,6 +5032,17 @@ const canvas = document.getElementById("game");
         });
         spawnParticles(eSx, eSy, deathVfx.particleBurst, deathVfx.particleColor, deathVfx.particleSpeed, deathVfx.particleLife);
         state.player.screenShake = clamp(state.player.screenShake + normalDefeatCallout.screenShake, 0, 0.75);
+        showCombatReadabilityNotice({
+          kind: "reward_drop",
+          title: "Reward dropped",
+          line: normalDefeatCallout.logLine,
+          rewardLine: normalDefeatCallout.floatingText,
+          state: "dead",
+          ttl: 4.2,
+        });
+        recordCombatEvent(combatSubtitles, "enemy_death");
+        recordCombatEvent(combatSubtitles, "reward_drop");
+        playCombatAudioCue(audioBuses?.ctx, "reward_drop");
 
         if (enemy.miniBossId) {
           const def = MINI_BOSS_DEFS[enemy.miniBossId];
@@ -4972,6 +5085,14 @@ const canvas = document.getElementById("game");
             });
             spawnParticles(eSx, eSy, bossDeathVfx.particleBurst, bossDeathVfx.particleColor, bossDeathVfx.particleSpeed, bossDeathVfx.particleLife);
             state.player.screenShake = clamp(state.player.screenShake + bossCallout.screenShake + bossDeathVfx.screenShake, 0, 0.95);
+            showCombatReadabilityNotice({
+              kind: "reward_drop",
+              title: "Boss reward dropped",
+              line: bossCallout.logLine,
+              rewardLine: bossCallout.floatingText,
+              state: "dead",
+              ttl: 5.2,
+            });
             logMsg(`Mini-boss defeated: ${def.label}! +${def.rewardGold}g, +${def.rewardResource.count} ${def.rewardResource.item}, +1 upgrade point.`);
             grantRolledLoot("mini_boss", def.region);
             if (enemy.miniBossId === "ashfall_scrap_tyrant" && state.quests.ashfall_boss?.status === "active") {
@@ -5397,6 +5518,24 @@ const canvas = document.getElementById("game");
     state.player.gold += Math.max(1, Math.round((10 + civicBounty) * rewardMult));
     grantXp(Math.max(1, Math.round((22 + truthBonusXp) * rewardMult)));
     state.inventory["Slime Core"] += 1;
+    const rewardCallout = resolveEnemyDefeatCallout({
+      label: enemy?.label || "Slime",
+      gold: 10 + civicBounty,
+      xp: 22 + truthBonusXp,
+      items: { "Slime Core": 1 },
+      color: enemy?.color || "#6be873",
+    });
+    showCombatReadabilityNotice({
+      kind: "reward_drop",
+      title: "Reward dropped",
+      line: rewardCallout.logLine,
+      rewardLine: rewardCallout.floatingText,
+      state: "dead",
+      ttl: 4.2,
+    });
+    recordCombatEvent(combatSubtitles, "enemy_death");
+    recordCombatEvent(combatSubtitles, "reward_drop");
+    playCombatAudioCue(audioBuses?.ctx, "reward_drop");
     const spawnMods = getActiveRegionEventModifiers();
     const phaseMods = state.world ? resolveSpawnModifier(state.world.timeOfDay || 0) : { hostileMult: 1 };
     const influenceMult = resolveInfluenceSpawnMult(state.regions?.activeRegion || "frontier", state.narrative?.factionRep);
@@ -5450,6 +5589,10 @@ const canvas = document.getElementById("game");
     if (hudNotice) {
       hudNotice.ttl -= dt;
       if (hudNotice.ttl <= 0) hudNotice = null;
+    }
+    if (combatReadabilityNotice) {
+      combatReadabilityNotice.ttl -= dt;
+      if (combatReadabilityNotice.ttl <= 0) combatReadabilityNotice = null;
     }
     // Use reverse loop to remove expired messages without creating new array
     for (let i = state.msg.length - 1; i >= 0; i--) {
@@ -5618,12 +5761,16 @@ const canvas = document.getElementById("game");
           enemy.alive = true;
           enemy.attackCooldown = 0.7;
           enemy.stagger = 0;
+          enemy.alerted = false;
+          enemy.alertTimer = 0;
+          enemy.windupWarned = false;
           clearStatuses(enemy);
         }
         continue;
       }
 
       if (enemy.flashTimer > 0) enemy.flashTimer = Math.max(0, enemy.flashTimer - dt);
+      if (enemy.alertTimer > 0) enemy.alertTimer = Math.max(0, enemy.alertTimer - dt);
       tickMiniBossInvulnerability(enemy, dt);
       if (enemy.stagger > 0) {
         enemy.stagger -= dt;
@@ -5662,7 +5809,22 @@ const canvas = document.getElementById("game");
         combatProfile.attackRange += 0.35;
       }
 
-      if (d < combatProfile.pursuitRange && enemy.stagger <= 0 && (enemy.searchTimer || 0) <= 0) {
+      const pursuingPlayer = d < combatProfile.pursuitRange && enemy.stagger <= 0 && (enemy.searchTimer || 0) <= 0;
+      if (pursuingPlayer) {
+        if (!enemy.alerted) {
+          enemy.alerted = true;
+          enemy.alertTimer = 1;
+          state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: "HOSTILE", life: 0.62, maxLife: 0.62, color: "#92f0a3" });
+          showCombatReadabilityNotice({
+            kind: "enemy_alert",
+            title: "Enemy noticed you",
+            line: `${enemy.label || "Enemy"} has aggro. Face it, block, or make space.`,
+            state: "aggro",
+            ttl: 2.4,
+          });
+          recordCombatEvent(combatSubtitles, "enemy_alert");
+          playCombatAudioCue(audioBuses?.ctx, "enemy_alert");
+        }
         // Pre-compute inverse distance to avoid division in both calculations
         const invD = 1 / (d + 1e-6);
         const nx = dx * invD;
@@ -5692,6 +5854,17 @@ const canvas = document.getElementById("game");
                 : 0.55;
           enemy.windupMax = enemy.windupTimer;
           enemy.windupConsumed = false;
+          enemy.windupWarned = true;
+          state.floatingTexts.push({ wx: enemy.x, wy: enemy.y, text: "WINDUP", life: 0.62, maxLife: 0.62, color: "#ff6048" });
+          showCombatReadabilityNotice({
+            kind: "windup",
+            title: "Heavy attack incoming",
+            line: `${enemy.label || "Enemy"} is winding up. Interrupt, block, or backstep now.`,
+            state: "windup",
+            ttl: 2.2,
+          });
+          recordCombatEvent(combatSubtitles, "windup");
+          playCombatAudioCue(audioBuses?.ctx, "windup");
         }
         if ((enemy.windupTimer || 0) > 0) {
           enemy.windupTimer = Math.max(0, enemy.windupTimer - dt);
@@ -5708,6 +5881,7 @@ const canvas = document.getElementById("game");
           if (enemy.windupTimer <= 0) {
             enemy.windupConsumed = true;
             enemy.windupBaitUsed = false;
+            enemy.windupWarned = false;
           }
         }
         const heavyReady = heavyTelegraph && enemy.windupConsumed;
@@ -5794,6 +5968,10 @@ const canvas = document.getElementById("game");
             }
           }
         }
+      } else if (d > combatProfile.pursuitRange + 2) {
+        enemy.alerted = false;
+        enemy.alertTimer = 0;
+        enemy.windupWarned = false;
       }
     }
 
@@ -9892,6 +10070,7 @@ const canvas = document.getElementById("game");
       const paid = claimJobReward(state.world.jobs, "frontier_slime_bounty");
       if (paid.ok && !paid.failed) {
         grantJobReward(paid.reward);
+        recordJobCompletionMemory(paid.job);
       }
       return { ok: !!paid?.ok, failed: !!paid?.failed, reward: paid?.reward || null };
     },
@@ -10005,6 +10184,13 @@ const canvas = document.getElementById("game");
       pressure: firstMinutePressure,
       enemies: activeEnemies,
     });
+    const combatReadability = resolveCombatEncounterReadability({
+      enemies: state.player.inHouse ? [] : activeEnemies,
+      player: state.player,
+      maxDistance: 10,
+      recentEvent: combatReadabilityNotice,
+      subtitlesEnabled: state.graphics.accessibility?.combatSubtitles !== false,
+    });
     const openingRouteGuide = resolveOpeningRouteGuide({
       mode: state.mode,
       time: state.time,
@@ -10098,6 +10284,7 @@ const canvas = document.getElementById("game");
         live_objective: liveObjective,
         opening_objective: openingObjective,
         opening_fight_cue: openingFightCue,
+        combat_readability: combatReadability,
         opening_route_guide: openingRouteGuide,
         road_discovery_lead: roadDiscoveryLead,
         roadside_discoveries_nearby: nearbyRoadsideDiscoveries,
@@ -10145,6 +10332,7 @@ const canvas = document.getElementById("game");
         hit_pulse: Number((state.player.hitPulse || 0).toFixed(2)),
         screen_shake: Number((state.player.screenShake || 0).toFixed(2)),
       },
+      combat_readability: combatReadability,
       location: state.player.inHouse ? "house" : "valley",
       weather: {
         kind: state.player.inHouse ? "sheltered" : state.weather.kind,
