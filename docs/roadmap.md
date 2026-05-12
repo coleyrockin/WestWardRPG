@@ -44,12 +44,12 @@ Every road, job, NPC, item, house upgrade, and ending should help that loop.
 
 ## Audit Snapshot
 
-Date: 2026-05-11.
+Date: 2026-05-12.
 
 Latest local facts:
 
 1. Branch target: `main`, tracking `origin/main`.
-2. Test gate: `npm test` reports 933 passing tests across 83 test files.
+2. Test gate: `npm test` reports 947 passing tests across 84 test files.
 3. `src/main.js` is over 10.5k lines. This is still the biggest technical drag.
 4. `docs/roadmap.md` had stale historical counts and mixed shipped work with
    future scope. This rewrite replaces that clutter with the finish path.
@@ -242,7 +242,8 @@ Required work:
 6. Visual regression.
    - Expand visual capture coverage for title, opening town, road, near-wall,
      job board, combat, housing, and run summary.
-   - Add pixelmatch pass/fail CI after baselines are stable.
+   - Keep review-mode CI capture active until human-approved baselines are
+     committed, then switch strict pixelmatch pass/fail on.
 
 Acceptance test:
 
@@ -502,14 +503,16 @@ Allowed optional ideas:
 Use this order for the next implementation chunks:
 
 1. Fix README/roadmap truth mismatches.
-2. Expand the golden-path browser smoke from visibility assertions to a full
+2. Keep `gameplay_feel.next_step` visible in HUD/debug output so testers always
+   know the intended next action and why it matters.
+3. Expand the golden-path browser smoke from visibility assertions to a full
    accept/fight/return/pay assertion.
-3. Commit visual baselines after human review of the Dustward road/near-wall
+4. Commit visual baselines after human review of the Dustward road/near-wall
    captures, then add the capture/diff pair to CI.
-4. Add per-slot save recovery and export/import UI.
-5. Extract HUD rendering from `main.js`.
-6. Extract modal input/drawing from `main.js`.
-7. Add combat subtitles and audio cues.
+5. Add per-slot save recovery and export/import UI.
+6. Extract HUD rendering from `main.js`.
+7. Extract modal input/drawing from `main.js`.
+8. Add combat subtitles and audio cues.
 
 ## Verification Gates
 
@@ -534,12 +537,13 @@ Run when visuals change:
 
 ```bash
 npm run test:visual:capture
-npm run test:visual
+npm run test:visual:review
+npm run test:visual # strict mode after baselines are committed
 ```
 
 Latest local verification snapshot:
 
 ```bash
 npm test
-# 933 passing across 83 test files
+# 947 passing across 84 test files
 ```

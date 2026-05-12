@@ -3,6 +3,7 @@ import {
   resolveFirstMinuteCache,
   resolveFirstMinuteCacheReward,
   resolveFirstMinutePressure,
+  resolveFirstSessionNextStep,
   resolveHitFeedback,
   resolveOpeningFightCue,
   resolveOpeningObjective,
@@ -270,5 +271,59 @@ describe("gameFeel", () => {
     });
 
     expect(guide?.secondaryLine).toContain("Road Slime");
+  });
+
+  it("synthesizes a single first-session next step from the live objective", () => {
+    const nextStep = resolveFirstSessionNextStep({
+      mode: "playing",
+      liveObjective: {
+        id: "opening-route-guide",
+        title: "Opening route",
+        objectiveLine: "Open cache: Smoke Cache • 3m • +12g",
+        secondaryLine: "Boone Job Board • 1m",
+        urgency: "high",
+      },
+      goldenPath: { phase: "available", rewardUseLine: "Use Slime Core at home." },
+      activeJob: null,
+      regionLabel: "Dustward Frontier",
+    });
+
+    expect(nextStep).toMatchObject({
+      title: "Next step",
+      source: "opening-route-guide",
+      actionLine: "Open cache: Smoke Cache • 3m • +12g",
+      urgency: "high",
+      regionHint: "Dustward Frontier",
+    });
+    expect(nextStep?.secondaryLine).toContain("Boone Job Board");
+    expect(nextStep?.secondaryLine).toContain("Boone road loop");
+    expect(nextStep?.payoffLine).toBe("Use Slime Core at home.");
+  });
+
+  it("points loot back to the house when no stronger objective is active", () => {
+    const nextStep = resolveFirstSessionNextStep({
+      mode: "playing",
+      inHouse: false,
+      house: { unlocked: true },
+      inventory: { "Slime Core": 1, Wood: 0, Stone: 0 },
+      regionLabel: "Dustward Frontier",
+    });
+
+    expect(nextStep?.source).toBe("house-workbench");
+    expect(nextStep?.actionLine).toContain("Return home");
+    expect(nextStep?.payoffLine).toContain("House");
+  });
+
+  it("falls back to Boone's board when the player has no active job", () => {
+    const nextStep = resolveFirstSessionNextStep({
+      mode: "playing",
+      player: { x: 9.5, y: 8.5 },
+      boardProp: { label: "Boone Job Board", x: 10.5, y: 8.5 },
+      inventory: {},
+    });
+
+    expect(nextStep?.source).toBe("job-board");
+    expect(nextStep?.actionLine).toContain("Boone Job Board");
+    expect(nextStep?.actionLine).toContain("1m");
   });
 });

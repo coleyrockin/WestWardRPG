@@ -148,6 +148,32 @@ function markerActionLine(marker = {}) {
   return `${action}: ${marker.label || "route marker"}${distance}${count}`;
 }
 
+function objectiveLineFor(objective = {}) {
+  return objective?.objectiveLine || objective?.line || "";
+}
+
+function joinBriefLines(parts = []) {
+  const seen = new Set();
+  return parts
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .filter((part) => {
+      if (seen.has(part)) return false;
+      seen.add(part);
+      return true;
+    })
+    .slice(0, 2)
+    .join(" | ");
+}
+
+function hasWorkbenchMaterial(inventory = {}) {
+  return (inventory["Slime Core"] || 0) > 0
+    || (inventory.Ashglass || 0) > 0
+    || (inventory["Lantern Filament"] || 0) > 0
+    || (inventory.Wood || 0) >= 2
+    || (inventory.Stone || 0) >= 2;
+}
+
 function isAliveEnemy(enemy = {}) {
   return enemy.alive !== false;
 }
@@ -299,6 +325,79 @@ export function resolveOpeningRouteGuide(input = {}) {
     steps,
     regionHint,
   };
+}
+
+export function resolveFirstSessionNextStep(input = {}) {
+  if (input.mode && input.mode !== "playing") return null;
+
+  const liveObjective = input.liveObjective || input.openingRouteGuide || null;
+  const activeJob = input.activeJob || null;
+  const goldenPath = input.goldenPath || null;
+  const house = input.house || {};
+  const inventory = input.inventory || {};
+  const regionHint = input.regionLabel || liveObjective?.regionHint || "";
+
+  if (liveObjective) {
+    const actionLine = objectiveLineFor(liveObjective);
+    if (!actionLine) return null;
+
+    const jobReady = activeJob?.status === "ready";
+    const reasonLine = jobReady
+      ? "Turn in the job so the board, Boone, and rewards can react."
+      : activeJob
+        ? "This advances your active job and keeps the road loop moving."
+        : goldenPath?.phase === "available"
+          ? "This starts the Boone road loop and pays into gear or house progress."
+          : "This keeps the first session moving toward a visible payoff.";
+    const payoffLine = liveObjective.rewardLine
+      || liveObjective.rewardHint
+      || goldenPath?.rewardUseLine
+      || (jobReady ? activeJob.rewardLine : "");
+
+    return {
+      id: "first-session-next-step",
+      title: "Next step",
+      source: liveObjective.id || liveObjective.title || "objective",
+      objectiveLine: actionLine,
+      actionLine,
+      secondaryLine: joinBriefLines([liveObjective.secondaryLine, reasonLine]),
+      payoffLine,
+      urgency: liveObjective.urgency || (jobReady ? "high" : "medium"),
+      regionHint,
+    };
+  }
+
+  if (!input.inHouse && house.unlocked && hasWorkbenchMaterial(inventory)) {
+    return {
+      id: "first-session-next-step",
+      title: "Next step",
+      source: "house-workbench",
+      objectiveLine: "Return home: use the workbench with your new materials.",
+      actionLine: "Return home: use the workbench with your new materials.",
+      secondaryLine: "Turn loot into repair, crafting, or upgrade prep so rewards matter.",
+      payoffLine: "House progress and gear prep",
+      urgency: "medium",
+      regionHint,
+    };
+  }
+
+  if (!activeJob && input.boardProp) {
+    const boardDistance = distanceLine(input.player, input.boardProp);
+    const distance = boardDistance ? ` (${boardDistance})` : "";
+    return {
+      id: "first-session-next-step",
+      title: "Next step",
+      source: "job-board",
+      objectiveLine: `Read Boone Job Board${distance}.`,
+      actionLine: `Read Boone Job Board${distance}.`,
+      secondaryLine: "Pick a paid road loop before wandering too far from town.",
+      payoffLine: "Gold, XP, route markers, and town reactions",
+      urgency: "medium",
+      regionHint,
+    };
+  }
+
+  return null;
 }
 
 export function resolveFirstMinuteCacheReward(input = {}) {

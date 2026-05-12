@@ -168,6 +168,7 @@ import {
   resolveFirstMinuteCache,
   resolveFirstMinuteCacheReward,
   resolveFirstMinutePressure,
+  resolveFirstSessionNextStep,
   resolveHitFeedback,
   resolveOpeningFightCue,
   resolveOpeningObjective,
@@ -9001,13 +9002,32 @@ const canvas = document.getElementById("game");
       jobMarker,
       boardProp,
     });
+    const goldenPath = resolveGoldenPathStatus({
+      jobState: state.world.jobs,
+      inventory: state.inventory,
+      house: state.house,
+      regionId: state.regions.activeRegion,
+    });
     const liveObjective = selectLiveObjective([openingRouteGuide, firstPressure, jobObjective, roadSignPrompt, roadRouteObjective, openingObjective, roadDiscoveryLead, explorationLead]);
-    const liveObjectiveLine = resolveLiveObjectiveLine(liveObjective);
-    if (liveObjective && msgY <= topY + topH - 10) {
+    const firstSessionNextStep = resolveFirstSessionNextStep({
+      mode: state.mode,
+      inHouse: state.player.inHouse,
+      regionLabel: regionProfile.label,
+      player: state.player,
+      inventory: state.inventory,
+      house: state.house,
+      liveObjective,
+      activeJob,
+      boardProp,
+      goldenPath,
+    });
+    const displayedObjective = firstSessionNextStep || liveObjective;
+    const liveObjectiveLine = firstSessionNextStep?.actionLine || resolveLiveObjectiveLine(liveObjective);
+    if (displayedObjective && msgY <= topY + topH - 10) {
       ctx.font = "bold 11px Georgia";
-      drawClippedText(`→ ${liveObjectiveLine}`, topX + 10, msgY, topW - 20, liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "#ffd77b" : "#f3e8cf");
+      drawClippedText(`→ ${liveObjectiveLine}`, topX + 10, msgY, topW - 20, displayedObjective.urgency === "high" || displayedObjective.urgency === "urgent" ? "#ffd77b" : "#f3e8cf");
     }
-    if (liveObjective) {
+    if (displayedObjective) {
       const strip = resolveObjectiveStripLayout({
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
@@ -9017,20 +9037,20 @@ const canvas = document.getElementById("game");
         topW,
         topH,
         bottomHudY: hudY,
-        hasSecondaryLine: Boolean(liveObjective.secondaryLine),
+        hasSecondaryLine: Boolean(displayedObjective.secondaryLine),
       });
       drawSoftPanel(strip.x, strip.y, strip.w, strip.h, {
-        top: liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "rgba(70, 44, 17, 0.82)" : "rgba(25, 32, 25, 0.76)",
-        bottom: liveObjective.urgency === "high" || liveObjective.urgency === "urgent" ? "rgba(30, 19, 9, 0.78)" : "rgba(9, 15, 11, 0.7)",
+        top: displayedObjective.urgency === "high" || displayedObjective.urgency === "urgent" ? "rgba(70, 44, 17, 0.82)" : "rgba(25, 32, 25, 0.76)",
+        bottom: displayedObjective.urgency === "high" || displayedObjective.urgency === "urgent" ? "rgba(30, 19, 9, 0.78)" : "rgba(9, 15, 11, 0.7)",
         border: "rgba(255, 215, 123, 0.45)",
         shadowBlur: 8,
         shadowOffsetY: 3,
       });
       ctx.font = "bold 11px Georgia";
-      drawClippedText(`${liveObjective.title}: ${liveObjectiveLine}`, strip.x + 10, strip.primaryY, strip.w - 20, "#ffd77b");
-      if (liveObjective.secondaryLine && strip.secondaryY) {
+      drawClippedText(`${displayedObjective.title}: ${liveObjectiveLine}`, strip.x + 10, strip.primaryY, strip.w - 20, "#ffd77b");
+      if (displayedObjective.secondaryLine && strip.secondaryY) {
         ctx.font = "10px Georgia";
-        drawClippedText(liveObjective.secondaryLine, strip.x + 10, strip.secondaryY, strip.w - 20, "#f1e5c8");
+        drawClippedText(displayedObjective.secondaryLine, strip.x + 10, strip.secondaryY, strip.w - 20, "#f1e5c8");
       }
     }
     drawInteractionPrompt(getInteractionPrompt(), hudY, margin);
@@ -9959,6 +9979,29 @@ const canvas = document.getElementById("game");
       jobMarker: jobRouteMarker,
       boardProp,
     });
+    const jobObjective = buildJobObjective({ activeJob, jobMarker: jobRouteMarker });
+    const liveObjective = selectLiveObjective([
+      openingRouteGuide,
+      firstMinutePressure,
+      jobObjective,
+      roadSignPrompt,
+      roadRouteObjective,
+      openingObjective,
+      roadDiscoveryLead,
+      explorationLead,
+    ]);
+    const firstSessionNextStep = resolveFirstSessionNextStep({
+      mode: state.mode,
+      inHouse: state.player.inHouse,
+      regionLabel: regionProfile.label,
+      player: state.player,
+      inventory: state.inventory,
+      house: state.house,
+      liveObjective,
+      activeJob,
+      boardProp,
+      goldenPath,
+    });
     const quests = {
       crystal: {
         title: state.quests.crystal.title,
@@ -10010,6 +10053,8 @@ const canvas = document.getElementById("game");
         last_saved_at: lastSaveAt,
       },
       gameplay_feel: {
+        next_step: firstSessionNextStep,
+        live_objective: liveObjective,
         opening_objective: openingObjective,
         opening_fight_cue: openingFightCue,
         opening_route_guide: openingRouteGuide,
