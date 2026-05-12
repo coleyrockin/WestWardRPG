@@ -42,12 +42,15 @@ describe("regionVisualIdentity", () => {
 
     expect(presentation.landmark.label).toContain("Watchtower");
     expect(presentation.routeLine).toContain("wagon ruts");
+    expect(presentation.routeLine).toContain("hanging lamps");
     expect(presentation.readability.roadPull).toContain("mileposts");
+    expect(presentation.readability.roadPull).toContain("paired lamps");
     expect(presentation.props.length).toBeGreaterThanOrEqual(5);
-    expect(presentation.roads.length).toBeGreaterThanOrEqual(5);
+    expect(presentation.roads.length).toBeGreaterThanOrEqual(7);
     expect(presentation.props.every((prop: any) => prop.blocking === false)).toBe(true);
     expect(presentation.roads.every((road: any) => road.blocking === false)).toBe(true);
     expect(presentation.props.some((prop: any) => prop.kind === "sign")).toBe(true);
+    expect(presentation.props.filter((prop: any) => prop.kind === "lamp").length).toBeGreaterThanOrEqual(2);
     expect(presentation.roads.some((road: any) => road.label.includes("Marshal"))).toBe(true);
     expect(presentation.roads.some((road: any) => road.label.includes("Broken Wagon"))).toBe(true);
   });

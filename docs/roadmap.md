@@ -49,7 +49,7 @@ Date: 2026-05-12.
 Latest local facts:
 
 1. Branch target: `main`, tracking `origin/main`.
-2. Test gate: `npm test` reports 947 passing tests across 84 test files.
+2. Test gate: `npm test` reports 949 passing tests across 84 test files.
 3. `src/main.js` is over 10.5k lines. This is still the biggest technical drag.
 4. `docs/roadmap.md` had stale historical counts and mixed shipped work with
    future scope. This rewrite replaces that clutter with the finish path.
@@ -545,5 +545,5 @@ Latest local verification snapshot:
 
 ```bash
 npm test
-# 947 passing across 84 test files
+# 949 passing across 84 test files
 ```

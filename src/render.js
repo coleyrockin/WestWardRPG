@@ -98,6 +98,51 @@ export function resolveNearWallVisualTreatment(options = {}) {
   };
 }
 
+export function resolveRoadSurfaceVisualStyle(options = {}) {
+  const width = Math.max(1, options.width || 1);
+  const height = Math.max(1, options.height || 1);
+  const horizon = Number.isFinite(options.horizon) ? options.horizon : height * 0.5;
+  const groundDepth = Math.max(1, height - horizon);
+  const normalizedDay = Math.max(0, Math.min(1, Number.isFinite(options.normalizedDay) ? options.normalizedDay : 0.6));
+  const regionId = options.regionId || "frontier";
+  const base = {
+    groundDepth,
+    chevronCount: Math.max(5, Math.min(11, Math.round(width / 100))),
+    postCount: Math.max(7, Math.min(13, Math.round(width / 86))),
+    centerGlowAlpha: 0.1 + normalizedDay * 0.08,
+    edgeAlpha: 0.24 + normalizedDay * 0.12,
+    chevronAlpha: 0.14 + normalizedDay * 0.1,
+    railAlpha: 0.16 + normalizedDay * 0.1,
+    accent: "#ffd77b",
+  };
+
+  if (regionId === "ashfall") {
+    return {
+      ...base,
+      chevronCount: Math.max(6, base.chevronCount),
+      centerGlowAlpha: 0.12 + normalizedDay * 0.1,
+      edgeAlpha: 0.3 + normalizedDay * 0.08,
+      chevronAlpha: 0.16 + normalizedDay * 0.1,
+      railAlpha: 0.18 + normalizedDay * 0.08,
+      accent: "#ff9f5f",
+    };
+  }
+
+  if (regionId === "ironlantern") {
+    return {
+      ...base,
+      chevronCount: Math.max(7, base.chevronCount),
+      centerGlowAlpha: 0.15 + normalizedDay * 0.12,
+      edgeAlpha: 0.34 + normalizedDay * 0.1,
+      chevronAlpha: 0.22 + normalizedDay * 0.12,
+      railAlpha: 0.2 + normalizedDay * 0.1,
+      accent: "#9bd3ff",
+    };
+  }
+
+  return base;
+}
+
 export function resolveObjectiveStripLayout(options = {}) {
   const margin = Math.max(0, options.margin || 0);
   const topX = Math.max(margin, options.topX || margin);

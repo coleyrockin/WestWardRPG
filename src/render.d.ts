@@ -11,6 +11,7 @@ export interface GradientCache {
 export function createGradientCache(): GradientCache;
 export function resolveWallProjection(options?: any): any;
 export function resolveNearWallVisualTreatment(options?: any): any;
+export function resolveRoadSurfaceVisualStyle(options?: any): any;
 export function resolveObjectiveStripLayout(options?: any): any;
 export function resolveScrollableRowWindow(options?: any): any;
 

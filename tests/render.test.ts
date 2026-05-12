@@ -6,6 +6,7 @@ import {
   createRenderHelpers,
   resolveNearWallVisualTreatment,
   resolveObjectiveStripLayout,
+  resolveRoadSurfaceVisualStyle,
   resolveScrollableRowWindow,
   resolveWallProjection,
 } from "../src/render.js";
@@ -183,6 +184,26 @@ describe("render — resolveObjectiveStripLayout", () => {
       h: 28,
       primaryY: 130,
     });
+  });
+});
+
+describe("render — resolveRoadSurfaceVisualStyle", () => {
+  it("scales road readability markers with viewport width", () => {
+    const small = resolveRoadSurfaceVisualStyle({ width: 420, height: 300, horizon: 150, regionId: "frontier" });
+    const large = resolveRoadSurfaceVisualStyle({ width: 1200, height: 720, horizon: 360, regionId: "frontier" });
+
+    expect(large.chevronCount).toBeGreaterThan(small.chevronCount);
+    expect(large.postCount).toBeGreaterThan(small.postCount);
+    expect(large.groundDepth).toBe(360);
+  });
+
+  it("gives Iron Lantern the strongest glowing road language", () => {
+    const frontier = resolveRoadSurfaceVisualStyle({ width: 900, height: 640, horizon: 320, regionId: "frontier", normalizedDay: 0.6 });
+    const lantern = resolveRoadSurfaceVisualStyle({ width: 900, height: 640, horizon: 320, regionId: "ironlantern", normalizedDay: 0.6 });
+
+    expect(lantern.centerGlowAlpha).toBeGreaterThan(frontier.centerGlowAlpha);
+    expect(lantern.chevronAlpha).toBeGreaterThan(frontier.chevronAlpha);
+    expect(lantern.accent).toBe("#9bd3ff");
   });
 });
 

@@ -333,6 +333,7 @@ import {
   createRenderHelpers,
   resolveNearWallVisualTreatment,
   resolveObjectiveStripLayout,
+  resolveRoadSurfaceVisualStyle,
   resolveScrollableRowWindow,
   resolveWallProjection,
 } from "./render.js";
@@ -3513,7 +3514,7 @@ const canvas = document.getElementById("game");
     }
 
     const boardProp = getActiveJobBoardProp();
-    if (boardProp && dist(player, boardProp) < 1.85) {
+    if (boardProp && dist(player, boardProp) < 2.15) {
       addCandidate("job-board", "Boone's job board", boardProp, { line: "Pick up paid road work", color: boardProp.color });
     }
 
@@ -6054,6 +6055,7 @@ const canvas = document.getElementById("game");
     const groundDepth = height - horizon;
     const roadColor = regionProfile.roadColor || regionProfile.groundPalette?.[2] || "#c79d5f";
     const edgeColor = regionProfile.roadEdgeColor || regionProfile.groundPalette?.[0] || "#7d5d3e";
+    const roadStyle = resolveRoadSurfaceVisualStyle({ regionId, width, height, horizon, normalizedDay });
 
     if (regionId === "ashfall") {
       ctx.fillStyle = hexToRgba("#2b211b", 0.88);
@@ -6064,7 +6066,7 @@ const canvas = document.getElementById("game");
       ctx.bezierCurveTo(width * 0.72, height * 0.82, width * 0.58, horizon + groundDepth * 0.32, trailCenter + width * 0.03, horizon + 4);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = hexToRgba(roadColor, 0.42);
+      ctx.strokeStyle = hexToRgba(roadColor, roadStyle.edgeAlpha);
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(trailCenter - width * 0.04, horizon + 2);
@@ -6076,9 +6078,21 @@ const canvas = document.getElementById("game");
         const t = i / 13;
         const y = horizon + Math.pow(t, 1.4) * groundDepth;
         const spread = lerp(width * 0.01, width * 0.1, t);
-        ctx.fillStyle = `rgba(255, 192, 120, ${0.04 + (1 - t) * 0.07})`;
+        ctx.fillStyle = `rgba(255, 192, 120, ${0.05 + (1 - t) * roadStyle.centerGlowAlpha})`;
         ctx.fillRect(trailCenter - spread, y, 4 + (1 - t) * 4, 1.5);
         ctx.fillRect(trailCenter + spread - 4, y + 1.5, 4 + (1 - t) * 4, 1.5);
+      }
+      for (let i = 0; i < roadStyle.chevronCount; i++) {
+        const t = (i + 1) / (roadStyle.chevronCount + 1);
+        const y = horizon + Math.pow(t, 1.34) * groundDepth;
+        const span = lerp(width * 0.018, width * 0.12, t);
+        ctx.strokeStyle = hexToRgba(roadStyle.accent, roadStyle.chevronAlpha * (1 - t * 0.45));
+        ctx.lineWidth = lerp(1, 3, t);
+        ctx.beginPath();
+        ctx.moveTo(trailCenter - span, y + 8);
+        ctx.lineTo(trailCenter, y);
+        ctx.lineTo(trailCenter + span, y + 8);
+        ctx.stroke();
       }
       return;
     }
@@ -6092,7 +6106,7 @@ const canvas = document.getElementById("game");
       ctx.bezierCurveTo(width * 0.62, height * 0.84, width * 0.56, horizon + groundDepth * 0.34, trailCenter + width * 0.018, horizon + 3);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = hexToRgba(roadColor, 0.5);
+      ctx.strokeStyle = hexToRgba(roadColor, roadStyle.edgeAlpha);
       ctx.lineWidth = 2.2;
       ctx.beginPath();
       ctx.moveTo(trailCenter - width * 0.03, horizon + 2);
@@ -6103,8 +6117,20 @@ const canvas = document.getElementById("game");
       for (let i = 0; i < 11; i++) {
         const t = i / 10;
         const y = horizon + Math.pow(t, 1.3) * groundDepth;
-        ctx.fillStyle = `rgba(155, 211, 255, ${0.1 + (1 - t) * 0.12})`;
+        ctx.fillStyle = `rgba(155, 211, 255, ${0.12 + (1 - t) * roadStyle.centerGlowAlpha})`;
         ctx.fillRect(trailCenter - width * 0.006, y, width * 0.012, 2.5);
+      }
+      for (let i = 0; i < roadStyle.chevronCount; i++) {
+        const t = (i + 1) / (roadStyle.chevronCount + 1);
+        const y = horizon + Math.pow(t, 1.28) * groundDepth;
+        const span = lerp(width * 0.016, width * 0.1, t);
+        ctx.strokeStyle = hexToRgba(roadStyle.accent, roadStyle.chevronAlpha * (1 - t * 0.35));
+        ctx.lineWidth = lerp(1, 3.2, t);
+        ctx.beginPath();
+        ctx.moveTo(trailCenter - span, y + 6);
+        ctx.lineTo(trailCenter, y);
+        ctx.lineTo(trailCenter + span, y + 6);
+        ctx.stroke();
       }
       return;
     }
@@ -6121,7 +6147,7 @@ const canvas = document.getElementById("game");
     ctx.bezierCurveTo(width * 0.78, height * 0.78, width * 0.64, horizon + groundDepth * 0.34, trailCenter + width * 0.04, horizon + 4);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = hexToRgba(edgeColor, 0.28 + normalizedDay * 0.12);
+    ctx.strokeStyle = hexToRgba(edgeColor, roadStyle.edgeAlpha);
     ctx.lineWidth = 2.2;
     for (let side = -1; side <= 1; side += 2) {
       ctx.beginPath();
@@ -6139,18 +6165,31 @@ const canvas = document.getElementById("game");
       ctx.fillRect(trailCenter - spread, y, rutW, 2.2 + t * 2.4);
       ctx.fillRect(trailCenter + spread - rutW, y + 1.5, rutW, 2.2 + t * 2.4);
       if (i % 2 === 0) {
-        ctx.fillStyle = `rgba(255, 226, 160, ${0.05 + (1 - t) * 0.08})`;
+        ctx.fillStyle = `rgba(255, 226, 160, ${0.06 + (1 - t) * roadStyle.centerGlowAlpha})`;
         ctx.fillRect(trailCenter - rutW * 0.5, y + 2, rutW, 1.8);
       }
     }
 
-    for (let i = 0; i < 9; i++) {
-      const t = i / 8;
+    for (let i = 0; i < roadStyle.chevronCount; i++) {
+      const t = (i + 1) / (roadStyle.chevronCount + 1);
+      const y = horizon + Math.pow(t, 1.32) * groundDepth;
+      const span = lerp(width * 0.018, width * 0.13, t);
+      ctx.strokeStyle = hexToRgba(roadStyle.accent, roadStyle.chevronAlpha * (1 - t * 0.4));
+      ctx.lineWidth = lerp(1, 3.4, t);
+      ctx.beginPath();
+      ctx.moveTo(trailCenter - span, y + 7);
+      ctx.lineTo(trailCenter, y);
+      ctx.lineTo(trailCenter + span, y + 7);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < roadStyle.postCount; i++) {
+      const t = i / Math.max(1, roadStyle.postCount - 1);
       const y = horizon + Math.pow(t, 1.55) * groundDepth;
       const leftX = lerp(trailCenter - width * 0.045, width * 0.11, t);
       const rightX = lerp(trailCenter + width * 0.045, width * 0.89, t);
       const postH = lerp(8, 42, t);
-      ctx.strokeStyle = `rgba(92, 64, 38, ${0.18 + t * 0.18})`;
+      ctx.strokeStyle = `rgba(92, 64, 38, ${roadStyle.railAlpha + t * 0.16})`;
       ctx.lineWidth = lerp(1, 3, t);
       ctx.beginPath();
       ctx.moveTo(leftX, y);
@@ -7961,7 +8000,7 @@ const canvas = document.getElementById("game");
           ...boardProp,
           kind: "job-board",
           label: boardProp.label,
-          size: 0.86,
+          size: 1.08,
         });
       }
 
@@ -8205,10 +8244,12 @@ const canvas = document.getElementById("game");
       const labelImportant = sprite.kind === "npc"
         || sprite.kind === "enemy"
         || sprite.kind === "chest"
+        || sprite.kind === "landmark"
         || sprite.kind === "house-door"
         || sprite.kind === "pressure"
         || sprite.kind === "job-route"
-        || sprite.kind === "job-board";
+        || sprite.kind === "job-board"
+        || (sprite.kind === "world-prop" && ["road-sign", "sign", "lamp"].includes(sprite.propKind));
       if (state.mode === "playing" && sprite.label && centeredLabel && sprite.distToPlayer < 5.8 && labelImportant) {
         ctx.font = "bold 11px Georgia";
         drawPillLabel(fitText(sprite.label, 116), left + spriteWidth / 2, top - 10);
