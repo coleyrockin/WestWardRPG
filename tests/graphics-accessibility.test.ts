@@ -69,6 +69,8 @@ describe("settings modal — stepSetting", () => {
     expect(ids).toContain("colorblindMode");
     expect(ids).toContain("fontScale");
     expect(ids).toContain("motionReduction");
+    expect(ids).toContain("combatSubtitles");
+    expect(ids).toContain("combatAudioCues");
     expect(ids).toContain("cameraShake");
   });
 
@@ -83,6 +85,14 @@ describe("settings modal — stepSetting", () => {
     expect(readSettingValue(g, "motionReduction")).toBe(false);
     stepSetting(g, "motionReduction", 1);
     expect(readSettingValue(g, "motionReduction")).toBe(true);
+
+    expect(readSettingValue(g, "combatSubtitles")).toBe(true);
+    stepSetting(g, "combatSubtitles", 1);
+    expect(readSettingValue(g, "combatSubtitles")).toBe(false);
+
+    expect(readSettingValue(g, "combatAudioCues")).toBe(true);
+    stepSetting(g, "combatAudioCues", 1);
+    expect(readSettingValue(g, "combatAudioCues")).toBe(false);
   });
 
   it("cycles enum rows in both directions", () => {

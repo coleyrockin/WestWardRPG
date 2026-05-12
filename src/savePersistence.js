@@ -191,8 +191,9 @@ export async function writeSave(slot, payload) {
       // Ensure the backup key (slot, savedAt) is unique. If two saves landed in the
       // same millisecond, nudge the timestamp by 1 ms to avoid collision.
       let backupAt = current.envelope.savedAt;
-      const existing = await reqAsync(backups.get([slotKey, backupAt]));
-      if (existing) backupAt += 1;
+      while (await reqAsync(backups.get([slotKey, backupAt]))) {
+        backupAt += 1;
+      }
       await reqAsync(
         backups.put({
           slot: slotKey,
@@ -408,10 +409,14 @@ export async function migrateFromLocalStorage(slot) {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      // Bad legacy blob — skip; clearing happens below regardless.
+      // Bad legacy blob — keep it in localStorage so the player still has data.
       continue;
     }
     if (!parsed || typeof parsed !== "object") continue;
+    const envelopeValidation = validateEnvelope(makeEnvelope(parsed));
+    if (!envelopeValidation.ok) {
+      return { ok: false, reason: `legacy-${envelopeValidation.reason}` };
+    }
     try {
       await writeSave(slotKey, parsed);
     } catch (err) {

@@ -107,7 +107,8 @@ export function resolveEnemyReadabilityCue(enemy = {}) {
     });
   }
 
-  if (numberOr(enemy.phase, 1) >= 2 || enemy.phaseLabel) {
+  const phaseCueTimer = numberOr(enemy.phaseCueTimer, 0);
+  if (phaseCueTimer > 0) {
     return baseCue("phase", `PHASE ${Math.max(2, Math.floor(numberOr(enemy.phase, 2)))}`, "high", "#ffc490", 1, {
       silhouette: "phase",
       actionLine: enemy.phaseLabel ? String(enemy.phaseLabel) : "Pattern changed.",

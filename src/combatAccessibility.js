@@ -29,7 +29,7 @@ export function createCombatSubtitleState() {
 export function recordCombatEvent(subtitleState, type) {
   if (!subtitleState || !COMBAT_EVENTS[type]) return;
   // Dedupe: don't re-queue the same event if it's already current
-  if (subtitleState.current?.type === type && subtitleState.ttl > 0.3) return;
+  if (subtitleState.current?.type === type && subtitleState.current.life > 0.3) return;
   subtitleState.queue.push({ type, ...COMBAT_EVENTS[type], life: COMBAT_EVENTS[type].duration });
 }
 
@@ -68,6 +68,7 @@ const AUDIO_CUES = {
   enemy_alert:   { freq: 360, dur: 0.08, vol: 0.11 },
   windup:        { freq: 240, dur: 0.16, vol: 0.14 },
   stagger:       { freq: 520, dur: 0.09, vol: 0.12 },
+  block:         { freq: 320, dur: 0.07, vol: 0.1 },
   perfect_parry: { freq: 880, dur: 0.12, vol: 0.18 },
   perfect_dodge: { freq: 660, dur: 0.10, vol: 0.15 },
   guard_break:   { freq: 200, dur: 0.20, vol: 0.22 },

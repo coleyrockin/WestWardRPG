@@ -50,6 +50,8 @@ export function createInitialGraphicsState() {
       cameraShake: 1,
       fontScale: 1,
       motionReduction: false,
+      combatSubtitles: true,
+      combatAudioCues: true,
       colorblindMode: "none",
     },
   };
@@ -93,6 +95,8 @@ export const SETTINGS_ROWS = [
   { id: "colorblindMode", label: "Colorblind Mode", kind: "enum", options: COLORBLIND_MODES },
   { id: "fontScale", label: "Font Scale", kind: "range", min: 0.8, max: 1.6, step: 0.1, format: (v) => `${v.toFixed(2)}x` },
   { id: "motionReduction", label: "Motion Reduction", kind: "bool" },
+  { id: "combatSubtitles", label: "Combat Subtitles", kind: "bool" },
+  { id: "combatAudioCues", label: "Combat Audio Cues", kind: "bool" },
   { id: "cameraShake", label: "Camera Shake", kind: "range", min: 0, max: 1.5, step: 0.25, format: (v) => v.toFixed(2) },
 ];
 
@@ -105,6 +109,8 @@ export function readSettingValue(graphics, id) {
     case "colorblindMode": return graphics.accessibility?.colorblindMode ?? "none";
     case "fontScale": return Number(graphics.accessibility?.fontScale ?? 1);
     case "motionReduction": return Boolean(graphics.accessibility?.motionReduction);
+    case "combatSubtitles": return graphics.accessibility?.combatSubtitles !== false;
+    case "combatAudioCues": return graphics.accessibility?.combatAudioCues !== false;
     case "cameraShake": return Number(graphics.accessibility?.cameraShake ?? 1);
     default: return null;
   }
@@ -121,6 +127,8 @@ export function stepSetting(graphics, id, dir) {
     if (id === "gradientCache") graphics.performance.gradientCache = !current;
     else if (id === "postFx") graphics.performance.postFx = !current;
     else if (id === "motionReduction") graphics.accessibility.motionReduction = !current;
+    else if (id === "combatSubtitles") graphics.accessibility.combatSubtitles = !current;
+    else if (id === "combatAudioCues") graphics.accessibility.combatAudioCues = !current;
     return readSettingValue(graphics, id);
   }
   if (row.kind === "enum") {

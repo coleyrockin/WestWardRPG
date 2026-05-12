@@ -49,7 +49,7 @@ Date: 2026-05-12.
 Latest local facts:
 
 1. Branch target: `main`, tracking `origin/main`.
-2. Test gate: `npm test` reports 959 passing tests across 84 test files.
+2. Test gate: `npm test` reports 963 passing tests across 84 test files.
 3. `src/main.js` is over 10.5k lines. This is still the biggest technical drag.
 4. `docs/roadmap.md` had stale historical counts and mixed shipped work with
    future scope. This rewrite replaces that clutter with the finish path.
@@ -91,8 +91,11 @@ Latest local facts:
 5. Save resilience is close but not complete.
    - IndexedDB saves, backup rotation, migration, export/import helpers, and
      slot summaries exist.
-   - The player still needs per-slot recovery UI, per-slot export/import UI,
-     and clear future-schema messaging.
+   - Per-slot import/export/recovery controls, save-state clarity copy, and
+     chosen-backup restore UI exist.
+   - The player still needs browser proof for corrupt-primary recovery,
+     export/import flows, IndexedDB quota handling, and clearer manual
+     save/autosave status.
 
 6. Test coverage is broad but still too helper-heavy.
    - Unit/state tests are strong.
@@ -347,9 +350,8 @@ Required work:
      accessibility, audio, graphics, and keybind clarity.
 
 2. Save resilience finish.
-   - Per-slot corruption recovery button.
-   - Per-slot export/import UI.
-   - Future schema messaging when a save is newer than the app.
+   - Browser smoke for corrupt primary plus chosen-backup restore.
+   - Browser smoke for per-slot export/import.
    - IndexedDB quota handling.
    - Manual save confirmation and autosave status clarity.
 
@@ -559,7 +561,7 @@ git diff --check
 # clean
 
 npm test
-# 959 passing across 84 test files
+# 963 passing across 84 test files
 
 npm run typecheck:ts
 # clean

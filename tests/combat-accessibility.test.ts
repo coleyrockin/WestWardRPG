@@ -22,6 +22,14 @@ describe("combatAccessibility — recordCombatEvent", () => {
       expect(state.queue.length).toBeGreaterThan(0);
     }
   });
+
+  it("dedupes the current event using the active subtitle life", () => {
+    const state = createCombatSubtitleState();
+    recordCombatEvent(state, "hit");
+    tickCombatSubtitles(state, 0.016);
+    recordCombatEvent(state, "hit");
+    expect(state.queue).toHaveLength(0);
+  });
 });
 
 describe("combatAccessibility — tickCombatSubtitles", () => {

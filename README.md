@@ -65,11 +65,11 @@ The current build contains the Shattered Frontier v3 foundation plus several ope
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, early open-world pressure/dressing work, and a Dustward road/watchtower/wall readability pass.
 
-Latest local fast gate: `npm test` reports **949 passing tests across 84 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **963 passing tests across 84 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
-The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the single source of truth. The active build order is:
+The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the single source of truth. The high-level active build order is:
 
 1. **Golden Path 1** — one complete Boone road-job loop from town to road to reward to consequence.
 2. **Hardcore visual readability** — stronger roads, landmarks, near-wall treatment, combat tells, interactable silhouettes, and visual regression gates.
@@ -96,7 +96,7 @@ The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the
 - **Run history + playtest metrics**
   - Last 10 completed runs persisted locally. Tracks time-to-first-kill, time-to-first-job-accepted, chapter reached, death cause, and setting changes per run.
 - **Automation**
-  - Unit tests, TypeScript checks, syntax checks, smoke actions, stable visual-regression capture/diff scripts, and `render_game_to_text()` for deterministic browser/state inspection.
+  - Unit tests, TypeScript checks, syntax checks, smoke actions, visual-regression capture/review scripts, and `render_game_to_text()` for deterministic browser/state inspection. Strict visual diff is intentionally blocked until baselines are committed.
 
 ## Quick Start
 
@@ -222,7 +222,7 @@ npm run test:visual # run after baselines are committed to enforce pixel thresho
 
 Saves live in **IndexedDB** (primary), with automatic backup rotation (last 3 backups per slot) and a one-time localStorage migration on first load. The storage envelope wraps every payload with a version, timestamp, and FNV-1a hash for corruption detection.
 
-Three save slots are available on the title screen. Each slot shows level, region, time played, and difficulty. Export (↓) and import (Import Save…) buttons are on the slot picker. Corrupted saves are auto-restored from the most recent valid backup.
+Three save slots are available on the title screen. Each slot shows level, region, time played, difficulty, recovery status, and backup availability. Export (↓), per-slot import (↑), global import, delete, and corrupt-slot recovery controls are on the slot picker. Corrupted saves can be restored from the latest valid backup, and multiple valid backups can be chosen manually.
 
 The on-disk payload schema version field tracks compatibility:
 
@@ -236,7 +236,7 @@ The on-disk payload schema version field tracks compatibility:
 
 ## Troubleshooting
 
-- **Wrong app appears on localhost**: another process is using `5173`; run on `5183`.
+- **Wrong app appears on localhost**: another process or service worker may be using `5173`; run smoke on a clean explicit port, for example `WESTWARD_PORT=5201 WESTWARD_URL=http://127.0.0.1:5201/index.html npm run test:smoke`.
 - **No audio at start**: click canvas first to unlock browser audio context.
 - **QA creates local artifacts**: smoke and visual checks write to ignored `output/`; remove it when you want a clean workspace.
 - **Roadmap seems ahead of README**: use [`docs/roadmap.md`](docs/roadmap.md) as the detailed current plan; this README is the high-level project entry point.

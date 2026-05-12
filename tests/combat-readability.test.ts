@@ -31,7 +31,7 @@ describe("combatReadability", () => {
   });
 
   it("surfaces stagger, phase, and death cues in priority order", () => {
-    expect(resolveEnemyReadabilityCue({ alive: true, phase: 2, phaseLabel: "Overdrive" })).toMatchObject({
+    expect(resolveEnemyReadabilityCue({ alive: true, phase: 2, phaseLabel: "Overdrive", phaseCueTimer: 1.5 })).toMatchObject({
       state: "phase",
       label: "PHASE 2",
     });
@@ -123,6 +123,21 @@ describe("combatReadability", () => {
 
     expect(summary.active).toBe(false);
     expect(summary.threatLine).toBe("No hostile pressure nearby.");
+  });
+
+  it("does not keep old phase-two bosses as permanent high urgency", () => {
+    const summary = resolveCombatEncounterReadability({
+      player: { x: 0, y: 0 },
+      maxDistance: 10,
+      enemies: [
+        { id: "boss", label: "Old Phase Boss", alive: true, x: 50, y: 50, phase: 2, phaseLabel: "Overdrive" },
+      ],
+    });
+
+    expect(summary.active).toBe(false);
+    expect(resolveEnemyReadabilityCue({ alive: true, phase: 2, phaseLabel: "Overdrive" })).toMatchObject({
+      state: "aggro",
+    });
   });
 
   it("builds readable defeat reward callouts", () => {

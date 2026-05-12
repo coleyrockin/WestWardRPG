@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   hashJson,
   makeEnvelope,
@@ -169,6 +169,23 @@ describe("backup rotation", () => {
     for (let i = 1; i < backups.length; i++) {
       expect(backups[i - 1].savedAt).toBeGreaterThanOrEqual(backups[i].savedAt);
     }
+  });
+
+  it("keeps backup rotation stable when saves share one millisecond", async () => {
+    __resetSavePersistenceForTests();
+    const now = 1700000000000;
+    const spy = vi.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      for (let i = 0; i < 5; i++) {
+        await writeSave(undefined, samplePayload({ player: { x: i, y: 0, hp: 10, level: 1 } }));
+      }
+    } finally {
+      spy.mockRestore();
+    }
+
+    const backups = await listBackups();
+    expect(backups).toHaveLength(MAX_BACKUPS_PER_SLOT);
+    expect(new Set(backups.map((backup) => backup.savedAt)).size).toBe(MAX_BACKUPS_PER_SLOT);
   });
 });
 
@@ -341,6 +358,20 @@ describe("legacy localStorage migration", () => {
     const result = await migrateFromLocalStorage();
     // Either null (skipped) or ok:false; never throws.
     expect(result === null || (result && result.ok === false) || (result && result.ok === true)).toBe(true);
+  });
+
+  it("does not clear malformed legacy objects that cannot validate", async () => {
+    __resetSavePersistenceForTests();
+    const badPayload = { player: { level: 5 } };
+    globalThis.localStorage.setItem("westward-save-v3", JSON.stringify(badPayload));
+
+    const result = await migrateFromLocalStorage();
+
+    expect(result).toMatchObject({ ok: false, reason: "legacy-missing-payload-version" });
+    expect(globalThis.localStorage.getItem("westward-save-v3")).toBe(JSON.stringify(badPayload));
+    const idb = await readSave();
+    expect(idb.ok).toBe(false);
+    if (!idb.ok) expect(idb.reason).toBe("missing");
   });
 
   it("is idempotent: running twice does not duplicate writes", async () => {

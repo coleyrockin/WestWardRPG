@@ -664,6 +664,11 @@ const canvas = document.getElementById("game");
     return audioCtx;
   }
 
+  function playCombatCue(type) {
+    if (!soundEnabled || state.graphics.accessibility?.combatAudioCues === false) return;
+    playCombatAudioCue(audioBuses?.ctx, type);
+  }
+
   function resolveModulatedMusicProfile(regionId) {
     const base = MUSIC_REGION_PROFILE[regionId] || MUSIC_REGION_PROFILE.frontier;
     return applyOutcomeModulation(base, state.narrative);
@@ -2133,17 +2138,16 @@ const canvas = document.getElementById("game");
     const ordered = IDB_KNOWN_SLOTS.map((slot) =>
       metas.find((m) => m.slot === slot) || { slot, empty: true, valid: true, payload: null, savedAt: null });
     for (const meta of ordered) {
-      const row = document.createElement("button");
-      row.type = "button";
+      const row = document.createElement("div");
       row.className = "save-slot";
       if (meta.empty) row.classList.add("is-empty");
       if (!meta.empty && !meta.valid) row.classList.add("is-corrupted");
       if (!savesLoaded) row.classList.add("is-loading");
-      row.disabled = !savesLoaded;
       row.dataset.slot = meta.slot;
       const summaryText = buildSlotSummaryText(meta);
       const recovery = describeSaveSlotRecovery(meta, { maxSupportedVersion: MAX_SUPPORTED_SAVE_VERSION });
       const backupInfo = describeSaveBackupChoices(cachedBackupMetasBySlot[meta.slot] || []);
+      row.setAttribute("role", "group");
       row.setAttribute("aria-label", `${slotDisplayLabel(meta.slot)}: ${summaryText}. ${recovery.line}`);
 
       const label = document.createElement("span");
@@ -2172,137 +2176,7 @@ const canvas = document.getElementById("game");
       const schemaUnsupported = isUnsupportedSchemaSlot(meta);
       if (schemaUnsupported) row.classList.add("is-future-schema");
 
-      const action = document.createElement("span");
-      action.className = "save-slot-action";
-      action.textContent = meta.empty
-        ? "New"
-        : schemaUnsupported
-          ? "Locked"
-          : meta.valid
-            ? "Continue"
-            : "Recover";
-
-      row.appendChild(label);
-      row.appendChild(copy);
-      row.appendChild(action);
-
-      const importToSlot = (e) => {
-        if (e) e.stopPropagation();
-        if (!meta.empty && !confirm(`Overwrite ${slotDisplayLabel(meta.slot)} with an imported save?`)) return;
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".json,application/json";
-        input.addEventListener("change", async () => {
-          const file = input.files?.[0];
-          if (!file) return;
-          try {
-            const text = await file.text();
-            const result = await idbImportSaveFromText(meta.slot, text);
-            if (!result?.ok) {
-              logMsg("Import failed: save file was invalid or corrupted.");
-              return;
-            }
-            await refreshSlotsAndPickActive();
-            renderSaveSlots();
-            logMsg(`Save imported to ${slotDisplayLabel(result.slot)}.`);
-          } catch (err) {
-            console.warn("[westward] importSave failed:", err);
-            logMsg("Import failed: could not read the file.");
-          }
-        });
-        input.click();
-      };
-
-      const imp = document.createElement("button");
-      imp.type = "button";
-      imp.className = "save-slot-import";
-      imp.setAttribute("aria-label", `Import into ${slotDisplayLabel(meta.slot)}`);
-      imp.textContent = "↑";
-      imp.title = meta.empty ? "Import save into this slot" : "Import save (replaces this slot)";
-      imp.addEventListener("click", importToSlot);
-      row.appendChild(imp);
-
-      if (!meta.empty) {
-        if (meta.valid) {
-          const exp = document.createElement("button");
-          exp.type = "button";
-          exp.className = "save-slot-export";
-          exp.setAttribute("aria-label", `Export ${slotDisplayLabel(meta.slot)}`);
-          exp.textContent = "↓";
-          exp.title = schemaUnsupported ? "Export newer save (forward-compatible backup)" : "Export save";
-          exp.addEventListener("click", async (e) => {
-            e.stopPropagation();
-            try {
-              const blob = await idbExportSaveBlob(meta.slot);
-              if (!blob) return;
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `westward-${meta.slot}-${Date.now()}.json`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-            } catch (err) {
-              console.warn("[westward] exportSave failed:", err);
-            }
-          });
-          row.appendChild(exp);
-        }
-
-        if (!meta.valid) {
-          const rec = document.createElement("button");
-          rec.type = "button";
-          rec.className = "save-slot-recover";
-          rec.setAttribute("aria-label", `Recover ${slotDisplayLabel(meta.slot)} from backup`);
-          rec.textContent = "↺";
-          rec.title = backupInfo.validCount > 1 ? "Choose a backup to restore" : "Recover from latest valid backup";
-          rec.addEventListener("click", async (e) => {
-            e.stopPropagation();
-            try {
-              const backups = (cachedBackupMetasBySlot[meta.slot] || []).length > 0
-                ? cachedBackupMetasBySlot[meta.slot]
-                : await idbListBackups(meta.slot);
-              const target = chooseBackupToRestore(meta.slot, backups);
-              if (!target) {
-                logMsg(`No valid backup found for ${slotDisplayLabel(meta.slot)}.`);
-                return;
-              }
-              const restoredPayload = await idbRestoreFromBackup(meta.slot, target.savedAt);
-              if (currentSaveSlot === meta.slot) {
-                setCachedSave(restoredPayload, target.savedAt);
-              }
-              await refreshSlotsAndPickActive();
-              renderSaveSlots();
-              logMsg(`${slotDisplayLabel(meta.slot)} restored from backup ${target.index} saved ${formatBackupAge(target.savedAt)}.`);
-            } catch (err) {
-              console.warn("[westward] manual recovery failed:", err);
-              logMsg(`Recovery failed for ${slotDisplayLabel(meta.slot)}.`);
-            }
-          });
-          row.appendChild(rec);
-        }
-
-        const del = document.createElement("button");
-        del.type = "button";
-        del.className = "save-slot-delete";
-        del.setAttribute("aria-label", `Delete ${slotDisplayLabel(meta.slot)}`);
-        del.textContent = "×";
-        del.addEventListener("click", async (e) => {
-          e.stopPropagation();
-          if (!confirm(`Delete ${slotDisplayLabel(meta.slot)}? This cannot be undone.`)) return;
-          try {
-            await idbDeleteSave(meta.slot);
-            await refreshSlotsAndPickActive();
-            renderSaveSlots();
-          } catch (err) {
-            console.warn("[westward] deleteSave failed:", err);
-          }
-        });
-        row.appendChild(del);
-      }
-
-      row.addEventListener("click", async () => {
+      const activateSlot = async () => {
         // Block clicks until the IDB scan has populated cachedSlotMetas.
         // Otherwise a click during the init window reads stale empty=true and
         // overwrites a real save.
@@ -2344,7 +2218,148 @@ const canvas = document.getElementById("game");
           beginSession();
         }
         renderSaveSlots();
+      };
+
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = "save-slot-action";
+      action.textContent = meta.empty
+        ? "New"
+        : schemaUnsupported
+          ? "Locked"
+          : meta.valid
+            ? "Continue"
+            : "Recover";
+      action.disabled = !savesLoaded;
+      action.setAttribute("aria-label", `${action.textContent} ${slotDisplayLabel(meta.slot)}`);
+      action.addEventListener("click", (event) => {
+        event.stopPropagation();
+        activateSlot();
       });
+
+      const actions = document.createElement("span");
+      actions.className = "save-slot-actions";
+
+      row.appendChild(label);
+      row.appendChild(copy);
+      row.appendChild(action);
+
+      const importToSlot = (e) => {
+        if (e) e.stopPropagation();
+        if (!meta.empty && !confirm(`Overwrite ${slotDisplayLabel(meta.slot)} with an imported save?`)) return;
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json,application/json";
+        input.addEventListener("change", async () => {
+          const file = input.files?.[0];
+          if (!file) return;
+          try {
+            const text = await file.text();
+            const result = await idbImportSaveFromText(meta.slot, text);
+            if (!result?.ok) {
+              logMsg("Import failed: save file was invalid or corrupted.");
+              return;
+            }
+            await refreshSlotsAndPickActive();
+            renderSaveSlots();
+            logMsg(`Save imported to ${slotDisplayLabel(result.slot)}.`);
+          } catch (err) {
+            console.warn("[westward] importSave failed:", err);
+            logMsg("Import failed: could not read the file.");
+          }
+        });
+        input.click();
+      };
+
+      const imp = document.createElement("button");
+      imp.type = "button";
+      imp.className = "save-slot-import";
+      imp.setAttribute("aria-label", `Import into ${slotDisplayLabel(meta.slot)}`);
+      imp.textContent = "↑";
+      imp.title = meta.empty ? "Import save into this slot" : "Import save (replaces this slot)";
+      imp.addEventListener("click", importToSlot);
+      actions.appendChild(imp);
+
+      if (!meta.empty) {
+        if (meta.valid) {
+          const exp = document.createElement("button");
+          exp.type = "button";
+          exp.className = "save-slot-export";
+          exp.setAttribute("aria-label", `Export ${slotDisplayLabel(meta.slot)}`);
+          exp.textContent = "↓";
+          exp.title = schemaUnsupported ? "Export newer save (forward-compatible backup)" : "Export save";
+          exp.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            try {
+              const blob = await idbExportSaveBlob(meta.slot);
+              if (!blob) return;
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `westward-${meta.slot}-${Date.now()}.json`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            } catch (err) {
+              console.warn("[westward] exportSave failed:", err);
+            }
+          });
+          actions.appendChild(exp);
+        }
+
+        if (!meta.valid) {
+          const rec = document.createElement("button");
+          rec.type = "button";
+          rec.className = "save-slot-recover";
+          rec.setAttribute("aria-label", `Recover ${slotDisplayLabel(meta.slot)} from backup`);
+          rec.textContent = "↺";
+          rec.title = backupInfo.validCount > 1 ? "Choose a backup to restore" : "Recover from latest valid backup";
+          rec.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            try {
+              const backups = (cachedBackupMetasBySlot[meta.slot] || []).length > 0
+                ? cachedBackupMetasBySlot[meta.slot]
+                : await idbListBackups(meta.slot);
+              const target = chooseBackupToRestore(meta.slot, backups);
+              if (!target) {
+                logMsg(`No valid backup found for ${slotDisplayLabel(meta.slot)}.`);
+                return;
+              }
+              const restoredPayload = await idbRestoreFromBackup(meta.slot, target.savedAt);
+              if (currentSaveSlot === meta.slot) {
+                setCachedSave(restoredPayload, target.savedAt);
+              }
+              await refreshSlotsAndPickActive();
+              renderSaveSlots();
+              logMsg(`${slotDisplayLabel(meta.slot)} restored from backup ${target.index} saved ${formatBackupAge(target.savedAt)}.`);
+            } catch (err) {
+              console.warn("[westward] manual recovery failed:", err);
+              logMsg(`Recovery failed for ${slotDisplayLabel(meta.slot)}.`);
+            }
+          });
+          actions.appendChild(rec);
+        }
+
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "save-slot-delete";
+        del.setAttribute("aria-label", `Delete ${slotDisplayLabel(meta.slot)}`);
+        del.textContent = "×";
+        del.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          if (!confirm(`Delete ${slotDisplayLabel(meta.slot)}? This cannot be undone.`)) return;
+          try {
+            await idbDeleteSave(meta.slot);
+            await refreshSlotsAndPickActive();
+            renderSaveSlots();
+          } catch (err) {
+            console.warn("[westward] deleteSave failed:", err);
+          }
+        });
+        actions.appendChild(del);
+      }
+      row.appendChild(actions);
 
       saveSlotsContainer.appendChild(row);
     }
@@ -2493,6 +2508,7 @@ const canvas = document.getElementById("game");
       try {
         const recovered = await idbFindMostRecentValidBackup(currentSaveSlot);
         if (recovered && recovered.ok) {
+          await idbRestoreFromBackup(currentSaveSlot, recovered.savedAt);
           setCachedSave(recovered.payload, recovered.savedAt);
           pendingSaveCorruptionMsg = "Save was corrupted; restored from a recent backup.";
           return;
@@ -3139,6 +3155,7 @@ const canvas = document.getElementById("game");
     enemy.color = stats.color || enemy.color;
     enemy.attackReach = Math.max(enemy.attackReach || 0, stats.attackReach + 0.25);
     enemy.damageVariance = Math.max(enemy.damageVariance || 0, stats.damageVariance + 2);
+    enemy.phaseCueTimer = 2.4;
     const vfx = resolveBossPhaseVfx({
       bossId: enemy.miniBossId,
       label: def?.label || enemy.label || "Mini-boss",
@@ -3156,7 +3173,7 @@ const canvas = document.getElementById("game");
       ttl: 4.2,
     });
     recordCombatEvent(combatSubtitles, "boss_phase");
-    playCombatAudioCue(audioBuses?.ctx, "boss_phase");
+    playCombatCue("boss_phase");
     sfx.thunder();
     return true;
   }
@@ -3335,7 +3352,7 @@ const canvas = document.getElementById("game");
       logMsg("Perfect dodge!");
       emitCompanionBark("perfect_dodge");
       recordCombatEvent(combatSubtitles, "perfect_dodge");
-      playCombatAudioCue(audioBuses?.ctx, "perfect_dodge");
+      playCombatCue("perfect_dodge");
     } else {
       logMsg("Dodge step executed.");
     }
@@ -4965,10 +4982,10 @@ const canvas = document.getElementById("game");
             ttl: 2.4,
           });
           recordCombatEvent(combatSubtitles, "stagger");
-          playCombatAudioCue(audioBuses?.ctx, "stagger");
+          playCombatCue("stagger");
         } else {
           recordCombatEvent(combatSubtitles, damage >= 24 ? "crit" : "hit");
-          if (damage >= 24) playCombatAudioCue(audioBuses?.ctx, "crit");
+          if (damage >= 24) playCombatCue("crit");
         }
       }
 
@@ -5042,7 +5059,7 @@ const canvas = document.getElementById("game");
         });
         recordCombatEvent(combatSubtitles, "enemy_death");
         recordCombatEvent(combatSubtitles, "reward_drop");
-        playCombatAudioCue(audioBuses?.ctx, "reward_drop");
+        playCombatCue("reward_drop");
 
         if (enemy.miniBossId) {
           const def = MINI_BOSS_DEFS[enemy.miniBossId];
@@ -5535,7 +5552,7 @@ const canvas = document.getElementById("game");
     });
     recordCombatEvent(combatSubtitles, "enemy_death");
     recordCombatEvent(combatSubtitles, "reward_drop");
-    playCombatAudioCue(audioBuses?.ctx, "reward_drop");
+    playCombatCue("reward_drop");
     const spawnMods = getActiveRegionEventModifiers();
     const phaseMods = state.world ? resolveSpawnModifier(state.world.timeOfDay || 0) : { hostileMult: 1 };
     const influenceMult = resolveInfluenceSpawnMult(state.regions?.activeRegion || "frontier", state.narrative?.factionRep);
@@ -5770,6 +5787,7 @@ const canvas = document.getElementById("game");
       }
 
       if (enemy.flashTimer > 0) enemy.flashTimer = Math.max(0, enemy.flashTimer - dt);
+      if (enemy.phaseCueTimer > 0) enemy.phaseCueTimer = Math.max(0, enemy.phaseCueTimer - dt);
       if (enemy.alertTimer > 0) enemy.alertTimer = Math.max(0, enemy.alertTimer - dt);
       tickMiniBossInvulnerability(enemy, dt);
       if (enemy.stagger > 0) {
@@ -5823,7 +5841,7 @@ const canvas = document.getElementById("game");
             ttl: 2.4,
           });
           recordCombatEvent(combatSubtitles, "enemy_alert");
-          playCombatAudioCue(audioBuses?.ctx, "enemy_alert");
+          playCombatCue("enemy_alert");
         }
         // Pre-compute inverse distance to avoid division in both calculations
         const invD = 1 / (d + 1e-6);
@@ -5864,7 +5882,7 @@ const canvas = document.getElementById("game");
             ttl: 2.2,
           });
           recordCombatEvent(combatSubtitles, "windup");
-          playCombatAudioCue(audioBuses?.ctx, "windup");
+          playCombatCue("windup");
         }
         if ((enemy.windupTimer || 0) > 0) {
           enemy.windupTimer = Math.max(0, enemy.windupTimer - dt);
@@ -5920,7 +5938,7 @@ const canvas = document.getElementById("game");
                 sfx.blockHit();
                 emitCompanionBark("perfect_parry");
                 recordCombatEvent(combatSubtitles, "perfect_parry");
-                playCombatAudioCue(audioBuses?.ctx, "perfect_parry");
+                playCombatCue("perfect_parry");
               } else if (facingDiff < 1.12 && player.stamina > 10) {
                 damage = Math.max(mitigated.chip, Math.floor(mitigated.blocked * stance.blockPenalty * (1 - blockBonus)));
                 const guardBroke = applyBlockStaminaChip(player, mitigated.staminaChip);
@@ -5929,9 +5947,11 @@ const canvas = document.getElementById("game");
                   state.floatingTexts.push({ wx: player.x, wy: player.y, text: "GUARD BREAK", life: 0.85, maxLife: 0.85, color: "#ffcf8a" });
                   logMsg("Guard broken! Stamina depleted by sustained blocking. Recover before defending again.");
                   recordCombatEvent(combatSubtitles, "guard_break");
-                  playCombatAudioCue(audioBuses?.ctx, "guard_break");
+                  playCombatCue("guard_break");
                 } else {
                   logMsg(`Block absorbed most of the hit. ${mitigated.chip} chip damage slipped through. (−${mitigated.staminaChip} stamina)`);
+                  recordCombatEvent(combatSubtitles, "block");
+                  playCombatCue("block");
                 }
                 sfx.blockHit();
               } else {
@@ -5949,7 +5969,7 @@ const canvas = document.getElementById("game");
             if (player.hp > 0 && player.hp / Math.max(1, player.maxHp) <= 0.25) {
               emitCompanionBark("low_hp");
               recordCombatEvent(combatSubtitles, "low_hp");
-              playCombatAudioCue(audioBuses?.ctx, "low_hp");
+              playCombatCue("low_hp");
             }
 
             if (player.hp <= 0) {
@@ -9439,9 +9459,7 @@ const canvas = document.getElementById("game");
     drawParticles();
     drawMiniMap();
     drawHud();
-    if (state.graphics.accessibility?.motionReduction !== true) {
-      tickCombatSubtitles(combatSubtitles, 0.016);
-    }
+    tickCombatSubtitles(combatSubtitles, 0.016);
     if (state.graphics.accessibility?.combatSubtitles !== false) {
       drawCombatSubtitles(ctx, combatSubtitles, canvas.width, canvas.height);
     }
