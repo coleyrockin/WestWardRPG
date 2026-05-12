@@ -107,16 +107,16 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Capture visual regression screenshots
-        run: npm run test:smoke
+        run: npm run test:visual:capture
 
       - name: Run pixelmatch diff
-        run: npm run test:visual
+        run: npm run test:visual:review
 
       - name: Upload diff images on failure
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: visual-diff-failures
-          path: output/visual-regression/diff_*.png
+          path: output/visual-regression/**/diff_*.png
           retention-days: 14
           if-no-files-found: ignore

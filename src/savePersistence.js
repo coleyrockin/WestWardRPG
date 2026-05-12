@@ -11,6 +11,8 @@ const DB_NAME = "westward";
 const DB_VERSION = 1;
 const SAVE_STORE = "saves";
 const BACKUP_STORE = "backups";
+const SAVE_FORMAT_VERSION = 1;
+const HASH_RE = /^[0-9a-f]{8}$/;
 
 export const DEFAULT_SLOT = "slot-1";
 export const KNOWN_SLOTS = ["slot-1", "slot-2", "slot-3"];
@@ -38,11 +40,12 @@ export function hashJson(value) {
 }
 
 export function makeEnvelope(payload, now = Date.now()) {
+  const payloadVersion = payload && typeof payload === "object" && Number.isFinite(payload.version)
+    ? payload.version
+    : null;
   return {
     storageVersion: STORAGE_VERSION,
-    payloadVersion: payload && typeof payload === "object" && Number.isFinite(payload.version)
-      ? payload.version
-      : null,
+    payloadVersion,
     savedAt: Number.isFinite(now) ? now : Date.now(),
     hash: hashJson(payload),
     payload,
@@ -56,11 +59,29 @@ export function validateEnvelope(envelope) {
   if (envelope.storageVersion !== STORAGE_VERSION) {
     return { ok: false, reason: "unknown-storage-version" };
   }
-  if (!envelope.payload || typeof envelope.payload !== "object") {
+  if (!Number.isFinite(envelope.savedAt)) {
+    return { ok: false, reason: "missing-savedAt" };
+  }
+  if (
+    !envelope.payload ||
+    typeof envelope.payload !== "object" ||
+    Array.isArray(envelope.payload)
+  ) {
     return { ok: false, reason: "missing-payload" };
   }
-  if (typeof envelope.hash !== "string") {
+  if (typeof envelope.hash !== "string" || !HASH_RE.test(envelope.hash)) {
     return { ok: false, reason: "missing-hash" };
+  }
+  const payload = envelope.payload;
+  const payloadVersion = envelope.payloadVersion;
+  if (!Number.isFinite(envelope.payloadVersion)) {
+    return { ok: false, reason: "missing-payload-version" };
+  }
+  if (!Number.isFinite(payload.version)) {
+    return { ok: false, reason: "bad-payload-version" };
+  }
+  if (payloadVersion !== payload.version) {
+    return { ok: false, reason: "payload-version-mismatch" };
   }
   const expected = hashJson(envelope.payload);
   if (envelope.hash !== expected) {
@@ -311,7 +332,7 @@ export async function exportSaveBlob(slot, options = {}) {
   }
   const file = {
     format: "westward-save",
-    formatVersion: 1,
+    formatVersion: SAVE_FORMAT_VERSION,
     exportedAt: Date.now(),
     slot: slotKey,
     envelope: makeEnvelope(source.payload, source.savedAt),
@@ -332,7 +353,7 @@ export async function exportSaveJson(slot, options = {}) {
   return JSON.stringify(
     {
       format: "westward-save",
-      formatVersion: 1,
+      formatVersion: SAVE_FORMAT_VERSION,
       exportedAt: Date.now(),
       slot: slotKey,
       envelope: makeEnvelope(source.payload, source.savedAt),
@@ -352,6 +373,12 @@ export async function importSaveFromText(slot, text) {
   }
   if (!parsed || parsed.format !== "westward-save") {
     return { ok: false, reason: "format-mismatch" };
+  }
+  if (!Number.isFinite(parsed.formatVersion) || parsed.formatVersion < 1) {
+    return { ok: false, reason: "format-version-missing" };
+  }
+  if (parsed.formatVersion !== SAVE_FORMAT_VERSION) {
+    return { ok: false, reason: "format-version-unsupported" };
   }
   const validation = validateEnvelope(parsed.envelope);
   if (!validation.ok) {

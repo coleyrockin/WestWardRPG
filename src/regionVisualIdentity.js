@@ -60,30 +60,70 @@ export function buildRegionIdentityLine(regionId) {
   return `${profile.label}: ${profile.mood}. Landmarks: ${profile.landmarkHints.slice(0, 3).join(", ")}. Danger: ${profile.dangerIdentity}`;
 }
 
+const DEFAULT_READABILITY = {
+  roadPull: "road edges and repeated props point toward the nearest landmark",
+  landmarkCue: "the largest silhouette anchors the first view",
+  wallCue: "walls use contact shading and trim to keep close movement readable",
+  interactableCue: "interactive props use consistent color and marker language",
+};
+
+function cloneReadability(readability) {
+  return {
+    roadPull: readability?.roadPull || DEFAULT_READABILITY.roadPull,
+    landmarkCue: readability?.landmarkCue || DEFAULT_READABILITY.landmarkCue,
+    wallCue: readability?.wallCue || DEFAULT_READABILITY.wallCue,
+    interactableCue: readability?.interactableCue || DEFAULT_READABILITY.interactableCue,
+  };
+}
+
+export function resolveRegionReadabilityCues(regionId) {
+  const profile = getRegionVisualIdentity(regionId);
+  const config = REGION_PRESENTATION[profile.id] || REGION_PRESENTATION.frontier;
+  return {
+    regionId: profile.id,
+    label: profile.label,
+    ...cloneReadability(config.readability),
+  };
+}
+
 const REGION_PRESENTATION = {
   frontier: {
     anchor: { x: 9.5, y: 8.5 },
-    routeLine: "marshal road east past the town circle",
-    compositionLine: "marshal road frames the town cluster, watchtower, and gate silhouettes from the first view",
-    landmark: { kind: "landmark", variant: "watchtower", label: "North Watchtower", dx: 4.7, dy: -1.25, color: "#d9b66d", size: 1.38 },
+    routeLine: "marshal road east between fence rails, wagon ruts, and the north watchtower",
+    compositionLine: "bright wagon-rut road pulls the eye from Boone's board through town posts toward the watchtower beacon",
+    readability: {
+      roadPull: "wide wagon ruts, bright edge dust, and repeated mileposts point out of town",
+      landmarkCue: "North Watchtower beacon should be the tallest first-view shape",
+      wallCue: "Dustward walls need dark contact trim, sunlit upper bands, and fence-shadow decals near the player",
+      interactableCue: "job board, road signs, and roadside discoveries share warm gold marker language",
+    },
+    landmark: { kind: "landmark", variant: "watchtower", label: "North Watchtower Beacon", dx: 4.95, dy: -1.34, color: "#ffd77b", size: 1.62 },
     vistas: [
-      { kind: "town", label: "Town Silhouette", dx: 1.65, dy: -0.75, color: "#caa66c", size: 1.12 },
-      { kind: "watchtower", label: "Watchtower Frame", dx: 4.15, dy: -1.65, color: "#d9b66d", size: 1.0 },
-      { kind: "gate", label: "Town Gate Posts", dx: 2.55, dy: -0.85, color: "#b9824d", size: 0.86 },
+      { kind: "town", label: "Town Roofline", dx: 1.45, dy: -0.82, color: "#caa66c", size: 1.18 },
+      { kind: "watchtower", label: "Watchtower Frame", dx: 4.25, dy: -1.72, color: "#ffd77b", size: 1.12 },
+      { kind: "gate", label: "Town Gate Posts", dx: 2.45, dy: -0.88, color: "#b9824d", size: 0.92 },
+      { kind: "wagon", label: "Broken Wagon Silhouette", dx: 3.32, dy: 0.72, color: "#d89f62", size: 0.86 },
+      { kind: "ranch", label: "Ranch Roof", dx: 0.72, dy: 1.06, color: "#9f7a4e", size: 0.84 },
     ],
     roads: [
-      { kind: "road", label: "Marshal Road Post", dx: 1.35, dy: 0.2, color: "#c8a56a", size: 0.42 },
-      { kind: "road", label: "Town Circle Marker", dx: 2.45, dy: 0.15, color: "#d7b06d", size: 0.44 },
-      { kind: "road", label: "Watchtower Milepost", dx: 3.55, dy: -0.1, color: "#d9b66d", size: 0.46 },
+      { kind: "road", label: "Marshal Road Post", dx: 1.2, dy: 0.24, color: "#c8a56a", size: 0.46 },
+      { kind: "road", label: "Town Circle Marker", dx: 2.14, dy: 0.18, color: "#d7b06d", size: 0.48 },
+      { kind: "road", label: "Broken Wagon Roadmark", dx: 3.02, dy: 0.04, color: "#d89f62", size: 0.52 },
+      { kind: "road", label: "Watchtower Milepost", dx: 4.0, dy: -0.14, color: "#ffd77b", size: 0.52 },
+      { kind: "road", label: "Marsh Fence Marker", dx: 4.78, dy: 0.42, color: "#9fc17c", size: 0.5 },
     ],
     props: [
-      { kind: "sign", label: "Road Sign", dx: 2.0, dy: 0.6, color: "#d7b06d", size: 0.58 },
-      { kind: "fence", label: "Split Fence", dx: 2.8, dy: 1.2, color: "#a47b4c", size: 0.52 },
-      { kind: "cart", label: "Supply Cart", dx: 3.6, dy: -0.5, color: "#b9824d", size: 0.72 },
-      { kind: "lamp", label: "Camp Lantern", dx: 4.25, dy: 0.55, color: "#ffd77b", size: 0.48 },
-      { kind: "smoke", label: "Road Smoke", dx: 3.15, dy: 0.25, color: "#c8bfa4", size: 0.7 },
-      { kind: "crate", label: "Barricade Crates", dx: 3.0, dy: 0.9, color: "#b9824d", size: 0.58 },
-      { kind: "post", label: "Patrol Post", dx: 4.9, dy: -0.15, color: "#c8a56a", size: 0.5 },
+      { kind: "sign", label: "Boone Road Sign", dx: 1.74, dy: 0.62, color: "#ffd77b", size: 0.68 },
+      { kind: "fence", label: "Left Split Fence", dx: 2.5, dy: 1.18, color: "#a47b4c", size: 0.58 },
+      { kind: "fence", label: "Right Split Fence", dx: 3.12, dy: -0.82, color: "#a47b4c", size: 0.54 },
+      { kind: "cart", label: "Supply Cart", dx: 3.58, dy: -0.48, color: "#b9824d", size: 0.76 },
+      { kind: "wagon", label: "Broken Wagon Marker", dx: 3.72, dy: 0.72, color: "#d89f62", size: 0.92 },
+      { kind: "lamp", label: "Road Lantern", dx: 4.25, dy: 0.55, color: "#ffd77b", size: 0.58 },
+      { kind: "lamp", label: "Board Lantern", dx: 1.18, dy: -0.34, color: "#ffe6a8", size: 0.48 },
+      { kind: "smoke", label: "Road Smoke", dx: 3.15, dy: 0.25, color: "#c8bfa4", size: 0.76 },
+      { kind: "crate", label: "Barricade Crates", dx: 2.84, dy: 0.92, color: "#b9824d", size: 0.62 },
+      { kind: "post", label: "Patrol Post", dx: 4.9, dy: -0.15, color: "#c8a56a", size: 0.58 },
+      { kind: "post", label: "Marsh Warning Post", dx: 5.38, dy: 0.35, color: "#9fc17c", size: 0.54 },
     ],
   },
   ashfall: {
@@ -203,7 +243,18 @@ function placeSpec(spec, anchor, context = {}) {
   const selected = PLACEMENT_NUDGES
     .map((nudge, index) => ({ ...pointAt(anchor, spec, nudge), index }))
     .find((point) => passesPlacement(point, spec, context));
-  const point = selected || base;
+  const anchorFallback = {
+    x: Number(anchor.x.toFixed(2)),
+    y: Number(anchor.y.toFixed(2)),
+    index: -1,
+  };
+  const fallbackPoint = selected ? null : (passesPlacement(base, spec, context)
+    ? base
+    : passesPlacement(anchorFallback, spec, context)
+      ? anchorFallback
+      : null);
+  if (!selected && !fallbackPoint) return null;
+  const point = selected || fallbackPoint;
 
   return {
     kind: spec.kind,
@@ -214,7 +265,7 @@ function placeSpec(spec, anchor, context = {}) {
     color: spec.color,
     size: spec.size,
     blocking: false,
-    placement: selected ? (selected.index === 0 ? "anchored" : "adjusted") : "unvalidated",
+    placement: selected ? (selected.index === 0 ? "anchored" : "adjusted") : "fallback",
   };
 }
 
@@ -259,6 +310,7 @@ function buildRoadDiscoverySignposts(regionId, anchor, context = {}) {
         color: kind.color,
         size: 0.58,
       }, anchor, context);
+      if (!placed) return null;
 
       return {
         ...placed,
@@ -287,6 +339,7 @@ export function buildRegionWorldPresentation(regionId, context = {}) {
     x: numberOr(context.playerX, config.anchor.x),
     y: numberOr(context.playerY, config.anchor.y),
   };
+  const toPlacements = (items) => items.map((item) => placeSpec(item, anchor, context)).filter(Boolean);
 
   return {
     regionId: profile.id,
@@ -294,11 +347,22 @@ export function buildRegionWorldPresentation(regionId, context = {}) {
     anchor,
     routeLine: config.routeLine,
     compositionLine: config.compositionLine,
-    landmark: placeSpec(config.landmark, anchor, context),
-    vistas: (config.vistas || []).map((vista) => placeSpec(vista, anchor, context)),
-    roads: (config.roads || []).map((road) => placeSpec(road, anchor, context)),
-    props: config.props.map((prop) => placeSpec(prop, anchor, context)),
-    roadSigns: buildRoadDiscoverySignposts(profile.id, anchor, context),
+    readability: cloneReadability(config.readability),
+    landmark: placeSpec(config.landmark, anchor, context) || {
+      kind: "landmark",
+    variant: null,
+      label: `${profile.label} Identity`,
+      x: Number(anchor.x.toFixed(2)),
+      y: Number(anchor.y.toFixed(2)),
+      color: getRegionVisualIdentity(profile.id).minimapTint || "#ffffff",
+      size: 1,
+      blocking: false,
+      placement: "fallback",
+    },
+    vistas: toPlacements(config.vistas || []),
+    roads: toPlacements(config.roads || []),
+    props: toPlacements(config.props || []),
+    roadSigns: buildRoadDiscoverySignposts(profile.id, anchor, context).filter(Boolean),
   };
 }
 

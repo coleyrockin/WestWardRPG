@@ -52,7 +52,7 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 
 ## Current State
 
-`main` ships the Shattered Frontier v3 foundation plus several open-world RPG systems:
+The current build contains the Shattered Frontier v3 foundation plus several open-world RPG systems:
 
 - **Story + payoff**: chapter progression, thematic axes, quest outcomes, final Lantern Revolt victory trigger, ending overlay, and run summary stats.
 - **Combat depth**: enemy archetypes, status effects, perfect dodge/parry, parry chains, boss phase transitions, charge-cancel windup, weapon affixes, block chip, and guard break.
@@ -63,9 +63,9 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - **Jobs/economy foundation**: Marshal Boone offers deterministic bounty, salvage, courier, patrol, supply-run, rescue, and escort work through in-world regional job boards with timed bonuses, failure/report-back states, regional job depth, route markers, minimap/HUD/debug visibility, progress tracking, and reward payout.
 - **Golden path starter loop**: Marsh Slime Bounty is the canonical Boone road loop, surfacing route, landmark, threat, crafting reward, NPC/board reaction, and house proof.
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
-- **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, and early open-world pressure/dressing work.
+- **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, early open-world pressure/dressing work, and a Dustward road/watchtower/wall readability pass.
 
-Latest local fast gate: `npm test` reports **918 passing tests across 82 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **933 passing tests across 83 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
@@ -96,13 +96,13 @@ The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the
 - **Run history + playtest metrics**
   - Last 10 completed runs persisted locally. Tracks time-to-first-kill, time-to-first-job-accepted, chapter reached, death cause, and setting changes per run.
 - **Automation**
-  - Unit tests, TypeScript checks, syntax checks, smoke actions, visual-regression capture scripts, and `render_game_to_text()` for deterministic browser/state inspection.
+  - Unit tests, TypeScript checks, syntax checks, smoke actions, stable visual-regression capture/diff scripts, and `render_game_to_text()` for deterministic browser/state inspection.
 
 ## Quick Start
 
 ```bash
 git clone https://github.com/coleyrockin/WestWardRPG.git
-cd WestWard
+cd WestWardRPG
 npm install
 npm run dev          # Vite dev server with HMR on port 5173
 ```
@@ -204,17 +204,18 @@ npm run dev          # Vite dev server (HMR)
 npm run build        # Production bundle -> dist/
 npm run preview      # Serve the built bundle locally
 
-# Verification (also runs in CI on every PR)
+# Verification
 npm test
 npm run typecheck:ts
 npm run test:syntax
 npm run dev:lint
-npm run test:coverage
 npm run test:smoke
 npm run qa
 
-# Optional visual capture
-WESTWARD_PORT=5183 scripts/visual_regression_capture.sh
+# Visual capture + diff
+npm run test:visual:capture
+npm run test:visual:review
+npm run test:visual # run after baselines are committed to enforce pixel thresholds
 ```
 
 ## Save Format & Migration

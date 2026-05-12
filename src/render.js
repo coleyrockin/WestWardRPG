@@ -70,16 +70,31 @@ export function resolveNearWallVisualTreatment(options = {}) {
       alpha: 0,
       edgeAlpha: 0,
       sideShade: 0,
+      contactAlpha: 0,
+      trimAlpha: 0,
+      decalAlpha: 0,
+      highlightAlpha: 0,
+      supportAlpha: 0,
+      courseAlpha: 0,
+      baseboardAlpha: 0,
     };
   }
 
   const sideShade = options.side === 1 ? 0.08 : 0.03;
+  const exteriorBoost = options.inHouse ? 0.82 : 1;
   return {
     active: true,
     alpha: Math.min(options.inHouse ? 0.46 : 0.54, 0.18 + closeness * 0.42),
     edgeAlpha: Math.min(0.26, 0.05 + closeness * 0.2),
     sideShade,
     grainAlpha: Math.min(0.16, 0.04 + closeness * 0.12),
+    contactAlpha: Math.min(0.34, (0.1 + closeness * 0.24) * exteriorBoost),
+    trimAlpha: Math.min(0.3, (0.08 + closeness * 0.22) * exteriorBoost),
+    decalAlpha: Math.min(0.22, (0.06 + closeness * 0.16) * exteriorBoost),
+    highlightAlpha: Math.min(0.2, (0.05 + closeness * 0.12) * exteriorBoost),
+    supportAlpha: Math.min(0.2, (0.06 + closeness * 0.16) * exteriorBoost),
+    courseAlpha: Math.min(0.18, (0.05 + closeness * 0.14) * exteriorBoost),
+    baseboardAlpha: Math.min(0.28, (0.09 + closeness * 0.22) * exteriorBoost),
   };
 }
 

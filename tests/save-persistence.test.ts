@@ -86,6 +86,22 @@ describe("makeEnvelope / validateEnvelope", () => {
     if (!result.ok) expect(result.reason).toBe("unknown-storage-version");
   });
 
+  it("rejects malformed hash formats", () => {
+    const env = makeEnvelope(samplePayload());
+    env.hash = "not-a-hash";
+    const result = validateEnvelope(env);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("missing-hash");
+  });
+
+  it("rejects payload version mismatches", () => {
+    const env = makeEnvelope(samplePayload());
+    env.payload.version = 4;
+    const result = validateEnvelope(env);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("payload-version-mismatch");
+  });
+
   it("rejects null/missing/non-object envelopes", () => {
     expect(validateEnvelope(null).ok).toBe(false);
     expect(validateEnvelope(undefined as any).ok).toBe(false);
@@ -252,6 +268,33 @@ describe("export / import", () => {
     );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe("format-mismatch");
+  });
+
+  it("rejects import when formatVersion is missing or invalid", async () => {
+    __resetSavePersistenceForTests();
+    const missing = await importSaveFromText(
+      undefined,
+      JSON.stringify({ format: "westward-save", envelope: makeEnvelope(samplePayload()) }),
+    );
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.reason).toBe("format-version-missing");
+
+    const invalid = await importSaveFromText(
+      undefined,
+      JSON.stringify({ format: "westward-save", formatVersion: "bad", envelope: makeEnvelope(samplePayload()) }),
+    );
+    expect(invalid.ok).toBe(false);
+    if (!invalid.ok) expect(invalid.reason).toBe("format-version-missing");
+  });
+
+  it("rejects import of unsupported format versions", async () => {
+    __resetSavePersistenceForTests();
+    const result = await importSaveFromText(
+      undefined,
+      JSON.stringify({ format: "westward-save", formatVersion: 2, envelope: makeEnvelope(samplePayload()) }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("format-version-unsupported");
   });
 
   it("rejects an import whose envelope hash is wrong", async () => {

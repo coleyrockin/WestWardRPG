@@ -119,6 +119,13 @@ describe("render — resolveNearWallVisualTreatment", () => {
     expect(treatment.alpha).toBeGreaterThan(0.35);
     expect(treatment.edgeAlpha).toBeGreaterThan(0.1);
     expect(treatment.sideShade).toBeGreaterThan(0);
+    expect(treatment.contactAlpha).toBeGreaterThan(0.18);
+    expect(treatment.trimAlpha).toBeGreaterThan(0.16);
+    expect(treatment.decalAlpha).toBeGreaterThan(0.1);
+    expect(treatment.highlightAlpha).toBeGreaterThan(0.08);
+    expect(treatment.supportAlpha).toBeGreaterThan(0.1);
+    expect(treatment.courseAlpha).toBeGreaterThan(0.08);
+    expect(treatment.baseboardAlpha).toBeGreaterThan(0.14);
   });
 
   it("stays off for normal-distance walls", () => {
@@ -131,6 +138,11 @@ describe("render — resolveNearWallVisualTreatment", () => {
       active: false,
       alpha: 0,
       edgeAlpha: 0,
+      contactAlpha: 0,
+      trimAlpha: 0,
+      supportAlpha: 0,
+      courseAlpha: 0,
+      baseboardAlpha: 0,
     });
   });
 });

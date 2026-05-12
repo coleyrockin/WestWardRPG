@@ -9733,6 +9733,53 @@ const canvas = document.getElementById("game");
     render();
   };
 
+  const SMOKE_REGION_STARTS = {
+    frontier: { x: 9.5, y: 8.5, angle: 0 },
+    ashfall: { x: 39.5, y: 39.5, angle: -0.18 },
+    ironlantern: { x: 14.5, y: 39.5, angle: 0.12 },
+  };
+
+  function resolveSmokeRegionStart(regionId) {
+    const base = SMOKE_REGION_STARTS[regionId] || SMOKE_REGION_STARTS.frontier;
+    const angleOptions = [
+      base.angle,
+      0,
+      Math.PI * 0.5,
+      -Math.PI * 0.5,
+      Math.PI,
+    ];
+    const viewClearance = (x, y, angle) => {
+      for (let d = 0.6; d <= 7; d += 0.45) {
+        if (isBlocking(x + Math.cos(angle) * d, y + Math.sin(angle) * d)) return d;
+      }
+      return 7;
+    };
+    let best = null;
+    for (let ix = -6; ix <= 6; ix++) {
+      for (let iy = -6; iy <= 6; iy++) {
+        const x = base.x + ix * 0.75;
+        const y = base.y + iy * 0.75;
+        if (!canOccupy(x, y) || isInHouseLot(x, y)) continue;
+        for (const angle of angleOptions) {
+          const clearance = viewClearance(x, y, angle);
+          const score = clearance - Math.hypot(ix, iy) * 0.08;
+          if (!best || score > best.score) {
+            best = { x, y, angle, score };
+          }
+        }
+      }
+    }
+    if (best) {
+      return { x: best.x, y: best.y, angle: best.angle };
+    }
+    const minX = clamp(Math.floor(base.x) - 3, 2, worldMap[0].length - 4);
+    const minY = clamp(Math.floor(base.y) - 3, 2, worldMap.length - 4);
+    const maxX = clamp(Math.floor(base.x) + 3, minX, worldMap[0].length - 3);
+    const maxY = clamp(Math.floor(base.y) + 3, minY, worldMap.length - 3);
+    const fallback = findEmptyCell(worldMap, minX, minY, maxX, maxY, (x, y) => !isInHouseLot(x, y));
+    return { x: fallback.x, y: fallback.y, angle: base.angle };
+  }
+
   window.__westwardSmoke = {
     unlockHouse() {
       state.house.unlocked = true;
@@ -9741,12 +9788,19 @@ const canvas = document.getElementById("game");
     },
     setRegion(regionId = "frontier") {
       if (!REGIONS[regionId]) return { ok: false, regionId: state.regions.activeRegion };
+      state.player.inHouse = false;
+      state.player.regionInterior = null;
+      state.regionInteriorReturn = null;
       unlockRegion(state.regions, regionId);
       state.regions.activeRegion = regionId;
+      const start = resolveSmokeRegionStart(regionId);
+      state.player.x = start.x;
+      state.player.y = start.y;
+      state.player.angle = start.angle;
       ensureRegionMiniBosses(regionId);
       invalidateMinimapCache(minimapTileCache);
       syncAmbientForRegion(regionId);
-      return { ok: true, regionId };
+      return { ok: true, regionId, x: Number(start.x.toFixed(2)), y: Number(start.y.toFixed(2)) };
     },
     acceptStarter() {
       state.world.jobs = normalizeJobBoardState(state.world.jobs);

@@ -5,6 +5,7 @@ import {
   buildRegionWorldPresentation,
   buildRegionIdentityLine,
   getRegionVisualIdentity,
+  resolveRegionReadabilityCues,
   resolveRoadSignPrompt,
 } from "../src/regionVisualIdentity.js";
 
@@ -40,13 +41,25 @@ describe("regionVisualIdentity", () => {
     const presentation = buildRegionWorldPresentation("frontier", { playerX: 9.5, playerY: 8.5 });
 
     expect(presentation.landmark.label).toContain("Watchtower");
-    expect(presentation.routeLine).toContain("road");
+    expect(presentation.routeLine).toContain("wagon ruts");
+    expect(presentation.readability.roadPull).toContain("mileposts");
     expect(presentation.props.length).toBeGreaterThanOrEqual(5);
-    expect(presentation.roads.length).toBeGreaterThanOrEqual(3);
+    expect(presentation.roads.length).toBeGreaterThanOrEqual(5);
     expect(presentation.props.every((prop: any) => prop.blocking === false)).toBe(true);
     expect(presentation.roads.every((road: any) => road.blocking === false)).toBe(true);
     expect(presentation.props.some((prop: any) => prop.kind === "sign")).toBe(true);
     expect(presentation.roads.some((road: any) => road.label.includes("Marshal"))).toBe(true);
+    expect(presentation.roads.some((road: any) => road.label.includes("Broken Wagon"))).toBe(true);
+  });
+
+  it("surfaces explicit readability cues for the Dustward visual pass", () => {
+    const cues = resolveRegionReadabilityCues("frontier");
+
+    expect(cues.regionId).toBe("frontier");
+    expect(cues.roadPull).toContain("wagon ruts");
+    expect(cues.landmarkCue).toContain("Watchtower");
+    expect(cues.wallCue).toContain("contact trim");
+    expect(cues.interactableCue).toContain("job board");
   });
 
   it("adds road discovery signposts that point to authored POIs", () => {
@@ -124,7 +137,7 @@ describe("regionVisualIdentity", () => {
   });
 
   it("moves props to map-valid visible tiles when a generated coordinate is blocked", () => {
-    const blocked = new Set(["11.50,9.10"]);
+    const blocked = new Set(["11.24,9.12"]);
     const isPassable = (x: number, y: number) => !blocked.has(`${x.toFixed(2)},${y.toFixed(2)}`);
     const isVisible = (x: number, y: number) => x >= 9 && x <= 16 && y >= 6 && y <= 11;
     const presentation = buildRegionWorldPresentation("frontier", {
@@ -154,13 +167,28 @@ describe("regionVisualIdentity", () => {
     expect(lantern.roadSigns.map((sign: any) => sign.targetKind)).toContain("hideout");
   });
 
+  it("does not emit unvalidated world dressing placements", () => {
+    for (const regionId of ["frontier", "ashfall", "ironlantern"]) {
+      const presentation = buildRegionWorldPresentation(regionId, {});
+      const placements = [
+        presentation.landmark,
+        ...presentation.props,
+        ...presentation.roads,
+        ...presentation.vistas,
+        ...presentation.roadSigns,
+      ];
+      expect(placements.every((item: any) => item.placement !== "unvalidated")).toBe(true);
+    }
+  });
+
   it("builds an ordered route polyline from player anchor through road dressing to the landmark", () => {
     const presentation = buildRegionWorldPresentation("frontier", { playerX: 9.5, playerY: 8.5 });
     const route = buildRegionRoutePolyline(presentation);
 
     expect(route[0]).toMatchObject({ kind: "start", x: 9.5, y: 8.5 });
     expect(route.slice(1, 4).every((point: any) => point.kind === "road")).toBe(true);
-    expect(route[route.length - 1]).toMatchObject({ kind: "landmark", label: "North Watchtower" });
+    expect(route[route.length - 1]).toMatchObject({ kind: "landmark" });
+    expect(route[route.length - 1].label).toContain("North Watchtower");
     expect(route).toHaveLength(presentation.roads.length + 2);
   });
 });

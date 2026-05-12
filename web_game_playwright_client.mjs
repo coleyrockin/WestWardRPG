@@ -103,6 +103,28 @@ function ensureDir(p) {
   fs.mkdirSync(p, { recursive: true });
 }
 
+function validateStateText(text, iterationIndex, outDir) {
+  if (typeof text !== "string") return;
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  try {
+    JSON.parse(trimmed);
+  } catch (err) {
+    const errorLog = [
+      {
+        type: "state-serialization",
+        text: String(err.message || err),
+        iteration: iterationIndex,
+      },
+    ];
+    fs.writeFileSync(
+      path.join(outDir, `errors-${iterationIndex}.json`),
+      JSON.stringify(errorLog, null, 2),
+    );
+    throw new Error(`state snapshot JSON parse failed at iteration ${iterationIndex}: ${err.message}`);
+  }
+}
+
 function makeVirtualTimeShim() {
   return `(() => {
     const pending = new Set();
@@ -255,6 +277,7 @@ class ConsoleErrorTracker {
 
 const SMOKE_API_METHODS = new Set([
   "unlockHouse",
+  "setRegion",
   "acceptStarter",
   "simulateStarterKills",
   "claimStarter",
@@ -418,6 +441,7 @@ async function main() {
       return null;
     });
     if (text) {
+      validateStateText(text, i, args.screenshotDir);
       fs.writeFileSync(path.join(args.screenshotDir, `state-${i}.json`), text);
     }
 

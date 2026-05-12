@@ -104,6 +104,8 @@ mkdir -p "$OUT_ROOT"
 echo "[INFO] Running smoke suite against: $BASE_URL"
 echo "[INFO] Output root: $OUT_ROOT"
 
+COMPLETED_SCENARIOS=()
+
 run_scenario() {
   local name="$1"
   local action_file="$2"
@@ -137,12 +139,63 @@ run_scenario() {
     exit 1
   fi
 
+  if ! assert_state_dump_valid "$out_dir" "$name"; then
+    exit 1
+  fi
+
   if ls "$out_dir"/errors-*.json >/dev/null 2>&1; then
     echo "[ERROR] Runtime errors detected in scenario: $name" >&2
     exit 1
   fi
 
   echo "[SUCCESS] $name passed"
+  COMPLETED_SCENARIOS+=("$name")
+}
+
+assert_state_dump_valid() {
+  local out_dir="$1"
+  local name="$2"
+  node - "$out_dir" "$name" <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+
+const dir = process.argv[2];
+const name = process.argv[3];
+const files = fs.readdirSync(dir)
+  .filter((file) => /^state-\d+\.json$/.test(file))
+  .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
+
+if (!files.length) {
+  throw new Error(`${name}: smoke did not write state JSON`);
+}
+
+for (const file of files) {
+  const fullPath = path.join(dir, file);
+  let parsed;
+  let raw;
+  try {
+    raw = fs.readFileSync(fullPath, "utf8");
+  } catch (err) {
+    throw new Error(`${name}: unable to read ${file}: ${err.message}`);
+  }
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`${name}: malformed JSON in ${file}: ${err.message}`);
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error(`${name}: state payload was not an object in ${file}`);
+  }
+  if (!parsed.save || typeof parsed.save !== "object" || typeof parsed.save.has_save !== "boolean") {
+    throw new Error(`${name}: missing save.has_save in ${file}`);
+  }
+  if (!parsed.player || typeof parsed.player !== "object") {
+    throw new Error(`${name}: missing player snapshot in ${file}`);
+  }
+}
+NODE
 }
 
 assert_golden_path_state() {
@@ -225,6 +278,20 @@ NODE
   echo "[SUCCESS] golden-path-full assertions passed"
 }
 
+EXPECTED_SCENARIOS=(
+  golden-path
+  golden-path-full
+  smoke
+  quest
+  combat
+  boss-fight
+  weather-heavy
+  upgrade-equip
+  settings-modal
+  mini-boss
+  codex
+)
+
 run_scenario "golden-path" "test-actions/golden_path_start.json" 1
 assert_golden_path_state
 run_scenario "golden-path-full" "test-actions/golden_path_full.json" 1
@@ -238,6 +305,19 @@ run_scenario "upgrade-equip" "test-actions/upgrade_purchase_equip_flow.json" 2
 run_scenario "settings-modal" "test-actions/settings_modal_flow.json" 1
 run_scenario "mini-boss" "test-actions/mini_boss_flow.json" 1
 run_scenario "codex" "test-actions/codex_flow.json" 1
+
+if [ "${#COMPLETED_SCENARIOS[@]}" -ne "${#EXPECTED_SCENARIOS[@]}" ]; then
+  echo "[ERROR] Smoke suite completed ${#COMPLETED_SCENARIOS[@]} of ${#EXPECTED_SCENARIOS[@]} expected scenarios." >&2
+  echo "[ERROR] Completed: ${COMPLETED_SCENARIOS[*]}" >&2
+  exit 1
+fi
+
+for scenario in "${EXPECTED_SCENARIOS[@]}"; do
+  if [ ! -d "$OUT_ROOT/$scenario" ]; then
+    echo "[ERROR] Expected smoke artifact folder missing: $scenario" >&2
+    exit 1
+  fi
+done
 
 echo "[SUCCESS] Functional smoke suite completed."
 echo "[SUCCESS] Artifacts: $OUT_ROOT"

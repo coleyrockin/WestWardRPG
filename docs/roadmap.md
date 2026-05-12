@@ -44,13 +44,13 @@ Every road, job, NPC, item, house upgrade, and ending should help that loop.
 
 ## Audit Snapshot
 
-Date: 2026-05-09.
+Date: 2026-05-11.
 
 Latest local facts:
 
-1. Git branch: `main`, clean and tracking `origin/main`.
-2. Test gate: `npm test` reports 918 passing tests across 82 test files.
-3. `src/main.js` is 10,348 lines. This is still the biggest technical drag.
+1. Branch target: `main`, tracking `origin/main`.
+2. Test gate: `npm test` reports 933 passing tests across 83 test files.
+3. `src/main.js` is over 10.5k lines. This is still the biggest technical drag.
 4. `docs/roadmap.md` had stale historical counts and mixed shipped work with
    future scope. This rewrite replaces that clutter with the finish path.
 5. The codebase has many real modules and tests: gear, jobs, save persistence,
@@ -204,6 +204,10 @@ Acceptance test:
 4. The tester sees a reaction after returning.
 
 ## Milestone 2: Hardcore Visual Readability Pass
+
+Status: active. Dustward pass 1 shipped locally: stronger road-pull data, more
+watchtower/town/wagon silhouettes, denser route props, brighter road ruts,
+repeated mileposts, and improved near-wall contact/trim/decal treatment.
 
 Goal: Make the game look and read more like an open-world RPG while staying on
 the current canvas raycaster.
@@ -498,14 +502,14 @@ Allowed optional ideas:
 Use this order for the next implementation chunks:
 
 1. Fix README/roadmap truth mismatches.
-2. Improve road/landmark/wall visuals in Dustward.
-3. Expand the golden-path browser smoke from visibility assertions to a full
+2. Expand the golden-path browser smoke from visibility assertions to a full
    accept/fight/return/pay assertion.
+3. Commit visual baselines after human review of the Dustward road/near-wall
+   captures, then add the capture/diff pair to CI.
 4. Add per-slot save recovery and export/import UI.
 5. Extract HUD rendering from `main.js`.
 6. Extract modal input/drawing from `main.js`.
 7. Add combat subtitles and audio cues.
-8. Add visual regression pass/fail to CI.
 
 ## Verification Gates
 
@@ -529,6 +533,7 @@ npm run test:smoke
 Run when visuals change:
 
 ```bash
+npm run test:visual:capture
 npm run test:visual
 ```
 
@@ -536,5 +541,5 @@ Latest local verification snapshot:
 
 ```bash
 npm test
-# 918 passing across 82 test files
+# 933 passing across 83 test files
 ```
