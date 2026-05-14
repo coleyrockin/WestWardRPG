@@ -949,6 +949,7 @@ export function resolveGoldenPathStatus({
   const progress = state.progressByJobId[CANONICAL_STARTER_JOB_ID] || null;
   const completed = state.completedJobIds.includes(CANONICAL_STARTER_JOB_ID);
   const active = state.activeJobId === CANONICAL_STARTER_JOB_ID;
+  const hasMapScrap = (normalizeInventoryState(inventory)["Map Scrap"] || 0) > 0;
   const decorated = job ? decorateJob(job, progress, {
     inventory,
     completedJobIds: state.completedJobIds,
@@ -970,7 +971,9 @@ export function resolveGoldenPathStatus({
       ? (progress?.status === "ready" ? "return" : "active")
       : "available";
   const nextStep = completed
-    ? "Inspect Boone's board, talk to town NPCs, or bring the proof home."
+    ? (hasMapScrap
+      ? "Take Old Road Survey from Boone's board."
+      : "Inspect Broken Wagon for the Map Scrap follow-up.")
     : active
       ? buildProgressLine(job, progress)
       : "Accept Marsh Slime Bounty from Boone's job board.";

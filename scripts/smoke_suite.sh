@@ -58,8 +58,8 @@ is_expected_app_url() {
   if ! html="$(curl -g -sSf "$candidate" 2>/dev/null)"; then
     return 1
   fi
-  echo "$html" | grep -q 'id="game"' || return 1
-  echo "$html" | grep -Eqi 'Dustward|WestWard' || return 1
+  grep -q 'id="game"' <<< "$html" || return 1
+  grep -Eqi 'Dustward|WestWard' <<< "$html" || return 1
   return 0
 }
 
@@ -297,9 +297,56 @@ NODE
   echo "[SUCCESS] golden-path-full assertions passed"
 }
 
+assert_golden_path_memory_state() {
+  local out_dir="$OUT_ROOT/golden-path-memory"
+  node - "$out_dir" <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+
+const dir = process.argv[2];
+const files = fs.readdirSync(dir)
+  .filter((file) => /^state-\d+\.json$/.test(file))
+  .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
+if (!files.length) {
+  throw new Error("golden-path-memory smoke did not write state JSON");
+}
+
+const state = JSON.parse(fs.readFileSync(path.join(dir, files[files.length - 1]), "utf8"));
+if (!state.discovered_pois?.includes("frontier_broken_wagon")) {
+  throw new Error("golden-path-memory did not discover Broken Wagon");
+}
+if ((state.inventory?.["Map Scrap"] || 0) < 1) {
+  throw new Error("golden-path-memory did not grant Map Scrap");
+}
+if (!state.job_board?.state?.completedJobIds?.includes("frontier_slime_bounty")) {
+  throw new Error("golden-path-memory did not complete starter bounty");
+}
+const survey = (state.job_board_choices || []).find((job) => job.id === "frontier_map_survey");
+if (!survey || !String(survey.availabilityLine || "").includes("Requires Map Scrap")) {
+  throw new Error("golden-path-memory did not surface Old Road Survey follow-up");
+}
+const boone = state.narrative?.npcMemory?.byNpc?.warden;
+if (boone?.recentPoiId !== "frontier_broken_wagon" || boone?.recentJobId !== "frontier_slime_bounty") {
+  throw new Error("golden-path-memory did not preserve Boone wagon/job memory");
+}
+const memory = state.gameplay_feel?.first_road_memory;
+if (!memory || !["survey_available", "survey_completed"].includes(memory.phase)) {
+  throw new Error(`golden-path-memory expected survey-ready first road memory, got ${memory?.phase}`);
+}
+if (!String(memory.booneLine || "").match(/map scrap|wagon/i)) {
+  throw new Error("golden-path-memory missing Boone road-memory reaction");
+}
+if (!String(state.run_summary?.firstRoadMemoryLine || "").includes("Old Road Survey")) {
+  throw new Error("golden-path-memory missing run summary first-road line");
+}
+NODE
+  echo "[SUCCESS] golden-path-memory assertions passed"
+}
+
 EXPECTED_SCENARIOS=(
   golden-path
   golden-path-full
+  golden-path-memory
   smoke
   quest
   combat
@@ -315,6 +362,8 @@ run_scenario "golden-path" "test-actions/golden_path_start.json" 1
 assert_golden_path_state
 run_scenario "golden-path-full" "test-actions/golden_path_full.json" 1
 assert_golden_path_full_state
+run_scenario "golden-path-memory" "test-actions/golden_path_memory.json" 1
+assert_golden_path_memory_state
 run_scenario "smoke" "test-actions/realism_smoke.json" 3
 run_scenario "quest" "test-actions/quest_flow.json" 2
 run_scenario "combat" "test-actions/combat_block_flow.json" 2

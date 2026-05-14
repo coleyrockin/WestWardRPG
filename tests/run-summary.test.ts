@@ -83,6 +83,7 @@ describe("run summary", () => {
           { line: "Worn Badge on the shelf" },
         ],
       },
+      { runSummaryLine: "Cleared the first road, found the Broken Wagon Map Scrap, and opened Old Road Survey." },
     );
 
     expect(summary.houseTrophyCount).toBe(2);
@@ -91,6 +92,7 @@ describe("run summary", () => {
       "Map Scrap pinned above the bench",
       "Worn Badge on the shelf",
     ]);
+    expect(summary.firstRoadMemoryLine).toContain("Old Road Survey");
   });
 
   it("syncs quest outcome counts independently", () => {

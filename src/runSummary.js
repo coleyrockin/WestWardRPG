@@ -75,7 +75,7 @@ export function formatRunDuration(seconds = 0) {
   return `${minutes}:${String(remain).padStart(2, "0")}`;
 }
 
-export function buildRunSummary(world, narrative, player, companion, now = 0, houseProgress = null) {
+export function buildRunSummary(world, narrative, player, companion, now = 0, houseProgress = null, firstRoadMemory = null) {
   const stats = syncQuestOutcomeCount(world, narrative);
   const endedAt = Number.isFinite(stats.endedAt) ? stats.endedAt : now;
   const duration = Math.max(0, endedAt - stats.startedAt);
@@ -98,6 +98,7 @@ export function buildRunSummary(world, narrative, player, companion, now = 0, ho
     houseTrophyCount: Math.max(0, Math.floor(houseProgress?.trophyCount || trophies.length || 0)),
     houseTrophyLine: typeof houseProgress?.trophyLine === "string" ? houseProgress.trophyLine : "House proof not recorded",
     houseTrophyHighlights: trophies.slice(0, 3).map((trophy) => trophy.line || trophy.label || trophy.id).filter(Boolean),
+    firstRoadMemoryLine: typeof firstRoadMemory?.runSummaryLine === "string" ? firstRoadMemory.runSummaryLine : "",
     companion: companion?.active
       ? `${companion.name} active (${Math.max(0, Math.round(companion.hp || 0))} HP)`
       : companion?.downed

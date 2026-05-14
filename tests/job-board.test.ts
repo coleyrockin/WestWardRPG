@@ -175,6 +175,12 @@ describe("jobBoard", () => {
 
     const paid = claimJobReward(state, CANONICAL_STARTER_JOB_ID);
     const completed = resolveGoldenPathStatus({ jobState: state, house: { unlocked: true }, regionId: "frontier" });
+    const completedWithMap = resolveGoldenPathStatus({
+      jobState: state,
+      house: { unlocked: true },
+      inventory: { "Map Scrap": 1 },
+      regionId: "frontier",
+    });
 
     expect(paid.reward).toEqual({ gold: 38, xp: 18, items: { Potion: 1, "Slime Core": 1, Stone: 1 } });
     expect(completed).toMatchObject({
@@ -183,6 +189,8 @@ describe("jobBoard", () => {
       houseProofLine: "Home proof visible: Marsh Bounty Notice.",
     });
     expect(completed.consequenceLine).toContain("house can display");
+    expect(completed.nextStep).toContain("Broken Wagon");
+    expect(completedWithMap.nextStep).toContain("Old Road Survey");
   });
 
   it("surfaces the latest completed story job board reaction", () => {

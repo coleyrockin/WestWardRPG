@@ -149,6 +149,10 @@ import {
   resolveJobRewardFeedback,
 } from "./jobRewardFeedback.js";
 import {
+  FIRST_ROAD_DISCOVERY_ID,
+  resolveFirstRoadMemoryStatus,
+} from "./firstRoadMemory.js";
+import {
   buildEconomySnapshot,
   getVendorServiceProfile,
 } from "./economyServices.js";
@@ -4012,6 +4016,7 @@ const canvas = document.getElementById("game");
       questOutcomes: state.narrative.questOutcomes || {},
       inventory: state.inventory,
       completedJobIds: state.world.jobs?.completedJobIds || [],
+      firstRoadMemory: getFirstRoadMemoryStatus(),
     });
     if (memoryLine) return memoryLine;
 
@@ -4074,6 +4079,17 @@ const canvas = document.getElementById("game");
       houseUnlocked: state.house.unlocked,
       gearMilestone: gearSummary.weaponLine,
       recentQuestOutcome: Object.values(state.narrative.questOutcomes || {}).slice(-1)[0] || null,
+    });
+  }
+
+  function getFirstRoadMemoryStatus() {
+    return resolveFirstRoadMemoryStatus({
+      regions: state.regions,
+      inventory: state.inventory,
+      jobState: state.world.jobs,
+      house: state.house,
+      narrative: state.narrative,
+      regionId: state.regions.activeRegion,
     });
   }
 
@@ -4233,6 +4249,15 @@ const canvas = document.getElementById("game");
             regionId: state.regions.activeRegion,
             at: state.time,
           });
+          if (poi.id === FIRST_ROAD_DISCOVERY_ID) {
+            recordNpcMemoryEvent(state.narrative.npcMemory, "warden", {
+              type: "poi_discovered",
+              poiId: poi.id,
+              poiLabel: poi.label,
+              regionId: state.regions.activeRegion,
+              at: state.time,
+            });
+          }
           renownReward = resolveExplorationRenownReward(state.regions.poisDiscovered.length);
           if (renownReward) {
             grantXp(renownReward.xp);
@@ -7830,14 +7855,15 @@ const canvas = document.getElementById("game");
     for (const discovery of findNearbyRoadsideDiscoveries(state.regions, state.regions.activeRegion, state.player.x, state.player.y, MAX_RAY_DIST).slice(0, 3)) {
       const isShrine = discovery.kind === "shrine";
       const isCamp = discovery.kind === "camp";
+      const isFirstRoadMemory = discovery.id === FIRST_ROAD_DISCOVERY_ID;
       pushDynamicLight(lights, {
         id: `roadside-${discovery.id}`,
         kind: discovery.kind,
         x: discovery.x,
         y: discovery.y,
-        color: discovery.color || (isShrine ? "#cdb8ff" : "#ffd77b"),
-        radius: isShrine ? 5.4 : isCamp ? 4.8 : 3.6,
-        intensity: isShrine ? 0.58 : isCamp ? 0.5 : 0.26,
+        color: isFirstRoadMemory ? "#ffbf63" : discovery.color || (isShrine ? "#cdb8ff" : "#ffd77b"),
+        radius: isFirstRoadMemory ? 5.0 : isShrine ? 5.4 : isCamp ? 4.8 : 3.6,
+        intensity: isFirstRoadMemory ? 0.46 : isShrine ? 0.58 : isCamp ? 0.5 : 0.26,
         flicker: isCamp || isShrine ? 0.58 : 0.18,
       });
     }
@@ -8228,14 +8254,15 @@ const canvas = document.getElementById("game");
       ).slice(0, 3);
       const roadsideIds = new Set(roadsideDiscoveries.map((poi) => poi.id));
       for (const discovery of roadsideDiscoveries) {
+        const isFirstRoadMemory = discovery.id === FIRST_ROAD_DISCOVERY_ID;
         sprites.push({
           x: discovery.x,
           y: discovery.y,
-          color: discovery.color,
+          color: isFirstRoadMemory ? "#ffbf63" : discovery.color,
           label: discovery.label,
           poiKind: discovery.kind,
           kind: "roadside-discovery",
-          size: discovery.kind === "camp" || discovery.kind === "wagon" ? 0.98 : 0.86,
+          size: isFirstRoadMemory ? 1.18 : discovery.kind === "camp" || discovery.kind === "wagon" ? 0.98 : 0.86,
         });
       }
       const poiLead = resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: MAX_RAY_DIST })
@@ -8948,7 +8975,8 @@ const canvas = document.getElementById("game");
       const roadsideIds = new Set(roadsideDiscoveries.map((poi) => poi.id));
       for (const discovery of roadsideDiscoveries) {
         const pulse = 0.45 + (Math.sin(state.time * 5.1 + discovery.distance) + 1) * 0.45;
-        drawMarker(discovery.x, discovery.y, discovery.color || "#d89f62", 2.2 + pulse * 0.5, "diamond");
+        const isFirstRoadMemory = discovery.id === FIRST_ROAD_DISCOVERY_ID;
+        drawMarker(discovery.x, discovery.y, isFirstRoadMemory ? "#ffbf63" : discovery.color || "#d89f62", (isFirstRoadMemory ? 2.8 : 2.2) + pulse * 0.5, "diamond");
       }
 
       // POI pings: blink nearby undiscovered POIs.
@@ -10059,6 +10087,45 @@ const canvas = document.getElementById("game");
       syncAmbientForRegion(regionId);
       return { ok: true, regionId, x: Number(start.x.toFixed(2)), y: Number(start.y.toFixed(2)) };
     },
+    discoverBrokenWagon() {
+      ensurePoiDefaults(state.regions);
+      const poi = getPOIsForRegion("frontier").find((entry) => entry.id === FIRST_ROAD_DISCOVERY_ID);
+      if (!poi) return { ok: false, reason: "missing-broken-wagon" };
+      const newlyDiscovered = markPOIDiscovered(state.regions, poi.id);
+      const reward = { gold: 0, items: {}, hp: 0, stamina: 0 };
+      if (newlyDiscovered) {
+        recordNpcMemoryEvent(state.narrative.npcMemory, "elder", {
+          type: "poi_discovered",
+          poiId: poi.id,
+          poiLabel: poi.label,
+          regionId: "frontier",
+          at: state.time,
+        });
+        recordNpcMemoryEvent(state.narrative.npcMemory, "warden", {
+          type: "poi_discovered",
+          poiId: poi.id,
+          poiLabel: poi.label,
+          regionId: "frontier",
+          at: state.time,
+        });
+        if (poi.loot?.gold) {
+          state.player.gold += poi.loot.gold;
+          reward.gold += poi.loot.gold;
+        }
+        for (const [name, count] of Object.entries(poi.loot?.items || {})) {
+          state.inventory[name] = (state.inventory[name] || 0) + count;
+          reward.items[name] = (reward.items[name] || 0) + count;
+        }
+        showDiscoveryBanner(resolveDiscoveryRewardFeedback({ poi, reward }));
+        logMsg(`Broken Wagon discovered. ${poi.mysteryLine} ${poi.returnReason}`);
+      }
+      return {
+        ok: true,
+        newlyDiscovered,
+        discovered: state.regions.poisDiscovered.includes(poi.id),
+        mapScrap: state.inventory["Map Scrap"] || 0,
+      };
+    },
     acceptStarter() {
       state.world.jobs = normalizeJobBoardState(state.world.jobs);
       const accepted = acceptJob(state.world.jobs, "frontier_slime_bounty", {
@@ -10109,7 +10176,8 @@ const canvas = document.getElementById("game");
       jobState: state.world.jobs,
       house: state.house,
     });
-    const runSummary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time, houseProgressSummary);
+    const firstRoadMemory = getFirstRoadMemoryStatus();
+    const runSummary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time, houseProgressSummary, firstRoadMemory);
     const explorationRenown = resolveExplorationRenownStatus(state.regions.poisDiscovered?.length || 0);
     const openingObjective = resolveOpeningObjective({
       mode: state.mode,
@@ -10305,6 +10373,7 @@ const canvas = document.getElementById("game");
         combat_readability: combatReadability,
         opening_route_guide: openingRouteGuide,
         road_discovery_lead: roadDiscoveryLead,
+        first_road_memory: firstRoadMemory,
         roadside_discoveries_nearby: nearbyRoadsideDiscoveries,
         discovery_banner: discoveryBanner
           ? {

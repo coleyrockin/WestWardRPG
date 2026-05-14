@@ -46,7 +46,7 @@ describe("houseProgress", () => {
     });
     expect(display.planningCards.map((card: any) => card.line)).toContain("Take Deputy Badge Return from Boone's board.");
     expect(display.planningLine).toBe("Take Deputy Badge Return from Boone's board.");
-    expect(display.trophyLine).toContain("Map Scrap pinned");
+    expect(display.trophyLine).toContain("Broken Wagon Map Scrap pinned");
   });
 
   it("promotes completed story jobs over carried trophy copy", () => {
@@ -111,7 +111,7 @@ describe("houseProgress", () => {
     expect(inspection).toMatchObject({
       id: "road_map",
       status: "completed",
-      label: "Road Map",
+      label: "Broken Wagon Map",
     });
     expect(inspection?.distance).toBeLessThan(0.2);
     expect(inspection?.message).toContain("Old Road Survey");

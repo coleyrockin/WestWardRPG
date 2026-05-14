@@ -278,6 +278,7 @@ class ConsoleErrorTracker {
 const SMOKE_API_METHODS = new Set([
   "unlockHouse",
   "setRegion",
+  "discoverBrokenWagon",
   "acceptStarter",
   "simulateStarterKills",
   "claimStarter",

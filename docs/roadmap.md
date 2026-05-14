@@ -44,12 +44,12 @@ Every road, job, NPC, item, house upgrade, and ending should help that loop.
 
 ## Audit Snapshot
 
-Date: 2026-05-12.
+Date: 2026-05-13.
 
 Latest local facts:
 
 1. Branch target: `main`, tracking `origin/main`.
-2. Test gate: `npm test` reports 963 passing tests across 84 test files.
+2. Test gate: `npm test` reports 968 passing tests across 85 test files.
 3. `src/main.js` is over 10.5k lines. This is still the biggest technical drag.
 4. `docs/roadmap.md` had stale historical counts and mixed shipped work with
    future scope. This rewrite replaces that clutter with the finish path.
@@ -134,7 +134,8 @@ The remaining roadmap is now organized as seven milestones. They are ordered by
 what will most improve the finished-product feel.
 
 1. Product Truth Pass.
-2. Golden Path 1: the first complete road loop.
+2. Golden Path 1: the first complete road loop, now focused on the First Road
+   Memory Slice.
 3. Hardcore Visual Readability Pass.
 4. Core RPG Loop Fusion.
 5. Town, NPC, and Consequence Payoff.
@@ -168,7 +169,9 @@ Acceptance test:
 Status: active. First slice shipped locally: Marsh Slime Bounty is now the
 canonical Boone starter loop with route, landmark, threat, crafting reward, NPC
 reaction, board reaction, house proof, render-text visibility, and smoke
-assertions.
+assertions. The next slice is **First Road Memory**: Broken Wagon discovery,
+Map Scrap follow-up, Old Road Survey availability, Boone/town/house reaction,
+and run-summary proof.
 
 Goal: Build one fully authored, repeatable 20 to 40 minute path that proves the
 game works as an RPG.
@@ -190,14 +193,21 @@ The player path:
 
 Required work:
 
-1. Choose the canonical first job for the golden path.
-2. Make the first route marker visually dominant without being noisy.
-3. Add a distinct landmark silhouette visible from the road.
-4. Add one authored interruption: cache, shrine, ambush, stranger, or warning.
-5. Make the job payout trigger a house/vendor/NPC follow-up.
-6. Make the run summary call out the job, reward, and consequence.
-7. Add one browser smoke test that asserts the path's state changes, not only
-   that the game did not throw.
+1. Use existing `frontier_broken_wagon`, `Map Scrap`,
+   `frontier_slime_bounty`, and `frontier_map_survey` as the canonical first
+   road memory chain.
+2. Add a derived first-road memory status to `render_game_to_text`, with no
+   save-schema bump.
+3. Make Broken Wagon discovery visibly stronger through banner copy, minimap
+   marker emphasis, road dressing, and story-reward language.
+4. Record Boone and Elder memory when Broken Wagon is discovered.
+5. After the bounty, point missed-discovery players back to Broken Wagon and
+   map-scrap players toward Old Road Survey.
+6. Surface the consequence in Boone dialogue, job board copy, house planning
+   proof, and run summary.
+7. Add a browser smoke test that asserts discovery, Map Scrap, bounty
+   completion, Old Road Survey availability, Boone memory, first-road memory
+   status, and run-summary line.
 
 Acceptance test:
 
@@ -205,6 +215,7 @@ Acceptance test:
 2. The tester remembers one visual landmark.
 3. The tester knows what to upgrade next.
 4. The tester sees a reaction after returning.
+5. The tester can explain why Map Scrap matters.
 
 ## Milestone 2: Hardcore Visual Readability Pass
 
@@ -513,10 +524,10 @@ Allowed optional ideas:
 
 Use this order for the next implementation chunks:
 
-1. Run the full verification gate for combat-readability pass 1.
-2. Expand the golden-path browser smoke from helper-driven reward assertions to
-   a fuller start, accept, fight, return, reward, house, NPC-memory, and
-   `gameplay_feel.next_step` proof.
+1. Ship the First Road Memory Slice: Broken Wagon discovery, Map Scrap
+   follow-up, Boone/town/house reaction, and run-summary proof.
+2. Expand browser smoke around first-road memory so the golden path proves
+   discovery, follow-up job availability, NPC memory, and consequence text.
 3. Human-review current visual captures, commit approved baselines, and then
    make strict `npm run test:visual` part of the release gate.
 4. Finish save recovery proof with browser smoke coverage for corrupt primary,
@@ -561,7 +572,7 @@ git diff --check
 # clean
 
 npm test
-# 963 passing across 84 test files
+# 968 passing across 85 test files
 
 npm run typecheck:ts
 # clean

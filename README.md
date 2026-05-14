@@ -65,7 +65,7 @@ The current build contains the Shattered Frontier v3 foundation plus several ope
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, early open-world pressure/dressing work, and a Dustward road/watchtower/wall readability pass.
 
-Latest local fast gate: `npm test` reports **963 passing tests across 84 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **968 passing tests across 85 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 

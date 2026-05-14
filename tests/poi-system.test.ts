@@ -211,6 +211,8 @@ describe("poiSystem — road discovery lead", () => {
     expect(lead?.objectiveLine).toContain("inspect");
     expect(lead?.rewardHint).toContain("Map Scrap");
     expect(lead?.returnReason).toContain("Boone");
+    expect(lead?.hookLine).toContain("slime-scarred");
+    expect(lead?.dangerHint).toContain("slime burns");
   });
 
   it("turns a nearby undiscovered POI into an open-road hook", () => {

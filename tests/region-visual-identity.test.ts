@@ -50,6 +50,7 @@ describe("regionVisualIdentity", () => {
     expect(presentation.props.every((prop: any) => prop.blocking === false)).toBe(true);
     expect(presentation.roads.every((road: any) => road.blocking === false)).toBe(true);
     expect(presentation.props.some((prop: any) => prop.kind === "sign")).toBe(true);
+    expect(presentation.props.some((prop: any) => prop.label === "Slime-Scarred Road")).toBe(true);
     expect(presentation.props.filter((prop: any) => prop.kind === "lamp").length).toBeGreaterThanOrEqual(2);
     expect(presentation.roads.some((road: any) => road.label.includes("Marshal"))).toBe(true);
     expect(presentation.roads.some((road: any) => road.label.includes("Broken Wagon"))).toBe(true);

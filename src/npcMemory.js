@@ -228,6 +228,17 @@ export function resolveNpcReactiveLine(npcId, memory, context = {}) {
   const rep = context.factionRep || {};
   const affinity = (context.npcAffinity || {})[npcId] ?? 0;
   const completedJobIds = Array.isArray(context.completedJobIds) ? context.completedJobIds : [];
+  const firstRoadPhase = context.firstRoadMemory?.phase;
+  if (
+    npcId === "warden"
+    && firstRoadPhase
+    && firstRoadPhase !== "unseen"
+    && firstRoadPhase !== "visible"
+    && typeof context.firstRoadMemory?.booneLine === "string"
+    && context.firstRoadMemory.booneLine
+  ) {
+    return context.firstRoadMemory.booneLine;
+  }
   const completedJobReaction = (COMPLETED_JOB_REACTIONS[npcId] || [])
     .find((reaction) => completedJobIds.includes(reaction.jobId));
   if (completedJobReaction) return completedJobReaction.line;

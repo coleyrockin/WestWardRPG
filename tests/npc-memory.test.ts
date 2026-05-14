@@ -134,6 +134,20 @@ describe("npcMemory", () => {
     expect(line).toContain("watchtower");
   });
 
+  it("lets first-road memory override the generic Boone completion line", () => {
+    const memory = createInitialNpcMemoryState();
+    const line = resolveNpcReactiveLine("warden", memory, {
+      completedJobIds: ["frontier_slime_bounty"],
+      firstRoadMemory: {
+        phase: "survey_available",
+        booneLine: "Marshal Boone: Bounty paid, map scrap found. Now we turn a strange wagon into a road people can trust.",
+      },
+    });
+
+    expect(line).toContain("map scrap");
+    expect(line).toContain("strange wagon");
+  });
+
   it("reacts to completed Ashfall helmet salvage work", () => {
     const memory = createInitialNpcMemoryState();
 
