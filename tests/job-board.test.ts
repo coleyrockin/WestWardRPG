@@ -278,12 +278,18 @@ describe("jobBoard", () => {
     expect(firstMarker?.detailLine).toContain("Dustward Frontier");
     expect(firstMarker?.detailLine).toContain("Step 1/3");
     expect(firstMarker?.objectiveLine).toContain("Patrol: Split-Road Sign");
+    expect(firstMarker?.line).toContain("wagon trail");
+    expect(firstMarker?.flavorLine).toContain("official map goes blank");
+    expect(firstMarker?.visualLine).toContain("Weathered road sign");
 
-    recordJobEvent(state, { type: "checkpoint", targetId: "frontier_survey_split_sign", time: 30 });
+    const first = recordJobEvent(state, { type: "checkpoint", targetId: "frontier_survey_split_sign", time: 30 });
     recordJobEvent(state, { type: "checkpoint", targetId: "frontier_survey_wagon_ruts", time: 65 });
     const completed = recordJobEvent(state, { type: "checkpoint", targetId: "frontier_survey_cairn", time: 110 });
+    const readySummary = getActiveJobSummary(state);
     const claimed = claimJobReward(state, "frontier_map_survey");
 
+    expect(first.message).toContain("official map goes blank");
+    expect(readySummary?.progressLine).toBe("Return to Marshal Boone");
     expect(completed.completed).toBe(true);
     expect(claimed.reward).toEqual({ gold: 44, xp: 22, items: { Ashglass: 1 } });
   });

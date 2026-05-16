@@ -154,9 +154,36 @@ export const JOB_DEFINITIONS = {
       count: 3,
       label: "old road marks surveyed",
       checkpoints: [
-        { id: "frontier_survey_split_sign", label: "Split-Road Sign", x: 13.05, y: 7.82 },
-        { id: "frontier_survey_wagon_ruts", label: "Old Wagon Ruts", x: 14.72, y: 8.28 },
-        { id: "frontier_survey_cairn", label: "Dust Cairn", x: 15.55, y: 9.42 },
+        {
+          id: "frontier_survey_split_sign",
+          label: "Split-Road Sign",
+          x: 13.05,
+          y: 7.82,
+          routeHint: "Copy the old marshal arrow where Boone's map splits from the wagon trail.",
+          progressLine: "Read Split-Road Sign",
+          surveyLine: "Split-Road Sign copied: the marshal arrow points where the official map goes blank.",
+          visualLine: "Weathered road sign with fresh slime scoring across one arrow.",
+        },
+        {
+          id: "frontier_survey_wagon_ruts",
+          label: "Old Wagon Ruts",
+          x: 14.72,
+          y: 8.28,
+          routeHint: "Match the Map Scrap against the deep ruts cutting away from town.",
+          progressLine: "Trace Old Wagon Ruts",
+          surveyLine: "Old Wagon Ruts traced: someone dragged cargo off-road after the slime attack.",
+          visualLine: "Rutted mud, cut cargo straps, and a road edge that no longer feels abandoned.",
+        },
+        {
+          id: "frontier_survey_cairn",
+          label: "Dust Cairn",
+          x: 15.55,
+          y: 9.42,
+          routeHint: "Mark the cairn as Boone's final safe turn before marsh trouble.",
+          progressLine: "Mark Dust Cairn",
+          surveyLine: "Dust Cairn marked: the first road now has a true return line back to Boone.",
+          visualLine: "Stacked dust stones catching lantern paint beside the old route.",
+        },
       ],
     },
     bonus: {
@@ -811,7 +838,7 @@ function buildProgressLine(job, progress = null) {
     const checkpoints = Array.isArray(objective.checkpoints) ? objective.checkpoints : [];
     if (progress?.status === "ready" || count >= objective.count || count >= checkpoints.length) return `Return to ${job.npcName}`;
     const checkpoint = checkpoints[count];
-    return `Checkpoint ${count + 1}/${checkpoints.length || objective.count}: ${checkpoint?.label || objective.label}`;
+    return `${checkpoint?.progressLine || `Checkpoint ${count + 1}/${checkpoints.length || objective.count}`}: ${checkpoint?.label || objective.label}`;
   }
   if (objective.type === "supply_run") {
     if (progress?.status === "ready" || count >= objective.count) return `Return to ${job.npcName}`;
@@ -1159,7 +1186,7 @@ function recordPatrolEvent(job, progress, event = {}) {
     ...result,
     message: completed
       ? result.message
-      : `Job progress: ${job.title} checkpoint ${progress.count}/${checkpoints.length}.`,
+      : (next.surveyLine || `Job progress: ${job.title} checkpoint ${progress.count}/${checkpoints.length}.`),
   };
 }
 
@@ -1535,12 +1562,15 @@ export function resolveJobRouteMarker({ jobState, player = {}, resources = [], e
       kind: "job_patrol",
       title: "Patrol checkpoint",
       label: `Patrol: ${checkpoint.label}`,
-      line: `${activeJob.regionHint}: Checkpoint ${index + 1}/${checkpoints.length} • ${checkpoint.label}`,
+      line: `${activeJob.regionHint}: Checkpoint ${index + 1}/${checkpoints.length} • ${checkpoint.label}${checkpoint.routeHint ? ` - ${checkpoint.routeHint}` : ""}`,
       color: "#8fd0ff",
       action: "checkpoint",
       targetId: checkpoint.id,
       checkpointIndex: index + 1,
       checkpointTotal: checkpoints.length,
+      routeHint: checkpoint.routeHint || activeJob.goldenPath?.routeLine || "",
+      flavorLine: checkpoint.surveyLine || "",
+      visualLine: checkpoint.visualLine || "",
     });
   }
 

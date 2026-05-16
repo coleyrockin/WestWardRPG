@@ -1,0 +1,11 @@
+[
+  { "smoke": "unlockHouse", "frames": 4 },
+  { "smoke": "setRegion", "smoke_args": ["frontier"], "frames": 8 },
+  { "smoke": "discoverBrokenWagon", "frames": 8 },
+  { "smoke": "acceptStarter", "frames": 4 },
+  { "smoke": "simulateStarterKills", "smoke_args": [3], "frames": 4 },
+  { "smoke": "claimStarter", "frames": 4 },
+  { "smoke": "acceptOldRoadSurvey", "frames": 4 },
+  { "smoke": "completeOldRoadSurvey", "frames": 8 },
+  { "smoke": "claimOldRoadSurvey", "frames": 8 }
+]

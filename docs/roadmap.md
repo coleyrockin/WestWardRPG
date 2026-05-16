@@ -44,12 +44,12 @@ Every road, job, NPC, item, house upgrade, and ending should help that loop.
 
 ## Audit Snapshot
 
-Date: 2026-05-13.
+Date: 2026-05-16.
 
 Latest local facts:
 
 1. Branch target: `main`, tracking `origin/main`.
-2. Test gate: `npm test` reports 968 passing tests across 85 test files.
+2. Test gate: `npm test` reports 969 passing tests across 85 test files.
 3. `src/main.js` is over 10.5k lines. This is still the biggest technical drag.
 4. `docs/roadmap.md` had stale historical counts and mixed shipped work with
    future scope. This rewrite replaces that clutter with the finish path.
@@ -166,12 +166,14 @@ Acceptance test:
 
 ## Milestone 1: Golden Path 1 - First Complete Road Loop
 
-Status: active. First slice shipped locally: Marsh Slime Bounty is now the
-canonical Boone starter loop with route, landmark, threat, crafting reward, NPC
-reaction, board reaction, house proof, render-text visibility, and smoke
-assertions. The next slice is **First Road Memory**: Broken Wagon discovery,
-Map Scrap follow-up, Old Road Survey availability, Boone/town/house reaction,
-and run-summary proof.
+Status: active. Marsh Slime Bounty is the canonical Boone starter loop with
+route, landmark, threat, crafting reward, NPC reaction, board reaction, house
+proof, render-text visibility, and smoke assertions. The **First Road Memory**
+slice now continues into Broken Wagon discovery, Map Scrap follow-up, Old Road
+Survey availability, Old Road Survey checkpoint progress, Boone/town/house
+reaction, run-summary proof, and an explicit `old-road-survey` browser smoke
+scenario. The remaining work is to make the loop feel visually bigger and more
+human-tested, not to add another unrelated system.
 
 Goal: Build one fully authored, repeatable 20 to 40 minute path that proves the
 game works as an RPG.
@@ -205,9 +207,9 @@ Required work:
    map-scrap players toward Old Road Survey.
 6. Surface the consequence in Boone dialogue, job board copy, house planning
    proof, and run summary.
-7. Add a browser smoke test that asserts discovery, Map Scrap, bounty
-   completion, Old Road Survey availability, Boone memory, first-road memory
-   status, and run-summary line.
+7. Keep browser smoke coverage asserting discovery, Map Scrap, bounty
+   completion, Old Road Survey availability/completion, Boone memory,
+   first-road memory status, house proof, and run-summary line.
 
 Acceptance test:
 
@@ -524,18 +526,14 @@ Allowed optional ideas:
 
 Use this order for the next implementation chunks:
 
-1. Ship the First Road Memory Slice: Broken Wagon discovery, Map Scrap
-   follow-up, Boone/town/house reaction, and run-summary proof.
-2. Expand browser smoke around first-road memory so the golden path proves
-   discovery, follow-up job availability, NPC memory, and consequence text.
-3. Human-review current visual captures, commit approved baselines, and then
+1. Human-review current visual captures, commit approved baselines, and then
    make strict `npm run test:visual` part of the release gate.
-4. Finish save recovery proof with browser smoke coverage for corrupt primary,
+2. Finish save recovery proof with browser smoke coverage for corrupt primary,
    chosen-backup restore, export, and import.
-5. Extract HUD and objective rendering from `src/main.js` without changing the
+3. Extract HUD and objective rendering from `src/main.js` without changing the
    renderer.
-6. Extract modal input and modal drawing from `src/main.js`.
-7. Build the release proof package: `npm run build`, `npm run build:itch`,
+4. Extract modal input and modal drawing from `src/main.js`.
+5. Build the release proof package: `npm run build`, `npm run build:itch`,
    README screenshots, known limits, and launch instructions.
 
 ## Verification Gates
@@ -572,7 +570,7 @@ git diff --check
 # clean
 
 npm test
-# 968 passing across 85 test files
+# 969 passing across 85 test files
 
 npm run typecheck:ts
 # clean
@@ -586,12 +584,15 @@ npm run dev:lint
 npm run build
 # passed with existing Vite chunk-size warning
 
-WESTWARD_PORT=5201 WESTWARD_URL=http://127.0.0.1:5201/index.html npm run test:smoke
-# clean; an earlier localhost:5173 attempt was rejected as environment-contaminated
-# after another app/service-worker appeared on that origin
+WESTWARD_PORT=5211 WESTWARD_URL=http://127.0.0.1:5211/index.html npm run test:smoke
+# clean; includes old-road-survey browser proof
+# artifacts: output/qa-smoke-20260516-121136
+
+npm run package:itch
+# clean; wrote releases/westward-rpg-offline-v1.0.0.zip
 
 WESTWARD_URL=http://127.0.0.1:5198/index.html npm run test:visual:capture
-# clean
+# last known clean; 2026-05-16 visual capture escalation was blocked by environment usage limits
 
 npm run test:visual:review
 # clean in review mode; 18 captures skipped because no committed baselines exist

@@ -61,11 +61,11 @@ The current build contains the Shattered Frontier v3 foundation plus several ope
 - **Gear loop foundation**: weapon families, armor slots, deterministic loot tables, POI/mini-boss gear finds, earned gear visibility, and crafting-relevant resources.
 - **Housing/workbench**: save-safe house workstation state, workbench levels, Workbench II potion/refine benefits, Workbench III map-table project, and selectable workbench actions.
 - **Jobs/economy foundation**: Marshal Boone offers deterministic bounty, salvage, courier, patrol, supply-run, rescue, and escort work through in-world regional job boards with timed bonuses, failure/report-back states, regional job depth, route markers, minimap/HUD/debug visibility, progress tracking, and reward payout.
-- **Golden path starter loop**: Marsh Slime Bounty is the canonical Boone road loop, surfacing route, landmark, threat, crafting reward, NPC/board reaction, and house proof.
+- **Golden path road loop**: Marsh Slime Bounty now flows into Broken Wagon, Map Scrap, and Old Road Survey, surfacing route, landmark, threat, authored checkpoint progress, crafting reward, NPC/board reaction, house proof, and run-summary memory.
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, early open-world pressure/dressing work, and a Dustward road/watchtower/wall readability pass.
 
-Latest local fast gate: `npm test` reports **968 passing tests across 85 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **969 passing tests across 85 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
@@ -120,7 +120,7 @@ For an offline-playable ZIP (itch.io style — runs by double-clicking
 `index.html`, no server, no install):
 
 ```bash
-npm run package:itch  # writes releases/westward-offline-v<version>.zip
+npm run package:itch  # writes releases/westward-rpg-offline-v<version>.zip
 ```
 
 If port `5173` is already used on your machine, Vite will automatically pick the next available port.

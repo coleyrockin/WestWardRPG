@@ -56,6 +56,49 @@ describe("firstRoadMemory", () => {
     expect(status.runSummaryLine).toContain("opened Old Road Survey");
   });
 
+  it("tracks active survey checkpoint progress before the turn-in", () => {
+    const active = resolveFirstRoadMemoryStatus({
+      regionId: "frontier",
+      regions: { poisDiscovered: [FIRST_ROAD_DISCOVERY_ID] },
+      inventory: { "Map Scrap": 1 },
+      jobState: {
+        activeJobId: FIRST_ROAD_SURVEY_JOB_ID,
+        completedJobIds: [FIRST_ROAD_STARTER_JOB_ID],
+        progressByJobId: {
+          [FIRST_ROAD_SURVEY_JOB_ID]: { status: "active", count: 1 },
+        },
+      },
+      house: { unlocked: true },
+    });
+    const ready = resolveFirstRoadMemoryStatus({
+      regionId: "frontier",
+      regions: { poisDiscovered: [FIRST_ROAD_DISCOVERY_ID] },
+      inventory: { "Map Scrap": 1 },
+      jobState: {
+        activeJobId: FIRST_ROAD_SURVEY_JOB_ID,
+        completedJobIds: [FIRST_ROAD_STARTER_JOB_ID],
+        progressByJobId: {
+          [FIRST_ROAD_SURVEY_JOB_ID]: { status: "ready", count: 3 },
+        },
+      },
+      house: { unlocked: true },
+    });
+
+    expect(active).toMatchObject({
+      phase: "survey_active",
+      surveyActive: true,
+      surveyCount: 1,
+      surveyTotal: 3,
+    });
+    expect(active.objectiveLine).toContain("checkpoint 2/3");
+    expect(ready).toMatchObject({
+      phase: "survey_ready",
+      surveyReady: true,
+      surveyCount: 3,
+    });
+    expect(ready.nextStep).toContain("claim Old Road Survey");
+  });
+
   it("recognizes the completed survey as the finished first-road memory", () => {
     const status = resolveFirstRoadMemoryStatus({
       regionId: "frontier",

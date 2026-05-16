@@ -343,10 +343,60 @@ NODE
   echo "[SUCCESS] golden-path-memory assertions passed"
 }
 
+assert_old_road_survey_state() {
+  local out_dir="$OUT_ROOT/old-road-survey"
+  node - "$out_dir" <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+
+const dir = process.argv[2];
+const files = fs.readdirSync(dir)
+  .filter((file) => /^state-\d+\.json$/.test(file))
+  .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
+if (!files.length) {
+  throw new Error("old-road-survey smoke did not write state JSON");
+}
+
+const state = JSON.parse(fs.readFileSync(path.join(dir, files[files.length - 1]), "utf8"));
+const completed = state.job_board?.state?.completedJobIds || [];
+if (!completed.includes("frontier_slime_bounty") || !completed.includes("frontier_map_survey")) {
+  throw new Error("old-road-survey did not complete both starter bounty and Old Road Survey");
+}
+const surveyProgress = state.job_board?.state?.progressByJobId?.frontier_map_survey;
+if (!surveyProgress || surveyProgress.rewardClaimed !== true) {
+  throw new Error("old-road-survey did not claim the Old Road Survey reward");
+}
+if ((state.inventory?.Ashglass || 0) < 1) {
+  throw new Error("old-road-survey did not grant Ashglass survey reward");
+}
+const memory = state.gameplay_feel?.first_road_memory;
+if (!memory || memory.phase !== "survey_completed") {
+  throw new Error(`old-road-survey expected survey_completed first-road memory, got ${memory?.phase}`);
+}
+if (!String(memory.houseLine || "").includes("Old Road Survey")) {
+  throw new Error("old-road-survey missing house proof copy for completed survey");
+}
+const trophies = state.house?.progress_display?.trophies || [];
+const routeMap = trophies.find((entry) => entry.id === "road_map");
+if (!routeMap || routeMap.status !== "completed") {
+  throw new Error("old-road-survey missing completed road_map trophy");
+}
+const boone = state.narrative?.npcMemory?.byNpc?.warden;
+if (boone?.recentJobId !== "frontier_map_survey") {
+  throw new Error("old-road-survey did not record Boone memory for Old Road Survey");
+}
+if (!String(state.run_summary?.firstRoadMemoryLine || "").includes("completed Old Road Survey")) {
+  throw new Error("old-road-survey missing completed survey run summary line");
+}
+NODE
+  echo "[SUCCESS] old-road-survey assertions passed"
+}
+
 EXPECTED_SCENARIOS=(
   golden-path
   golden-path-full
   golden-path-memory
+  old-road-survey
   smoke
   quest
   combat
@@ -364,6 +414,8 @@ run_scenario "golden-path-full" "test-actions/golden_path_full.json" 1
 assert_golden_path_full_state
 run_scenario "golden-path-memory" "test-actions/golden_path_memory.json" 1
 assert_golden_path_memory_state
+run_scenario "old-road-survey" "test-actions/old_road_survey.json" 1
+assert_old_road_survey_state
 run_scenario "smoke" "test-actions/realism_smoke.json" 3
 run_scenario "quest" "test-actions/quest_flow.json" 2
 run_scenario "combat" "test-actions/combat_block_flow.json" 2

@@ -150,6 +150,7 @@ import {
 } from "./jobRewardFeedback.js";
 import {
   FIRST_ROAD_DISCOVERY_ID,
+  FIRST_ROAD_SURVEY_JOB_ID,
   resolveFirstRoadMemoryStatus,
 } from "./firstRoadMemory.js";
 import {
@@ -10153,6 +10154,54 @@ const canvas = document.getElementById("game");
     claimStarter() {
       state.world.jobs = normalizeJobBoardState(state.world.jobs);
       const paid = claimJobReward(state.world.jobs, "frontier_slime_bounty");
+      if (paid.ok && !paid.failed) {
+        grantJobReward(paid.reward);
+        recordJobCompletionMemory(paid.job);
+      }
+      return { ok: !!paid?.ok, failed: !!paid?.failed, reward: paid?.reward || null };
+    },
+    acceptOldRoadSurvey() {
+      state.world.jobs = normalizeJobBoardState(state.world.jobs);
+      const accepted = acceptJob(state.world.jobs, FIRST_ROAD_SURVEY_JOB_ID, {
+        time: state.time,
+        inventory: state.inventory,
+        narrative: state.narrative,
+      });
+      return { ok: !!accepted?.ok, jobId: accepted?.job?.id || null, message: accepted?.message || "" };
+    },
+    completeOldRoadSurvey() {
+      state.world.jobs = normalizeJobBoardState(state.world.jobs);
+      const checkpoints = [
+        "frontier_survey_split_sign",
+        "frontier_survey_wagon_ruts",
+        "frontier_survey_cairn",
+      ];
+      const results = [];
+      for (const [index, targetId] of checkpoints.entries()) {
+        const result = recordJobEvent(state.world.jobs, {
+          type: "checkpoint",
+          targetId,
+          regionId: "frontier",
+          time: state.time + index * 10,
+        });
+        results.push({
+          ok: !!result.ok,
+          completed: !!result.completed,
+          message: result.message || "",
+          count: result.progress?.count || 0,
+          status: result.progress?.status || "",
+        });
+        if (result.ok && result.message) logMsg(result.message);
+      }
+      return {
+        ok: results.every((entry) => entry.ok),
+        results,
+        status: state.world.jobs.progressByJobId?.[FIRST_ROAD_SURVEY_JOB_ID]?.status || null,
+      };
+    },
+    claimOldRoadSurvey() {
+      state.world.jobs = normalizeJobBoardState(state.world.jobs);
+      const paid = claimJobReward(state.world.jobs, FIRST_ROAD_SURVEY_JOB_ID);
       if (paid.ok && !paid.failed) {
         grantJobReward(paid.reward);
         recordJobCompletionMemory(paid.job);

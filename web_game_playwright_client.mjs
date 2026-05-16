@@ -282,6 +282,9 @@ const SMOKE_API_METHODS = new Set([
   "acceptStarter",
   "simulateStarterKills",
   "claimStarter",
+  "acceptOldRoadSurvey",
+  "completeOldRoadSurvey",
+  "claimOldRoadSurvey",
 ]);
 
 async function doChoreography(page, canvas, steps) {

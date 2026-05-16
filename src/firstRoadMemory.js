@@ -35,11 +35,18 @@ export function resolveFirstRoadMemoryStatus({
   const wagonDiscovered = pois.has(FIRST_ROAD_DISCOVERY_ID);
   const bountyCompleted = jobs.has(FIRST_ROAD_STARTER_JOB_ID);
   const surveyCompleted = jobs.has(FIRST_ROAD_SURVEY_JOB_ID);
+  const surveyProgress = jobState?.progressByJobId?.[FIRST_ROAD_SURVEY_JOB_ID] || null;
+  const surveyActive = jobState?.activeJobId === FIRST_ROAD_SURVEY_JOB_ID && !surveyCompleted;
+  const surveyReady = surveyActive && surveyProgress?.status === "ready";
+  const surveyCount = Math.max(0, Math.min(3, Math.floor(Number.isFinite(surveyProgress?.count) ? surveyProgress.count : 0)));
+  const nextSurveyStep = Math.min(3, surveyCount + 1);
   const booneMemory = narrative?.npcMemory?.byNpc?.warden || {};
   const booneSawWagon = booneMemory.recentPoiId === FIRST_ROAD_DISCOVERY_ID;
 
   let phase = "unseen";
   if (surveyCompleted) phase = "survey_completed";
+  else if (surveyReady) phase = "survey_ready";
+  else if (surveyActive) phase = "survey_active";
   else if (bountyCompleted && (wagonDiscovered || hasMapScrap || booneSawWagon)) phase = "survey_available";
   else if (bountyCompleted) phase = "bounty_completed";
   else if (wagonDiscovered || hasMapScrap || booneSawWagon) phase = "discovered";
@@ -86,6 +93,22 @@ export function resolveFirstRoadMemoryStatus({
       runSummaryLine: "Cleared the first road, found the Broken Wagon Map Scrap, and opened Old Road Survey.",
       nextStep: "Accept Old Road Survey from Boone's board.",
     },
+    survey_active: {
+      objectiveLine: `Mark Old Road Survey checkpoint ${nextSurveyStep}/3 before returning to Boone.`,
+      booneLine: "Marshal Boone: Keep your eyes on the old road marks. A map is only useful when boots prove it.",
+      boardLine: `Old Road Survey active: ${surveyCount}/3 road marks checked.`,
+      houseLine: house?.unlocked ? "The workbench map waits for the last road marks before Boone signs it." : "Unlock the house to pin the finished survey map.",
+      runSummaryLine: `Old Road Survey started with ${surveyCount}/3 road marks checked.`,
+      nextStep: `Reach Old Road Survey checkpoint ${nextSurveyStep}/3.`,
+    },
+    survey_ready: {
+      objectiveLine: "Return to Boone with 3/3 Old Road Survey marks checked.",
+      booneLine: "Marshal Boone: Bring those marks back. If they line up, the board can stop guessing where the road is safe.",
+      boardLine: "Old Road Survey is ready to claim; return to Boone for pay and route proof.",
+      houseLine: house?.unlocked ? "The finished Old Road Survey is ready to pin above the workbench." : "Unlock the house to display the finished Old Road Survey.",
+      runSummaryLine: "Old Road Survey route marks are complete and waiting for Boone's pay.",
+      nextStep: "Return to Boone and claim Old Road Survey.",
+    },
     survey_completed: {
       objectiveLine: "Old Road Survey complete; Boone's first road now has marked proof.",
       booneLine: "Marshal Boone: That road survey helps. A marked road keeps families from learning geography by panic.",
@@ -104,6 +127,10 @@ export function resolveFirstRoadMemoryStatus({
     hasMapScrap,
     bountyCompleted,
     surveyCompleted,
+    surveyActive,
+    surveyReady,
+    surveyCount,
+    surveyTotal: 3,
     houseUnlocked: Boolean(house?.unlocked),
     ...copy,
   };
