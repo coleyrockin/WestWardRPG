@@ -29,6 +29,7 @@ export interface AudioBuses {
   sfx: GainNode;
   ambient: GainNode;
   music: GainNode;
+  musicFilter: BiquadFilterNode;
   current: any;
   currentMusic?: any;
 }

@@ -32,6 +32,7 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - [Why This Project](#why-this-project)
 - [Current State](#current-state)
 - [Current Direction](#current-direction)
+- [MVP Test Path](#mvp-test-path)
 - [Core Systems](#core-systems)
 - [Quick Start](#quick-start)
 - [Controls](#controls)
@@ -65,7 +66,7 @@ The current build contains the Shattered Frontier v3 foundation plus several ope
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, early open-world pressure/dressing work, and a Dustward road/watchtower/wall readability pass.
 
-Latest local fast gate: `npm test` reports **969 passing tests across 85 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **970 passing tests across 85 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
@@ -76,6 +77,35 @@ The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the
 3. **Core RPG loop fusion** — jobs, loot, gear, crafting, housing, economy, and consequences feeding one repeatable loop.
 4. **Playtest hardening** — per-slot recovery/export UI, stronger browser assertions, feedback capture, and clean run history.
 5. **Architecture finish** — extract HUD, input, modal, save, combat, and renderer runtime from the remaining `main.js` pressure.
+
+## MVP Test Path
+
+For a Steve-ready MVP review, use the first-road vertical slice:
+
+1. Start in Dustward Frontier and find Marshal Boone's job board.
+2. Accept **Marsh Slime Bounty** and follow the road/marker toward the marsh threat.
+3. Inspect **Broken Wagon** to earn **Map Scrap** and reveal why the road matters.
+4. Complete the bounty, return to Boone, then take **Old Road Survey**.
+5. Mark the three survey checkpoints, claim the reward, and check the house/workbench proof.
+6. Review the run summary and NPC/job-board reactions for first-road memory payoff.
+
+MVP launch options:
+
+```bash
+npm install
+npm run dev
+```
+
+For offline handoff, run:
+
+```bash
+npm run package:itch
+```
+
+That writes `releases/westward-rpg-offline-v1.0.0.zip`; unzip it and open
+`index.html`. Known MVP limits: visuals still need human-approved baselines,
+the first road is the strongest authored loop, and broader region/pet/LLM
+expansion is intentionally post-MVP.
 
 ## Core Systems
 

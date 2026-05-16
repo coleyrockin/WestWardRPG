@@ -49,7 +49,7 @@ Date: 2026-05-16.
 Latest local facts:
 
 1. Branch target: `main`, tracking `origin/main`.
-2. Test gate: `npm test` reports 969 passing tests across 85 test files.
+2. Test gate: `npm test` reports 970 passing tests across 85 test files.
 3. `src/main.js` is over 10.5k lines. This is still the biggest technical drag.
 4. `docs/roadmap.md` had stale historical counts and mixed shipped work with
    future scope. This rewrite replaces that clutter with the finish path.
@@ -355,6 +355,8 @@ show explicit empty, valid, corrupted, invalid, or newer-schema guidance with
 recover/import/export language. Backup picker pass 1 also shipped locally:
 slots cache backup metadata, show whether valid backups exist, and let a
 player choose which valid backup to restore when more than one is available.
+Browser smoke now proves corrupt-primary detection, chosen-backup restore, and
+per-slot export/import through the `save-recovery` scenario.
 
 Required work:
 
@@ -363,8 +365,9 @@ Required work:
      accessibility, audio, graphics, and keybind clarity.
 
 2. Save resilience finish.
-   - Browser smoke for corrupt primary plus chosen-backup restore.
-   - Browser smoke for per-slot export/import.
+   - Keep `save-recovery` smoke green for corrupt primary plus chosen-backup
+     restore.
+   - Keep per-slot export/import smoke green.
    - IndexedDB quota handling.
    - Manual save confirmation and autosave status clarity.
 
@@ -528,8 +531,7 @@ Use this order for the next implementation chunks:
 
 1. Human-review current visual captures, commit approved baselines, and then
    make strict `npm run test:visual` part of the release gate.
-2. Finish save recovery proof with browser smoke coverage for corrupt primary,
-   chosen-backup restore, export, and import.
+2. Finish IndexedDB quota and manual save/autosave status clarity.
 3. Extract HUD and objective rendering from `src/main.js` without changing the
    renderer.
 4. Extract modal input and modal drawing from `src/main.js`.
@@ -570,7 +572,7 @@ git diff --check
 # clean
 
 npm test
-# 969 passing across 85 test files
+# 970 passing across 85 test files
 
 npm run typecheck:ts
 # clean

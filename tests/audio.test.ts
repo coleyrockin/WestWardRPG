@@ -73,10 +73,14 @@ describe("audio module", () => {
     expect(buses.sfx).toBeTruthy();
     expect(buses.ambient).toBeTruthy();
     expect(buses.music).toBeTruthy();
-    // sfx, ambient, music each connected to master; master to destination
+    // Music routes through a soft low-pass before master so procedural synths
+    // do not buzz on laptop speakers.
     expect(buses.sfx.connect).toHaveBeenCalledWith(buses.master);
     expect(buses.ambient.connect).toHaveBeenCalledWith(buses.master);
-    expect(buses.music.connect).toHaveBeenCalledWith(buses.master);
+    expect(buses.musicFilter).toBeTruthy();
+    expect(buses.musicFilter.type).toBe("lowpass");
+    expect(buses.music.connect).toHaveBeenCalledWith(buses.musicFilter);
+    expect(buses.musicFilter.connect).toHaveBeenCalledWith(buses.master);
     expect(buses.master.connect).toHaveBeenCalledWith(ctx.destination);
   });
 
@@ -147,6 +151,15 @@ describe("procedural music", () => {
     for (const [, profile] of Object.entries(MUSIC_REGION_PROFILE)) {
       expect(profile.tempoBPM).toBeGreaterThanOrEqual(40);
       expect(profile.tempoBPM).toBeLessThanOrEqual(160);
+    }
+  });
+
+  it("uses soft music waveforms instead of buzzy square/saw pads", () => {
+    for (const [, profile] of Object.entries(MUSIC_REGION_PROFILE)) {
+      expect(["sine", "triangle"]).toContain(profile.padType);
+      expect(["sine", "triangle"]).toContain(profile.melodyType);
+      expect(["sine", "triangle"]).toContain(profile.tensionType);
+      expect(profile.tensionMaxGain).toBeLessThanOrEqual(0.04);
     }
   });
 

@@ -392,11 +392,53 @@ NODE
   echo "[SUCCESS] old-road-survey assertions passed"
 }
 
+assert_save_recovery_state() {
+  local out_dir="$OUT_ROOT/save-recovery"
+  node - "$out_dir" <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+
+const dir = process.argv[2];
+const files = fs.readdirSync(dir)
+  .filter((file) => /^state-\d+\.json$/.test(file))
+  .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
+if (!files.length) {
+  throw new Error("save-recovery smoke did not write state JSON");
+}
+
+const state = JSON.parse(fs.readFileSync(path.join(dir, files[files.length - 1]), "utf8"));
+const proof = state.save?.smoke_recovery;
+if (!proof || proof.ok !== true) {
+  throw new Error("save-recovery smoke did not complete corrupt/restore/import proof");
+}
+if (proof.corruptReason !== "hash-mismatch") {
+  throw new Error(`save-recovery expected hash-mismatch, got ${proof.corruptReason}`);
+}
+if (proof.backupCountBeforeRestore < 1 || proof.exportBytes < 100) {
+  throw new Error("save-recovery missing backup or export proof");
+}
+if (proof.restoredX !== 3.25 || proof.importedX !== 7.75) {
+  throw new Error(`save-recovery restored/imported wrong payloads: ${proof.restoredX}/${proof.importedX}`);
+}
+const slots = state.save?.slots || [];
+const slot1 = slots.find((slot) => slot.slot === "slot-1");
+const slot2 = slots.find((slot) => slot.slot === "slot-2");
+if (!slot1?.valid || !slot2?.valid) {
+  throw new Error("save-recovery expected slot-1 and slot-2 to be valid after restore/import");
+}
+if (slot1.recovery?.state !== "valid" || slot2.recovery?.state !== "valid") {
+  throw new Error("save-recovery missing valid recovery copy after restore/import");
+}
+NODE
+  echo "[SUCCESS] save-recovery assertions passed"
+}
+
 EXPECTED_SCENARIOS=(
   golden-path
   golden-path-full
   golden-path-memory
   old-road-survey
+  save-recovery
   smoke
   quest
   combat
@@ -416,6 +458,8 @@ run_scenario "golden-path-memory" "test-actions/golden_path_memory.json" 1
 assert_golden_path_memory_state
 run_scenario "old-road-survey" "test-actions/old_road_survey.json" 1
 assert_old_road_survey_state
+run_scenario "save-recovery" "test-actions/save_recovery.json" 1
+assert_save_recovery_state
 run_scenario "smoke" "test-actions/realism_smoke.json" 3
 run_scenario "quest" "test-actions/quest_flow.json" 2
 run_scenario "combat" "test-actions/combat_block_flow.json" 2

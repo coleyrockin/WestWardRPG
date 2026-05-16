@@ -19,15 +19,20 @@ export function createAudioBuses(ctx) {
   const sfx = ctx.createGain();
   const ambient = ctx.createGain();
   const music = ctx.createGain();
+  const musicFilter = ctx.createBiquadFilter();
   master.gain.value = 1;
   sfx.gain.value = 1;
   ambient.gain.value = 0; // crossfade target
   music.gain.value = 0;
+  musicFilter.type = "lowpass";
+  musicFilter.frequency.value = 2400;
+  musicFilter.Q.value = 0.2;
   sfx.connect(master);
   ambient.connect(master);
-  music.connect(master);
+  music.connect(musicFilter);
+  musicFilter.connect(master);
   master.connect(ctx.destination);
-  return { ctx, master, sfx, ambient, music, current: null };
+  return { ctx, master, sfx, ambient, music, musicFilter, current: null };
 }
 
 function buildNoiseBuffer(ctx, durationSec = 2) {
@@ -135,39 +140,39 @@ export const MUSIC_REGION_PROFILE = {
     padGain: 0.06,
     padDetuneCents: -3,
     melodyType: "triangle",
-    melodyGain: 0.04,
+    melodyGain: 0.028,
     melodyPattern: [0, -1, 2, -1, 4, -1, 2, 0, -1, -1, 1, -1, 3, -1, -1, -1],
     tensionRootHz: 220,
-    tensionType: "sawtooth",
-    tensionMaxGain: 0.05,
+    tensionType: "triangle",
+    tensionMaxGain: 0.028,
   },
   ashfall: {
     rootHz: 92,                          // F#2 — duskier
     scale: [0, 2, 5, 7, 9],
     tempoBPM: 64,
-    padType: "sawtooth",
-    padGain: 0.045,
+    padType: "triangle",
+    padGain: 0.034,
     padDetuneCents: 4,
     melodyType: "triangle",
-    melodyGain: 0.035,
+    melodyGain: 0.026,
     melodyPattern: [0, -1, -1, 3, -1, 2, -1, 0, -1, -1, 4, -1, -1, 2, -1, -1],
     tensionRootHz: 184,
-    tensionType: "sawtooth",
-    tensionMaxGain: 0.06,
+    tensionType: "triangle",
+    tensionMaxGain: 0.032,
   },
   ironlantern: {
     rootHz: 130.81,                      // C3 — colder
     scale: [0, 3, 5, 6, 10],             // hint of blues 6th
     tempoBPM: 88,
-    padType: "square",
-    padGain: 0.035,
+    padType: "triangle",
+    padGain: 0.03,
     padDetuneCents: 6,
     melodyType: "sine",
-    melodyGain: 0.03,
+    melodyGain: 0.024,
     melodyPattern: [0, -1, 4, -1, 2, -1, -1, 3, -1, -1, 1, -1, 4, -1, 2, -1],
     tensionRootHz: 261.63,
-    tensionType: "sawtooth",
-    tensionMaxGain: 0.07,
+    tensionType: "sine",
+    tensionMaxGain: 0.034,
   },
 };
 
@@ -187,7 +192,7 @@ function buildMusicNode(ctx, profile) {
   padOscB.detune.value = -profile.padDetuneCents;
   const padFilter = ctx.createBiquadFilter();
   padFilter.type = "lowpass";
-  padFilter.frequency.value = profile.rootHz * 6;
+  padFilter.frequency.value = profile.rootHz * 4.5;
   padFilter.Q.value = 0.4;
   const padGain = ctx.createGain();
   padGain.gain.value = 0; // ramped up by startMusicForRegion

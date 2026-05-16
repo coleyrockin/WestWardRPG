@@ -83,6 +83,8 @@ describe("gameFeel", () => {
     expect(pressure?.actionLabel).toBe("Open cache");
     expect(pressure?.distanceLine).toBe("3m");
     expect(pressure?.rewardLine).toBe("+12g, +6 XP, +1 Potion, +1 Slime Core");
+    expect(pressure?.objectiveLine).toContain("Mission");
+    expect(pressure?.objectiveLine).toContain("Press E");
     expect(pressure?.objectiveLine).toContain("3m");
     expect(pressure?.objectiveLine).toContain("+12g");
   });
@@ -176,7 +178,8 @@ describe("gameFeel", () => {
       urgency: "high",
       stepCount: 3,
     });
-    expect(guide?.objectiveLine).toContain("Open cache");
+    expect(guide?.objectiveLine).toContain("Mission");
+    expect(guide?.objectiveLine).toContain("Press E");
     expect(guide?.objectiveLine).toContain("+12g");
     expect(guide?.secondaryLine).toContain("Boone Job Board");
     expect(guide?.secondaryLine).toContain("Threat");
@@ -279,7 +282,7 @@ describe("gameFeel", () => {
       liveObjective: {
         id: "opening-route-guide",
         title: "Opening route",
-        objectiveLine: "Open cache: Smoke Cache • 3m • +12g",
+        objectiveLine: "Mission: follow the marshal road to Smoke Cache • 3m. Press E to open it • +12g",
         secondaryLine: "Boone Job Board • 1m",
         urgency: "high",
       },
@@ -291,7 +294,7 @@ describe("gameFeel", () => {
     expect(nextStep).toMatchObject({
       title: "Next step",
       source: "opening-route-guide",
-      actionLine: "Open cache: Smoke Cache • 3m • +12g",
+      actionLine: "Mission: follow the marshal road to Smoke Cache • 3m. Press E to open it • +12g",
       urgency: "high",
       regionHint: "Dustward Frontier",
     });
@@ -324,6 +327,7 @@ describe("gameFeel", () => {
 
     expect(nextStep?.source).toBe("job-board");
     expect(nextStep?.actionLine).toContain("Boone Job Board");
+    expect(nextStep?.actionLine).toContain("Press E");
     expect(nextStep?.actionLine).toContain("1m");
   });
 });

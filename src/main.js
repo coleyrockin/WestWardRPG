@@ -284,6 +284,7 @@ import {
   restoreFromBackup as idbRestoreFromBackup,
   listBackups as idbListBackups,
   exportSaveBlob as idbExportSaveBlob,
+  exportSaveJson as idbExportSaveJson,
   importSaveFromText as idbImportSaveFromText,
   deleteSave as idbDeleteSave,
   listSlots as idbListSlots,
@@ -3687,6 +3688,21 @@ const canvas = document.getElementById("game");
     updateQuestProgressFromInventory();
     state.chest.lastReward = reward.summary;
     logMsg(`Opening cache secured: ${reward.summary}.`);
+    showHudNotice(createHudNotice({
+      kind: "reward",
+      title: "Road cache secured",
+      line: `${reward.summary}. Use the Slime Core for early gear or house progress.`,
+      color: "#ffd77b",
+      ttl: 6.4,
+    }));
+    state.floatingTexts.push({
+      wx: state.chest.x,
+      wy: state.chest.y,
+      text: "CACHE LOOT",
+      life: 1.0,
+      maxLife: 1.0,
+      color: "#ffe16a",
+    });
   }
 
   function grantJobReward(reward) {
@@ -10066,6 +10082,64 @@ const canvas = document.getElementById("game");
     return { x: fallback.x, y: fallback.y, angle: base.angle };
   }
 
+  let smokeSaveRecoveryProof = null;
+
+  function openSmokeSaveDb() {
+    return new Promise((resolve, reject) => {
+      if (typeof indexedDB === "undefined") {
+        reject(new Error("IndexedDB unavailable"));
+        return;
+      }
+      const req = indexedDB.open("westward", 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error("IndexedDB open failed"));
+    });
+  }
+
+  function smokeReqAsync(req) {
+    return new Promise((resolve, reject) => {
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error("IndexedDB request failed"));
+    });
+  }
+
+  async function corruptSmokePrimarySave(slot) {
+    const db = await openSmokeSaveDb();
+    try {
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(["saves"], "readwrite");
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error("IndexedDB transaction failed"));
+        tx.onabort = () => reject(tx.error || new Error("IndexedDB transaction aborted"));
+        (async () => {
+          const store = tx.objectStore("saves");
+          const record = await smokeReqAsync(store.get(slot));
+          if (!record?.envelope) throw new Error(`missing primary save for ${slot}`);
+          record.envelope.hash = record.envelope.hash === "00000000" ? "ffffffff" : "00000000";
+          await smokeReqAsync(store.put(record));
+        })().catch((err) => {
+          try {
+            tx.abort();
+          } catch {
+            // ignore
+          }
+          reject(err);
+        });
+      });
+    } finally {
+      try {
+        db.close();
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  function cloneSmokePayload(payload) {
+    if (typeof structuredClone === "function") return structuredClone(payload);
+    return JSON.parse(JSON.stringify(payload));
+  }
+
   window.__westwardSmoke = {
     unlockHouse() {
       state.house.unlocked = true;
@@ -10207,6 +10281,66 @@ const canvas = document.getElementById("game");
         recordJobCompletionMemory(paid.job);
       }
       return { ok: !!paid?.ok, failed: !!paid?.failed, reward: paid?.reward || null };
+    },
+    async proveSaveRecovery() {
+      const primarySlot = "slot-1";
+      const importSlot = "slot-2";
+      await idbDeleteSave(primarySlot);
+      await idbDeleteSave(importSlot);
+
+      const firstPayload = cloneSmokePayload(captureSaveData());
+      firstPayload.player.x = 3.25;
+      firstPayload.player.level = Math.max(2, firstPayload.player.level || 1);
+      firstPayload.regions.activeRegion = "frontier";
+      firstPayload.time = Math.max(90, firstPayload.time || 0);
+      await idbWriteSave(primarySlot, firstPayload);
+
+      const secondPayload = cloneSmokePayload(captureSaveData());
+      secondPayload.player.x = 7.75;
+      secondPayload.player.level = Math.max(3, secondPayload.player.level || 1);
+      secondPayload.regions.activeRegion = "frontier";
+      secondPayload.time = Math.max(180, secondPayload.time || 0);
+      await idbWriteSave(primarySlot, secondPayload);
+
+      const exportJson = await idbExportSaveJson(primarySlot);
+      const backupsBefore = await idbListBackups(primarySlot);
+      const restoreTarget = backupsBefore.find((backup) => backup.valid);
+      if (!restoreTarget) throw new Error("save recovery smoke did not create a valid backup");
+
+      await corruptSmokePrimarySave(primarySlot);
+      const corruptedRead = await idbReadSave(primarySlot);
+      const restoredPayload = await idbRestoreFromBackup(primarySlot, restoreTarget.savedAt);
+      const restoredRead = await idbReadSave(primarySlot);
+      const imported = await idbImportSaveFromText(importSlot, exportJson);
+      const importedRead = await idbReadSave(importSlot);
+
+      await refreshSlotsAndPickActive();
+      const slotDescriptions = cachedSlotMetas.map((meta) => ({
+        slot: meta.slot,
+        empty: Boolean(meta.empty),
+        valid: Boolean(meta.valid),
+        recovery: describeSaveSlotRecovery(meta, { maxSupportedVersion: MAX_SUPPORTED_SAVE_VERSION }),
+        backups: describeSaveBackupChoices(cachedBackupMetasBySlot[meta.slot] || []),
+      }));
+
+      smokeSaveRecoveryProof = {
+        ok: corruptedRead.ok === false
+          && corruptedRead.reason === "hash-mismatch"
+          && restoredRead.ok === true
+          && imported.ok === true
+          && importedRead.ok === true,
+        primarySlot,
+        importSlot,
+        corruptReason: corruptedRead.reason || null,
+        backupCountBeforeRestore: backupsBefore.length,
+        restoredLevel: restoredPayload?.player?.level || null,
+        restoredX: Number((restoredPayload?.player?.x || 0).toFixed(2)),
+        importedLevel: importedRead.ok ? importedRead.payload?.player?.level || null : null,
+        importedX: importedRead.ok ? Number((importedRead.payload?.player?.x || 0).toFixed(2)) : null,
+        exportBytes: exportJson.length,
+        slotDescriptions,
+      };
+      return smokeSaveRecoveryProof;
     },
   };
 
@@ -10401,6 +10535,13 @@ const canvas = document.getElementById("game");
         x_direction: "positive x moves east/right",
         y_direction: "positive y moves south/down",
       },
+      map: {
+        width_tiles: worldMap[0]?.length || 0,
+        height_tiles: worldMap.length,
+        active_region: state.regions.activeRegion,
+        player_location: state.player.inHouse ? "house interior" : getRegionVisualIdentity(state.regions.activeRegion).label,
+        note: "Use the minimap for nearby roads, markers, NPCs, enemies, and POIs; the full overworld is 56 by 56 tiles.",
+      },
       mode: state.mode,
       character_sheet_open: characterSheetOpen,
       workbench_open: workbenchOpen,
@@ -10413,6 +10554,19 @@ const canvas = document.getElementById("game");
       save: {
         has_save: hasSaveData,
         last_saved_at: lastSaveAt,
+        current_slot: currentSaveSlot,
+        slots_loaded: savesLoaded,
+        slots: cachedSlotMetas.map((meta) => ({
+          slot: meta.slot,
+          empty: Boolean(meta.empty),
+          valid: Boolean(meta.valid),
+          saved_at: meta.savedAt || null,
+          reason: meta.reason || null,
+          summary: buildSlotSummaryText(meta),
+          recovery: describeSaveSlotRecovery(meta, { maxSupportedVersion: MAX_SUPPORTED_SAVE_VERSION }),
+          backups: describeSaveBackupChoices(cachedBackupMetasBySlot[meta.slot] || []),
+        })),
+        smoke_recovery: smokeSaveRecoveryProof,
       },
       gameplay_feel: {
         next_step: firstSessionNextStep,
