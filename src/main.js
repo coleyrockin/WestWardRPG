@@ -7209,6 +7209,24 @@ const canvas = document.getElementById("game");
         drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.5, spriteWidth * (0.66 + windupPulse * 0.18), "#ff4438", 0.18 + windupPulse * 0.15);
         drawSpritePulseRing(spriteWidth * 0.5, spriteHeight * 0.52, spriteWidth * (0.46 + (1 - windupRatio) * 0.2), "#ffcf65", 0.44 + windupPulse * 0.28, spriteWidth * 0.035);
       }
+      const dangerPulse = 0.5 + Math.sin(state.time * 5.8) * 0.5;
+      drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.6, spriteWidth * (0.42 + dangerPulse * 0.06), enemyBase, 0.08 + dangerPulse * 0.08);
+      ctx.fillStyle = "rgba(6, 17, 10, 0.46)";
+      ctx.beginPath();
+      ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.86, spriteWidth * 0.44, spriteHeight * 0.08, 0, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(8, 24, 12, 0.72)";
+      ctx.lineWidth = Math.max(1.5, spriteWidth * 0.03);
+      ctx.beginPath();
+      ctx.moveTo(spriteWidth * 0.2, spriteHeight * 0.62);
+      ctx.lineTo(spriteWidth * 0.08, spriteHeight * 0.48);
+      ctx.moveTo(spriteWidth * 0.8, spriteHeight * 0.62);
+      ctx.lineTo(spriteWidth * 0.92, spriteHeight * 0.48);
+      ctx.moveTo(spriteWidth * 0.32, spriteHeight * 0.28);
+      ctx.lineTo(spriteWidth * 0.24, spriteHeight * 0.12);
+      ctx.moveTo(spriteWidth * 0.68, spriteHeight * 0.28);
+      ctx.lineTo(spriteWidth * 0.76, spriteHeight * 0.12);
+      ctx.stroke();
       if (cue.fillAlpha > 0) {
         const pulse = cue.pulseRate ? (Math.sin(state.time * cue.pulseRate) * 0.5 + 0.5) : 0.5;
         ctx.fillStyle = hexToRgbaUtil(cue.color || "#ffd77b", clamp(cue.fillAlpha + pulse * 0.08, 0, 0.32));
@@ -7248,9 +7266,24 @@ const canvas = document.getElementById("game");
       ctx.strokeStyle = "rgba(10, 32, 20, 0.42)";
       ctx.lineWidth = Math.max(1, spriteWidth * 0.028);
       ctx.stroke();
+      ctx.fillStyle = "rgba(170, 255, 146, 0.2)";
+      ctx.beginPath();
+      ctx.arc(spriteWidth * 0.5, spriteHeight * 0.54, spriteWidth * (0.14 + dangerPulse * 0.025), 0, TAU);
+      ctx.fill();
       ctx.fillStyle = shadeHex(enemyBase, 0.32);
       ctx.fillRect(spriteWidth * 0.34, spriteHeight * 0.43, spriteWidth * 0.08, spriteHeight * 0.06);
       ctx.fillRect(spriteWidth * 0.58, spriteHeight * 0.43, spriteWidth * 0.08, spriteHeight * 0.06);
+      ctx.fillStyle = "rgba(7, 15, 8, 0.78)";
+      ctx.beginPath();
+      ctx.moveTo(spriteWidth * 0.36, spriteHeight * 0.62);
+      ctx.quadraticCurveTo(spriteWidth * 0.5, spriteHeight * 0.7, spriteWidth * 0.64, spriteHeight * 0.62);
+      ctx.lineTo(spriteWidth * 0.6, spriteHeight * 0.69);
+      ctx.lineTo(spriteWidth * 0.54, spriteHeight * 0.64);
+      ctx.lineTo(spriteWidth * 0.5, spriteHeight * 0.72);
+      ctx.lineTo(spriteWidth * 0.46, spriteHeight * 0.64);
+      ctx.lineTo(spriteWidth * 0.4, spriteHeight * 0.69);
+      ctx.closePath();
+      ctx.fill();
       ctx.fillStyle = "rgba(255, 255, 255, 0.32)";
       ctx.beginPath();
       ctx.arc(spriteWidth * 0.38, spriteHeight * 0.33, spriteWidth * 0.06, 0, TAU);
@@ -7451,20 +7484,41 @@ const canvas = document.getElementById("game");
       ctx.arc(spriteWidth * 0.5, spriteHeight * 0.6, spriteWidth * (0.32 + pulse * 0.06), 0, TAU);
       ctx.fill();
       if (sprite.poiKind === "wagon") {
-        ctx.fillStyle = shadeHex(color, 0.46);
-        ctx.fillRect(spriteWidth * 0.2, spriteHeight * 0.48, spriteWidth * 0.6, spriteHeight * 0.18);
-        ctx.fillRect(spriteWidth * 0.28, spriteHeight * 0.36, spriteWidth * 0.44, spriteHeight * 0.12);
-        ctx.strokeStyle = "#5b402b";
-        ctx.lineWidth = Math.max(1.6, spriteWidth * 0.04);
+        ctx.save();
+        ctx.translate(spriteWidth * 0.5, spriteHeight * 0.5);
+        ctx.rotate(-0.12);
+        ctx.translate(-spriteWidth * 0.5, -spriteHeight * 0.5);
+        ctx.fillStyle = "#3f281b";
+        ctx.fillRect(spriteWidth * 0.18, spriteHeight * 0.5, spriteWidth * 0.64, spriteHeight * 0.2);
+        ctx.fillStyle = shadeHex(color, 0.54);
+        ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.42, spriteWidth * 0.54, spriteHeight * 0.15);
+        ctx.fillStyle = shadeHex(color, 0.82);
+        ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.32, spriteWidth * 0.34, spriteHeight * 0.12);
+        ctx.strokeStyle = "#26180f";
+        ctx.lineWidth = Math.max(1.8, spriteWidth * 0.045);
         ctx.beginPath();
-        ctx.arc(spriteWidth * 0.32, spriteHeight * 0.74, spriteWidth * 0.1, 0, TAU);
-        ctx.arc(spriteWidth * 0.68, spriteHeight * 0.74, spriteWidth * 0.1, 0, TAU);
+        ctx.arc(spriteWidth * 0.3, spriteHeight * 0.76, spriteWidth * 0.13, 0, TAU);
+        ctx.arc(spriteWidth * 0.69, spriteHeight * 0.76, spriteWidth * 0.1, 0, TAU * 0.72);
         ctx.stroke();
-        ctx.fillStyle = color;
-        ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.32, spriteWidth * 0.08, spriteHeight * 0.18);
-        drawSpriteGlow(spriteWidth * 0.26, spriteHeight * 0.34, spriteWidth * 0.18, "#ffd27a", 0.28 + pulse * 0.14);
+        ctx.strokeStyle = "rgba(255, 205, 117, 0.42)";
+        ctx.lineWidth = Math.max(1, spriteWidth * 0.018);
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.moveTo(spriteWidth * (0.28 + i * 0.14), spriteHeight * 0.44);
+          ctx.lineTo(spriteWidth * (0.34 + i * 0.12), spriteHeight * 0.68);
+          ctx.stroke();
+        }
+        ctx.restore();
+        drawSpriteGlow(spriteWidth * 0.32, spriteHeight * 0.36, spriteWidth * 0.2, "#ffd27a", 0.3 + pulse * 0.16);
         ctx.fillStyle = "#fff0b8";
-        ctx.fillRect(spriteWidth * 0.24, spriteHeight * 0.34, spriteWidth * 0.04, spriteHeight * 0.06);
+        ctx.fillRect(spriteWidth * 0.29, spriteHeight * 0.33, spriteWidth * 0.06, spriteHeight * 0.08);
+        ctx.fillStyle = "rgba(255, 245, 190, 0.48)";
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.35, spriteHeight * 0.34);
+        ctx.lineTo(spriteWidth * 0.5, spriteHeight * 0.28);
+        ctx.lineTo(spriteWidth * 0.48, spriteHeight * 0.39);
+        ctx.closePath();
+        ctx.fill();
       } else if (sprite.poiKind === "shrine") {
         drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.26, spriteWidth * (0.32 + pulse * 0.08), "#d9a8ff", 0.16 + pulse * 0.13);
         ctx.fillStyle = shadeHex(color, 0.42);
@@ -8898,6 +8952,7 @@ const canvas = document.getElementById("game");
 
     projected.sort((a, b) => b.distToPlayer - a.distToPlayer);
 
+    const drawnSpriteLabelRects = [];
     for (const sprite of projected) {
       const widthScale = sprite.kind === "resource" && sprite.label === "Tree" ? 0.82 : sprite.kind === "pig" ? 0.58 : 0.62;
       const nearDampen = clamp((sprite.distToPlayer - 0.35) / 1.7, 0.52, 1);
@@ -8958,19 +9013,43 @@ const canvas = document.getElementById("game");
         }
       }
 
-      const centeredLabel = Math.abs(sprite.sx - width / 2) < width * 0.24;
-      const labelImportant = sprite.kind === "npc"
+      const nearCenterLabel = Math.abs(sprite.sx - width / 2) < width * 0.16;
+      const criticalLabel = sprite.kind === "npc"
         || sprite.kind === "enemy"
         || sprite.kind === "chest"
-        || sprite.kind === "landmark"
-        || sprite.kind === "house-door"
         || sprite.kind === "pressure"
         || sprite.kind === "job-route"
-        || sprite.kind === "job-board"
+        || sprite.kind === "job-board";
+      const contextualLabel = sprite.kind === "landmark"
+        || sprite.kind === "house-door"
         || (sprite.kind === "world-prop" && ["road-sign", "sign", "lamp"].includes(sprite.propKind));
-      if (state.mode === "playing" && sprite.label && centeredLabel && sprite.distToPlayer < 5.8 && labelImportant) {
+      const labelDistance = criticalLabel
+        ? 5.8
+        : sprite.kind === "world-prop"
+          ? 2.6
+          : 3.2;
+      if (state.mode === "playing" && sprite.label && nearCenterLabel && sprite.distToPlayer < labelDistance && (criticalLabel || contextualLabel)) {
         ctx.font = "bold 11px Georgia";
-        drawPillLabel(fitText(sprite.label, 116), left + spriteWidth / 2, top - 10);
+        const labelText = fitText(sprite.label, 116);
+        const labelX = left + spriteWidth / 2;
+        const labelY = top - 10;
+        const labelWidth = clamp(ctx.measureText(labelText).width + 18, 42, 132);
+        const labelRect = {
+          left: labelX - labelWidth / 2,
+          right: labelX + labelWidth / 2,
+          top: labelY - 14,
+          bottom: labelY + 4,
+        };
+        const overlapsExistingLabel = drawnSpriteLabelRects.some((rect) => (
+          labelRect.left < rect.right
+          && labelRect.right > rect.left
+          && labelRect.top < rect.bottom
+          && labelRect.bottom > rect.top
+        ));
+        if (!overlapsExistingLabel) {
+          drawPillLabel(labelText, labelX, labelY);
+          drawnSpriteLabelRects.push(labelRect);
+        }
       }
     }
 
@@ -10981,6 +11060,35 @@ const canvas = document.getElementById("game");
       boardProp,
       goldenPath,
     });
+    const presentationLabels = [
+      ...(worldPresentation.props || []),
+      ...(worldPresentation.vegetation || []),
+      ...(worldPresentation.roads || []),
+      ...(worldPresentation.roadSigns || []),
+      worldPresentation.landmark,
+    ]
+      .filter(Boolean)
+      .map((entry) => String(entry.label || entry.kind || "").toLowerCase());
+    const openingSceneProof = {
+      style: regionArtKit.id === "frontier" ? "playable-haunted-western-dusk" : regionArtKit.sky.style,
+      has_dusk_sky: regionArtKit.sky.style.includes("dusk") || regionArtKit.sky.style.includes("western"),
+      has_road_cue: Boolean(regionReadability.roadPull || regionArtKit.road?.style),
+      has_landmark: Boolean(worldPresentation.landmark?.label || openingComposition.landmark),
+      has_job_board: Boolean(boardProp),
+      has_smoke_cache: state.regions.activeRegion === "frontier" && !state.chest.opened,
+      has_broken_wagon_cue: presentationLabels.some((label) => label.includes("broken wagon")),
+      has_first_enemy_cue: Boolean(openingFightCue || combatReadability?.nearest),
+      hud_focus_line: firstSessionNextStep?.actionLine || liveObjective?.objectiveLine || liveObjective?.line || null,
+    };
+    openingSceneProof.proof_score = [
+      openingSceneProof.has_dusk_sky,
+      openingSceneProof.has_road_cue,
+      openingSceneProof.has_landmark,
+      openingSceneProof.has_job_board,
+      openingSceneProof.has_smoke_cache,
+      openingSceneProof.has_broken_wagon_cue,
+      openingSceneProof.has_first_enemy_cue,
+    ].filter(Boolean).length;
     const quests = {
       crystal: {
         title: state.quests.crystal.title,
@@ -11178,6 +11286,7 @@ const canvas = document.getElementById("game");
         visual_quality_setting: state.weather.quality,
         world_dressing_counts: worldPresentation.worldDressing,
         opening_composition: openingComposition,
+        opening_scene_proof: openingSceneProof,
       },
       dynamic_lighting: {
         active_count: dynamicLightSnapshot.length,

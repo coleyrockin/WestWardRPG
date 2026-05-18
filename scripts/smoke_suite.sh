@@ -230,6 +230,18 @@ const combatReadability = state.gameplay_feel?.combat_readability || state.comba
 if (!combatReadability || typeof combatReadability.threatLine !== "string" || typeof combatReadability.responseLine !== "string") {
   throw new Error("golden-path smoke missing combat readability summary");
 }
+const visualProof = state.visual_qa?.opening_scene_proof;
+if (!visualProof || visualProof.proof_score < 6) {
+  throw new Error(`golden-path smoke missing first-minute visual proof, score ${visualProof?.proof_score}`);
+}
+for (const key of ["has_dusk_sky", "has_road_cue", "has_landmark", "has_job_board", "has_smoke_cache", "has_broken_wagon_cue"]) {
+  if (visualProof[key] !== true) {
+    throw new Error(`golden-path smoke visual proof missing ${key}`);
+  }
+}
+if (!String(visualProof.hud_focus_line || "").includes("Smoke Cache")) {
+  throw new Error("golden-path smoke visual proof missing Smoke Cache HUD focus");
+}
 if (goldenPath.phase !== "available" || !goldenPath.routeLine || !goldenPath.threatLine) {
   throw new Error("golden-path smoke missing route/threat guidance");
 }
