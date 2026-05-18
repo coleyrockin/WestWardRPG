@@ -10,7 +10,7 @@
 Story-first open-world frontier RPG built on a custom Canvas raycasting stack.
 No engine. No framework lock-in. Just readable systems code, deterministic helpers, and a growing RPG loop.
 
-The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction: origins, attributes, regional identity, gear, armor, loot, workbench upgrades, housing utility, Boone's job board, deterministic NPC memory, combat payoff, and first-pass visual open-world pressure.
+The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction with a new visual target: a stylized dark western RPG, closer to Oblivion meets Weird West meets a low-poly graphic novel.
 
 ## Preview
 
@@ -64,16 +64,16 @@ The current build contains the Shattered Frontier v3 foundation plus several ope
 - **Jobs/economy foundation**: Marshal Boone offers deterministic bounty, salvage, courier, patrol, supply-run, rescue, and escort work through in-world regional job boards with timed bonuses, failure/report-back states, regional job depth, route markers, minimap/HUD/debug visibility, progress tracking, and reward payout.
 - **Golden path road loop**: Marsh Slime Bounty now flows into Broken Wagon, Map Scrap, and Old Road Survey, surfacing route, landmark, threat, authored checkpoint progress, crafting reward, NPC/board reaction, house proof, and run-summary memory.
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
-- **Visual feel foundation**: redesigned title screen, region visual identities, first-pass hit feedback, near-wall projection repair, early open-world pressure/dressing work, and a Dustward road/watchtower/wall readability pass.
+- **Visual direction**: redesigned title screen, region visual identities, combat feedback, and an active Dustward Canvas art-kit pass with dusk sky, warmer road language, town silhouettes, lantern/wanted-board props, lower marsh barriers, and less placeholder-heavy opening composition.
 
-Latest local fast gate: `npm test` reports **970 passing tests across 85 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **979 passing tests across 86 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
 The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the single source of truth. The high-level active build order is:
 
 1. **Golden Path 1** — one complete Boone road-job loop from town to road to reward to consequence.
-2. **Hardcore visual readability** — stronger roads, landmarks, near-wall treatment, combat tells, interactable silhouettes, and visual regression gates.
+2. **Hardcore visual readability** — finish the first-five-minutes Dustward rescue pass: dark western dusk palette, clearer NPC/enemy/interactable silhouettes, cleaner HUD, near-wall/marsh readability, and visual regression gates.
 3. **Core RPG loop fusion** — jobs, loot, gear, crafting, housing, economy, and consequences feeding one repeatable loop.
 4. **Playtest hardening** — per-slot recovery/export UI, stronger browser assertions, feedback capture, and clean run history.
 5. **Architecture finish** — extract HUD, input, modal, save, combat, and renderer runtime from the remaining `main.js` pressure.

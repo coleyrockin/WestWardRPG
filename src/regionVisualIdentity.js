@@ -1,4 +1,5 @@
 import { getPOIsForRegion, POI_KINDS } from "./poiSystem.js";
+import { getRegionArtKit, resolveWorldDressingForView } from "./regionArtKits.js";
 
 export const REGION_VISUAL_IDENTITIES = {
   frontier: {
@@ -341,15 +342,35 @@ function buildRoadDiscoverySignposts(regionId, anchor, context = {}) {
 export function buildRegionWorldPresentation(regionId, context = {}) {
   const profile = getRegionVisualIdentity(regionId);
   const config = REGION_PRESENTATION[profile.id] || REGION_PRESENTATION.frontier;
+  const artKit = getRegionArtKit(profile.id);
+  const worldDressing = resolveWorldDressingForView({
+    regionId: profile.id,
+    preset: context.visualPreset,
+    motionReduction: context.motionReduction,
+  });
   const anchor = {
     x: numberOr(context.playerX, config.anchor.x),
     y: numberOr(context.playerY, config.anchor.y),
   };
   const toPlacements = (items) => items.map((item) => placeSpec(item, anchor, context)).filter(Boolean);
+  const vistas = toPlacements(config.vistas || []);
+  const roads = toPlacements(config.roads || []);
+  const props = toPlacements([...(config.props || []), ...(worldDressing.props || [])]);
+  const vegetation = toPlacements(worldDressing.vegetation || []);
 
   return {
     regionId: profile.id,
     label: profile.label,
+    artKit: {
+      id: artKit.id,
+      label: artKit.label,
+      quality: artKit.quality,
+      skyStyle: artKit.sky.style,
+      horizonStyle: artKit.horizon.style,
+      roadStyle: artKit.road.style,
+      landmarkStyle: artKit.landmark.style,
+      weatherMood: artKit.weatherMood,
+    },
     anchor,
     routeLine: config.routeLine,
     compositionLine: config.compositionLine,
@@ -365,9 +386,17 @@ export function buildRegionWorldPresentation(regionId, context = {}) {
       blocking: false,
       placement: "fallback",
     },
-    vistas: toPlacements(config.vistas || []),
-    roads: toPlacements(config.roads || []),
-    props: toPlacements(config.props || []),
+    vistas,
+    roads,
+    props,
+    vegetation,
+    worldDressing: {
+      density: worldDressing.density,
+      propCount: props.length,
+      vegetationCount: vegetation.length,
+      vistaCount: vistas.length,
+      roadCount: roads.length,
+    },
     roadSigns: buildRoadDiscoverySignposts(profile.id, anchor, context).filter(Boolean),
   };
 }

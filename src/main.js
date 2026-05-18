@@ -403,12 +403,19 @@ import {
   GRAPHICS_PRESETS,
   createInitialGraphicsState,
   resolveRecommendedPreset,
+  resolveVisualQualitySettingForPreset,
   applyGraphicsAccessibility,
   getColorblindPalette,
   SETTINGS_ROWS,
   readSettingValue,
   stepSetting,
 } from "./graphicsSettings.js";
+import {
+  getRegionArtKit,
+  resolveOpeningViewComposition,
+  resolveSpriteArtVariant,
+  resolveWallMaterial,
+} from "./regionArtKits.js";
 import {
   createInitialCompanionRuntime,
   chooseEligibleCompanion,
@@ -1010,7 +1017,7 @@ const canvas = document.getElementById("game");
     const next = stepSetting(state.graphics, row.id, dir);
     if (row.id === "gradientCache") clearGradientCache();
     if (row.id === "preset") {
-      state.weather.quality = state.graphics.preset === "high" ? "cinematic" : state.graphics.preset === "low" ? "performance" : "balanced";
+      state.weather.quality = resolveVisualQualitySettingForPreset(state.graphics.preset);
     }
     logMsg(`${row.label}: ${typeof next === "boolean" ? (next ? "ON" : "OFF") : next}`);
     if (state.mode === "playing") {
@@ -2000,14 +2007,14 @@ const canvas = document.getElementById("game");
       "Sir Oinks-a-Lot",
     ];
     const presetPens = [
-      { x: 8.2, y: 7.6 },
-      { x: 10.7, y: 7.9 },
-      { x: 7.1, y: 8.9 },
-      { x: 11.9, y: 9.2 },
-      { x: 9.3, y: 10.1 },
-      { x: 7.9, y: 10.7 },
-      { x: 10.9, y: 10.7 },
-      { x: 9.5, y: 11.3 },
+      { x: 6.1, y: 6.8 },
+      { x: 12.9, y: 6.9 },
+      { x: 5.8, y: 9.2 },
+      { x: 13.2, y: 9.3 },
+      { x: 6.3, y: 11.4 },
+      { x: 12.7, y: 11.5 },
+      { x: 5.4, y: 12.7 },
+      { x: 13.5, y: 12.7 },
     ];
     for (let i = 0; i < 8; i++) {
       const style = WESTERN_PIG_ROLES[i % WESTERN_PIG_ROLES.length];
@@ -3405,6 +3412,8 @@ const canvas = document.getElementById("game");
     return {
       isPassable: isWorldDecorationPlacement,
       isVisible: isWorldDecorationPlacement,
+      visualPreset: state.graphics?.preset || "balanced",
+      motionReduction: Boolean(state.graphics?.accessibility?.motionReduction),
     };
   }
 
@@ -5635,7 +5644,7 @@ const canvas = document.getElementById("game");
         deviceMemory: navigator.deviceMemory || 4,
       });
       state.graphics.preset = recommended;
-      state.weather.quality = recommended === "high" ? "cinematic" : recommended === "low" ? "performance" : "balanced";
+      state.weather.quality = resolveVisualQualitySettingForPreset(recommended);
     }
 
     for (const m of state.msg) {
@@ -6160,6 +6169,215 @@ const canvas = document.getElementById("game");
   let cachedCloudGradient = null;
   let lastCloudOpacity = -1;
 
+  function drawLayeredCloudBand(width, horizon, band, artKit, index) {
+    const palette = artKit.sky.cloudPalette || ["#fff0c4", "#d9b88f"];
+    const cloudColor = palette[index % palette.length];
+    const y = horizon * band.y + Math.sin(state.time * 0.04 + index) * 4;
+    const speed = band.speed || 0.1;
+    const scale = band.scale || 1;
+    const alpha = band.alpha || 0.16;
+    const clusterCount = Math.max(4, Math.ceil(width / (170 * scale)));
+    for (let i = 0; i < clusterCount + 2; i++) {
+      const drift = (state.time * 18 * speed + i * width / clusterCount + index * 97) % (width + 260);
+      const cx = drift - 130;
+      const cy = y + Math.sin(i * 1.9 + state.time * 0.06) * 7;
+      const cloud = ctx.createRadialGradient(cx, cy, 5, cx, cy, 88 * scale);
+      cloud.addColorStop(0, hexToRgba(cloudColor, alpha));
+      cloud.addColorStop(0.42, hexToRgba(cloudColor, alpha * 0.52));
+      cloud.addColorStop(1, "rgba(255, 255, 255, 0)");
+      ctx.fillStyle = cloud;
+      ctx.fillRect(cx - 130 * scale, cy - 64 * scale, 260 * scale, 128 * scale);
+    }
+  }
+
+  function drawArtKitSky(width, height, horizon, normalizedDay, weather, artKit) {
+    if (!artKit?.sky) return;
+    const sky = artKit.sky;
+    const frontierDusk = artKit.id === "frontier";
+    const intensity = frontierDusk
+      ? clamp(0.94 - weather.rain * 0.12, 0.7, 0.98)
+      : clamp(0.54 + normalizedDay * 0.22 - weather.rain * 0.1, 0.32, 0.78);
+    const kitSky = ctx.createLinearGradient(0, 0, 0, horizon);
+    kitSky.addColorStop(0, hexToRgba(sky.top, intensity));
+    kitSky.addColorStop(frontierDusk ? 0.46 : 0.58, hexToRgba(sky.middle, intensity * (frontierDusk ? 0.82 : 0.62)));
+    kitSky.addColorStop(1, hexToRgba(sky.bottom, intensity * (frontierDusk ? 0.94 : 0.82)));
+    ctx.fillStyle = kitSky;
+    ctx.fillRect(0, 0, width, horizon);
+
+    const glowX = width * (frontierDusk ? 0.78 : 0.72);
+    const glowY = horizon * (frontierDusk ? 0.38 : 0.24);
+    const glowR = width * (frontierDusk ? 0.46 : 0.34);
+    const sunGlow = ctx.createRadialGradient(glowX, glowY, 8, glowX, glowY, glowR);
+    sunGlow.addColorStop(0, hexToRgba(sky.sunGlow, (frontierDusk ? 0.34 : 0.18 * normalizedDay) * (1 - weather.rain * 0.7)));
+    sunGlow.addColorStop(0.36, hexToRgba(sky.bottom, frontierDusk ? 0.18 : 0.06));
+    sunGlow.addColorStop(1, "rgba(255, 215, 123, 0)");
+    ctx.fillStyle = sunGlow;
+    ctx.fillRect(glowX - glowR, glowY - glowR, glowR * 2, glowR * 2);
+
+    if (frontierDusk) {
+      const shadowGrade = ctx.createLinearGradient(0, 0, 0, horizon);
+      shadowGrade.addColorStop(0, "rgba(14, 12, 42, 0.26)");
+      shadowGrade.addColorStop(0.52, "rgba(76, 38, 68, 0.1)");
+      shadowGrade.addColorStop(1, "rgba(255, 171, 91, 0.16)");
+      ctx.fillStyle = shadowGrade;
+      ctx.fillRect(0, 0, width, horizon);
+
+      ctx.fillStyle = "rgba(255, 219, 132, 0.62)";
+      ctx.beginPath();
+      ctx.arc(glowX, glowY, Math.max(18, width * 0.025), 0, TAU);
+      ctx.fill();
+    }
+
+    const bands = sky.cloudBands || [];
+    for (let i = 0; i < bands.length; i++) {
+      drawLayeredCloudBand(width, horizon, bands[i], artKit, i);
+    }
+  }
+
+  function drawMesaSilhouette(points, color, alpha) {
+    ctx.fillStyle = hexToRgba(color, alpha);
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], points[0][1]);
+    for (const [x, y] of points.slice(1)) ctx.lineTo(x, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawArtKitHorizon(width, height, horizon, artKit, normalizedDay) {
+    if (!artKit?.horizon) return;
+    const frontierDusk = artKit.id === "frontier";
+    const farAlpha = frontierDusk ? 0.52 : 0.2 + normalizedDay * 0.08;
+    const midAlpha = frontierDusk ? 0.62 : 0.26 + normalizedDay * 0.09;
+    const nearAlpha = frontierDusk ? 0.68 : 0.22 + normalizedDay * 0.08;
+    drawMesaSilhouette([
+      [0, horizon + 4],
+      [width * 0.08, horizon - 24],
+      [width * 0.24, horizon - 30],
+      [width * 0.32, horizon - 14],
+      [width * 0.48, horizon - 34],
+      [width * 0.62, horizon - 20],
+      [width * 0.78, horizon - 38],
+      [width, horizon - 18],
+      [width, horizon + 34],
+      [0, horizon + 34],
+    ], artKit.horizon.far, farAlpha);
+
+    drawMesaSilhouette([
+      [0, horizon + 18],
+      [width * 0.12, horizon - 10],
+      [width * 0.24, horizon - 3],
+      [width * 0.36, horizon - 22],
+      [width * 0.55, horizon - 8],
+      [width * 0.68, horizon - 26],
+      [width * 0.86, horizon - 8],
+      [width, horizon - 16],
+      [width, horizon + 46],
+      [0, horizon + 46],
+    ], artKit.horizon.mid, midAlpha);
+
+    if (artKit.id === "frontier") {
+      ctx.fillStyle = hexToRgba(artKit.horizon.near, nearAlpha);
+      for (let i = 0; i < 10; i++) {
+        const x = width * (0.035 + i * 0.1);
+        const roofY = horizon - 5 - (i % 4) * 6;
+        const w = 22 + (i % 3) * 9;
+        const h = 22 + (i % 2) * 8;
+        ctx.fillRect(x, roofY, w, h);
+        ctx.beginPath();
+        ctx.moveTo(x - 5, roofY + 1);
+        ctx.lineTo(x + w * 0.5, roofY - 13);
+        ctx.lineTo(x + w + 5, roofY + 1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 186, 91, 0.38)";
+        ctx.fillRect(x + w * 0.6, roofY + h * 0.48, 4, 6);
+        ctx.fillStyle = hexToRgba(artKit.horizon.near, nearAlpha);
+      }
+      const treeCount = 18;
+      for (let i = 0; i < treeCount; i++) {
+        const x = width * (0.03 + i * 0.073);
+        const h = 22 + (i % 5) * 7;
+        ctx.fillStyle = hexToRgba("#17151d", 0.58);
+        ctx.fillRect(x, horizon - h * 0.55, 4, h);
+        ctx.beginPath();
+        ctx.arc(x + 2, horizon - h * 0.55, 8 + (i % 3) * 3, 0, TAU);
+        ctx.fill();
+      }
+      const heroTrees = [
+        { x: width * 0.07, y: horizon + 46, scale: 1.08 },
+        { x: width * 0.91, y: horizon + 48, scale: 1.24 },
+      ];
+      for (const tree of heroTrees) {
+        const sway = Math.sin(state.time * 0.25 + tree.x * 0.01) * 3;
+        ctx.fillStyle = hexToRgba("#5d3b22", 0.46);
+        ctx.fillRect(tree.x - 5 + sway * 0.25, tree.y - 48 * tree.scale, 10 * tree.scale, 72 * tree.scale);
+        const canopy = ctx.createRadialGradient(tree.x - 14 + sway, tree.y - 70 * tree.scale, 4, tree.x, tree.y - 58 * tree.scale, 62 * tree.scale);
+        canopy.addColorStop(0, hexToRgba("#91b66c", 0.36));
+        canopy.addColorStop(0.56, hexToRgba("#527c45", 0.44));
+        canopy.addColorStop(1, "rgba(38, 62, 34, 0)");
+        ctx.fillStyle = canopy;
+        ctx.fillRect(tree.x - 76 * tree.scale, tree.y - 132 * tree.scale, 152 * tree.scale, 124 * tree.scale);
+        ctx.fillStyle = hexToRgba("#b7d08a", 0.16);
+        ctx.beginPath();
+        ctx.ellipse(tree.x - 22 * tree.scale + sway, tree.y - 92 * tree.scale, 24 * tree.scale, 13 * tree.scale, -0.3, 0, TAU);
+        ctx.fill();
+      }
+
+      const boardX = width * 0.17;
+      const boardY = horizon + 18;
+      ctx.fillStyle = "rgba(24, 17, 16, 0.7)";
+      ctx.fillRect(boardX - 18, boardY - 42, 36, 36);
+      ctx.fillRect(boardX - 21, boardY - 47, 42, 6);
+      ctx.fillStyle = "rgba(255, 207, 111, 0.24)";
+      ctx.fillRect(boardX - 12, boardY - 36, 8, 11);
+      ctx.fillRect(boardX + 2, boardY - 36, 9, 13);
+      drawSpriteGlow(boardX, boardY - 44, 42, "#ffbf68", 0.12);
+    }
+  }
+
+  function drawArtKitTerrain(width, height, horizon, artKit, normalizedDay) {
+    if (!artKit?.terrain) return;
+    const depth = height - horizon;
+    const wash = ctx.createLinearGradient(0, horizon, 0, height);
+    const frontierDusk = artKit.id === "frontier";
+    wash.addColorStop(0, hexToRgba(artKit.terrain.highlight, frontierDusk ? 0.18 : 0.13 + normalizedDay * 0.04));
+    wash.addColorStop(0.44, hexToRgba(artKit.terrain.base, frontierDusk ? 0.28 : 0.16));
+    wash.addColorStop(1, hexToRgba(artKit.terrain.near, frontierDusk ? 0.52 : 0.28));
+    ctx.fillStyle = wash;
+    ctx.fillRect(0, horizon, width, depth);
+
+    for (let i = 0; i < Math.floor(width / (frontierDusk ? 18 : 24)); i++) {
+      const t = ((i * 47) % 100) / 100;
+      const near = 1 - t;
+      const x = (i * 97 + 23) % width;
+      const y = horizon + Math.pow(t, 1.5) * depth;
+      ctx.fillStyle = hexToRgba(i % 7 === 0 ? artKit.terrain.wildflower : artKit.terrain.grass, 0.08 + near * 0.18);
+      ctx.beginPath();
+      ctx.ellipse(x, y, 2 + near * 4, 1 + near * 2, 0, 0, TAU);
+      ctx.fill();
+    }
+
+    if (frontierDusk) {
+      const foregroundShadow = ctx.createLinearGradient(0, horizon, 0, height);
+      foregroundShadow.addColorStop(0, "rgba(42, 28, 27, 0)");
+      foregroundShadow.addColorStop(0.7, "rgba(27, 25, 33, 0.22)");
+      foregroundShadow.addColorStop(1, "rgba(12, 14, 18, 0.42)");
+      ctx.fillStyle = foregroundShadow;
+      ctx.fillRect(0, horizon, width, depth);
+
+      ctx.strokeStyle = "rgba(255, 189, 104, 0.12)";
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < 9; i++) {
+        const t = i / 8;
+        const y = horizon + Math.pow(t, 1.7) * depth;
+        ctx.beginPath();
+        ctx.moveTo(width * 0.18 - t * width * 0.13, y);
+        ctx.lineTo(width * 0.82 + t * width * 0.13, y + 2);
+        ctx.stroke();
+      }
+    }
+  }
+
   function drawRegionHorizonAccents(regionId, regionProfile, horizon, width, height, normalizedDay, weather) {
     const baseAlpha = 0.16 + normalizedDay * 0.12 + weather.fog * 0.06;
     if (regionId === "ashfall") {
@@ -6375,10 +6593,11 @@ const canvas = document.getElementById("game");
       return;
     }
 
+    const frontierDusk = regionId === "frontier";
     const trail = ctx.createLinearGradient(0, horizon, 0, height);
-    trail.addColorStop(0, hexToRgba(roadColor, 0.1 + normalizedDay * 0.06));
-    trail.addColorStop(0.42, hexToRgba(roadColor, 0.2 + normalizedDay * 0.08));
-    trail.addColorStop(1, hexToRgba(roadColor, 0.34 + normalizedDay * 0.12));
+    trail.addColorStop(0, hexToRgba(roadColor, frontierDusk ? 0.28 : 0.1 + normalizedDay * 0.06));
+    trail.addColorStop(0.42, hexToRgba(roadColor, frontierDusk ? 0.44 : 0.2 + normalizedDay * 0.08));
+    trail.addColorStop(1, hexToRgba(roadColor, frontierDusk ? 0.68 : 0.34 + normalizedDay * 0.12));
     ctx.fillStyle = trail;
     ctx.beginPath();
     ctx.moveTo(trailCenter - width * 0.04, horizon + 4);
@@ -6387,8 +6606,8 @@ const canvas = document.getElementById("game");
     ctx.bezierCurveTo(width * 0.78, height * 0.78, width * 0.64, horizon + groundDepth * 0.34, trailCenter + width * 0.04, horizon + 4);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = hexToRgba(edgeColor, roadStyle.edgeAlpha);
-    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = hexToRgba(edgeColor, frontierDusk ? Math.max(0.55, roadStyle.edgeAlpha) : roadStyle.edgeAlpha);
+    ctx.lineWidth = frontierDusk ? 3.6 : 2.2;
     for (let side = -1; side <= 1; side += 2) {
       ctx.beginPath();
       ctx.moveTo(trailCenter + side * width * 0.035, horizon + 2);
@@ -6401,11 +6620,13 @@ const canvas = document.getElementById("game");
       const y = horizon + Math.pow(t, 1.38) * groundDepth;
       const spread = lerp(width * 0.015, width * 0.14, t);
       const rutW = lerp(width * 0.007, width * 0.02, t);
-      ctx.fillStyle = `rgba(70, 50, 31, ${0.08 + (1 - t) * 0.08})`;
+      ctx.fillStyle = frontierDusk
+        ? `rgba(55, 31, 21, ${0.18 + (1 - t) * 0.16})`
+        : `rgba(70, 50, 31, ${0.08 + (1 - t) * 0.08})`;
       ctx.fillRect(trailCenter - spread, y, rutW, 2.2 + t * 2.4);
       ctx.fillRect(trailCenter + spread - rutW, y + 1.5, rutW, 2.2 + t * 2.4);
       if (i % 2 === 0) {
-        ctx.fillStyle = `rgba(255, 226, 160, ${0.06 + (1 - t) * roadStyle.centerGlowAlpha})`;
+        ctx.fillStyle = `rgba(255, 210, 121, ${frontierDusk ? 0.18 + (1 - t) * 0.16 : 0.06 + (1 - t) * roadStyle.centerGlowAlpha})`;
         ctx.fillRect(trailCenter - rutW * 0.5, y + 2, rutW, 1.8);
       }
     }
@@ -6460,6 +6681,8 @@ const canvas = document.getElementById("game");
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, width, horizon);
     const regionProfile = visualMood?.regionProfile || getRegionVisualIdentity(state.regions.activeRegion);
+    const artKit = visualMood?.artKit || getRegionArtKit(regionProfile.id);
+    drawArtKitSky(width, height, horizon, normalizedDay, weather, artKit);
     if (regionProfile?.skyTint) {
       ctx.fillStyle = hexToRgba(regionProfile.skyTint, 0.1 + normalizedDay * 0.06);
       ctx.fillRect(0, 0, width, horizon);
@@ -6527,6 +6750,15 @@ const canvas = document.getElementById("game");
       ctx.restore();
     }
 
+    if (artKit?.sky) {
+      const skyGrade = ctx.createLinearGradient(0, 0, 0, horizon);
+      skyGrade.addColorStop(0, hexToRgba(artKit.sky.top, 0.2));
+      skyGrade.addColorStop(0.64, hexToRgba(artKit.sky.middle, 0.12));
+      skyGrade.addColorStop(1, hexToRgba(artKit.sky.bottom, 0.18));
+      ctx.fillStyle = skyGrade;
+      ctx.fillRect(0, 0, width, horizon);
+    }
+
     const dustLine = ctx.createLinearGradient(0, horizon - 88, 0, horizon + 22);
     dustLine.addColorStop(0, "rgba(226, 189, 130, 0)");
     dustLine.addColorStop(0.62, `rgba(226, 189, 130, ${0.08 + weather.fog * 0.08 + normalizedDay * 0.05})`);
@@ -6586,6 +6818,8 @@ const canvas = document.getElementById("game");
       ctx.fillStyle = hexToRgba(regionProfile.groundPalette[0], 0.1);
       ctx.fillRect(0, horizon, width, height - horizon);
     }
+    drawArtKitHorizon(width, height, horizon, artKit, normalizedDay);
+    drawArtKitTerrain(width, height, horizon, artKit, normalizedDay);
 
     const trailCenter = width * 0.5 + Math.sin(state.player.angle * 1.7) * width * 0.08;
     drawRegionRoadSurface(regionProfile.id, regionProfile, horizon, width, height, trailCenter, normalizedDay);
@@ -6604,8 +6838,14 @@ const canvas = document.getElementById("game");
 
     if (weather.fog > 0.06) {
       const haze = ctx.createLinearGradient(0, horizon - 20, 0, height);
-      haze.addColorStop(0, `rgba(204, 219, 232, ${weather.fog * 0.2})`);
-      haze.addColorStop(1, `rgba(204, 219, 232, ${weather.fog * 0.34})`);
+      if (regionProfile.id === "frontier") {
+        haze.addColorStop(0, `rgba(216, 148, 91, ${weather.fog * 0.14})`);
+        haze.addColorStop(0.45, `rgba(95, 67, 86, ${weather.fog * 0.12})`);
+        haze.addColorStop(1, `rgba(28, 25, 36, ${weather.fog * 0.16})`);
+      } else {
+        haze.addColorStop(0, `rgba(204, 219, 232, ${weather.fog * 0.2})`);
+        haze.addColorStop(1, `rgba(204, 219, 232, ${weather.fog * 0.34})`);
+      }
       ctx.fillStyle = haze;
       ctx.fillRect(0, horizon - 20, width, height - horizon + 20);
     }
@@ -6629,6 +6869,22 @@ const canvas = document.getElementById("game");
         ctx.fillStyle = `rgba(${10 + shiftR}, ${10 + shiftG}, ${30 + shiftB}, ${darken})`;
         ctx.fillRect(0, 0, width, height);
       }
+    }
+
+    if (regionProfile.id === "frontier") {
+      const duskGrade = ctx.createLinearGradient(0, 0, 0, height);
+      duskGrade.addColorStop(0, "rgba(16, 13, 46, 0.18)");
+      duskGrade.addColorStop(0.36, "rgba(151, 70, 70, 0.08)");
+      duskGrade.addColorStop(0.62, "rgba(255, 163, 77, 0.08)");
+      duskGrade.addColorStop(1, "rgba(14, 17, 24, 0.28)");
+      ctx.fillStyle = duskGrade;
+      ctx.fillRect(0, 0, width, height);
+
+      const lanternWash = ctx.createRadialGradient(width * 0.5, horizon + (height - horizon) * 0.48, 8, width * 0.5, horizon + (height - horizon) * 0.48, width * 0.52);
+      lanternWash.addColorStop(0, "rgba(255, 178, 79, 0.1)");
+      lanternWash.addColorStop(1, "rgba(255, 178, 79, 0)");
+      ctx.fillStyle = lanternWash;
+      ctx.fillRect(0, horizon, width, height - horizon);
     }
 
     return horizon;
@@ -6884,13 +7140,28 @@ const canvas = document.getElementById("game");
         },
         gradientCacheEnabled,
       );
+      ctx.fillStyle = "rgba(13, 12, 17, 0.46)";
+      ctx.beginPath();
+      ctx.ellipse(spriteWidth * 0.5 + swayPx, spriteHeight * 0.84 + bobPx, spriteWidth * 0.34, spriteHeight * 0.09, 0, 0, TAU);
+      ctx.fill();
       ctx.fillStyle = robe;
-      ctx.strokeStyle = "rgba(21, 18, 16, 0.34)";
-      ctx.lineWidth = Math.max(1, spriteWidth * 0.025);
-      ctx.fillRect(spriteWidth * 0.3 + swayPx, spriteHeight * 0.3 + bobPx, spriteWidth * 0.4, spriteHeight * 0.5);
-      ctx.strokeRect(spriteWidth * 0.3 + swayPx, spriteHeight * 0.3 + bobPx, spriteWidth * 0.4, spriteHeight * 0.5);
-      ctx.fillStyle = "rgba(30, 23, 18, 0.24)";
-      ctx.fillRect(spriteWidth * 0.36 + swayPx, spriteHeight * 0.58 + bobPx, spriteWidth * 0.28, spriteHeight * 0.04);
+      ctx.strokeStyle = "rgba(15, 12, 13, 0.62)";
+      ctx.lineWidth = Math.max(1, spriteWidth * 0.035);
+      ctx.beginPath();
+      ctx.moveTo(spriteWidth * 0.35 + swayPx, spriteHeight * 0.32 + bobPx);
+      ctx.lineTo(spriteWidth * 0.65 + swayPx, spriteHeight * 0.32 + bobPx);
+      ctx.lineTo(spriteWidth * 0.72 + swayPx, spriteHeight * 0.8 + bobPx);
+      ctx.lineTo(spriteWidth * 0.56 + swayPx, spriteHeight * 0.86 + bobPx);
+      ctx.lineTo(spriteWidth * 0.5 + swayPx, spriteHeight * 0.68 + bobPx);
+      ctx.lineTo(spriteWidth * 0.44 + swayPx, spriteHeight * 0.86 + bobPx);
+      ctx.lineTo(spriteWidth * 0.28 + swayPx, spriteHeight * 0.8 + bobPx);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255, 196, 94, 0.24)";
+      ctx.fillRect(spriteWidth * 0.47 + swayPx, spriteHeight * 0.35 + bobPx, spriteWidth * 0.06, spriteHeight * 0.31);
+      ctx.fillStyle = "rgba(30, 23, 18, 0.38)";
+      ctx.fillRect(spriteWidth * 0.35 + swayPx, spriteHeight * 0.57 + bobPx, spriteWidth * 0.3, spriteHeight * 0.045);
       // Alternating legs — sweep one forward while the other tucks back.
       const legSweep = cycle.legPhase * cycle.legAmp * spriteHeight;
       ctx.fillStyle = shadeHex(sprite.color, 0.42);
@@ -6900,9 +7171,17 @@ const canvas = document.getElementById("game");
       ctx.beginPath();
       ctx.arc(spriteWidth * 0.5 + swayPx * 0.6, spriteHeight * 0.2 + bobPx * 1.2, Math.max(3, spriteWidth * 0.14), 0, TAU);
       ctx.fill();
-      ctx.fillStyle = "#4e3428";
-      ctx.fillRect(spriteWidth * 0.38 + swayPx * 0.6, spriteHeight * 0.08 + bobPx * 1.2, spriteWidth * 0.24, spriteHeight * 0.06);
-      ctx.fillStyle = "rgba(42, 30, 24, 0.72)";
+      const hatColor = sprite.label && String(sprite.label).toLowerCase().includes("boone") ? "#2a1b15" : "#3c2a22";
+      ctx.fillStyle = hatColor;
+      ctx.fillRect(spriteWidth * 0.32 + swayPx * 0.6, spriteHeight * 0.1 + bobPx * 1.2, spriteWidth * 0.36, spriteHeight * 0.055);
+      ctx.fillRect(spriteWidth * 0.39 + swayPx * 0.6, spriteHeight * 0.01 + bobPx * 1.2, spriteWidth * 0.22, spriteHeight * 0.1);
+      if (sprite.label && String(sprite.label).toLowerCase().includes("boone")) {
+        ctx.fillStyle = "#ffd36f";
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.58 + swayPx, spriteHeight * 0.43 + bobPx, Math.max(1.5, spriteWidth * 0.035), 0, TAU);
+        ctx.fill();
+      }
+      ctx.fillStyle = "rgba(42, 30, 24, 0.82)";
       ctx.fillRect(spriteWidth * 0.43 + swayPx * 0.6, spriteHeight * 0.18 + bobPx * 1.2, spriteWidth * 0.035, spriteHeight * 0.025);
       ctx.fillRect(spriteWidth * 0.55 + swayPx * 0.6, spriteHeight * 0.18 + bobPx * 1.2, spriteWidth * 0.035, spriteHeight * 0.025);
       ctx.fillStyle = "rgba(255,255,255,0.18)";
@@ -7011,12 +7290,13 @@ const canvas = document.getElementById("game");
         `sprite-pig-body|${sizeKey}`,
         () => {
           const g = ctx.createLinearGradient(0, spriteHeight * 0.26, 0, spriteHeight * 0.9);
-          g.addColorStop(0, "#efb8b2");
-          g.addColorStop(1, "#d58f8a");
+          g.addColorStop(0, "#b88479");
+          g.addColorStop(1, "#7a534d");
           return g;
         },
         gradientCacheEnabled,
       );
+      ctx.globalAlpha = 0.78;
       ctx.fillStyle = body;
       ctx.beginPath();
       ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.62, spriteWidth * 0.32, spriteHeight * 0.24, 0, 0, TAU);
@@ -7083,6 +7363,7 @@ const canvas = document.getElementById("game");
       ctx.fillRect(spriteWidth * 0.43, spriteHeight * 0.8 + legLift * 0.3, spriteWidth * 0.06, spriteHeight * 0.1 - legLift * 0.3);
       ctx.fillRect(spriteWidth * 0.54, spriteHeight * 0.78 + legLift * 0.2, spriteWidth * 0.06, spriteHeight * 0.12 - legLift * 0.2);
       ctx.fillRect(spriteWidth * 0.63, spriteHeight * 0.8 - legLift * 0.4, spriteWidth * 0.06, spriteHeight * 0.1 + legLift * 0.4);
+      ctx.globalAlpha = 1;
     } else if (sprite.kind === "resource" && sprite.label === "Tree") {
       ctx.fillStyle = "#63472f";
       ctx.fillRect(spriteWidth * 0.44, spriteHeight * 0.36, spriteWidth * 0.14, spriteHeight * 0.58);
@@ -7118,6 +7399,8 @@ const canvas = document.getElementById("game");
       ctx.fillStyle = "rgba(255,255,255,0.35)";
       ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.2, spriteWidth * 0.08, spriteHeight * 0.5);
     } else if (sprite.kind === "chest") {
+      const pulse = 0.5 + Math.sin(state.time * 4.9) * 0.5;
+      drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.44, spriteWidth * (0.42 + pulse * 0.12), "#ffd77b", 0.12 + pulse * 0.12);
       const wood = getCachedGradient(
         `sprite-chest-wood|${sizeKey}`,
         () => {
@@ -7129,11 +7412,18 @@ const canvas = document.getElementById("game");
         gradientCacheEnabled,
       );
       ctx.fillStyle = wood;
+      ctx.fillRect(spriteWidth * 0.26, spriteHeight * 0.38, spriteWidth * 0.48, spriteHeight * 0.11);
       ctx.fillRect(spriteWidth * 0.18, spriteHeight * 0.45, spriteWidth * 0.64, spriteHeight * 0.45);
       ctx.fillStyle = "#c8ac43";
       ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.52, spriteWidth * 0.08, spriteHeight * 0.22);
       ctx.fillStyle = "#8b6c3e";
       ctx.fillRect(spriteWidth * 0.18, spriteHeight * 0.42, spriteWidth * 0.64, spriteHeight * 0.08);
+      ctx.fillStyle = `rgba(226, 216, 190, ${0.14 + pulse * 0.1})`;
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.ellipse(spriteWidth * (0.36 + i * 0.08), spriteHeight * (0.32 - i * 0.045), spriteWidth * 0.1, spriteHeight * 0.07, 0, 0, TAU);
+        ctx.fill();
+      }
     } else if (sprite.kind === "pressure") {
       const pulse = 0.5 + Math.sin(state.time * 5) * 0.5;
       drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.5, spriteWidth * (0.5 + pulse * 0.12), "#ffd77b", 0.17 + pulse * 0.14);
@@ -7346,9 +7636,123 @@ const canvas = document.getElementById("game");
       }
     } else if (sprite.kind === "world-prop") {
       const color = sprite.color || "#b9824d";
-      if (sprite.propKind === "lamp" || sprite.propKind === "seam" || sprite.propKind === "relay") {
+      if (sprite.propKind === "dead-tree") {
+        const trunkColor = sprite.trunkColor || "#70472b";
+        const sway = Math.sin(state.time * 0.55 + sprite.x * 1.7) * spriteWidth * 0.012;
+        ctx.strokeStyle = shadeHex(trunkColor, 0.52);
+        ctx.lineWidth = Math.max(2, spriteWidth * 0.078);
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.5 + sway, spriteHeight * 0.88);
+        ctx.lineTo(spriteWidth * 0.52 + sway, spriteHeight * 0.2);
+        ctx.moveTo(spriteWidth * 0.52 + sway, spriteHeight * 0.42);
+        ctx.lineTo(spriteWidth * 0.26 + sway, spriteHeight * 0.28);
+        ctx.moveTo(spriteWidth * 0.52 + sway, spriteHeight * 0.36);
+        ctx.lineTo(spriteWidth * 0.78 + sway, spriteHeight * 0.18);
+        ctx.moveTo(spriteWidth * 0.5 + sway, spriteHeight * 0.58);
+        ctx.lineTo(spriteWidth * 0.34 + sway, spriteHeight * 0.46);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(255, 195, 110, 0.18)";
+        ctx.lineWidth = Math.max(1, spriteWidth * 0.022);
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.56 + sway, spriteHeight * 0.24);
+        ctx.lineTo(spriteWidth * 0.62 + sway, spriteHeight * 0.52);
+        ctx.stroke();
+      } else if (sprite.propKind === "tree") {
+        const trunkColor = sprite.trunkColor || "#7a5231";
+        const sway = Math.sin(state.time * 0.9 + sprite.x * 1.7) * spriteWidth * 0.025;
+        ctx.fillStyle = shadeHex(trunkColor, 0.58);
+        ctx.fillRect(spriteWidth * 0.43 + sway * 0.4, spriteHeight * 0.42, spriteWidth * 0.16, spriteHeight * 0.46);
+        ctx.fillStyle = trunkColor;
+        ctx.fillRect(spriteWidth * 0.47 + sway * 0.4, spriteHeight * 0.32, spriteWidth * 0.08, spriteHeight * 0.56);
+        const canopy = getCachedGradient(
+          `sprite-tree-canopy|${sizeKey}|${color}`,
+          () => {
+            const g = ctx.createRadialGradient(spriteWidth * 0.45, spriteHeight * 0.18, 2, spriteWidth * 0.5, spriteHeight * 0.28, spriteWidth * 0.44);
+            g.addColorStop(0, shadeHex(color, 1.45));
+            g.addColorStop(0.62, color);
+            g.addColorStop(1, shadeHex(color, 0.48));
+            return g;
+          },
+          gradientCacheEnabled,
+        );
+        ctx.fillStyle = canopy;
+        for (let i = 0; i < 5; i++) {
+          const ox = (i - 2) * spriteWidth * 0.12 + sway;
+          const oy = (i % 2) * spriteHeight * 0.06;
+          ctx.beginPath();
+          ctx.ellipse(spriteWidth * 0.5 + ox, spriteHeight * (0.24 + oy / spriteHeight), spriteWidth * 0.23, spriteHeight * 0.17, 0, 0, TAU);
+          ctx.fill();
+        }
+        ctx.fillStyle = "rgba(242, 232, 170, 0.18)";
+        ctx.beginPath();
+        ctx.ellipse(spriteWidth * 0.38 + sway, spriteHeight * 0.18, spriteWidth * 0.13, spriteHeight * 0.08, 0, 0, TAU);
+        ctx.fill();
+      } else if (sprite.propKind === "scrub" || sprite.propKind === "flower") {
+        const tuftCount = sprite.propKind === "flower" ? 7 : 5;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(1, spriteWidth * 0.035);
+        for (let i = 0; i < tuftCount; i++) {
+          const baseX = spriteWidth * (0.22 + i * 0.095);
+          const lean = (i - tuftCount / 2) * spriteWidth * 0.018;
+          ctx.beginPath();
+          ctx.moveTo(baseX, spriteHeight * 0.84);
+          ctx.lineTo(baseX + lean, spriteHeight * (0.42 + (i % 3) * 0.08));
+          ctx.stroke();
+          if (sprite.propKind === "flower") {
+            ctx.fillStyle = "#ffe18a";
+            ctx.beginPath();
+            ctx.arc(baseX + lean, spriteHeight * (0.42 + (i % 3) * 0.08), Math.max(1.2, spriteWidth * 0.025), 0, TAU);
+            ctx.fill();
+          }
+        }
+      } else if (sprite.propKind === "barrel") {
+        ctx.fillStyle = shadeHex(color, 0.55);
+        ctx.beginPath();
+        ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.72, spriteWidth * 0.25, spriteHeight * 0.12, 0, 0, TAU);
+        ctx.fill();
+        ctx.fillRect(spriteWidth * 0.25, spriteHeight * 0.34, spriteWidth * 0.5, spriteHeight * 0.38);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.ellipse(spriteWidth * 0.5, spriteHeight * 0.34, spriteWidth * 0.25, spriteHeight * 0.1, 0, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 232, 170, 0.22)";
+        ctx.fillRect(spriteWidth * 0.34, spriteHeight * 0.38, spriteWidth * 0.05, spriteHeight * 0.28);
+      } else if (sprite.propKind === "hitching-post") {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(2, spriteWidth * 0.08);
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.24, spriteHeight * 0.32);
+        ctx.lineTo(spriteWidth * 0.24, spriteHeight * 0.86);
+        ctx.moveTo(spriteWidth * 0.76, spriteHeight * 0.32);
+        ctx.lineTo(spriteWidth * 0.76, spriteHeight * 0.86);
+        ctx.moveTo(spriteWidth * 0.18, spriteHeight * 0.38);
+        ctx.lineTo(spriteWidth * 0.82, spriteHeight * 0.34);
+        ctx.stroke();
+      } else if (sprite.propKind === "banner") {
+        ctx.fillStyle = shadeHex(color, 0.52);
+        ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.18, spriteWidth * 0.08, spriteHeight * 0.7);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.52, spriteHeight * 0.2);
+        ctx.lineTo(spriteWidth * 0.86, spriteHeight * 0.28);
+        ctx.lineTo(spriteWidth * 0.52, spriteHeight * 0.42);
+        ctx.closePath();
+        ctx.fill();
+      } else if (sprite.propKind === "trail-stone") {
+        ctx.fillStyle = shadeHex(color, 0.72);
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.18, spriteHeight * 0.82);
+        ctx.lineTo(spriteWidth * 0.3, spriteHeight * 0.5);
+        ctx.lineTo(spriteWidth * 0.54, spriteHeight * 0.36);
+        ctx.lineTo(spriteWidth * 0.78, spriteHeight * 0.58);
+        ctx.lineTo(spriteWidth * 0.84, spriteHeight * 0.84);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 240, 200, 0.22)";
+        ctx.fillRect(spriteWidth * 0.4, spriteHeight * 0.5, spriteWidth * 0.12, spriteHeight * 0.05);
+      } else if (sprite.propKind === "lantern-post" || sprite.propKind === "lamp" || sprite.propKind === "seam" || sprite.propKind === "relay") {
         const pulse = 0.5 + Math.sin(state.time * (sprite.propKind === "lamp" ? 5.2 : 3.2)) * 0.5;
-        const lightColor = sprite.propKind === "relay" ? "#9bd3ff" : sprite.propKind === "seam" ? "#ff9f46" : "#ffe8a8";
+        const lightColor = sprite.propKind === "relay" ? "#9bd3ff" : sprite.propKind === "seam" ? "#ff9f46" : "#ffbf68";
         drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.28, spriteWidth * (0.34 + pulse * 0.08), lightColor, 0.24 + pulse * 0.17);
         drawSpritePulseRing(spriteWidth * 0.5, spriteHeight * 0.28, spriteWidth * (0.2 + pulse * 0.08), lightColor, 0.12 + pulse * 0.2, spriteWidth * 0.018);
         ctx.fillStyle = shadeHex(color, 0.45);
@@ -7365,6 +7769,19 @@ const canvas = document.getElementById("game");
         ctx.beginPath();
         ctx.arc(spriteWidth * 0.5, spriteHeight * 0.28, spriteWidth * 0.09, 0, TAU);
         ctx.fill();
+      } else if (sprite.propKind === "wanted-board") {
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.48, spriteWidth * 0.4, "#ffbf68", 0.14);
+        ctx.fillStyle = "#3a2217";
+        ctx.fillRect(spriteWidth * 0.2, spriteHeight * 0.32, spriteWidth * 0.6, spriteHeight * 0.46);
+        ctx.fillRect(spriteWidth * 0.16, spriteHeight * 0.27, spriteWidth * 0.68, spriteHeight * 0.07);
+        ctx.fillStyle = "#d8a35e";
+        ctx.fillRect(spriteWidth * 0.28, spriteHeight * 0.38, spriteWidth * 0.18, spriteHeight * 0.22);
+        ctx.fillRect(spriteWidth * 0.52, spriteHeight * 0.38, spriteWidth * 0.18, spriteHeight * 0.28);
+        ctx.fillStyle = "#2a1a13";
+        ctx.fillRect(spriteWidth * 0.31, spriteHeight * 0.43, spriteWidth * 0.12, spriteHeight * 0.018);
+        ctx.fillRect(spriteWidth * 0.55, spriteHeight * 0.43, spriteWidth * 0.12, spriteHeight * 0.018);
+        ctx.fillStyle = "rgba(255, 221, 139, 0.32)";
+        ctx.fillRect(spriteWidth * 0.21, spriteHeight * 0.3, spriteWidth * 0.58, spriteHeight * 0.025);
       } else if (sprite.propKind === "road-sign") {
         ctx.fillStyle = "#4a3323";
         ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.34, spriteWidth * 0.06, spriteHeight * 0.54);
@@ -7551,8 +7968,10 @@ const canvas = document.getElementById("game");
       const color = sprite.color || "#d8a84f";
       const pulse = 0.5 + Math.sin(state.time * 4.8) * 0.5;
       drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.38, spriteWidth * (0.46 + pulse * 0.1), "#ffd77b", 0.14 + pulse * 0.12);
+      drawSpriteGlow(spriteWidth * 0.76, spriteHeight * 0.18, spriteWidth * (0.18 + pulse * 0.04), "#ffe8a8", 0.2 + pulse * 0.12);
       ctx.fillStyle = "#5b402b";
       ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.34, spriteWidth * 0.07, spriteHeight * 0.56);
+      ctx.fillRect(spriteWidth * 0.74, spriteHeight * 0.2, spriteWidth * 0.04, spriteHeight * 0.68);
       ctx.fillStyle = shadeHex(color, 0.74);
       ctx.fillRect(spriteWidth * 0.16, spriteHeight * 0.22, spriteWidth * 0.68, spriteHeight * 0.34);
       ctx.strokeStyle = "rgba(31, 22, 12, 0.55)";
@@ -7562,6 +7981,12 @@ const canvas = document.getElementById("game");
       ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.29, spriteWidth * 0.56, spriteHeight * 0.06);
       ctx.fillStyle = "rgba(255, 245, 200, 0.38)";
       ctx.fillRect(spriteWidth * 0.26, spriteHeight * 0.41, spriteWidth * 0.48, spriteHeight * 0.04);
+      ctx.fillRect(spriteWidth * 0.28, spriteHeight * 0.48, spriteWidth * 0.2, spriteHeight * 0.035);
+      ctx.fillRect(spriteWidth * 0.52, spriteHeight * 0.48, spriteWidth * 0.18, spriteHeight * 0.035);
+      ctx.fillStyle = "#ffe8a8";
+      ctx.beginPath();
+      ctx.arc(spriteWidth * 0.76, spriteHeight * 0.18, spriteWidth * 0.06, 0, TAU);
+      ctx.fill();
       ctx.fillStyle = "rgba(255, 215, 123, 0.18)";
       ctx.beginPath();
       ctx.arc(spriteWidth * 0.5, spriteHeight * 0.4, spriteWidth * 0.42, 0, TAU);
@@ -7815,6 +8240,7 @@ const canvas = document.getElementById("game");
     const lights = [];
     const moodStrength = clamp(numberOr(visualMood?.dynamicLightStrength, 0.35), 0, 1.4);
     const nightBoost = state.world?.timeOfDay > 0.68 || state.world?.timeOfDay < 0.2 ? 0.18 : 0;
+    const maxLights = GRAPHICS_PRESETS[state.graphics?.preset]?.dynamicLights || 14;
     pushDynamicLight(lights, {
       id: "player-lantern",
       kind: "player",
@@ -7829,7 +8255,7 @@ const canvas = document.getElementById("game");
     if (state.player.inHouse) {
       pushDynamicLight(lights, { id: "house-bed-light", kind: "lamp", x: state.house.bed.x, y: state.house.bed.y, color: "#ffd0a0", radius: 4.6, intensity: 0.42, flicker: 0.3 });
       pushDynamicLight(lights, { id: "house-stash-light", kind: "lamp", x: state.house.stash.x, y: state.house.stash.y, color: "#ffd77b", radius: 4.2, intensity: 0.34, flicker: 0.2 });
-      return selectDynamicLights(lights, state.player, { maxLights: 8 });
+      return selectDynamicLights(lights, state.player, { maxLights });
     }
 
     const regionProfile = visualMood?.regionProfile || getRegionVisualIdentity(state.regions.activeRegion);
@@ -7847,6 +8273,7 @@ const canvas = document.getElementById("game");
       });
     }
     for (const prop of regionPresentation?.props || []) pushPropDynamicLight(lights, prop);
+    for (const plant of regionPresentation?.vegetation || []) pushPropDynamicLight(lights, plant);
     for (const vista of regionPresentation?.vistas || []) pushPropDynamicLight(lights, vista);
     for (const road of regionPresentation?.roads || []) pushPropDynamicLight(lights, road);
     for (const sign of regionPresentation?.roadSigns || []) pushPropDynamicLight(lights, sign, { color: sign.color });
@@ -7920,7 +8347,7 @@ const canvas = document.getElementById("game");
       pushDynamicLight(lights, { id: "smoke-cache-light", kind: "cache", x: state.chest.x, y: state.chest.y, color: state.chest.firstRewardClaimed ? "#bf8a4f" : "#ffd77b", radius: 4.6, intensity: state.chest.firstRewardClaimed ? 0.26 : 0.52, flicker: 0.42 });
     }
 
-    return selectDynamicLights(lights, state.player, { maxLights: 8 });
+    return selectDynamicLights(lights, state.player, { maxLights });
   }
 
   function drawDynamicLightPools(lights, horizon, width, height, shakeX, visualMood) {
@@ -8004,6 +8431,7 @@ const canvas = document.getElementById("game");
       biome: state.regions.activeRegion,
     });
     visualMoodBase.regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
+    visualMoodBase.artKit = getRegionArtKit(state.regions.activeRegion);
     const visualMood = applyGraphicsAccessibility(visualMoodBase, state.graphics.accessibility);
     const worldNightStrength = resolveWorldNightStrength();
     visualMood.nightStrength = Math.max(numberOr(visualMood.nightStrength, 0), worldNightStrength);
@@ -8049,6 +8477,10 @@ const canvas = document.getElementById("game");
       const projectedDist = projection.projectedDist;
       const wallHeight = projection.wallHeight;
       const y = projection.y;
+      const wallMaterial = state.player.inHouse ? null : resolveWallMaterial(hit.tileType, state.regions.activeRegion);
+      const visualHeightScale = state.player.inHouse ? 1 : clamp(numberOr(wallMaterial?.visualHeight, 1), 0.3, 1);
+      const drawWallHeight = wallHeight * visualHeightScale;
+      const drawY = y + (wallHeight - drawWallHeight);
 
       let tex = textures.stone;
       if (hit.tileType === 2) tex = textures.water;
@@ -8063,15 +8495,28 @@ const canvas = document.getElementById("game");
       }
       texX = clamp(texX, 0, TEXTURE_SIZE - 1);
 
-      ctx.drawImage(tex, texX, 0, 1, TEXTURE_SIZE, x, y, 1, wallHeight);
+      ctx.drawImage(tex, texX, 0, 1, TEXTURE_SIZE, x, drawY, 1, drawWallHeight);
+      if (wallMaterial) {
+        const visibleTop = Math.max(0, drawY);
+        const visibleBottom = Math.min(height, drawY + drawWallHeight);
+        const visibleH = Math.max(0, visibleBottom - visibleTop);
+        if (visibleH > 0) {
+          ctx.fillStyle = hexToRgba(wallMaterial.highlight, 0.08);
+          ctx.fillRect(x, visibleTop, 1, Math.max(2, visibleH * 0.035));
+          ctx.fillStyle = hexToRgba(wallMaterial.trim, 0.07);
+          ctx.fillRect(x, visibleTop + visibleH * 0.28 + Math.sin(texX * 0.4) * 1.2, 1, Math.max(1, visibleH * 0.012));
+          ctx.fillStyle = hexToRgba(wallMaterial.decal, 0.06);
+          ctx.fillRect(x, visibleTop + visibleH * 0.58 + Math.sin(texX * 0.17 + state.time * 0.3) * 2, 1, Math.max(1, visibleH * 0.018));
+        }
+      }
 
       const shade = clamp(1.24 - projectedDist / (MAX_RAY_DIST * 0.86) - (hit.side === 1 ? 0.14 : 0), 0.2, 1);
       const contrastPass = (state.player.inHouse ? 0.74 : 0.94) * clamp(visualMood.contrastBoost || 1, 0.9, 1.4);
       ctx.fillStyle = `rgba(8, 12, 18, ${(1 - shade) * contrastPass * (1 + visualMood.gradeStrength * 0.22)})`;
-      ctx.fillRect(x, y, 1, wallHeight);
+      ctx.fillRect(x, drawY, 1, drawWallHeight);
       const baseShadow = clamp((projectedDist / MAX_RAY_DIST) * 0.5 + 0.06, 0.08, 0.56);
       ctx.fillStyle = `rgba(9, 14, 18, ${baseShadow})`;
-      ctx.fillRect(x, y + wallHeight * 0.82, 1, wallHeight * 0.18);
+      ctx.fillRect(x, drawY + drawWallHeight * 0.82, 1, drawWallHeight * 0.18);
       const wallLight = resolveDynamicLightAtPoint(
         { x: hitX, y: hitY },
         sceneLights,
@@ -8080,9 +8525,9 @@ const canvas = document.getElementById("game");
       if (wallLight.active) {
         const verticalAlpha = Number((wallLight.alpha * 0.09).toFixed(3));
         ctx.fillStyle = wallLight.style;
-        ctx.fillRect(x, y, 1, wallHeight);
+        ctx.fillRect(x, drawY, 1, drawWallHeight);
         ctx.fillStyle = `rgba(${wallLight.r}, ${wallLight.g}, ${wallLight.b}, ${verticalAlpha})`;
-        ctx.fillRect(x, y + wallHeight * 0.72, 1, wallHeight * 0.28);
+        ctx.fillRect(x, drawY + drawWallHeight * 0.72, 1, drawWallHeight * 0.28);
       }
       const nearWall = resolveNearWallVisualTreatment({
         correctedDist,
@@ -8091,24 +8536,26 @@ const canvas = document.getElementById("game");
         inHouse: state.player.inHouse,
       });
       if (nearWall.active) {
-        ctx.fillStyle = `rgba(7, 10, 12, ${nearWall.alpha + nearWall.sideShade})`;
+        ctx.fillStyle = wallMaterial
+          ? hexToRgba(wallMaterial.contact, clamp(nearWall.alpha * 0.78 + nearWall.sideShade, 0, 0.5))
+          : `rgba(7, 10, 12, ${nearWall.alpha + nearWall.sideShade})`;
         ctx.fillRect(x, 0, 1, height);
         const grain = (Math.sin(state.time * 21 + x * 0.42) * 0.5 + 0.5) * nearWall.grainAlpha;
-        ctx.fillStyle = `rgba(255, 235, 190, ${grain})`;
-        ctx.fillRect(x, Math.max(0, y), 1, Math.min(height, wallHeight));
-        const visibleTop = Math.max(0, y);
-        const visibleBottom = Math.min(height, y + wallHeight);
+        ctx.fillStyle = wallMaterial ? hexToRgba(wallMaterial.highlight, grain) : `rgba(255, 235, 190, ${grain})`;
+        ctx.fillRect(x, Math.max(0, drawY), 1, Math.min(height, drawWallHeight));
+        const visibleTop = Math.max(0, drawY);
+        const visibleBottom = Math.min(height, drawY + drawWallHeight);
         const visibleH = Math.max(0, visibleBottom - visibleTop);
         if (visibleH > 0) {
-          ctx.fillStyle = `rgba(0, 0, 0, ${nearWall.contactAlpha})`;
+          ctx.fillStyle = wallMaterial ? hexToRgba(wallMaterial.contact, nearWall.contactAlpha) : `rgba(0, 0, 0, ${nearWall.contactAlpha})`;
           ctx.fillRect(x, visibleBottom - Math.max(3, visibleH * 0.13), 1, Math.max(3, visibleH * 0.13));
-          ctx.fillStyle = `rgba(255, 218, 148, ${nearWall.highlightAlpha})`;
+          ctx.fillStyle = wallMaterial ? hexToRgba(wallMaterial.highlight, nearWall.highlightAlpha) : `rgba(255, 218, 148, ${nearWall.highlightAlpha})`;
           ctx.fillRect(x, visibleTop, 1, Math.max(2, visibleH * 0.035));
           const trimY = visibleTop + visibleH * 0.32 + Math.sin(x * 0.13) * 1.5;
-          ctx.fillStyle = `rgba(255, 205, 132, ${nearWall.trimAlpha})`;
+          ctx.fillStyle = wallMaterial ? hexToRgba(wallMaterial.trim, nearWall.trimAlpha) : `rgba(255, 205, 132, ${nearWall.trimAlpha})`;
           ctx.fillRect(x, trimY, 1, Math.max(1, visibleH * 0.012));
           const decalY = visibleTop + visibleH * (0.56 + Math.sin(x * 0.037 + state.time * 0.4) * 0.04);
-          ctx.fillStyle = `rgba(33, 24, 18, ${nearWall.decalAlpha})`;
+          ctx.fillStyle = wallMaterial ? hexToRgba(wallMaterial.decal, nearWall.decalAlpha) : `rgba(33, 24, 18, ${nearWall.decalAlpha})`;
           ctx.fillRect(x, decalY, 1, Math.max(1, visibleH * 0.018));
           const supportPhase = x % 112;
           if (supportPhase < 2 || supportPhase > 109) {
@@ -8135,8 +8582,22 @@ const canvas = document.getElementById("game");
 
       if (hit.tileType === 2 && !state.player.inHouse) {
         const shimmer = (Math.sin(state.time * 3.2 + x * 0.07) * 0.5 + 0.5) * 0.2 * (1 + visualMood.shimmerStrength);
-        ctx.fillStyle = `rgba(126, 188, 226, ${shimmer * 0.4})`;
-        ctx.fillRect(x, y, 1, wallHeight);
+        ctx.fillStyle = `rgba(81, 116, 112, ${0.08 + shimmer * 0.28})`;
+        ctx.fillRect(x, drawY, 1, drawWallHeight);
+        ctx.fillStyle = "rgba(71, 93, 61, 0.48)";
+        ctx.fillRect(x, drawY - Math.max(4, drawWallHeight * 0.18), 1, Math.max(4, drawWallHeight * 0.18));
+        if (x % 11 === 0 || x % 17 === 0) {
+          const reedH = Math.max(6, drawWallHeight * (0.28 + (x % 5) * 0.04));
+          ctx.strokeStyle = "rgba(39, 52, 34, 0.62)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x, drawY + drawWallHeight * 0.12);
+          ctx.lineTo(x + Math.sin(state.time + x) * 1.5, drawY - reedH);
+          ctx.stroke();
+        }
+      } else if (hit.tileType === 1 && !state.player.inHouse && wallMaterial) {
+        ctx.fillStyle = hexToRgba(wallMaterial.contact, 0.16);
+        ctx.fillRect(x, drawY + drawWallHeight * 0.76, 1, drawWallHeight * 0.24);
       }
 
       if (!state.player.inHouse) {
@@ -8144,7 +8605,7 @@ const canvas = document.getElementById("game");
         if (fog > 0) {
           const tint = visualMood.skyTint;
           ctx.fillStyle = `rgba(${tint.r + 100}, ${tint.g + 112}, ${tint.b + 120}, ${fog * (0.28 + visualMood.fogStrength)})`;
-          ctx.fillRect(x, y, 1, wallHeight);
+          ctx.fillRect(x, drawY, 1, drawWallHeight);
         }
       }
     }
@@ -8235,6 +8696,15 @@ const canvas = document.getElementById("game");
           size: prop.size || 0.58,
         });
       }
+      for (const plant of regionPresentation.vegetation || []) {
+        sprites.push({
+          ...plant,
+          kind: "world-prop",
+          propKind: plant.kind,
+          label: plant.label,
+          size: plant.size || (plant.kind === "tree" ? 1.0 : 0.48),
+        });
+      }
       const boardProp = getActiveJobBoardProp();
       if (boardProp) {
         sprites.push({
@@ -8306,7 +8776,7 @@ const canvas = document.getElementById("game");
       }
 
       for (const npc of state.npcs) {
-        sprites.push({ x: npc.x, y: npc.y, color: npc.color, label: npc.name, size: 1.04, kind: "npc" });
+        sprites.push({ x: npc.x, y: npc.y, color: npc.color, label: npc.name, size: 0.88, kind: "npc" });
       }
 
       if (state.companion.active) {
@@ -8326,7 +8796,7 @@ const canvas = document.getElementById("game");
           y: pig.y,
           color: "#e29da0",
           label: pig.name,
-          size: 0.92,
+          size: 0.58,
           kind: "pig",
           role: pig.role,
           hatColor: pig.hatColor,
@@ -8417,18 +8887,24 @@ const canvas = document.getElementById("game");
       const d = Math.sqrt(distSq);
       const sx = ((ang + FOV / 2) / FOV) * width;
       const scale = (height / (d + 0.01)) * sprite.size * 0.58;
-      projected.push({ ...sprite, sx, distToPlayer: d, scale });
+      projected.push({
+        ...sprite,
+        artVariant: state.player.inHouse ? null : resolveSpriteArtVariant(sprite, state.regions.activeRegion),
+        sx,
+        distToPlayer: d,
+        scale,
+      });
     }
 
     projected.sort((a, b) => b.distToPlayer - a.distToPlayer);
 
     for (const sprite of projected) {
-      const widthScale = sprite.kind === "resource" && sprite.label === "Tree" ? 0.82 : sprite.kind === "pig" ? 0.72 : 0.62;
+      const widthScale = sprite.kind === "resource" && sprite.label === "Tree" ? 0.82 : sprite.kind === "pig" ? 0.58 : 0.62;
       const nearDampen = clamp((sprite.distToPlayer - 0.35) / 1.7, 0.52, 1);
       const visualScale = sprite.scale * nearDampen;
       const maxHeight =
-        sprite.kind === "npc" ? height * 0.56 :
-          sprite.kind === "pig" ? height * 0.42 :
+        sprite.kind === "npc" ? height * 0.42 :
+          sprite.kind === "pig" ? height * 0.28 :
             sprite.kind === "enemy" ? height * 0.5 : height * 0.7;
       const spriteWidth = clamp(visualScale * widthScale, 6, width * 0.34);
       const spriteHeight = clamp(visualScale, 8, maxHeight);
@@ -9158,7 +9634,7 @@ const canvas = document.getElementById("game");
     const margin = canvas.width < 620 ? 8 : 12;
     const compact = canvas.width < 560;
     const hudW = Math.min(compact ? canvas.width - margin * 2 : 560, canvas.width - margin * 2);
-    const hudH = compact ? 94 : 112;
+    const hudH = compact ? 82 : 92;
     const hudX = margin;
     const hudY = canvas.height - hudH - margin;
     drawSoftPanel(hudX, hudY, hudW, hudH);
@@ -9182,8 +9658,8 @@ const canvas = document.getElementById("game");
       drawClippedText(`${state.player.loadout.weapon} / ${state.player.loadout.stance} / ${state.player.perks.length} perks / ${quick.active}:${quickCount}`, statsX, hudY + 57, statsW, "#d7c7a7");
 
       ctx.font = "10px Georgia";
-      let qy = hudY + 75;
-      for (const line of questLines.filter(Boolean).slice(0, 4)) {
+      let qy = hudY + 73;
+      for (const line of questLines.filter(Boolean).slice(0, 2)) {
         drawClippedText(line, statsX, qy, statsW, "#f1e5c8");
         qy += 12;
       }
@@ -9194,22 +9670,23 @@ const canvas = document.getElementById("game");
     const weatherText = state.player.inHouse ? t("labels.sheltered") : weatherLabel(state.weather.kind);
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const mapReserve = state.showMap && canvas.width >= 760 ? (canvas.width < 900 ? 176 : 214) : 0;
-    const topW = Math.max(240, Math.min(730, canvas.width - margin * 2 - mapReserve));
-    const topH = compact ? 78 : 92;
+    const topW = Math.max(240, Math.min(620, canvas.width - margin * 2 - mapReserve));
+    const topH = compact ? 58 : 68;
     const topX = margin;
     const topY = margin;
     drawSoftPanel(topX, topY, topW, topH, {
-      top: "rgba(16, 25, 29, 0.78)",
-      bottom: "rgba(9, 16, 20, 0.66)",
-      shadowBlur: 12,
+      top: "rgba(24, 20, 28, 0.84)",
+      bottom: "rgba(10, 12, 18, 0.74)",
+      border: "rgba(255, 198, 102, 0.34)",
+      shadowBlur: 14,
       shadowOffsetY: 5,
     });
 
-    ctx.font = "bold 11px Georgia";
-    drawClippedText(`${t("labels.location")}: ${location}   ${t("labels.house")}: ${houseStatus}   ${t("labels.weather")}: ${weatherText}`, topX + 10, topY + 20, topW - 20, "#fff1d0");
+    ctx.font = "bold 12px Georgia";
+    drawClippedText(`${location}  •  ${regionProfile.label}`, topX + 10, topY + 20, topW - 20, "#fff1d0");
     ctx.font = "10px Georgia";
     drawClippedText(
-      `Region: ${regionProfile.label}  Chapter: ${state.narrative.chapterTitle}  CVF:${state.narrative.thematicAxes.controlVsFreedom}  TVC:${state.narrative.thematicAxes.truthVsComfort}  SVS:${state.narrative.thematicAxes.solidarityVsStatus}`,
+      `${weatherText} dusk road  •  House ${houseStatus}  •  ${state.narrative.chapterTitle}`,
       topX + 10,
       topY + 35,
       topW - 20,
@@ -9224,9 +9701,9 @@ const canvas = document.getElementById("game");
     if (hudNotice) {
       msgY += drawHudNotice(topX + 10, msgY - 2, topW - 20);
     }
-    const shown = state.msg.slice(0, 2);
+    const shown = [];
     ctx.font = "11px Georgia";
-    if (shown.length === 0) {
+    if (shown.length === 0 && topH > 80) {
       drawClippedText(t("labels.explore"), topX + 10, msgY, topW - 20, "#f3e8cf");
     }
     for (const m of shown) {
@@ -9307,9 +9784,10 @@ const canvas = document.getElementById("game");
     });
     const displayedObjective = firstSessionNextStep || liveObjective;
     const liveObjectiveLine = firstSessionNextStep?.actionLine || resolveLiveObjectiveLine(liveObjective);
+    const primaryObjectiveLine = String(liveObjectiveLine || "").replace(/\s+•\s+\+.*/, "");
     if (displayedObjective && msgY <= topY + topH - 10) {
       ctx.font = "bold 11px Georgia";
-      drawClippedText(`→ ${liveObjectiveLine}`, topX + 10, msgY, topW - 20, displayedObjective.urgency === "high" || displayedObjective.urgency === "urgent" ? "#ffd77b" : "#f3e8cf");
+      drawClippedText(`→ ${primaryObjectiveLine}`, topX + 10, msgY, topW - 20, displayedObjective.urgency === "high" || displayedObjective.urgency === "urgent" ? "#ffd77b" : "#f3e8cf");
     }
     if (displayedObjective) {
       const strip = resolveObjectiveStripLayout({
@@ -9324,17 +9802,19 @@ const canvas = document.getElementById("game");
         hasSecondaryLine: Boolean(displayedObjective.secondaryLine),
       });
       drawSoftPanel(strip.x, strip.y, strip.w, strip.h, {
-        top: displayedObjective.urgency === "high" || displayedObjective.urgency === "urgent" ? "rgba(70, 44, 17, 0.82)" : "rgba(25, 32, 25, 0.76)",
-        bottom: displayedObjective.urgency === "high" || displayedObjective.urgency === "urgent" ? "rgba(30, 19, 9, 0.78)" : "rgba(9, 15, 11, 0.7)",
-        border: "rgba(255, 215, 123, 0.45)",
-        shadowBlur: 8,
-        shadowOffsetY: 3,
+        top: displayedObjective.urgency === "high" || displayedObjective.urgency === "urgent" ? "rgba(75, 42, 22, 0.9)" : "rgba(32, 27, 35, 0.84)",
+        bottom: displayedObjective.urgency === "high" || displayedObjective.urgency === "urgent" ? "rgba(22, 14, 12, 0.86)" : "rgba(9, 12, 17, 0.8)",
+        border: "rgba(255, 198, 102, 0.66)",
+        shadowBlur: 14,
+        shadowOffsetY: 5,
       });
+      ctx.fillStyle = "rgba(255, 191, 104, 0.85)";
+      ctx.fillRect(strip.x + 8, strip.y + 7, 4, strip.h - 14);
       ctx.font = "bold 11px Georgia";
-      drawClippedText(`${displayedObjective.title}: ${liveObjectiveLine}`, strip.x + 10, strip.primaryY, strip.w - 20, "#ffd77b");
+      drawClippedText(`${displayedObjective.title}: ${primaryObjectiveLine}`, strip.x + 20, strip.primaryY, strip.w - 30, "#ffd77b");
       if (displayedObjective.secondaryLine && strip.secondaryY) {
         ctx.font = "10px Georgia";
-        drawClippedText(displayedObjective.secondaryLine, strip.x + 10, strip.secondaryY, strip.w - 20, "#f1e5c8");
+        drawClippedText(displayedObjective.secondaryLine, strip.x + 20, strip.secondaryY, strip.w - 30, "#f1e5c8");
       }
     }
     drawInteractionPrompt(getInteractionPrompt(), hudY, margin);
@@ -9843,12 +10323,12 @@ const canvas = document.getElementById("game");
     }
 
     if (event.code === "BracketLeft" || event.code === "BracketRight") {
-      const presetOrder = ["low", "balanced", "high"];
+      const presetOrder = ["low", "balanced", "high", "cinematic"];
       const dir = event.code === "BracketRight" ? 1 : -1;
       const currentIdx = presetOrder.indexOf(state.graphics.preset);
       const nextIdx = (currentIdx + dir + presetOrder.length) % presetOrder.length;
       state.graphics.preset = presetOrder[nextIdx];
-      state.weather.quality = state.graphics.preset === "high" ? "cinematic" : state.graphics.preset === "low" ? "performance" : "balanced";
+      state.weather.quality = resolveVisualQualitySettingForPreset(state.graphics.preset);
       logMsg(`Graphics preset: ${state.graphics.preset}.`);
     }
 
@@ -10400,6 +10880,8 @@ const canvas = document.getElementById("game");
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const worldPresentation = buildRegionWorldPresentation(state.regions.activeRegion, worldPresentationContext());
     const regionReadability = resolveRegionReadabilityCues(state.regions.activeRegion);
+    const regionArtKit = getRegionArtKit(state.regions.activeRegion);
+    const openingComposition = resolveOpeningViewComposition({ regionId: state.regions.activeRegion });
     const textVisualMoodBase = buildVisualMood({
       weather: state.weather,
       chapterIndex: state.narrative.chapterIndex,
@@ -10408,6 +10890,7 @@ const canvas = document.getElementById("game");
       biome: state.regions.activeRegion,
     });
     textVisualMoodBase.regionProfile = regionProfile;
+    textVisualMoodBase.artKit = getRegionArtKit(state.regions.activeRegion);
     const textVisualMood = applyGraphicsAccessibility(textVisualMoodBase, state.graphics.accessibility);
     const textWorldNightStrength = resolveWorldNightStrength();
     textVisualMood.nightStrength = Math.max(numberOr(textVisualMood.nightStrength, 0), textWorldNightStrength);
@@ -10682,9 +11165,23 @@ const canvas = document.getElementById("game");
         readability: regionReadability,
         world_presentation: worldPresentation,
       },
+      visual_qa: {
+        active_region_art_kit: regionArtKit.label,
+        art_kit_quality: regionArtKit.quality,
+        sky_style: regionArtKit.sky.style,
+        horizon_style: regionArtKit.horizon.style,
+        road_style: regionArtKit.road.style,
+        landmark_visible: Boolean(worldPresentation.landmark?.label),
+        landmark: worldPresentation.landmark?.label || openingComposition.landmark,
+        road_readability_cue: regionReadability.roadPull,
+        current_visual_preset: state.graphics.preset,
+        visual_quality_setting: state.weather.quality,
+        world_dressing_counts: worldPresentation.worldDressing,
+        opening_composition: openingComposition,
+      },
       dynamic_lighting: {
         active_count: dynamicLightSnapshot.length,
-        max_active: 8,
+        max_active: GRAPHICS_PRESETS[state.graphics?.preset]?.dynamicLights || 14,
         strength: Number((textVisualMood.dynamicLightStrength || 0).toFixed(2)),
         night_strength: Number((textVisualMood.nightStrength || 0).toFixed(2)),
         dusk_strength: Number((textVisualMood.duskStrength || 0).toFixed(2)),

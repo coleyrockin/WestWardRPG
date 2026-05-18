@@ -44,12 +44,12 @@ Every road, job, NPC, item, house upgrade, and ending should help that loop.
 
 ## Audit Snapshot
 
-Date: 2026-05-16.
+Date: 2026-05-18.
 
 Latest local facts:
 
 1. Branch target: `main`, tracking `origin/main`.
-2. Test gate: `npm test` reports 970 passing tests across 85 test files.
+2. Test gate: `npm test` reports 979 passing tests across 86 test files.
 3. `src/main.js` is over 10.5k lines. This is still the biggest technical drag.
 4. `docs/roadmap.md` had stale historical counts and mixed shipped work with
    future scope. This rewrite replaces that clutter with the finish path.
@@ -219,29 +219,31 @@ Acceptance test:
 4. The tester sees a reaction after returning.
 5. The tester can explain why Map Scrap matters.
 
-## Milestone 2: Hardcore Visual Readability Pass
+## Milestone 2: Canvas Visual Overhaul: Dustward First 10 Minutes
 
-Status: active. Dustward pass 1 shipped locally: stronger road-pull data, more
-watchtower/town/wagon silhouettes, denser route props, brighter road ruts,
-repeated mileposts, and improved near-wall contact/trim/decal treatment.
+Status: active. Dustward pass 2 is the current MVP visual rescue: a Canvas-only
+art-kit overhaul for the first 5 to 10 minutes, with a haunted western dusk
+sky, stronger dusty road, lower marsh/wall treatment, cleaner HUD, smaller
+first-frame animal clutter, town silhouettes, lantern/wanted-board dressing,
+and distinct Smoke Cache/Broken Wagon/Boone board shape language.
 Combat readability pass 1 shipped locally: aggro, windup, stagger, boss phase,
 death, and reward-drop cues now feed subtitle/audio events, floating combat
 text, and `render_game_to_text` combat-readability state.
 
-Goal: Make the game look and read more like an open-world RPG while staying on
-the current canvas raycaster.
+Goal: Make the opening Dustward loop look beautiful, authored, and readable
+while staying on the current canvas raycaster.
 
 Required work:
 
 1. Road composition.
-   - Roads need better edges, turn hints, posts, fences, lamps, signs, and
-     destination silhouettes.
+   - Roads need better edges, wagon ruts, turn hints, posts, fences, lamps,
+     signs, trees, and destination silhouettes.
    - The player should feel pulled down the road before reading the HUD.
 
 2. Near-wall and collision visuals.
    - Improve harsh wall approach moments.
-   - Add better edge shading, height hints, decals, trim bands, or contact
-     shadows so walls feel placed instead of flat.
+   - Use region wall materials, edge shading, height hints, decals, trim bands,
+     and contact shadows so walls feel placed instead of flat.
 
 3. Landmark identity.
    - Dustward needs a stronger town/watchtower/road image.
@@ -252,6 +254,8 @@ Required work:
    - Job board, POIs, house stations, vendors, doors, loot, and route markers
      need clear shape language.
    - Minimap markers and 3D sprites should agree.
+   - Dustward interactables should be recognizable before reading text.
+   - NPCs should no longer read as plain colored rectangles.
 
 5. Combat readability.
    - Aggro, windup, stagger, parry, block, death, reward drops, and boss phases
@@ -269,7 +273,8 @@ Acceptance test:
 1. A tester can look at a screenshot and identify region, road direction,
    interactables, and danger.
 2. Walking into or near walls no longer looks broken or harsh.
-3. Visual captures are stable enough to gate changes.
+3. The opening view has sky, road, trees, landmark, and town identity.
+4. Visual captures are stable enough to gate changes.
 
 ## Milestone 3: Core RPG Loop Fusion
 
@@ -529,13 +534,16 @@ Allowed optional ideas:
 
 Use this order for the next implementation chunks:
 
-1. Human-review current visual captures, commit approved baselines, and then
+1. Finish the Dustward Canvas art-kit visual overhaul and browser-review the
+   title, opening road, Smoke Cache, Broken Wagon, first combat, and near-wall
+   views.
+2. Human-review current visual captures, commit approved baselines, and then
    make strict `npm run test:visual` part of the release gate.
-2. Finish IndexedDB quota and manual save/autosave status clarity.
-3. Extract HUD and objective rendering from `src/main.js` without changing the
+3. Finish IndexedDB quota and manual save/autosave status clarity.
+4. Extract HUD and objective rendering from `src/main.js` without changing the
    renderer.
-4. Extract modal input and modal drawing from `src/main.js`.
-5. Build the release proof package: `npm run build`, `npm run build:itch`,
+5. Extract modal input and modal drawing from `src/main.js`.
+6. Build the release proof package: `npm run build`, `npm run build:itch`,
    README screenshots, known limits, and launch instructions.
 
 ## Verification Gates
@@ -572,7 +580,7 @@ git diff --check
 # clean
 
 npm test
-# 970 passing across 85 test files
+# 979 passing across 86 test files
 
 npm run typecheck:ts
 # clean
@@ -586,15 +594,15 @@ npm run dev:lint
 npm run build
 # passed with existing Vite chunk-size warning
 
-WESTWARD_PORT=5211 WESTWARD_URL=http://127.0.0.1:5211/index.html npm run test:smoke
+env WESTWARD_PORT=5231 WESTWARD_URL=http://127.0.0.1:5231/index.html npm run test:smoke
 # clean; includes old-road-survey browser proof
-# artifacts: output/qa-smoke-20260516-121136
+# artifacts: output/qa-smoke-20260518-145802
 
 npm run package:itch
 # clean; wrote releases/westward-rpg-offline-v1.0.0.zip
 
-WESTWARD_URL=http://127.0.0.1:5198/index.html npm run test:visual:capture
-# last known clean; 2026-05-16 visual capture escalation was blocked by environment usage limits
+node web_game_playwright_client.mjs --url http://127.0.0.1:5228/index.html --screenshot-dir output/visual-rescue/frontier-opening-polished
+# clean with escalation; reviewed shot-1.png for the Dustward opening pass
 
 npm run test:visual:review
 # clean in review mode; 18 captures skipped because no committed baselines exist

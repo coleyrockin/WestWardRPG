@@ -12,6 +12,7 @@ export const SETTINGS_ROWS: Array<{
   format?: (value: number) => string;
 }>;
 export function resolveRecommendedPreset(metrics?: any): string;
+export function resolveVisualQualitySettingForPreset(preset?: string): string;
 export function createInitialGraphicsState(): any;
 export function applyGraphicsAccessibility(strengths: any, accessibility: any): any;
 export function getColorblindPalette(mode: string): any;

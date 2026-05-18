@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   COLORBLIND_MODES,
+  GRAPHICS_PRESETS,
   applyGraphicsAccessibility,
   createInitialGraphicsState,
   getColorblindPalette,
+  resolveRecommendedPreset,
+  resolveVisualQualitySettingForPreset,
 } from "../src/graphicsSettings.js";
 
 describe("graphics accessibility — colorblind", () => {
@@ -101,9 +104,11 @@ describe("settings modal — stepSetting", () => {
     stepSetting(g, "preset", 1);
     expect(readSettingValue(g, "preset")).toBe("high");
     stepSetting(g, "preset", 1);
+    expect(readSettingValue(g, "preset")).toBe("cinematic");
+    stepSetting(g, "preset", 1);
     expect(readSettingValue(g, "preset")).toBe("low");
     stepSetting(g, "preset", -1);
-    expect(readSettingValue(g, "preset")).toBe("high");
+    expect(readSettingValue(g, "preset")).toBe("cinematic");
   });
 
   it("clamps range rows at min and max", () => {
@@ -127,6 +132,28 @@ describe("settings modal — stepSetting", () => {
     expect(stepSetting(null as any, "preset", 1)).toBeNull();
     const g = createInitialGraphicsState();
     expect(stepSetting(g, "garbage" as any, 1)).toBeNull();
+  });
+});
+
+describe("graphics presets — cinematic visual overhaul", () => {
+  it("adds cinematic density controls for sky, vegetation, props, and lights", () => {
+    expect(GRAPHICS_PRESETS.cinematic.dynamicLights).toBeGreaterThan(GRAPHICS_PRESETS.high.dynamicLights);
+    expect(GRAPHICS_PRESETS.cinematic.vegetationDensity).toBeGreaterThan(1);
+    expect(GRAPHICS_PRESETS.cinematic.propDensity).toBeGreaterThan(1);
+    expect(GRAPHICS_PRESETS.cinematic.skyDetail).toBeGreaterThan(1);
+  });
+
+  it("recommends cinematic only for large capable screens", () => {
+    expect(resolveRecommendedPreset({ width: 1920, height: 1080, deviceMemory: 8 })).toBe("cinematic");
+    expect(resolveRecommendedPreset({ width: 1440, height: 900, deviceMemory: 6 })).toBe("high");
+    expect(resolveRecommendedPreset({ width: 800, height: 500, deviceMemory: 2 })).toBe("low");
+  });
+
+  it("maps graphics presets to visual quality settings", () => {
+    expect(resolveVisualQualitySettingForPreset("cinematic")).toBe("cinematic");
+    expect(resolveVisualQualitySettingForPreset("high")).toBe("cinematic");
+    expect(resolveVisualQualitySettingForPreset("balanced")).toBe("balanced");
+    expect(resolveVisualQualitySettingForPreset("low")).toBe("performance");
   });
 });
 

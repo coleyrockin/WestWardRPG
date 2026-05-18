@@ -46,10 +46,13 @@ describe("regionVisualIdentity", () => {
     expect(presentation.readability.roadPull).toContain("mileposts");
     expect(presentation.readability.roadPull).toContain("paired lamps");
     expect(presentation.props.length).toBeGreaterThanOrEqual(5);
+    expect(presentation.vegetation.length).toBeGreaterThanOrEqual(4);
     expect(presentation.roads.length).toBeGreaterThanOrEqual(7);
     expect(presentation.props.every((prop: any) => prop.blocking === false)).toBe(true);
+    expect(presentation.vegetation.every((plant: any) => plant.blocking === false)).toBe(true);
     expect(presentation.roads.every((road: any) => road.blocking === false)).toBe(true);
     expect(presentation.props.some((prop: any) => prop.kind === "sign")).toBe(true);
+    expect(presentation.vegetation.some((plant: any) => plant.kind === "tree")).toBe(true);
     expect(presentation.props.some((prop: any) => prop.label === "Slime-Scarred Road")).toBe(true);
     expect(presentation.props.filter((prop: any) => prop.kind === "lamp").length).toBeGreaterThanOrEqual(2);
     expect(presentation.roads.some((road: any) => road.label.includes("Marshal"))).toBe(true);
@@ -151,7 +154,7 @@ describe("regionVisualIdentity", () => {
       isVisible,
     });
 
-    const placements = [presentation.landmark, ...presentation.props, ...presentation.roads, ...presentation.vistas, ...presentation.roadSigns];
+    const placements = [presentation.landmark, ...presentation.props, ...presentation.vegetation, ...presentation.roads, ...presentation.vistas, ...presentation.roadSigns];
     expect(placements.every((item: any) => isPassable(item.x, item.y) && isVisible(item.x, item.y))).toBe(true);
     expect(presentation.props.find((prop: any) => prop.kind === "sign")).toMatchObject({
       placement: "adjusted",
@@ -165,6 +168,7 @@ describe("regionVisualIdentity", () => {
     expect(ashfall.landmark.label).toContain("Slag");
     expect(lantern.landmark.label).toContain("Signal");
     expect(ashfall.props.map((prop: any) => prop.label)).not.toEqual(lantern.props.map((prop: any) => prop.label));
+    expect(ashfall.vegetation.map((prop: any) => prop.label)).not.toEqual(lantern.vegetation.map((prop: any) => prop.label));
     expect(ashfall.roads.map((road: any) => road.label)).not.toEqual(lantern.roads.map((road: any) => road.label));
     expect(ashfall.vistas.map((vista: any) => vista.label)).not.toEqual(lantern.vistas.map((vista: any) => vista.label));
     expect(ashfall.roadSigns.map((sign: any) => sign.targetKind)).toContain("mine");
@@ -177,6 +181,7 @@ describe("regionVisualIdentity", () => {
       const placements = [
         presentation.landmark,
         ...presentation.props,
+        ...presentation.vegetation,
         ...presentation.roads,
         ...presentation.vistas,
         ...presentation.roadSigns,

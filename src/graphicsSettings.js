@@ -5,6 +5,9 @@ export const GRAPHICS_PRESETS = {
     dynamicLights: 8,
     rainDepth: 0.45,
     postWeight: 0.5,
+    vegetationDensity: 0.46,
+    propDensity: 0.58,
+    skyDetail: 0.56,
   },
   balanced: {
     fogDensity: 0.82,
@@ -12,6 +15,9 @@ export const GRAPHICS_PRESETS = {
     dynamicLights: 14,
     rainDepth: 0.75,
     postWeight: 0.82,
+    vegetationDensity: 0.78,
+    propDensity: 0.82,
+    skyDetail: 0.82,
   },
   high: {
     fogDensity: 1,
@@ -19,6 +25,19 @@ export const GRAPHICS_PRESETS = {
     dynamicLights: 22,
     rainDepth: 1,
     postWeight: 1,
+    vegetationDensity: 1,
+    propDensity: 1,
+    skyDetail: 1,
+  },
+  cinematic: {
+    fogDensity: 1.08,
+    particleDensity: 1.08,
+    dynamicLights: 26,
+    rainDepth: 1.08,
+    postWeight: 1.12,
+    vegetationDensity: 1.16,
+    propDensity: 1.12,
+    skyDetail: 1.18,
   },
 };
 
@@ -30,8 +49,15 @@ export const BIOME_GRADING = {
 
 export function resolveRecommendedPreset(metrics = {}) {
   const score = (metrics.width || 1280) * (metrics.height || 720);
-  if (score >= 1920 * 1080 && (metrics.deviceMemory || 4) >= 8) return "high";
+  if (score >= 1920 * 1080 && (metrics.deviceMemory || 4) >= 8) return "cinematic";
+  if (score >= 1440 * 900 && (metrics.deviceMemory || 4) >= 6) return "high";
   if (score <= 960 * 540 || (metrics.deviceMemory || 4) <= 2) return "low";
+  return "balanced";
+}
+
+export function resolveVisualQualitySettingForPreset(preset = "balanced") {
+  if (preset === "cinematic" || preset === "high") return "cinematic";
+  if (preset === "low") return "performance";
   return "balanced";
 }
 
@@ -89,7 +115,7 @@ export function getColorblindPalette(mode) {
 }
 
 export const SETTINGS_ROWS = [
-  { id: "preset", label: "Graphics Preset", kind: "enum", options: ["low", "balanced", "high"] },
+  { id: "preset", label: "Graphics Preset", kind: "enum", options: ["low", "balanced", "high", "cinematic"] },
   { id: "gradientCache", label: "Gradient Cache", kind: "bool" },
   { id: "postFx", label: "Post-FX", kind: "bool" },
   { id: "colorblindMode", label: "Colorblind Mode", kind: "enum", options: COLORBLIND_MODES },
