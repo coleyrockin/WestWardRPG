@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildJobObjective,
+  buildObjectiveDisplay,
   buildQuestHudLines,
   resolveLiveObjectiveLine,
   selectLiveObjective,
@@ -53,5 +54,49 @@ describe("hudObjectives", () => {
     expect(objective?.title).toBe("Road");
     expect(resolveLiveObjectiveLine(objective)).toBe("Follow smoke");
     expect(resolveLiveObjectiveLine({ line: "Return home" })).toBe("Return home");
+  });
+
+  it("formats the first-minute mission as one primary line with metadata", () => {
+    const display = buildObjectiveDisplay({
+      title: "Next step",
+      objectiveLine: "Mission: follow the marshal road to Smoke Cache • 3m. Press E to open it • +12g, +6 XP, +1 Potion, +1 Slime Core",
+      secondaryLine: "Boone Job Board • 1m | Threat: Fight: Road Slime • 5m • near Smoke Cache | This starts the Boone road loop and pays into gear or house progress.",
+    });
+
+    expect(display).toMatchObject({
+      displayTitle: "Mission",
+      displayPrimary: "Follow the marshal road to Smoke Cache",
+      displaySecondary: "This starts the Boone road loop and pays into gear or house progress.",
+    });
+    expect(display?.displayMeta).toEqual([
+      "3m",
+      "Press E to open it",
+      "Reward +12g, +6 XP, +1 Potion, +1 Slime Core",
+      "Threat Road Slime",
+    ]);
+  });
+
+  it("formats active and return job objectives without losing route details", () => {
+    expect(buildObjectiveDisplay({
+      title: "Job route",
+      line: "Patrol: Dustward road • Checkpoint 2 • 2/3 • 22m",
+      secondaryLine: "This advances your active job and keeps the road loop moving.",
+    })).toMatchObject({
+      displayTitle: "Job route",
+      displayPrimary: "Patrol: Dustward road",
+      displayMeta: ["Checkpoint 2", "2/3", "22m"],
+      displaySecondary: "This advances your active job and keeps the road loop moving.",
+    });
+
+    expect(buildObjectiveDisplay({
+      title: "Job ready",
+      line: "Return to Boone for +28g, +14 XP (14m)",
+      secondaryLine: "Turn in the job so the board, Boone, and rewards can react.",
+    })).toMatchObject({
+      displayTitle: "Job ready",
+      displayPrimary: "Return to Boone for +28g, +14 XP (14m)",
+      displayMeta: [],
+      displaySecondary: "Turn in the job so the board, Boone, and rewards can react.",
+    });
   });
 });

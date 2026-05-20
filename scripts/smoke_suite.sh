@@ -242,6 +242,9 @@ for (const key of ["has_dusk_sky", "has_road_cue", "has_landmark", "has_job_boar
 if (!String(visualProof.hud_focus_line || "").includes("Smoke Cache")) {
   throw new Error("golden-path smoke visual proof missing Smoke Cache HUD focus");
 }
+if (visualProof.has_single_primary_objective !== true || visualProof.objective_display_mode !== "single-strip") {
+  throw new Error("golden-path smoke visual proof missing single-strip objective HUD");
+}
 if (goldenPath.phase !== "available" || !goldenPath.routeLine || !goldenPath.threatLine) {
   throw new Error("golden-path smoke missing route/threat guidance");
 }

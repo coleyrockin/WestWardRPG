@@ -49,7 +49,7 @@ Date: 2026-05-19.
 Latest local facts:
 
 1. Branch target: `main`, tracking `origin/main`.
-2. Test gate: `npm test` reports 979 passing tests across 86 test files.
+2. Test gate: `npm test` reports 982 passing tests across 86 test files.
 3. `src/main.js` is over 10.5k lines. This is still the biggest technical drag.
 4. `docs/roadmap.md` had stale historical counts and mixed shipped work with
    future scope. This rewrite replaces that clutter with the finish path.
@@ -59,6 +59,8 @@ Latest local facts:
 6. The main product risk is not missing systems. The risk is that the systems
    still feel adjacent instead of fused into one unforgettable first session.
 7. Latest pushed visual-proof commit: `850e022 Tighten opening visual proof`.
+8. Latest local HUD clarity pass removes duplicated first-minute mission copy
+   and exposes `visual_qa.opening_scene_proof.has_single_primary_objective`.
 
 ### Code Audit Findings
 
@@ -581,7 +583,7 @@ git diff --check
 # clean
 
 npm test
-# 979 passing across 86 test files
+# 982 passing across 86 test files
 
 npm run typecheck:ts
 # clean
@@ -595,10 +597,10 @@ npm run dev:lint
 npm run build
 # passed with existing Vite chunk-size warning
 
-env WESTWARD_PORT=5236 WESTWARD_URL=http://127.0.0.1:5236/index.html npm run test:smoke
+env WESTWARD_PORT=5237 WESTWARD_URL=http://127.0.0.1:5237/index.html npm run test:smoke
 # clean; includes golden path, first-road memory, old-road-survey, save recovery,
 # combat, boss, weather, upgrade/equip, settings, mini-boss, and codex browser proof
-# artifacts: output/qa-smoke-20260519-200033
+# artifacts: output/qa-smoke-20260520-120308
 
 npm run package:itch
 # clean; wrote releases/westward-rpg-offline-v1.0.0.zip

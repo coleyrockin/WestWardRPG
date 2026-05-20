@@ -150,7 +150,8 @@ export function resolveObjectiveStripLayout(options = {}) {
   const topW = Math.max(180, options.topW || 320);
   const topH = Math.max(24, options.topH || 72);
   const hasSecondaryLine = Boolean(options.hasSecondaryLine);
-  const h = hasSecondaryLine ? 44 : 28;
+  const hasMetaLine = Boolean(options.hasMetaLine);
+  const h = hasMetaLine && hasSecondaryLine ? 58 : hasSecondaryLine || hasMetaLine ? 44 : 28;
   const preferredY = topY + topH + 8;
   const canvasHeight = Math.max(1, options.canvasHeight || 1);
   const bottomHudY = Number.isFinite(options.bottomHudY) ? options.bottomHudY : canvasHeight - margin;
@@ -162,8 +163,9 @@ export function resolveObjectiveStripLayout(options = {}) {
     y,
     w: topW,
     h,
-    primaryY: y + (hasSecondaryLine ? 17 : 18),
-    secondaryY: hasSecondaryLine ? y + 34 : null,
+    primaryY: y + (hasSecondaryLine || hasMetaLine ? 17 : 18),
+    metaY: hasMetaLine ? y + 34 : null,
+    secondaryY: hasSecondaryLine ? y + (hasMetaLine ? 50 : 34) : null,
   };
 }
 

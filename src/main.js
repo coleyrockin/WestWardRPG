@@ -218,6 +218,7 @@ import {
 } from "./interactionPrompt.js";
 import {
   buildJobObjective,
+  buildObjectiveDisplay,
   buildQuestHudLines,
   resolveLiveObjectiveLine,
   selectLiveObjective,
@@ -9687,6 +9688,25 @@ const canvas = document.getElementById("game");
     return drawHudNoticePanel(hudNotice, x, y, w);
   }
 
+  function drawObjectiveMetaChips(items = [], x, y, maxW) {
+    if (!items.length || maxW <= 0) return;
+    ctx.font = "bold 9px Georgia";
+    let cursor = x;
+    const maxRight = x + maxW;
+    for (const item of items.slice(0, 4)) {
+      const label = fitText(String(item || ""), 132);
+      const chipW = clamp(ctx.measureText(label).width + 16, 34, Math.min(146, maxRight - cursor));
+      if (chipW < 30 || cursor + chipW > maxRight + 1) break;
+      fillRoundedRect(cursor, y - 10, chipW, 14, 7, "rgba(255, 216, 128, 0.15)");
+      ctx.strokeStyle = "rgba(255, 216, 128, 0.34)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cursor + 1, y - 9, chipW - 2, 12);
+      drawClippedText(label, cursor + 8, y, chipW - 16, "#ffdda6");
+      cursor += chipW + 6;
+      if (cursor >= maxRight - 28) break;
+    }
+  }
+
   function drawInteractionPrompt(prompt, bottomHudY, margin) {
     if (!prompt || state.mode !== "playing") return;
     const layout = resolveInteractionPromptLayout({
@@ -9750,7 +9770,9 @@ const canvas = document.getElementById("game");
     const regionProfile = getRegionVisualIdentity(state.regions.activeRegion);
     const mapReserve = state.showMap && canvas.width >= 760 ? (canvas.width < 900 ? 176 : 214) : 0;
     const topW = Math.max(240, Math.min(620, canvas.width - margin * 2 - mapReserve));
-    const topH = compact ? 58 : 68;
+    const eventMods = getActiveRegionEventModifiers();
+    const hasTopNotice = Boolean(eventMods.banner || hudNotice);
+    const topH = compact ? hasTopNotice ? 58 : 48 : hasTopNotice ? 68 : 50;
     const topX = margin;
     const topY = margin;
     drawSoftPanel(topX, topY, topW, topH, {
@@ -9771,7 +9793,6 @@ const canvas = document.getElementById("game");
       topW - 20,
       "#d4c4a4",
     );
-    const eventMods = getActiveRegionEventModifiers();
     let msgY = topY + 54;
     if (eventMods.banner) {
       drawClippedText(`Event: ${eventMods.banner}`, topX + 10, topY + 50, topW - 20, "#ffb46d");
@@ -9863,12 +9884,10 @@ const canvas = document.getElementById("game");
     });
     const displayedObjective = firstSessionNextStep || liveObjective;
     const liveObjectiveLine = firstSessionNextStep?.actionLine || resolveLiveObjectiveLine(liveObjective);
-    const primaryObjectiveLine = String(liveObjectiveLine || "").replace(/\s+•\s+\+.*/, "");
-    if (displayedObjective && msgY <= topY + topH - 10) {
-      ctx.font = "bold 11px Georgia";
-      drawClippedText(`→ ${primaryObjectiveLine}`, topX + 10, msgY, topW - 20, displayedObjective.urgency === "high" || displayedObjective.urgency === "urgent" ? "#ffd77b" : "#f3e8cf");
-    }
+    const objectiveDisplay = buildObjectiveDisplay(displayedObjective);
+    const primaryObjectiveLine = objectiveDisplay?.displayPrimary || String(liveObjectiveLine || "").replace(/\s+•\s+\+.*/, "");
     if (displayedObjective) {
+      const hasMetaLine = Boolean(objectiveDisplay?.displayMeta?.length);
       const strip = resolveObjectiveStripLayout({
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
@@ -9878,7 +9897,8 @@ const canvas = document.getElementById("game");
         topW,
         topH,
         bottomHudY: hudY,
-        hasSecondaryLine: Boolean(displayedObjective.secondaryLine),
+        hasMetaLine,
+        hasSecondaryLine: Boolean(objectiveDisplay?.displaySecondary),
       });
       drawSoftPanel(strip.x, strip.y, strip.w, strip.h, {
         top: displayedObjective.urgency === "high" || displayedObjective.urgency === "urgent" ? "rgba(75, 42, 22, 0.9)" : "rgba(32, 27, 35, 0.84)",
@@ -9890,10 +9910,13 @@ const canvas = document.getElementById("game");
       ctx.fillStyle = "rgba(255, 191, 104, 0.85)";
       ctx.fillRect(strip.x + 8, strip.y + 7, 4, strip.h - 14);
       ctx.font = "bold 11px Georgia";
-      drawClippedText(`${displayedObjective.title}: ${primaryObjectiveLine}`, strip.x + 20, strip.primaryY, strip.w - 30, "#ffd77b");
-      if (displayedObjective.secondaryLine && strip.secondaryY) {
+      drawClippedText(`${objectiveDisplay?.displayTitle || displayedObjective.title}: ${primaryObjectiveLine}`, strip.x + 20, strip.primaryY, strip.w - 30, "#ffd77b");
+      if (hasMetaLine && strip.metaY) {
+        drawObjectiveMetaChips(objectiveDisplay.displayMeta, strip.x + 20, strip.metaY, strip.w - 30);
+      }
+      if (objectiveDisplay?.displaySecondary && strip.secondaryY) {
         ctx.font = "10px Georgia";
-        drawClippedText(displayedObjective.secondaryLine, strip.x + 20, strip.secondaryY, strip.w - 30, "#f1e5c8");
+        drawClippedText(objectiveDisplay.displaySecondary, strip.x + 20, strip.secondaryY, strip.w - 30, "#f1e5c8");
       }
     }
     drawInteractionPrompt(getInteractionPrompt(), hudY, margin);
@@ -11060,6 +11083,7 @@ const canvas = document.getElementById("game");
       boardProp,
       goldenPath,
     });
+    const firstSessionObjectiveDisplay = buildObjectiveDisplay(firstSessionNextStep || liveObjective);
     const presentationLabels = [
       ...(worldPresentation.props || []),
       ...(worldPresentation.vegetation || []),
@@ -11078,6 +11102,8 @@ const canvas = document.getElementById("game");
       has_smoke_cache: state.regions.activeRegion === "frontier" && !state.chest.opened,
       has_broken_wagon_cue: presentationLabels.some((label) => label.includes("broken wagon")),
       has_first_enemy_cue: Boolean(openingFightCue || combatReadability?.nearest),
+      has_single_primary_objective: Boolean(firstSessionObjectiveDisplay?.displayPrimary && firstSessionObjectiveDisplay?.displayMeta?.length),
+      objective_display_mode: firstSessionObjectiveDisplay ? "single-strip" : "none",
       hud_focus_line: firstSessionNextStep?.actionLine || liveObjective?.objectiveLine || liveObjective?.line || null,
     };
     openingSceneProof.proof_score = [
@@ -11088,6 +11114,7 @@ const canvas = document.getElementById("game");
       openingSceneProof.has_smoke_cache,
       openingSceneProof.has_broken_wagon_cue,
       openingSceneProof.has_first_enemy_cue,
+      openingSceneProof.has_single_primary_objective,
     ].filter(Boolean).length;
     const quests = {
       crystal: {

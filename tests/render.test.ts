@@ -185,6 +185,25 @@ describe("render — resolveObjectiveStripLayout", () => {
       primaryY: 130,
     });
   });
+
+  it("adds room for metadata chips and secondary copy", () => {
+    const layout = resolveObjectiveStripLayout({
+      canvasWidth: 900,
+      canvasHeight: 640,
+      margin: 12,
+      topX: 12,
+      topY: 12,
+      topW: 600,
+      topH: 68,
+      bottomHudY: 516,
+      hasMetaLine: true,
+      hasSecondaryLine: true,
+    });
+
+    expect(layout.h).toBe(58);
+    expect(layout.metaY).toBeGreaterThan(layout.primaryY);
+    expect(layout.secondaryY).toBeGreaterThan(layout.metaY);
+  });
 });
 
 describe("render — resolveRoadSurfaceVisualStyle", () => {
