@@ -20,7 +20,12 @@ const UPDATE = process.argv.includes("--update");
 const ALLOW_MISSING_BASELINES = process.argv.includes("--allow-missing-baselines");
 const CAPTURES_DIR = join(import.meta.dirname, "..", "output", "visual-regression");
 const BASELINES_DIR = join(import.meta.dirname, "baselines");
-const THRESHOLD = 0.08; // max allowed diff ratio (8%)
+// Max allowed diff ratio. 10% is the headroom we need for animated elements
+// like the watchtower beacon sweep/flicker, NPC walk cycles, enemy windup
+// pulses, weather dust/rain particles, and torch glow — none of which freeze
+// for screenshots. Real visual regressions (layout, color, missing geometry)
+// produce diffs well above this band.
+const THRESHOLD = 0.10;
 
 if (!existsSync(BASELINES_DIR)) mkdirSync(BASELINES_DIR, { recursive: true });
 

@@ -22,6 +22,7 @@ import {
   STORAGE_VERSION,
   MAX_BACKUPS_PER_SLOT,
   LEGACY_LOCAL_STORAGE_KEYS,
+  isQuotaError,
   __resetSavePersistenceForTests,
 } from "../src/savePersistence.js";
 
@@ -108,6 +109,43 @@ describe("makeEnvelope / validateEnvelope", () => {
     expect(validateEnvelope(null).ok).toBe(false);
     expect(validateEnvelope(undefined as any).ok).toBe(false);
     expect(validateEnvelope("not-an-envelope" as any).ok).toBe(false);
+  });
+});
+
+describe("isQuotaError", () => {
+  it("detects DOMException name QuotaExceededError", () => {
+    expect(isQuotaError({ name: "QuotaExceededError" })).toBe(true);
+  });
+
+  it("detects the legacy Firefox quota error name", () => {
+    expect(isQuotaError({ name: "NS_ERROR_DOM_QUOTA_REACHED" })).toBe(true);
+  });
+
+  it("detects DOMException code 22", () => {
+    expect(isQuotaError({ code: 22 })).toBe(true);
+  });
+
+  it("detects our wrapper error codes", () => {
+    expect(isQuotaError({ code: "quota-exceeded" })).toBe(true);
+    expect(isQuotaError({ code: "quota-exceeded-after-recovery" })).toBe(true);
+  });
+
+  it("detects 'quota' in a generic error message", () => {
+    expect(isQuotaError(new Error("Quota exceeded in storage."))).toBe(true);
+  });
+
+  it("walks the cause chain", () => {
+    const inner = { name: "QuotaExceededError" };
+    const outer: any = new Error("write failed");
+    outer.cause = inner;
+    expect(isQuotaError(outer)).toBe(true);
+  });
+
+  it("returns false for ordinary errors and null", () => {
+    expect(isQuotaError(null)).toBe(false);
+    expect(isQuotaError(undefined)).toBe(false);
+    expect(isQuotaError(new Error("file not found"))).toBe(false);
+    expect(isQuotaError({ name: "AbortError" })).toBe(false);
   });
 });
 

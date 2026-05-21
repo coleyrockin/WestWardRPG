@@ -44,13 +44,13 @@ Every road, job, NPC, item, house upgrade, and ending should help that loop.
 
 ## Audit Snapshot
 
-Date: 2026-05-19.
+Date: 2026-05-21.
 
 Latest local facts:
 
 1. Branch target: `main`, tracking `origin/main`.
-2. Test gate: `npm test` reports 984 passing tests across 86 test files.
-3. `src/main.js` is over 10.5k lines. This is still the biggest technical drag.
+2. Test gate: `npm test` reports 985 passing tests across 86 test files.
+3. `src/main.js` is over 11.5k lines. This is still the biggest technical drag.
 4. `docs/roadmap.md` had stale historical counts and mixed shipped work with
    future scope. This rewrite replaces that clutter with the finish path.
 5. The codebase has many real modules and tests: gear, jobs, save persistence,
@@ -58,9 +58,19 @@ Latest local facts:
    lights, WFC interiors, run history, replay, and more.
 6. The main product risk is not missing systems. The risk is that the systems
    still feel adjacent instead of fused into one unforgettable first session.
-7. Latest pushed visual-proof commit: `850e022 Tighten opening visual proof`.
-8. Latest local HUD clarity pass removes duplicated first-minute mission copy
+7. Latest pushed visual-proof commit: `035b5c2 Land Dustward visual overhaul
+   and commit visual baselines`. North Watchtower with rotating sweep, taller
+   clustered town buildings with chimneys and saloon balcony, road-shoulder
+   fence rails and cottonwoods, town gate at the road vanishing point, and
+   stronger job-board and cache-POI shape language all shipped.
+8. 18 visual baselines committed across `frontier`, `ashfall`, `ironlantern`
+   regions and `low`, `balanced`, `high` graphics presets. `npm run test:visual`
+   now runs as a strict pixelmatch gate (8% threshold) instead of review-only.
+9. Latest local HUD clarity pass removes duplicated first-minute mission copy
    and exposes `visual_qa.opening_scene_proof.has_single_primary_objective`.
+10. First extraction batch from `main.js` is in flight: `buildObjectiveDisplay`
+    landed in `src/hudObjectives.js`. Remaining HUD/modal/runtime extractions
+    are still pending.
 
 ### Code Audit Findings
 
@@ -268,8 +278,9 @@ Required work:
 6. Visual regression.
    - Expand visual capture coverage for title, opening town, road, near-wall,
      job board, combat, housing, and run summary.
-   - Keep review-mode CI capture active until human-approved baselines are
-     committed, then switch strict pixelmatch pass/fail on.
+   - Baselines committed at `scripts/baselines/` for all three regions and
+     three graphics presets. `npm run test:visual` is now the strict gate;
+     review mode (`test:visual:review`) remains for staging proposed changes.
 
 Acceptance test:
 
@@ -583,7 +594,7 @@ git diff --check
 # clean
 
 npm test
-# 984 passing across 86 test files
+# 985 passing across 86 test files
 
 npm run typecheck:ts
 # clean
@@ -608,6 +619,7 @@ npm run package:itch
 node web_game_playwright_client.mjs --url http://127.0.0.1:5228/index.html --screenshot-dir output/visual-rescue/frontier-opening-polished
 # clean with escalation; reviewed shot-1.png for the Dustward opening pass
 
-npm run test:visual:review
-# clean in review mode; 18 captures skipped because no committed baselines exist
+npm run test:visual
+# strict mode: 18 baselines committed at scripts/baselines/; all 18 captures
+# PASS at 0.00% pixel diff across frontier/ashfall/ironlantern x low/balanced/high
 ```

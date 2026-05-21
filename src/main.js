@@ -295,6 +295,7 @@ import {
   describeSaveBackupChoices,
   KNOWN_SLOTS as IDB_KNOWN_SLOTS,
   DEFAULT_SLOT as IDB_DEFAULT_SLOT,
+  isQuotaError as isSaveQuotaError,
 } from "./savePersistence.js";
 import {
   createInitialProgressionState,
@@ -1670,6 +1671,10 @@ const canvas = document.getElementById("game");
     mouseLook: 0,
     showMap: true,
     msg: [],
+    // Autosave/manual save status — read by HUD for clarity. Updated by saveGame()
+    // after each write. Kinds: "ok", "recovered" (saved after quota prune),
+    // "quota-exceeded" (storage full), "failed" (generic error).
+    saveStatus: { kind: "idle", savedAt: 0 },
     weather: {
       kind: "clear",
       rain: 0,
@@ -2873,10 +2878,33 @@ const canvas = document.getElementById("game");
     // Async write-through to IDB. localStorage is no longer the primary store;
     // the only fallback is the cache held in memory (which is enough for the
     // current session — and the next session if IDB succeeds before tab close).
-    idbWriteSave(currentSaveSlot, payload).catch((err) => {
-      console.warn("[westward] save write failed:", err);
-      if (!silent) logMsg("Save failed: storage error.");
-    });
+    idbWriteSave(currentSaveSlot, payload)
+      .then((env) => {
+        state.saveStatus = {
+          kind: env && env.__quotaRecovered ? "recovered" : "ok",
+          savedAt: Date.now(),
+          removedBackups: env && env.__quotaRecovered ? env.__quotaRecovered.removedBackups : 0,
+        };
+        if (env && env.__quotaRecovered && !silent) {
+          logMsg(`Storage almost full — pruned ${env.__quotaRecovered.removedBackups} old backup(s) and saved.`);
+        }
+      })
+      .catch((err) => {
+        console.warn("[westward] save write failed:", err);
+        const quota = isSaveQuotaError(err);
+        state.saveStatus = {
+          kind: quota ? "quota-exceeded" : "failed",
+          savedAt: Date.now(),
+          message: err && err.message,
+        };
+        if (!silent) {
+          logMsg(
+            quota
+              ? "Save failed: browser storage is full. Export a slot or remove a save to recover."
+              : "Save failed: storage error. Progress kept in memory until next save."
+          );
+        }
+      });
     if (!silent) logMsg("Progress saved.");
     return true;
   }

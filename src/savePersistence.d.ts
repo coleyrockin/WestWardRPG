@@ -81,7 +81,8 @@ export function validateEnvelope(envelope: unknown):
   | { ok: true; payload: any; savedAt: number }
   | { ok: false; reason: string };
 
-export function writeSave(slot: string | undefined, payload: any): Promise<SaveEnvelope>;
+export function writeSave(slot: string | undefined, payload: any): Promise<SaveEnvelope & { __quotaRecovered?: { removedBackups: number } }>;
+export function isQuotaError(err: unknown): boolean;
 export function readSave(slot?: string): Promise<ReadResult>;
 export function listBackups(slot?: string): Promise<BackupMeta[]>;
 export function readBackup(slot: string | undefined, savedAt: number): Promise<ReadResult>;

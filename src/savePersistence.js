@@ -19,6 +19,21 @@ export const KNOWN_SLOTS = ["slot-1", "slot-2", "slot-3"];
 export const STORAGE_VERSION = 1;
 export const MAX_BACKUPS_PER_SLOT = 3;
 
+// Detect IndexedDB / Storage quota errors across browsers. Chrome/Edge raise
+// DOMException name "QuotaExceededError"; older Firefox used
+// "NS_ERROR_DOM_QUOTA_REACHED"; the legacy DOMException code is 22.
+export function isQuotaError(err) {
+  if (!err) return false;
+  if (err.code === "quota-exceeded" || err.code === "quota-exceeded-after-recovery") return true;
+  if (err.name === "QuotaExceededError") return true;
+  if (err.name === "NS_ERROR_DOM_QUOTA_REACHED") return true;
+  if (err.code === 22) return true;
+  if (typeof err.message === "string" && /quota/i.test(err.message)) return true;
+  // Bubble up through wrapping
+  if (err.cause && err.cause !== err) return isQuotaError(err.cause);
+  return false;
+}
+
 export const LEGACY_LOCAL_STORAGE_KEYS = [
   "westward-save-v3",
   "westward-save-v2",
@@ -177,10 +192,8 @@ export function __resetSavePersistenceForTests() {
   cachedDbPromise = null;
 }
 
-export async function writeSave(slot, payload) {
-  const slotKey = slot || DEFAULT_SLOT;
-  const db = await openDB();
-  const envelope = makeEnvelope(payload);
+async function writeSaveTransaction(db, slotKey, envelope, options = {}) {
+  const { keepBackups = MAX_BACKUPS_PER_SLOT } = options;
   return txAsync(db, [SAVE_STORE, BACKUP_STORE], "readwrite", async (tx) => {
     const saves = tx.objectStore(SAVE_STORE);
     const backups = tx.objectStore(BACKUP_STORE);
@@ -206,19 +219,80 @@ export async function writeSave(slot, payload) {
     // 2. Write the new primary.
     await reqAsync(saves.put({ slot: slotKey, envelope }));
 
-    // 3. Prune backups for this slot to MAX_BACKUPS_PER_SLOT (newest first).
+    // 3. Prune backups for this slot to keepBackups (newest first).
     const allBackups = await reqAsync(backups.index("by-slot").getAll(slotKey));
-    if (allBackups.length > MAX_BACKUPS_PER_SLOT) {
+    if (allBackups.length > keepBackups) {
       const sorted = allBackups
         .slice()
         .sort((a, b) => b.savedAt - a.savedAt);
-      const toDelete = sorted.slice(MAX_BACKUPS_PER_SLOT);
+      const toDelete = sorted.slice(keepBackups);
       for (const entry of toDelete) {
         await reqAsync(backups.delete([slotKey, entry.savedAt]));
       }
     }
     return envelope;
   });
+}
+
+// Aggressively prune backups across all slots when quota is hit, keeping only
+// the newest backup per slot. Returns the number of backups removed.
+async function pruneAllBackupsToMinimum(db) {
+  return txAsync(db, [BACKUP_STORE], "readwrite", async (tx) => {
+    const backups = tx.objectStore(BACKUP_STORE);
+    const all = await reqAsync(backups.getAll());
+    // Group by slot, keep newest per slot.
+    const newestPerSlot = new Map();
+    for (const entry of all) {
+      const cur = newestPerSlot.get(entry.slot);
+      if (!cur || entry.savedAt > cur.savedAt) newestPerSlot.set(entry.slot, entry);
+    }
+    let removed = 0;
+    for (const entry of all) {
+      const keep = newestPerSlot.get(entry.slot);
+      if (!keep || entry.savedAt !== keep.savedAt) {
+        await reqAsync(backups.delete([entry.slot, entry.savedAt]));
+        removed += 1;
+      }
+    }
+    return removed;
+  });
+}
+
+export async function writeSave(slot, payload) {
+  const slotKey = slot || DEFAULT_SLOT;
+  const db = await openDB();
+  const envelope = makeEnvelope(payload);
+  try {
+    return await writeSaveTransaction(db, slotKey, envelope);
+  } catch (err) {
+    if (!isQuotaError(err)) throw err;
+    // Quota hit. Prune all but the newest backup per slot, then retry once.
+    let removed = 0;
+    try {
+      removed = await pruneAllBackupsToMinimum(db);
+    } catch (pruneErr) {
+      const wrapped = new Error("Storage quota exceeded and backup pruning failed.");
+      wrapped.code = "quota-exceeded";
+      wrapped.cause = pruneErr;
+      wrapped.recovered = false;
+      throw wrapped;
+    }
+    try {
+      const env = await writeSaveTransaction(db, slotKey, envelope, { keepBackups: 1 });
+      // Tag the envelope so callers can surface that recovery happened.
+      env.__quotaRecovered = { removedBackups: removed };
+      return env;
+    } catch (retryErr) {
+      const wrapped = new Error(
+        `Storage quota exceeded; pruned ${removed} backup(s) but the save still failed.`,
+      );
+      wrapped.code = "quota-exceeded-after-recovery";
+      wrapped.cause = retryErr;
+      wrapped.recovered = false;
+      wrapped.removedBackups = removed;
+      throw wrapped;
+    }
+  }
 }
 
 export async function readSave(slot) {
