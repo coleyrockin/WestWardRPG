@@ -1,10 +1,23 @@
 # Scripts & Utilities
 
-This directory contains various utility scripts written in different programming languages to support the WestWard project.
+This directory contains utility scripts for WestWard development, QA, packaging, and deployment.
 
 ## Overview
 
-The scripts demonstrate language variety and provide useful functionality for development, testing, and deployment.
+Most day-to-day work should use the npm scripts in `package.json`. The multi-language utilities below are optional maintenance tools; they are useful for audits, generated configs, and local reports, but they are not required to play or build the game.
+
+## Core npm-backed commands
+
+```bash
+npm run dev
+npm test
+npm run typecheck:ts
+npm run test:syntax
+npm run dev:lint
+npm run build
+npm run test:smoke
+npm run package:itch
+```
 
 ## Scripts by Language
 
@@ -230,7 +243,7 @@ php scripts/config_generator.php -t nginx -s myserver.com -p 9000
 ## Requirements
 
 ### Core Requirements (already installed)
-- **Node.js** 16+ (for JavaScript/npm)
+- **Node.js** 22 (matches CI)
 - **Python** 3.x (for Python scripts)
 - **TypeScript** (npm dev dependency)
 
@@ -245,7 +258,7 @@ Most systems come with Perl and Shell pre-installed. Ruby and PHP are commonly a
 
 ## Testing
 
-All scripts have been tested and include example data in the `test-data/` directory:
+Core JavaScript/TypeScript scripts are covered by the npm gates. Optional language tools should be treated as maintenance utilities and validated before relying on them in a release flow. Example data lives in the `test-data/` directory:
 
 - `test-data/sample_map.json` - Example map for Go validator
 - `test-data/sample_texture.txt` - Example texture for Rust analyzer

@@ -27,6 +27,7 @@ None.
 
 - Rule ID: JS-CSP-001 / JS-CSP-002 / JS-TT-001
 - Severity: Medium
+- Status: Partially fixed for deploy configs.
 - Location:
   - `index.html:4-21`
   - `index.html:730-755`
@@ -36,9 +37,9 @@ None.
 - Evidence:
   - `index.html` loads remote Google Fonts and local scripts without an in-repo CSP.
   - `index.html:730-752` contains inline JavaScript for the controls disclosure.
-  - Generated Nginx, Apache, and Caddy configs set `X-Frame-Options`, `X-Content-Type-Options`, and legacy `X-XSS-Protection`, but do not emit `Content-Security-Policy`.
+  - Generated Nginx, Apache, Caddy, and Vercel configs now emit a practical CSP, `Referrer-Policy`, and `Permissions-Policy`, and no longer rely on legacy `X-XSS-Protection`.
 - Impact: A future DOM XSS bug, compromised same-origin script, or accidental HTML sink would have fewer browser-level containment controls. This matters more as the roadmap adds imported saves/mods, optional dialogue providers, or distribution packaging.
-- Fix: Prefer header-delivered CSP in `scripts/config_generator.php`. A practical static-app baseline should constrain `default-src`, `script-src`, `style-src`, `font-src`, `img-src`, `connect-src`, and `object-src`. If inline code remains, use a hash/nonce or move the disclosure script into an external same-origin file before enforcing a strict `script-src`.
+- Remaining fix: Move the inline controls disclosure script into a same-origin module, then remove `'unsafe-inline'` from `script-src`. Keep Google Fonts explicitly allowed until fonts are self-hosted.
 - Mitigation: If static hosting cannot set headers, place an early `<meta http-equiv="Content-Security-Policy">` before scripts/resources and document its limits. Do not rely on meta CSP for `frame-ancestors`, `sandbox`, or reporting.
 - False positive notes: Production hosting might add CSP outside this repo. Verify the deployed headers before treating this as an externally exploitable gap.
 
@@ -102,7 +103,7 @@ None.
 
 ## Suggested Fix Order
 
-1. Add CSP headers to `scripts/config_generator.php`, then move or hash the inline disclosure script so the policy can avoid `unsafe-inline` for scripts.
+1. Move or hash the inline disclosure script so the deployed CSP can avoid `unsafe-inline` for scripts.
 2. Gate `window.advanceTime` and `window.render_game_to_text` behind an explicit debug/test flag and update smoke tooling.
 3. Change legacy save-key migration to write normalized v3 payloads only after `migrateSaveToV3()` succeeds.
 4. Decide whether to self-host fonts for distribution builds or document Google Fonts as an intentional external dependency.

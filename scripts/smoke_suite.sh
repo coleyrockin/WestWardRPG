@@ -82,7 +82,7 @@ detect_url() {
   done
 
   echo "[ERROR] Could not locate a reachable WestWard game URL on port ${PORT}." >&2
-  echo "[ERROR] Start the game server first (npm run start) or set WESTWARD_URL explicitly." >&2
+  echo "[ERROR] Start the game server first (npm run dev) or set WESTWARD_URL explicitly." >&2
   exit 1
 }
 

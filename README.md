@@ -14,9 +14,9 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 
 ## Preview
 
-▶ **Play in your browser:** [westward.vercel.app](https://westward.vercel.app) — runs entirely client-side, no install, no account.
+▶ **Play in your browser:** [westward-rpg.vercel.app](https://westward-rpg.vercel.app) — runs entirely client-side, no install, no account.
 
-📦 **Download the offline build:** [latest release](https://github.com/coleyrockin/WestWard/releases/latest) — unzip and double-click `index.html`, no server required.
+📦 **Download the offline build:** [latest release](https://github.com/coleyrockin/WestWardRPG/releases/latest) — unzip and double-click `index.html`, no server required.
 
 ![Opening view: Dustward town, route guide, HUD, and minimap](docs/images/launch-opening.png)
 ![Town dusk: signs, lanterns, props, and NPC silhouettes — region identity work](docs/images/launch-town-dusk.png)
@@ -30,6 +30,7 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 ## Table of Contents
 
 - [Why This Project](#why-this-project)
+- [Reviewer Quick Path](#reviewer-quick-path)
 - [Current State](#current-state)
 - [Current Direction](#current-direction)
 - [MVP Test Path](#mvp-test-path)
@@ -38,6 +39,7 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - [Controls](#controls)
 - [Architecture](#architecture)
 - [Developer Commands](#developer-commands)
+- [Release Readiness](#release-readiness)
 - [Save Format & Migration](#save-format--migration)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -50,6 +52,32 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - Treats narrative as gameplay logic, not only dialogue flavor.
 - Uses automated tests for core systems and progression logic.
 - Keeps future work in one roadmap: [`docs/roadmap.md`](docs/roadmap.md).
+
+## Reviewer Quick Path
+
+Use Node.js 22, which matches CI.
+
+```bash
+npm ci
+npm run dev
+```
+
+Open the printed Vite URL, start in Dustward Frontier, then play the first-road loop:
+
+1. Find Marshal Boone's job board.
+2. Follow **Marsh Slime Bounty** toward Smoke Cache.
+3. Inspect **Broken Wagon** for Map Scrap.
+4. Return through Boone, Old Road Survey, and the house/workbench proof.
+
+For confidence before review:
+
+```bash
+npm test
+npm run typecheck:ts
+npm run test:syntax
+npm run dev:lint
+npm run build
+```
 
 ## Current State
 
@@ -66,7 +94,7 @@ The current build contains the Shattered Frontier v3 foundation plus several ope
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual direction**: redesigned title screen, region visual identities, combat feedback, and an active Dustward Canvas art-kit pass with dusk sky, warmer road language, town silhouettes, lantern/wanted-board props, lower marsh barriers, and less placeholder-heavy opening composition.
 
-Latest local fast gate: `npm test` reports **982 passing tests across 86 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **984 passing tests across 86 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
@@ -133,7 +161,7 @@ expansion is intentionally post-MVP.
 ```bash
 git clone https://github.com/coleyrockin/WestWardRPG.git
 cd WestWardRPG
-npm install
+npm ci
 npm run dev          # Vite dev server with HMR on port 5173
 ```
 
@@ -247,6 +275,14 @@ npm run test:visual:capture
 npm run test:visual:review
 npm run test:visual # run after baselines are committed to enforce pixel thresholds
 ```
+
+## Release Readiness
+
+- **Web deployment**: Vercel builds with `npm run build` and serves `dist/`. `vercel.json` includes static caching and browser security headers.
+- **Offline package**: `npm run package:itch` writes `releases/westward-rpg-offline-v1.0.0.zip`; the ZIP uses relative asset paths and can be opened directly from `index.html`.
+- **Smoke proof**: `npm run test:smoke` writes ignored screenshots and JSON states under `output/qa-smoke-*`.
+- **Visual baselines**: strict visual regression is intentionally not enforced until human-approved baselines are committed. Use `npm run test:visual:review` for review mode.
+- **Known public-review limits**: the first Dustward road loop is the strongest authored slice; broader regions, pets, optional AI dialogue, and deeper economy are post-MVP roadmap items.
 
 ## Save Format & Migration
 

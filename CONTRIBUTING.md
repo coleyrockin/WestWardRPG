@@ -4,15 +4,16 @@ Thanks for contributing.
 
 ## Development Setup
 
-1. Install dependencies:
+1. Use Node.js 22, matching CI.
+2. Install dependencies:
    ```bash
-   npm install
+   npm ci
    ```
-2. Start local server:
+3. Start local server:
    ```bash
-   npm run start
+   npm run dev
    ```
-3. Open:
+4. Open:
    - http://127.0.0.1:5173/index.html
 
 ## Before Opening a PR
