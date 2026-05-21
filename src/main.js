@@ -6294,62 +6294,190 @@ const canvas = document.getElementById("game");
     ], artKit.horizon.mid, midAlpha);
 
     if (artKit.id === "frontier") {
-      ctx.fillStyle = hexToRgba(artKit.horizon.near, nearAlpha);
-      for (let i = 0; i < 10; i++) {
-        const x = width * (0.035 + i * 0.1);
-        const roofY = horizon - 5 - (i % 4) * 6;
-        const w = 22 + (i % 3) * 9;
-        const h = 22 + (i % 2) * 8;
-        ctx.fillRect(x, roofY, w, h);
+      const nearCol = artKit.horizon.near;
+
+      // --- Town building clusters left and right of road gap ---
+      const leftBuildings = [
+        { rx: 0.028, w: 30, h: 46, windows: 2 },  // livery
+        { rx: 0.072, w: 44, h: 68, windows: 3 },  // saloon — tallest
+        { rx: 0.134, w: 28, h: 42, windows: 1 },  // general store
+        { rx: 0.178, w: 22, h: 34, windows: 1 },  // cabin
+        { rx: 0.214, w: 20, h: 30, windows: 0 },  // shed
+        { rx: 0.248, w: 26, h: 40, windows: 1 },  // office
+        { rx: 0.286, w: 32, h: 52, windows: 2 },  // hotel
+        { rx: 0.334, w: 18, h: 26, windows: 0 },  // lean-to
+      ];
+      const rightBuildings = [
+        { rx: 0.660, w: 20, h: 30, windows: 0 },  // far outpost
+        { rx: 0.694, w: 24, h: 36, windows: 1 },
+        { rx: 0.736, w: 28, h: 42, windows: 1 },
+        { rx: 0.778, w: 22, h: 32, windows: 0 },
+        { rx: 0.812, w: 30, h: 46, windows: 2 },  // marshal post
+        { rx: 0.858, w: 18, h: 26, windows: 0 },
+        { rx: 0.892, w: 24, h: 36, windows: 1 },
+        { rx: 0.930, w: 20, h: 28, windows: 0 },
+      ];
+      for (const spec of [...leftBuildings, ...rightBuildings]) {
+        const bx = width * spec.rx;
+        const bh = spec.h;
+        const bw = spec.w;
+        const roofY = horizon - bh;
+        ctx.fillStyle = hexToRgba(nearCol, nearAlpha);
+        ctx.fillRect(bx, roofY, bw, bh);
+        // Gabled roof
         ctx.beginPath();
-        ctx.moveTo(x - 5, roofY + 1);
-        ctx.lineTo(x + w * 0.5, roofY - 13);
-        ctx.lineTo(x + w + 5, roofY + 1);
+        ctx.moveTo(bx - 4, roofY + 1);
+        ctx.lineTo(bx + bw * 0.5, roofY - (bh > 40 ? 18 : 12));
+        ctx.lineTo(bx + bw + 4, roofY + 1);
         ctx.closePath();
         ctx.fill();
-        ctx.fillStyle = "rgba(255, 186, 91, 0.38)";
-        ctx.fillRect(x + w * 0.6, roofY + h * 0.48, 4, 6);
-        ctx.fillStyle = hexToRgba(artKit.horizon.near, nearAlpha);
+        // Lit windows
+        ctx.fillStyle = "rgba(255, 186, 91, 0.36)";
+        for (let w = 0; w < spec.windows; w++) {
+          ctx.fillRect(bx + bw * (0.22 + w * 0.42), roofY + bh * 0.42, 4, 6);
+        }
+        // Chimney on taller buildings
+        if (spec.h >= 38) {
+          ctx.fillStyle = hexToRgba(nearCol, nearAlpha * 0.88);
+          ctx.fillRect(bx + bw * 0.7, roofY - (bh > 46 ? 20 : 13) + 2, 4, 14);
+        }
+        // Saloon: second-floor balcony + extra upper windows
+        if (spec.rx === 0.072) {
+          ctx.fillStyle = hexToRgba(nearCol, nearAlpha * 0.76);
+          ctx.fillRect(bx - 6, roofY + bh * 0.36, bw + 12, 5);
+          for (let bp = 0; bp < 5; bp++) {
+            ctx.fillRect(bx - 5 + bp * (bw + 10) / 4.4, roofY + bh * 0.36, 3, 11);
+          }
+          ctx.fillStyle = "rgba(255, 186, 91, 0.30)";
+          ctx.fillRect(bx + bw * 0.22, roofY + bh * 0.16, 5, 7);
+          ctx.fillRect(bx + bw * 0.56, roofY + bh * 0.16, 5, 7);
+        }
       }
-      const treeCount = 18;
-      for (let i = 0; i < treeCount; i++) {
-        const x = width * (0.03 + i * 0.073);
-        const h = 22 + (i % 5) * 7;
-        ctx.fillStyle = hexToRgba("#17151d", 0.58);
-        ctx.fillRect(x, horizon - h * 0.55, 4, h);
+
+      // --- Dead cottonwood tree line at horizon ---
+      const treePositions = [0.030, 0.082, 0.118, 0.162, 0.212, 0.260, 0.308, 0.360,
+        0.640, 0.688, 0.730, 0.778, 0.820, 0.864, 0.908, 0.950];
+      for (let i = 0; i < treePositions.length; i++) {
+        const tx = width * treePositions[i];
+        const th = 24 + (i % 5) * 8;
+        ctx.fillStyle = hexToRgba("#17151d", 0.52);
+        ctx.fillRect(tx, horizon - th * 0.55, 3, th);
         ctx.beginPath();
-        ctx.arc(x + 2, horizon - h * 0.55, 8 + (i % 3) * 3, 0, TAU);
-        ctx.fill();
-      }
-      const heroTrees = [
-        { x: width * 0.07, y: horizon + 46, scale: 1.08 },
-        { x: width * 0.91, y: horizon + 48, scale: 1.24 },
-      ];
-      for (const tree of heroTrees) {
-        const sway = Math.sin(state.time * 0.25 + tree.x * 0.01) * 3;
-        ctx.fillStyle = hexToRgba("#5d3b22", 0.46);
-        ctx.fillRect(tree.x - 5 + sway * 0.25, tree.y - 48 * tree.scale, 10 * tree.scale, 72 * tree.scale);
-        const canopy = ctx.createRadialGradient(tree.x - 14 + sway, tree.y - 70 * tree.scale, 4, tree.x, tree.y - 58 * tree.scale, 62 * tree.scale);
-        canopy.addColorStop(0, hexToRgba("#91b66c", 0.36));
-        canopy.addColorStop(0.56, hexToRgba("#527c45", 0.44));
-        canopy.addColorStop(1, "rgba(38, 62, 34, 0)");
-        ctx.fillStyle = canopy;
-        ctx.fillRect(tree.x - 76 * tree.scale, tree.y - 132 * tree.scale, 152 * tree.scale, 124 * tree.scale);
-        ctx.fillStyle = hexToRgba("#b7d08a", 0.16);
-        ctx.beginPath();
-        ctx.ellipse(tree.x - 22 * tree.scale + sway, tree.y - 92 * tree.scale, 24 * tree.scale, 13 * tree.scale, -0.3, 0, TAU);
+        ctx.arc(tx + 1.5, horizon - th * 0.55, 7 + (i % 3) * 3, 0, TAU);
         ctx.fill();
       }
 
+      // --- North Watchtower Beacon (landmark, right of road, artKit.landmark.hero) ---
+      const towerX = width * 0.636;
+      const towerBase = horizon + 8;
+      const towerH = Math.round(height * 0.36);  // ~36% of screen height — very visible
+      const towerW = Math.round(width * 0.026);
+      const towerFlicker = 0.86 + Math.sin(state.time * 3.4) * 0.14;
+      // Tapered shaft
+      ctx.fillStyle = hexToRgba("#221828", 0.9);
+      ctx.beginPath();
+      ctx.moveTo(towerX - towerW * 0.6, towerBase);
+      ctx.lineTo(towerX - towerW * 0.36, towerBase - towerH);
+      ctx.lineTo(towerX + towerW * 0.36, towerBase - towerH);
+      ctx.lineTo(towerX + towerW * 0.6, towerBase);
+      ctx.closePath();
+      ctx.fill();
+      // Watch platform overhang
+      ctx.fillRect(towerX - towerW * 0.72, towerBase - towerH - 4, towerW * 1.44, 5);
+      // Crenellations
+      ctx.fillStyle = hexToRgba("#221828", 0.9);
+      const crenCount = 5;
+      const crenW = (towerW * 1.44) / (crenCount * 2 - 1);
+      for (let c = 0; c < crenCount; c++) {
+        ctx.fillRect(towerX - towerW * 0.72 + c * crenW * 2, towerBase - towerH - 12, crenW, 9);
+      }
+      // Beacon glow halo
+      drawSpriteGlow(towerX, towerBase - towerH - 16, Math.round(width * 0.05), "#ffb84d", 0.52 * towerFlicker);
+      // Beacon point
+      ctx.fillStyle = `rgba(255, 212, 112, ${0.92 * towerFlicker})`;
+      ctx.beginPath();
+      ctx.arc(towerX, towerBase - towerH - 15, 4, 0, TAU);
+      ctx.fill();
+      // Faint light beam down the road
+      const beamGrad = ctx.createLinearGradient(towerX, towerBase - towerH, towerX, towerBase + 90);
+      beamGrad.addColorStop(0, `rgba(255, 205, 85, ${0.06 * towerFlicker})`);
+      beamGrad.addColorStop(1, "rgba(255, 205, 85, 0)");
+      ctx.fillStyle = beamGrad;
+      ctx.beginPath();
+      ctx.moveTo(towerX - 3, towerBase - towerH);
+      ctx.lineTo(towerX - width * 0.06, towerBase + 90);
+      ctx.lineTo(towerX + width * 0.06, towerBase + 90);
+      ctx.closePath();
+      ctx.fill();
+      // Rotating sweep — slow arc scanning across the ground plane
+      const sweepAngle = (state.time * 0.62) % (Math.PI * 2);
+      const sweepLen = width * 0.28;
+      ctx.fillStyle = `rgba(255, 210, 90, ${0.038 * towerFlicker})`;
+      ctx.beginPath();
+      ctx.moveTo(towerX, towerBase - towerH - 15);
+      ctx.arc(towerX, towerBase - towerH - 15, sweepLen, sweepAngle - 0.16, sweepAngle + 0.16);
+      ctx.closePath();
+      ctx.fill();
+
+      // --- Dustward town gate at road vanishing point ---
+      const gateX = width * 0.5;
+      const gateBase = horizon + 5;
+      const gatePostH = Math.round(height * 0.1);
+      ctx.fillStyle = hexToRgba("#2a1d28", 0.72);
+      ctx.fillRect(gateX - 14, gateBase - gatePostH, 5, gatePostH);
+      ctx.fillRect(gateX + 9, gateBase - gatePostH, 5, gatePostH);
+      // Arch crossbeam
+      ctx.fillRect(gateX - 15, gateBase - gatePostH - 4, 34, 5);
+      // Gate post tops
+      ctx.fillRect(gateX - 15, gateBase - gatePostH - 8, 7, 5);
+      ctx.fillRect(gateX + 8, gateBase - gatePostH - 8, 7, 5);
+      // Gate lanterns
+      ctx.fillStyle = "rgba(255, 194, 95, 0.42)";
+      ctx.beginPath(); ctx.arc(gateX - 12, gateBase - gatePostH - 5, 3, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(gateX + 12, gateBase - gatePostH - 5, 3, 0, TAU); ctx.fill();
+      drawSpriteGlow(gateX - 12, gateBase - gatePostH - 5, 12, "#ffb84d", 0.26);
+      drawSpriteGlow(gateX + 12, gateBase - gatePostH - 5, 12, "#ffb84d", 0.26);
+
+      // --- Hero cottonwood pair flanking road (tall narrow silhouettes) ---
+      const heroTrees = [
+        { rx: 0.08, scale: 1.1 },
+        { rx: 0.92, scale: 1.26 },
+      ];
+      for (const tree of heroTrees) {
+        const tx = width * tree.rx;
+        const ty = horizon + 44;
+        const sc = tree.scale;
+        const sway = Math.sin(state.time * 0.25 + tx * 0.01) * 2.5;
+        // Trunk
+        ctx.fillStyle = hexToRgba("#4a2e18", 0.54);
+        ctx.fillRect(tx - 4 * sc + sway * 0.2, ty - 82 * sc, 8 * sc, 96 * sc);
+        // Canopy — narrow oval, not a blob
+        ctx.fillStyle = hexToRgba("#4a6436", 0.46);
+        ctx.beginPath();
+        ctx.ellipse(tx + sway, ty - 98 * sc, 18 * sc, 44 * sc, 0, 0, TAU);
+        ctx.fill();
+        // Secondary cluster
+        ctx.fillStyle = hexToRgba("#3d5430", 0.36);
+        ctx.beginPath();
+        ctx.ellipse(tx - 10 * sc + sway, ty - 86 * sc, 12 * sc, 26 * sc, -0.24, 0, TAU);
+        ctx.fill();
+        // Highlight fringe
+        ctx.fillStyle = hexToRgba("#9fc46a", 0.14);
+        ctx.beginPath();
+        ctx.ellipse(tx - 6 * sc + sway, ty - 112 * sc, 9 * sc, 12 * sc, -0.3, 0, TAU);
+        ctx.fill();
+      }
+
+      // --- Wanted/job board at left road shoulder ---
       const boardX = width * 0.17;
       const boardY = horizon + 18;
-      ctx.fillStyle = "rgba(24, 17, 16, 0.7)";
-      ctx.fillRect(boardX - 18, boardY - 42, 36, 36);
-      ctx.fillRect(boardX - 21, boardY - 47, 42, 6);
-      ctx.fillStyle = "rgba(255, 207, 111, 0.24)";
-      ctx.fillRect(boardX - 12, boardY - 36, 8, 11);
-      ctx.fillRect(boardX + 2, boardY - 36, 9, 13);
-      drawSpriteGlow(boardX, boardY - 44, 42, "#ffbf68", 0.12);
+      ctx.fillStyle = "rgba(24, 17, 16, 0.74)";
+      ctx.fillRect(boardX - 18, boardY - 48, 36, 42);
+      ctx.fillRect(boardX - 21, boardY - 53, 42, 6);
+      ctx.fillStyle = "rgba(255, 207, 111, 0.26)";
+      ctx.fillRect(boardX - 12, boardY - 42, 8, 11);
+      ctx.fillRect(boardX + 2, boardY - 42, 9, 13);
+      drawSpriteGlow(boardX, boardY - 50, 44, "#ffbf68", 0.14);
     }
   }
 
@@ -6977,6 +7105,67 @@ const canvas = document.getElementById("game");
         ctx.stroke();
       }
       return;
+    }
+
+    // --- Frontier: near-ground road shoulder features ---
+    if (regionId === "frontier") {
+      // Fence rails flanking the road — two parallel lines converging to horizon
+      const roadCx = width * 0.5;
+      const fenceAlpha = 0.32;
+      ctx.strokeStyle = `rgba(92, 64, 38, ${fenceAlpha})`;
+      ctx.lineWidth = 1.8;
+      for (let side = -1; side <= 1; side += 2) {
+        // Near post to far post — fence posts at intervals
+        const postCount = 10;
+        for (let p = 0; p < postCount; p++) {
+          const t = (p + 0.5) / postCount;
+          const y = horizon + Math.pow(t, 1.5) * depth;
+          const fenceX = roadCx + side * lerp(width * 0.08, width * 0.44, t);
+          const postH = lerp(6, 28, t);
+          ctx.strokeStyle = `rgba(78, 54, 32, ${fenceAlpha * (0.5 + t * 0.5)})`;
+          ctx.lineWidth = lerp(1, 2.4, t);
+          ctx.beginPath();
+          ctx.moveTo(fenceX, y);
+          ctx.lineTo(fenceX, y + postH);
+          ctx.stroke();
+        }
+        // Rail line connecting the posts
+        ctx.strokeStyle = `rgba(92, 64, 38, ${fenceAlpha * 0.55})`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(roadCx + side * width * 0.42, horizon + Math.pow(0.9 / postCount, 1.5) * depth + 14);
+        ctx.bezierCurveTo(
+          roadCx + side * width * 0.3, horizon + depth * 0.38,
+          roadCx + side * width * 0.15, horizon + depth * 0.7,
+          roadCx + side * width * 0.08, height - 8,
+        );
+        ctx.stroke();
+      }
+
+      // Near-edge cottonwood silhouettes — one per side, tall and narrow
+      const nearTrees = [
+        { rx: 0.06, ry: 0.95, scale: 1.0 },
+        { rx: 0.94, ry: 0.97, scale: 1.14 },
+      ];
+      for (const tree of nearTrees) {
+        const tx = width * tree.rx;
+        const ty = height * tree.ry;
+        const sc = tree.scale;
+        const sway = Math.sin(state.time * 0.28 + tx * 0.008) * 3;
+        // Trunk
+        ctx.fillStyle = "rgba(50, 32, 18, 0.62)";
+        ctx.fillRect(tx - 6 * sc + sway * 0.15, ty - 110 * sc, 11 * sc, 118 * sc);
+        // Canopy — tall narrow oval
+        ctx.fillStyle = "rgba(52, 72, 38, 0.54)";
+        ctx.beginPath();
+        ctx.ellipse(tx + sway, ty - 126 * sc, 20 * sc, 52 * sc, 0, 0, TAU);
+        ctx.fill();
+        // Secondary branch mass
+        ctx.fillStyle = "rgba(42, 60, 30, 0.42)";
+        ctx.beginPath();
+        ctx.ellipse(tx - 12 * sc + sway, ty - 108 * sc, 14 * sc, 28 * sc, -0.22, 0, TAU);
+        ctx.fill();
+      }
     }
 
     const tuftCount = Math.floor(width / 7);
@@ -7648,12 +7837,27 @@ const canvas = document.getElementById("game");
         ctx.arc(spriteWidth * 0.5, spriteHeight * 0.58, spriteWidth * 0.28, Math.PI * 0.15, Math.PI * 0.85);
         ctx.stroke();
       } else {
-        ctx.fillStyle = "#6c4b30";
+        // Generic cache/supply crate — strong shape, readable at distance
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.6, spriteWidth * (0.38 + pulse * 0.08), color, 0.12 + pulse * 0.09);
+        // Dark backing for contrast
+        ctx.fillStyle = "rgba(16, 10, 6, 0.5)";
+        ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.49, spriteWidth * 0.56, spriteHeight * 0.38);
+        // Crate body
+        ctx.fillStyle = "#5c3d22";
         ctx.fillRect(spriteWidth * 0.25, spriteHeight * 0.52, spriteWidth * 0.5, spriteHeight * 0.34);
+        // Crate lid (colored)
         ctx.fillStyle = color;
-        ctx.fillRect(spriteWidth * 0.31, spriteHeight * 0.44, spriteWidth * 0.38, spriteHeight * 0.12);
-        ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-        ctx.fillRect(spriteWidth * 0.45, spriteHeight * 0.58, spriteWidth * 0.1, spriteHeight * 0.16);
+        ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.44, spriteWidth * 0.56, spriteHeight * 0.1);
+        // Strong outline
+        ctx.strokeStyle = "rgba(18, 10, 4, 0.65)";
+        ctx.lineWidth = Math.max(1.5, spriteWidth * 0.038);
+        ctx.strokeRect(spriteWidth * 0.25, spriteHeight * 0.52, spriteWidth * 0.5, spriteHeight * 0.34);
+        // Lock/clasp
+        ctx.fillStyle = "rgba(255, 230, 140, 0.72)";
+        ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.58, spriteWidth * 0.08, spriteHeight * 0.14);
+        // Gleam
+        ctx.fillStyle = "rgba(255, 255, 255, 0.28)";
+        ctx.fillRect(spriteWidth * 0.27, spriteHeight * 0.54, spriteWidth * 0.1, spriteHeight * 0.04);
       }
     } else if (sprite.kind === "landmark") {
       const color = sprite.color || "#d9b66d";
@@ -8039,29 +8243,43 @@ const canvas = document.getElementById("game");
     } else if (sprite.kind === "job-board") {
       const color = sprite.color || "#d8a84f";
       const pulse = 0.5 + Math.sin(state.time * 4.8) * 0.5;
-      drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.38, spriteWidth * (0.46 + pulse * 0.1), "#ffd77b", 0.14 + pulse * 0.12);
-      drawSpriteGlow(spriteWidth * 0.76, spriteHeight * 0.18, spriteWidth * (0.18 + pulse * 0.04), "#ffe8a8", 0.2 + pulse * 0.12);
-      ctx.fillStyle = "#5b402b";
+      // Larger ambient glow so it reads from distance
+      drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.38, spriteWidth * (0.56 + pulse * 0.12), "#ffd77b", 0.18 + pulse * 0.14);
+      drawSpriteGlow(spriteWidth * 0.76, spriteHeight * 0.18, spriteWidth * (0.22 + pulse * 0.06), "#ffe8a8", 0.26 + pulse * 0.14);
+      // Posts
+      ctx.fillStyle = "#4a3221";
       ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.34, spriteWidth * 0.07, spriteHeight * 0.56);
       ctx.fillRect(spriteWidth * 0.74, spriteHeight * 0.2, spriteWidth * 0.04, spriteHeight * 0.68);
-      ctx.fillStyle = shadeHex(color, 0.74);
+      // Board body with dark backing for contrast
+      ctx.fillStyle = "rgba(18, 12, 8, 0.62)";
+      ctx.fillRect(spriteWidth * 0.13, spriteHeight * 0.19, spriteWidth * 0.74, spriteHeight * 0.40);
+      ctx.fillStyle = shadeHex(color, 0.72);
       ctx.fillRect(spriteWidth * 0.16, spriteHeight * 0.22, spriteWidth * 0.68, spriteHeight * 0.34);
-      ctx.strokeStyle = "rgba(31, 22, 12, 0.55)";
-      ctx.lineWidth = Math.max(1, spriteWidth * 0.03);
-      ctx.strokeRect(spriteWidth * 0.16, spriteHeight * 0.22, spriteWidth * 0.68, spriteHeight * 0.34);
+      // Bright header title strip
       ctx.fillStyle = color;
-      ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.29, spriteWidth * 0.56, spriteHeight * 0.06);
-      ctx.fillStyle = "rgba(255, 245, 200, 0.38)";
-      ctx.fillRect(spriteWidth * 0.26, spriteHeight * 0.41, spriteWidth * 0.48, spriteHeight * 0.04);
-      ctx.fillRect(spriteWidth * 0.28, spriteHeight * 0.48, spriteWidth * 0.2, spriteHeight * 0.035);
-      ctx.fillRect(spriteWidth * 0.52, spriteHeight * 0.48, spriteWidth * 0.18, spriteHeight * 0.035);
+      ctx.fillRect(spriteWidth * 0.16, spriteHeight * 0.22, spriteWidth * 0.68, spriteHeight * 0.09);
+      // Strong outer border
+      ctx.strokeStyle = "rgba(20, 13, 6, 0.72)";
+      ctx.lineWidth = Math.max(1.5, spriteWidth * 0.04);
+      ctx.strokeRect(spriteWidth * 0.16, spriteHeight * 0.22, spriteWidth * 0.68, spriteHeight * 0.34);
+      // Posted notices
+      ctx.fillStyle = "rgba(255, 248, 210, 0.46)";
+      ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.34, spriteWidth * 0.28, spriteHeight * 0.18);
+      ctx.fillRect(spriteWidth * 0.54, spriteHeight * 0.34, spriteWidth * 0.24, spriteHeight * 0.18);
+      // Notice lines
+      ctx.fillStyle = "rgba(30, 18, 8, 0.5)";
+      ctx.fillRect(spriteWidth * 0.24, spriteHeight * 0.38, spriteWidth * 0.24, spriteHeight * 0.022);
+      ctx.fillRect(spriteWidth * 0.24, spriteHeight * 0.43, spriteWidth * 0.18, spriteHeight * 0.018);
+      ctx.fillRect(spriteWidth * 0.56, spriteHeight * 0.38, spriteWidth * 0.18, spriteHeight * 0.022);
+      ctx.fillRect(spriteWidth * 0.56, spriteHeight * 0.43, spriteWidth * 0.14, spriteHeight * 0.018);
+      // Lantern
       ctx.fillStyle = "#ffe8a8";
       ctx.beginPath();
-      ctx.arc(spriteWidth * 0.76, spriteHeight * 0.18, spriteWidth * 0.06, 0, TAU);
+      ctx.arc(spriteWidth * 0.76, spriteHeight * 0.18, spriteWidth * 0.07, 0, TAU);
       ctx.fill();
-      ctx.fillStyle = "rgba(255, 215, 123, 0.18)";
+      ctx.fillStyle = `rgba(255, 232, 150, ${0.22 + pulse * 0.1})`;
       ctx.beginPath();
-      ctx.arc(spriteWidth * 0.5, spriteHeight * 0.4, spriteWidth * 0.42, 0, TAU);
+      ctx.arc(spriteWidth * 0.5, spriteHeight * 0.4, spriteWidth * 0.44, 0, TAU);
       ctx.fill();
     } else if (sprite.kind === "house-door") {
       ctx.fillStyle = state.house.unlocked ? "#7f694a" : "#5f4f3a";
