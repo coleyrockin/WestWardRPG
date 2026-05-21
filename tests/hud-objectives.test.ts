@@ -3,6 +3,7 @@ import {
   buildJobObjective,
   buildObjectiveDisplay,
   buildQuestHudLines,
+  resolveHudChromeMode,
   resolveLiveObjectiveLine,
   selectLiveObjective,
 } from "../src/hudObjectives.js";
@@ -98,5 +99,39 @@ describe("hudObjectives", () => {
       displayMeta: [],
       displaySecondary: "Turn in the job so the board, Boone, and rewards can react.",
     });
+  });
+
+  it("keeps the first-minute HUD low-chrome until the player makes progress", () => {
+    expect(resolveHudChromeMode({
+      mode: "playing",
+      time: 24,
+      inHouse: false,
+      hasOpeningProgress: false,
+      hasModalOpen: false,
+    })).toBe("first-minute-low-chrome");
+
+    expect(resolveHudChromeMode({
+      mode: "playing",
+      time: 24,
+      inHouse: false,
+      hasOpeningProgress: true,
+      hasModalOpen: false,
+    })).toBe("standard");
+
+    expect(resolveHudChromeMode({
+      mode: "playing",
+      time: 95,
+      inHouse: false,
+      hasOpeningProgress: false,
+      hasModalOpen: false,
+    })).toBe("standard");
+
+    expect(resolveHudChromeMode({
+      mode: "playing",
+      time: 24,
+      inHouse: false,
+      hasOpeningProgress: false,
+      hasModalOpen: true,
+    })).toBe("standard");
   });
 });

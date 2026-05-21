@@ -220,6 +220,7 @@ import {
   buildJobObjective,
   buildObjectiveDisplay,
   buildQuestHudLines,
+  resolveHudChromeMode,
   resolveLiveObjectiveLine,
   selectLiveObjective,
 } from "./hudObjectives.js";
@@ -5580,6 +5581,22 @@ const canvas = document.getElementById("game");
       || workbenchOpen;
   }
 
+  function hasFirstMinuteHudProgress() {
+    return (state.quests.slime?.progress || 0) > 0
+      || (state.quests.crystal?.progress || 0) > 0
+      || (state.inventory["Slime Core"] || 0) > 0;
+  }
+
+  function getOpeningHudChromeMode() {
+    return resolveHudChromeMode({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      hasOpeningProgress: hasFirstMinuteHudProgress(),
+      hasModalOpen: anyModalOpen(),
+    });
+  }
+
   function grantEnemyKillRewards(enemy) {
     const civicBounty = state.narrative.globalFlags.curfewNormalized ? 3 : 0;
     const truthBonusXp = state.narrative.globalFlags.ledgerPublished ? 4 : 0;
@@ -9718,6 +9735,8 @@ const canvas = document.getElementById("game");
   }
 
   function drawHud() {
+    const hudChromeMode = getOpeningHudChromeMode();
+    const lowChromeHud = hudChromeMode === "first-minute-low-chrome";
     const activeJob = getActiveJobSummary(state.world.jobs);
     const questLines = buildQuestHudLines({
       quests: state.quests,
@@ -9732,8 +9751,8 @@ const canvas = document.getElementById("game");
 
     const margin = canvas.width < 620 ? 8 : 12;
     const compact = canvas.width < 560;
-    const hudW = Math.min(compact ? canvas.width - margin * 2 : 560, canvas.width - margin * 2);
-    const hudH = compact ? 82 : 92;
+    const hudW = Math.min(compact ? canvas.width - margin * 2 : lowChromeHud ? 420 : 560, canvas.width - margin * 2);
+    const hudH = compact ? lowChromeHud ? 70 : 82 : lowChromeHud ? 70 : 92;
     const hudX = margin;
     const hudY = canvas.height - hudH - margin;
     drawSoftPanel(hudX, hudY, hudW, hudH);
@@ -9746,12 +9765,12 @@ const canvas = document.getElementById("game");
 
     ctx.font = "bold 11px Georgia";
     const statsX = compact ? barX : barX + barW + 16;
-    const statsY = compact ? hudY + 76 : hudY + 24;
+    const statsY = compact ? hudY + (lowChromeHud ? 64 : 76) : hudY + 24;
     const statsW = hudX + hudW - statsX - 12;
     drawClippedText(`${t("labels.lvl")} ${state.player.level}  ${t("labels.gold")} ${state.player.gold}  ${t("labels.potions")} ${state.inventory.Potion}`, statsX, statsY, statsW, "#fff1d0");
-    const quick = state.player.quickUtility || { active: "smoke", inventory: { smoke: 0, flare: 0, tonic: 0 } };
-    const quickCount = Math.max(0, Math.floor(numberOr(quick.inventory?.[quick.active], 0)));
-    if (!compact) {
+    if (!compact && !lowChromeHud) {
+      const quick = state.player.quickUtility || { active: "smoke", inventory: { smoke: 0, flare: 0, tonic: 0 } };
+      const quickCount = Math.max(0, Math.floor(numberOr(quick.inventory?.[quick.active], 0)));
       ctx.font = "11px Georgia";
       drawClippedText(`${t("labels.crystals")} ${state.inventory["Crystal Shard"]}  ${t("labels.wood")} ${state.inventory.Wood}  ${t("labels.stone")} ${state.inventory.Stone}  ${t("labels.cores")} ${state.inventory["Slime Core"]}`, statsX, hudY + 41, statsW, "#d7c7a7");
       drawClippedText(`${state.player.loadout.weapon} / ${state.player.loadout.stance} / ${state.player.perks.length} perks / ${quick.active}:${quickCount}`, statsX, hudY + 57, statsW, "#d7c7a7");
@@ -11084,6 +11103,7 @@ const canvas = document.getElementById("game");
       goldenPath,
     });
     const firstSessionObjectiveDisplay = buildObjectiveDisplay(firstSessionNextStep || liveObjective);
+    const hudChromeMode = getOpeningHudChromeMode();
     const presentationLabels = [
       ...(worldPresentation.props || []),
       ...(worldPresentation.vegetation || []),
@@ -11104,6 +11124,8 @@ const canvas = document.getElementById("game");
       has_first_enemy_cue: Boolean(openingFightCue || combatReadability?.nearest),
       has_single_primary_objective: Boolean(firstSessionObjectiveDisplay?.displayPrimary && firstSessionObjectiveDisplay?.displayMeta?.length),
       objective_display_mode: firstSessionObjectiveDisplay ? "single-strip" : "none",
+      has_low_chrome_hud: hudChromeMode === "first-minute-low-chrome",
+      hud_display_mode: hudChromeMode,
       hud_focus_line: firstSessionNextStep?.actionLine || liveObjective?.objectiveLine || liveObjective?.line || null,
     };
     openingSceneProof.proof_score = [
@@ -11115,6 +11137,7 @@ const canvas = document.getElementById("game");
       openingSceneProof.has_broken_wagon_cue,
       openingSceneProof.has_first_enemy_cue,
       openingSceneProof.has_single_primary_objective,
+      openingSceneProof.has_low_chrome_hud,
     ].filter(Boolean).length;
     const quests = {
       crystal: {

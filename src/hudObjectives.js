@@ -174,6 +174,14 @@ export function buildObjectiveDisplay(objective = null) {
   };
 }
 
+export function resolveHudChromeMode(options = {}) {
+  if (options.mode !== "playing") return "standard";
+  if (options.inHouse || options.hasModalOpen) return "standard";
+  if (Math.max(0, Number(options.time) || 0) > 90) return "standard";
+  if (options.hasOpeningProgress) return "standard";
+  return "first-minute-low-chrome";
+}
+
 export function selectLiveObjective(candidates = []) {
   return candidates.find(Boolean) || null;
 }

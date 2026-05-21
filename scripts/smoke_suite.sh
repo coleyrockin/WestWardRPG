@@ -245,6 +245,9 @@ if (!String(visualProof.hud_focus_line || "").includes("Smoke Cache")) {
 if (visualProof.has_single_primary_objective !== true || visualProof.objective_display_mode !== "single-strip") {
   throw new Error("golden-path smoke visual proof missing single-strip objective HUD");
 }
+if (visualProof.has_low_chrome_hud !== true || visualProof.hud_display_mode !== "first-minute-low-chrome") {
+  throw new Error("golden-path smoke visual proof missing first-minute low-chrome HUD");
+}
 if (goldenPath.phase !== "available" || !goldenPath.routeLine || !goldenPath.threatLine) {
   throw new Error("golden-path smoke missing route/threat guidance");
 }
