@@ -303,10 +303,10 @@ authored-art direction.
 
 ### Spike Outcome
 
-The spike cleared the gate: the Three.js dusk frontier opening is obviously more
-dimensional and atmospheric than the flat Canvas raycaster (which on the same
-view is dominated by a text-heavy job-board overlay). **Decision: Three.js is
-the engine.**
+The spike cleared the strategic gate: the Three.js dusk frontier opening is more
+dimensional and atmospheric than the old raycaster can realistically become.
+**Decision: Three.js is the engine.** The visual comparison script still needs a
+fair in-world Canvas capture before it becomes a strict proof gate.
 
 What shipped (all behind a dev route; the Canvas game is byte-for-byte unchanged):
 
@@ -328,6 +328,10 @@ primitives, no GLB art, no animation, no gameplay wiring, frontier only.
 
 ## Milestone 2: State Adapter
 
+Status: **done (2026-05-24)** — the render snapshot bridge is in place. The 3D
+spike consumes a plain `westward-render-snapshot`, exposes it for browser proof,
+and keeps the static frontier layout only as fallback/seed data.
+
 Goal: Feed the new renderer from existing game state without coupling gameplay
 to Three.js.
 
@@ -348,7 +352,20 @@ Acceptance:
 2. No Three.js object is stored in save data.
 3. Snapshot tests cover the first-road loop phases.
 
+Outcome:
+
+1. `src/bridge/stateSnapshot.js` exports `createRenderSnapshot(state, options)`.
+2. Snapshot output is JSON-safe and includes player, region, weather, objective,
+   first-road memory, interactables, enemies, route markers, combat cues, lights,
+   and world objects.
+3. `src/render3d/spike.js` now consumes that snapshot and publishes
+   `window.__westwardRenderSnapshot` for browser proof.
+4. `tests/state-snapshot.test.ts` covers serialization, starting board objective,
+   active bounty route state, combat cue state, and Old Road Survey availability.
+
 ## Milestone 3: First Five-Minute Rewrite
+
+Status: **active next (2026-05-25).**
 
 Goal: Rebuild the first playable slice in the new renderer.
 
@@ -663,40 +680,82 @@ Add `postprocessing` (`EffectComposer`) on top of the existing ACES tone map:
 
 ## Immediate Action Plan
 
-Steps 1–7 are **done** (Milestones 0–1: prep, Three.js spike, screenshot gate,
-decision = Three.js). What remains, in order:
+Steps 1–8 are **done** (Milestones 0–2: prep, Three.js spike, screenshot gate,
+decision = Three.js, render snapshot bridge). What remains, in order:
 
-8. Wire the first **render snapshot** (Milestone 2).
-9. Rebuild the **first five-minute loop** in the new renderer (Milestone 3).
-10. Only then migrate broader systems (Milestones 4–9), pulling from the
+9. Fix the visual comparison gate so it compares old in-world Canvas gameplay
+   against new Three.js gameplay, not title/menu state.
+10. Rebuild the **first five-minute loop** in the new renderer (Milestone 3).
+11. Only then migrate broader systems (Milestones 4–9), pulling from the
     **Graphics: Next-Level Plan** as each scene/character lands.
 
-### Next Agent — Start Here
+### Tomorrow Agent Handoff — Start Here
 
 Branch is merged to `main`. The spike is on `main` and runnable today.
 
 - **Run it:** `npm run dev` → open `http://127.0.0.1:5173/render3d.html`.
 - **Compare:** `node scripts/spike_compare.mjs` (dev server up) → writes
-  `output/spike-compare/{old,new}.png` and asserts no console errors.
+  `output/spike-compare/{old,new}.png`, asserts no console errors, and verifies
+  the Three.js route publishes a `westward-render-snapshot`.
 - **Verify (before any commit):** `npm test` · `npm run typecheck:ts` ·
-  `npm run test:syntax` · `npm run build` (must still emit `index.html` **and**
-  `render3d.html`). The Canvas game must stay untouched and green.
+  `npm run test:syntax` · `npm run dev:lint` · `npm run build` (must still emit
+  `index.html` **and** `render3d.html`). The Canvas game must stay untouched and
+  green.
 
-**First task — Milestone 2 (State Adapter):**
+**Critical first task — fix the comparison proof:**
 
-1. Create `src/bridge/stateSnapshot.js` exporting `createRenderSnapshot(state)`
-   that returns a plain, serializable object: player `{x, y, angle}`, region,
-   time, weather, active objective, interactables, visible NPCs/enemies/POIs,
-   route markers, lights, and combat cues. **No Three.js objects in it; it must
-   never touch save data** (Rewrite Rules #4–5).
-2. Add Vitest coverage proving the snapshot is JSON-serializable and stable across
-   the first-road phases (reuse `resolveFirstFiveMinuteLoop` in `gameFeel.js`).
-3. Have `spike.js` consume the snapshot instead of the static `frontierLayout`
-   (keep `frontierLayout` as the fallback/seed). Leave Canvas reading old state.
-4. Keep `render_game_to_text()` intact as the QA contract.
+The current compare script verifies the new 3D snapshot correctly, but the old
+Canvas screenshot can still land on title/save/menu UI. That makes the old-vs-new
+claim weaker than it should be. Before polishing the scene, make the comparison
+apples-to-apples:
 
-Then proceed to Milestone 3 (movement, camera, collision proxies, interaction
-prompts, the playable board→bounty→road→cache→slime→wagon→reward→return loop).
+1. Capture old Canvas in an actual in-world Dustward gameplay state.
+2. Assert the old capture is not title, save, settings, job-board modal, or any
+   other non-gameplay screen.
+3. Keep the new route assertion:
+   `window.__westwardRenderSnapshot.kind === "westward-render-snapshot"` and
+   `objective.phase === "accept_bounty"`.
+4. Store captures in `output/spike-compare/` only; do not commit screenshots
+   until the owner approves them.
+
+**Then do Milestone 3A — art proof before gameplay wiring:**
+
+The five-agent review agreed on the same point: the Three.js spike is the right
+path, but it still reads like programmer-art blockout. Tomorrow should make one
+first-frame screenshot undeniable before adding broader systems.
+
+1. Recompose the spawn frame around the road:
+   - road centered and readable
+   - Boone/job board as a near-left landmark
+   - Smoke Cache visible down-road
+   - Broken Wagon as a shoulder discovery
+   - Road Slime as a clear threat
+   - watchtower/mesa/town silhouette on the horizon
+2. Push buildings out of the camera's face; use them to frame the road instead
+   of dominating the frame.
+3. Add a stronger palette:
+   - purple dusk shadows
+   - amber lantern light
+   - muted dusty road
+   - sickly green slime glow
+   - pale smoke plume
+4. Add graphic-novel readability:
+   - bolder silhouettes
+   - contact/blob shadows
+   - selective emissive glow
+   - subtle vignette/post tone
+5. Remove prototype language from the public frame. No visible "render3d spike"
+   label in screenshots meant for review.
+
+Acceptance for tomorrow:
+
+1. `old.png` is real Canvas gameplay and `new.png` is the Three.js opening.
+2. The first 3D screenshot clearly beats the Canvas screenshot without needing
+   explanation.
+3. A reviewer can identify road, town, Boone board, Smoke Cache, Broken Wagon,
+   Road Slime, and horizon landmark without reading debug text.
+4. Canvas remains playable and untouched.
+5. Full gates pass before commit.
 
 ## Verification Gates
 
@@ -733,10 +792,11 @@ npm run package:itch
 
 ## Current Repo Note
 
-As of 2026-05-24, Milestones 0–1 are landed on `main`: the Canvas polish pass is
-committed as the reference build, and the Three.js spike lives behind the
-`render3d.html` dev route. The Canvas renderer (`src/main.js`) is the reference
-and remains untouched by spike work.
+As of 2026-05-24, Milestones 0–2 are landed on `main`: the Canvas polish pass is
+committed as the reference build, the Three.js spike lives behind the
+`render3d.html` dev route, and the first plain render snapshot bridge feeds that
+spike without coupling game state to Three.js. The Canvas renderer
+(`src/main.js`) is the reference and remains untouched by spike work.
 
 Do not delete the Canvas renderer or mix Canvas changes with renderer-rewrite
 work in one commit until Milestone 8 (System Parity proven, then retire).

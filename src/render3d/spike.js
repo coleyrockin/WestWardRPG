@@ -8,6 +8,7 @@
 // first frame so the comparison capture script knows when to screenshot.
 
 import * as THREE from "three";
+import { createRenderSnapshot } from "../bridge/stateSnapshot.js";
 import { buildFrontierPlacements, PLAYER_SPAWN } from "./frontierLayout.js";
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
@@ -237,25 +238,26 @@ function buildPlacement(group, p) {
   }
 }
 
-function buildGround(scene) {
+function buildGround(scene, snapshot) {
+  const spawn = snapshot?.player || PLAYER_SPAWN;
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(80, 80),
     standard(GROUND_TINT, { roughness: 1 }),
   );
   ground.rotation.x = -Math.PI / 2;
-  ground.position.set(PLAYER_SPAWN.x + 6, 0, PLAYER_SPAWN.y);
+  ground.position.set(spawn.x + 6, 0, spawn.y);
   ground.receiveShadow = true;
   scene.add(ground);
 
   // dusty road strip running east from spawn through town toward the tower
   const ROAD_LEN = 22;
-  const ROAD_CX = PLAYER_SPAWN.x + 9;
+  const ROAD_CX = spawn.x + 9;
   const road = new THREE.Mesh(
     new THREE.PlaneGeometry(ROAD_LEN, 1.9),
     standard("#9a7c4f", { roughness: 1 }),
   );
   road.rotation.x = -Math.PI / 2;
-  road.position.set(ROAD_CX, 0.02, PLAYER_SPAWN.y + 0.4);
+  road.position.set(ROAD_CX, 0.02, spawn.y + 0.4);
   road.receiveShadow = true;
   scene.add(road);
 
@@ -266,12 +268,60 @@ function buildGround(scene) {
       standard("#d8be8c", { roughness: 1, emissive: "#3a2c14", emissiveIntensity: 0.2 }),
     );
     edge.rotation.x = -Math.PI / 2;
-    edge.position.set(ROAD_CX, 0.03, PLAYER_SPAWN.y + 0.4 + off);
+    edge.position.set(ROAD_CX, 0.03, spawn.y + 0.4 + off);
     scene.add(edge);
   }
 }
 
-export function startSpike(canvas) {
+function createSpikeSnapshot() {
+  const worldObjects = buildFrontierPlacements();
+  return createRenderSnapshot({
+    mode: "playing",
+    time: 8,
+    player: { x: PLAYER_SPAWN.x, y: PLAYER_SPAWN.y, angle: 0, inHouse: false },
+    regions: { activeRegion: "frontier", activeRegionLabel: "Dustward Frontier", poisDiscovered: [] },
+    inventory: {},
+    quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+    weather: { kind: "clear", rain: 0, fog: 0.18, wind: 0.15, lightning: 0, quality: "high" },
+    world: { timeOfDay: 0.7, jobs: { activeJobId: null, completedJobIds: [], progressByJobId: {} } },
+    house: { unlocked: false },
+    narrative: { npcMemory: { byNpc: {} } },
+    chest: { opened: false },
+  }, {
+    boardProp: worldObjects.find((p) => p.kind === "jobBoard"),
+    roadDiscoveryLead: worldObjects.find((p) => p.kind === "brokenWagon"),
+    enemies: worldObjects
+      .filter((p) => p.kind === "roadSlime")
+      .map((p) => ({
+        id: "opening-patrol",
+        type: "slime",
+        label: "Road Slime",
+        behavior: "balanced",
+        x: p.x,
+        y: p.y,
+        hp: 38,
+        alive: true,
+        color: p.color,
+        openingPatrol: true,
+      })),
+    worldObjects,
+  });
+}
+
+function syncObjectiveDom(snapshot) {
+  const label = document.querySelector("#objective .label");
+  const text = document.querySelector("#objective .text");
+  const tag = document.querySelector("#tag");
+  if (label) label.textContent = snapshot.objective?.title || "Objective";
+  if (text) text.textContent = snapshot.objective?.currentTarget
+    ? `${snapshot.objective.currentTarget} - ${snapshot.objective.nextAction}`
+    : "Open Boone's board - accept the Marsh Slime Bounty.";
+  if (tag) tag.textContent = `WestWard - render3d spike - ${snapshot.region.label} - ${snapshot.objective?.phase || "static"}`;
+}
+
+export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
+  syncObjectiveDom(snapshot);
+  window.__westwardRenderSnapshot = snapshot;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -289,7 +339,7 @@ export function startSpike(canvas) {
   // lighting: dim warm ambient + low sunset key + cool sky fill
   scene.add(new THREE.HemisphereLight(col("#c9a6ff"), col("#4a3826"), 0.55));
   const sun = new THREE.DirectionalLight(col("#ffae6a"), 1.6);
-  sun.position.set(PLAYER_SPAWN.x - 8, 6, PLAYER_SPAWN.y - 5); // low west sun
+  sun.position.set(snapshot.player.x - 8, 6, snapshot.player.y - 5); // low west sun
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 0.5;
@@ -298,21 +348,21 @@ export function startSpike(canvas) {
   sun.shadow.camera.right = 25;
   sun.shadow.camera.top = 25;
   sun.shadow.camera.bottom = -25;
-  sun.target.position.set(PLAYER_SPAWN.x + 6, 0, PLAYER_SPAWN.y);
+  sun.target.position.set(snapshot.player.x + 6, 0, snapshot.player.y);
   scene.add(sun);
   scene.add(sun.target);
 
-  buildGround(scene);
+  buildGround(scene, snapshot);
 
   const props = new THREE.Group();
-  for (const p of buildFrontierPlacements()) buildPlacement(props, p);
+  for (const p of snapshot.worldObjects) buildPlacement(props, p);
   scene.add(props);
 
   // hero vista: pulled back behind spawn and raised, looking east down the road
   // toward the board / cache / wagon / slime cluster and the watchtower beacon.
   const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 200);
-  camera.position.set(PLAYER_SPAWN.x - 4.0, 3.4, PLAYER_SPAWN.y + 0.3);
-  camera.lookAt(PLAYER_SPAWN.x + 6.0, 0.6, PLAYER_SPAWN.y + 0.5);
+  camera.position.set(snapshot.player.x - 4.0, 3.4, snapshot.player.y + 0.3);
+  camera.lookAt(snapshot.player.x + 6.0, 0.6, snapshot.player.y + 0.5);
 
   function onResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -330,7 +380,7 @@ export function startSpike(canvas) {
   }
   loop();
 
-  return { scene, camera, renderer };
+  return { scene, camera, renderer, snapshot };
 }
 
 // Auto-start when loaded as the render3d.html entry.

@@ -62,6 +62,10 @@ async function captureNew(context) {
   await page.goto(`${BASE}/render3d.html`, { waitUntil: "load" });
   await page.waitForSelector("#scene");
   await page.waitForFunction(() => window.__spikeReady === true, { timeout: 15000 });
+  const snapshot = await page.evaluate(() => window.__westwardRenderSnapshot || null);
+  if (!snapshot || snapshot.kind !== "westward-render-snapshot" || snapshot.objective?.phase !== "accept_bounty") {
+    errors.push(`render3d snapshot missing or wrong phase: ${snapshot?.objective?.phase || "none"}`);
+  }
   await sleep(300);
   await page.locator("#scene").screenshot({ path: path.join(OUT, "new.png") });
   await page.close();
