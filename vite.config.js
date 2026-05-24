@@ -24,6 +24,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
+        // Engine-rewrite spike dev route (Milestone 1). Keeps build coverage of
+        // the Three.js page; the Canvas game entry (main) is unchanged.
+        render3d: 'render3d.html',
       },
     },
   },

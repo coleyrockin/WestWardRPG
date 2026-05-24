@@ -98,6 +98,14 @@ Latest local fast gate: `npm test` reports **984 passing tests across 86 files**
 
 ## Current Direction
 
+> **Active next direction: a renderer rewrite spike.** WestWard is migrating its
+> presentation layer to a **Three.js** engine for richer scene depth, lighting,
+> and characters. The current Canvas build is the **reference build** — it stays
+> the playable source of truth for shipped gameplay until the new renderer proves
+> the same first-road slice. The spike lives behind the `render3d.html` dev route
+> (`npm run dev` → open `/render3d.html`) and does not touch the Canvas game. See
+> [`docs/roadmap.md`](docs/roadmap.md) (Milestones 0–9).
+
 The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the single source of truth. The high-level active build order is:
 
 1. **Golden Path 1** — one complete Boone road-job loop from town to road to reward to consequence.

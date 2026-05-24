@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23131c20'/%3E%3Cstop offset='1' stop-color='%23d27238'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='6' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='20' r='5' fill='%23f5d8a8' opacity='0.9'/%3E%3C/svg%3E" />
+    <title>WestWard — Engine Rewrite Spike (Three.js)</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: #1a1226; overflow: hidden; }
+      #scene { display: block; width: 100vw; height: 100vh; }
+
+      /* DOM objective strip — stays out of the 3D scene, low-chrome */
+      #objective {
+        position: fixed;
+        left: 50%;
+        bottom: 28px;
+        transform: translateX(-50%);
+        max-width: min(680px, 92vw);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 20px;
+        font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+        color: #f6e4c4;
+        background: rgba(24, 16, 30, 0.72);
+        border: 1px solid rgba(216, 168, 79, 0.55);
+        border-radius: 10px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(4px);
+        letter-spacing: 0.2px;
+      }
+      #objective .pip {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: #ffd77b;
+        box-shadow: 0 0 10px 2px rgba(255, 215, 123, 0.7);
+        flex: none;
+      }
+      #objective .label { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #d8a84f; }
+      #objective .text { font-size: 17px; }
+
+      #tag {
+        position: fixed; top: 14px; left: 16px;
+        font: 12px/1.4 ui-monospace, monospace;
+        color: rgba(246, 228, 196, 0.6);
+        background: rgba(24, 16, 30, 0.5);
+        padding: 6px 10px; border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div id="tag">WestWard · render3d spike · Dustward opening (static)</div>
+    <div id="objective">
+      <span class="pip"></span>
+      <span>
+        <span class="label">Objective</span><br />
+        <span class="text">Open Boone's board — accept the Marsh Slime Bounty.</span>
+      </span>
+    </div>
+    <script type="module" src="/src/render3d/spike.js"></script>
+  </body>
+</html>
