@@ -136,6 +136,16 @@ function distanceLine(player = {}, marker = {}) {
   return `${Math.max(1, Math.round(distance))}m`;
 }
 
+function distanceTo(player = {}, marker = {}) {
+  if (!Number.isFinite(player.x) || !Number.isFinite(player.y)) return Infinity;
+  if (!Number.isFinite(marker.x) || !Number.isFinite(marker.y)) return Infinity;
+  return Math.hypot(marker.x - player.x, marker.y - player.y);
+}
+
+function hasItem(inventory = {}, item) {
+  return (inventory[item] || 0) > 0;
+}
+
 function markerActionLine(marker = {}) {
   if (!marker) return "";
   const action = marker.action === "checkpoint" ? "Reach"
@@ -244,13 +254,15 @@ export function resolveFirstMinutePressure(input = {}) {
   const reward = FIRST_CACHE_REWARD_BY_REGION[regionId] || FIRST_CACHE_REWARD_BY_REGION.frontier;
   const rewardLine = formatRewardLine(reward);
   const routeDistance = distanceLine(input.player, marker);
+  const routeDistanceValue = distanceTo(input.player, marker);
   const actionLabel = "Open cache";
+  const routeAction = routeDistanceValue <= 2.15 ? "Press E to open it" : "Reach the smoke plume";
 
   return {
     id: `${regionId}-first-pressure`,
     title: config.title,
     line: config.line,
-    objectiveLine: `Mission: follow the ${config.routeLabel} to ${config.label}${routeDistance ? ` • ${routeDistance}` : ""}. Press E to open it • ${rewardLine}`,
+    objectiveLine: `Mission: follow the ${config.routeLabel} to ${config.label}${routeDistance ? ` • ${routeDistance}` : ""} • ${routeAction} • ${rewardLine}`,
     actionLabel,
     distanceLine: routeDistance,
     rewardLine,
@@ -260,6 +272,158 @@ export function resolveFirstMinutePressure(input = {}) {
     urgency: time < 18 ? "soft" : time < 55 ? "high" : "urgent",
     marker,
   };
+}
+
+function firstLoopObjective(input, phase, target, action, reason, options = {}) {
+  const distance = options.distanceLine || distanceLine(input.player, options.marker || {});
+  const distancePart = distance ? ` • ${distance}` : "";
+  const actionPart = action ? ` • ${action}` : "";
+  return {
+    id: "first-five-minute-loop",
+    title: "Mission",
+    phase,
+    currentTarget: target,
+    nextAction: action,
+    reasonLine: reason,
+    confusionGuardLine: options.confusionGuardLine || "Follow the objective and the E prompt; they should point at the same thing.",
+    objectiveLine: `Mission: ${target}${distancePart}${actionPart}`,
+    actionLine: `Mission: ${target}${distancePart}${actionPart}`,
+    secondaryLine: joinBriefLines([options.secondaryLine, reason]),
+    payoffLine: options.payoffLine || "",
+    actionLabel: options.actionLabel || action,
+    distanceLine: distance,
+    marker: options.marker || null,
+    urgency: options.urgency || "high",
+    regionHint: options.regionHint || input.regionLabel || input.regionId || "",
+  };
+}
+
+export function resolveFirstFiveMinuteLoop(input = {}) {
+  if (input.mode && input.mode !== "playing") return null;
+  if (input.inHouse) return null;
+
+  const regionId = input.regionId || "frontier";
+  if (regionId !== "frontier") return null;
+
+  const inventory = input.inventory || {};
+  const activeJob = input.activeJob || null;
+  const boardProp = input.boardProp || null;
+  const jobMarker = input.jobMarker || null;
+  const firstRoadMemory = input.firstRoadMemory || null;
+  const pressure = input.pressure || resolveFirstMinutePressure(input);
+  const fightCue = input.fightCue || null;
+  const chest = input.chest || {};
+  const cacheClaimed = Boolean(chest.opened || chest.claimed || chest.firstRewardClaimed);
+  const mapScrapCarried = hasItem(inventory, "Map Scrap");
+  const boardDistance = boardProp ? distanceTo(input.player, boardProp) : Infinity;
+  const pressureDistance = pressure?.marker ? distanceTo(input.player, pressure.marker) : Infinity;
+  const fightDistance = fightCue?.marker ? distanceTo(input.player, fightCue.marker) : Infinity;
+  const roadDiscovery = input.roadDiscoveryLead || null;
+  const roadDiscoveryDistance = roadDiscovery ? distanceTo(input.player, roadDiscovery) : Infinity;
+  const regionHint = input.regionLabel || "Dustward Frontier";
+
+  if (firstRoadMemory?.phase === "survey_available" || firstRoadMemory?.phase === "survey_completed" || activeJob?.id === "frontier_map_survey") {
+    return firstLoopObjective(input, "survey_followup", "open Old Road Survey on Boone's board", boardDistance <= 3.25 ? "Press E to open jobs" : "Return to Boone's board", "Map Scrap turned the first road into follow-up work.", {
+      marker: boardProp,
+      payoffLine: "Old Road Survey, gold, XP, and house planning proof",
+      regionHint,
+      urgency: firstRoadMemory?.phase === "survey_completed" ? "medium" : "high",
+    });
+  }
+
+  if (activeJob?.status === "ready") {
+    const marker = jobMarker || boardProp;
+    return firstLoopObjective(input, "claim_reward", `return to ${activeJob.npcName || "Boone"}`, jobMarker?.returnTarget || boardDistance <= 3.25 ? "Press E to claim/report" : "Follow the return marker", "Claim the job so Boone, the board, and rewards can react.", {
+      marker,
+      distanceLine: jobMarker?.distanceLine || distanceLine(input.player, marker),
+      payoffLine: activeJob.rewardLine || "Job reward",
+      regionHint,
+      urgency: "high",
+    });
+  }
+
+  if (mapScrapCarried && (firstRoadMemory?.phase === "discovered" || cacheClaimed)) {
+    return firstLoopObjective(input, "return_to_boone", "carry Map Scrap back to Boone", boardDistance <= 3.25 ? "Press E at the board" : "Return to town", "Boone's board can turn the wagon clue into Old Road Survey.", {
+      marker: boardProp,
+      payoffLine: "Old Road Survey unlock",
+      regionHint,
+    });
+  }
+
+  if (activeJob && fightCue && fightDistance <= 7.5) {
+    return firstLoopObjective(input, "fight_slime", `fight ${fightCue.targetLabel || "Road Slime"}`, "Block, dodge, then strike", "The first threat guards the cache route and drops useful gear material.", {
+      marker: fightCue.marker,
+      distanceLine: fightCue.distanceLine,
+      payoffLine: fightCue.rewardHint,
+      secondaryLine: fightCue.threatLine,
+      regionHint,
+      urgency: "urgent",
+    });
+  }
+
+  if (pressure && !cacheClaimed && pressureDistance <= 2.15) {
+    return firstLoopObjective(input, "open_cache", "open Smoke Cache", "Press E to open it", "This pays the first reward and points toward gear or house progress.", {
+      marker: pressure.marker,
+      distanceLine: pressure.distanceLine,
+      payoffLine: pressure.rewardLine,
+      secondaryLine: pressure.threatHint,
+      regionHint,
+      urgency: "high",
+    });
+  }
+
+  if (roadDiscovery && roadDiscoveryDistance <= 3.2 && firstRoadMemory?.phase !== "discovered") {
+    return firstLoopObjective(input, "inspect_wagon", "inspect Broken Wagon", "Press E to inspect", "The wagon clue explains why Boone's road matters.", {
+      marker: roadDiscovery,
+      distanceLine: distanceLine(input.player, roadDiscovery),
+      payoffLine: "Map Scrap unlocks Old Road Survey",
+      secondaryLine: roadDiscovery.returnReason || roadDiscovery.mysteryLine,
+      regionHint,
+    });
+  }
+
+  if (activeJob && pressure && !cacheClaimed) {
+    return firstLoopObjective(input, "follow_road", "follow the marshal road to Smoke Cache", "Reach the smoke plume", "The cache is the first visible reward before the slime fight.", {
+      marker: pressure.marker,
+      distanceLine: pressure.distanceLine,
+      payoffLine: pressure.rewardLine,
+      secondaryLine: pressure.threatHint,
+      regionHint,
+    });
+  }
+
+  if (activeJob && jobMarker) {
+    return firstLoopObjective(input, "follow_road", `follow ${activeJob.title || "the active job"}`, markerActionLine(jobMarker), "Route markers keep the job physically in the world.", {
+      marker: jobMarker,
+      distanceLine: jobMarker.distanceLine,
+      payoffLine: activeJob.rewardLine,
+      regionHint,
+    });
+  }
+
+  if (!activeJob && boardProp) {
+    const nearBoard = boardDistance <= 3.25;
+    return firstLoopObjective(input, nearBoard ? "accept_bounty" : "find_board", "open Boone's job board", nearBoard ? "Press E to open jobs" : "Walk to the lit board", "Choose Marsh Slime Bounty to start the first road loop.", {
+      marker: boardProp,
+      distanceLine: distanceLine(input.player, boardProp),
+      payoffLine: "Marsh Slime Bounty starts the showcase route",
+      secondaryLine: "Boone's board gives the road a job, reward, and return reason.",
+      regionHint,
+      urgency: nearBoard ? "high" : "medium",
+    });
+  }
+
+  if (pressure) {
+    return firstLoopObjective(input, "follow_road", "follow the marshal road to Smoke Cache", pressureDistance <= 2.15 ? "Press E to open it" : "Reach the smoke plume", "This starts the first visible reward loop.", {
+      marker: pressure.marker,
+      distanceLine: pressure.distanceLine,
+      payoffLine: pressure.rewardLine,
+      secondaryLine: pressure.threatHint,
+      regionHint,
+    });
+  }
+
+  return null;
 }
 
 export function resolveOpeningRouteGuide(input = {}) {

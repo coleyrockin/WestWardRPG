@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   resolveFirstMinuteCache,
   resolveFirstMinuteCacheReward,
+  resolveFirstFiveMinuteLoop,
   resolveFirstMinutePressure,
   resolveFirstSessionNextStep,
   resolveHitFeedback,
@@ -84,7 +85,7 @@ describe("gameFeel", () => {
     expect(pressure?.distanceLine).toBe("3m");
     expect(pressure?.rewardLine).toBe("+12g, +6 XP, +1 Potion, +1 Slime Core");
     expect(pressure?.objectiveLine).toContain("Mission");
-    expect(pressure?.objectiveLine).toContain("Press E");
+    expect(pressure?.objectiveLine).toContain("Reach the smoke plume");
     expect(pressure?.objectiveLine).toContain("3m");
     expect(pressure?.objectiveLine).toContain("+12g");
   });
@@ -179,7 +180,7 @@ describe("gameFeel", () => {
       stepCount: 3,
     });
     expect(guide?.objectiveLine).toContain("Mission");
-    expect(guide?.objectiveLine).toContain("Press E");
+    expect(guide?.objectiveLine).toContain("Reach the smoke plume");
     expect(guide?.objectiveLine).toContain("+12g");
     expect(guide?.secondaryLine).toContain("Boone Job Board");
     expect(guide?.secondaryLine).toContain("Threat");
@@ -301,6 +302,79 @@ describe("gameFeel", () => {
     expect(nextStep?.secondaryLine).toContain("Boone Job Board");
     expect(nextStep?.secondaryLine).toContain("Boone road loop");
     expect(nextStep?.payoffLine).toBe("Use Slime Core at home.");
+  });
+
+  it("derives a first-five-minute loop from board to survey follow-up", () => {
+    const base = {
+      mode: "playing",
+      time: 20,
+      inHouse: false,
+      regionId: "frontier",
+      regionLabel: "Dustward Frontier",
+      player: { x: 9.5, y: 8.5 },
+      inventory: { "Slime Core": 0 },
+      quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
+      boardProp: { label: "Boone Job Board", x: 10.5, y: 8.5 },
+    };
+
+    expect(resolveFirstFiveMinuteLoop(base)).toMatchObject({
+      phase: "accept_bounty",
+      currentTarget: "open Boone's job board",
+      nextAction: "Press E to open jobs",
+    });
+
+    const pressure = resolveFirstMinutePressure(base);
+    expect(resolveFirstFiveMinuteLoop({
+      ...base,
+      activeJob: { id: "frontier_slime_bounty", title: "Marsh Slime Bounty", status: "active", rewardLine: "+38g, +24 XP" },
+      pressure,
+    })).toMatchObject({
+      phase: "follow_road",
+      currentTarget: "follow the marshal road to Smoke Cache",
+    });
+
+    expect(resolveFirstFiveMinuteLoop({
+      ...base,
+      player: { x: 12.6, y: 8.85 },
+      activeJob: { id: "frontier_slime_bounty", title: "Marsh Slime Bounty", status: "active", rewardLine: "+38g, +24 XP" },
+      pressure,
+    })).toMatchObject({
+      phase: "open_cache",
+      nextAction: "Press E to open it",
+    });
+
+    expect(resolveFirstFiveMinuteLoop({
+      ...base,
+      activeJob: { id: "frontier_slime_bounty", title: "Marsh Slime Bounty", status: "active", rewardLine: "+38g, +24 XP" },
+      pressure,
+      fightCue: {
+        targetLabel: "Road Slime",
+        distanceLine: "5m",
+        rewardHint: "+10g, +22 XP, +1 Slime Core",
+        marker: { x: 14.4, y: 9.4 },
+      },
+    })).toMatchObject({
+      phase: "fight_slime",
+      currentTarget: "fight Road Slime",
+    });
+
+    expect(resolveFirstFiveMinuteLoop({
+      ...base,
+      roadDiscoveryLead: { label: "Broken Wagon", x: 9.8, y: 8.6, returnReason: "Map scrap route." },
+      firstRoadMemory: { phase: "visible" },
+    })).toMatchObject({
+      phase: "inspect_wagon",
+      payoffLine: "Map Scrap unlocks Old Road Survey",
+    });
+
+    expect(resolveFirstFiveMinuteLoop({
+      ...base,
+      inventory: { "Map Scrap": 1, "Slime Core": 1 },
+      firstRoadMemory: { phase: "survey_available" },
+    })).toMatchObject({
+      phase: "survey_followup",
+      currentTarget: "open Old Road Survey on Boone's board",
+    });
   });
 
   it("points loot back to the house when no stronger objective is active", () => {

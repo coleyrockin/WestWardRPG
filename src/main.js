@@ -174,6 +174,7 @@ import {
   resolveFirstMinuteCache,
   resolveFirstMinuteCacheReward,
   resolveFirstMinutePressure,
+  resolveFirstFiveMinuteLoop,
   resolveFirstSessionNextStep,
   resolveHitFeedback,
   resolveOpeningFightCue,
@@ -214,6 +215,7 @@ import {
   createHudNotice,
 } from "./hudNotice.js";
 import {
+  formatInteractionPrompt,
   resolveInteractionPrompt,
 } from "./interactionPrompt.js";
 import {
@@ -3647,8 +3649,8 @@ const canvas = document.getElementById("game");
     }
 
     const boardProp = getActiveJobBoardProp();
-    if (boardProp && dist(player, boardProp) < 2.15) {
-      addCandidate("job-board", "Boone's job board", boardProp, { line: "Pick up paid road work", color: boardProp.color });
+    if (boardProp && dist(player, boardProp) < 3.25) {
+      addCandidate("job-board", "Boone's job board", boardProp, { line: "Open jobs: choose Marsh Slime Bounty", color: boardProp.color });
     }
 
     const jobMarker = getJobRouteMarker();
@@ -4445,7 +4447,7 @@ const canvas = document.getElementById("game");
     }
 
     const boardProp = getActiveJobBoardProp();
-    if (boardProp && dist(state.player, boardProp) < 1.85) {
+    if (boardProp && dist(state.player, boardProp) < 3.25) {
       openJobBoard();
       return;
     }
@@ -5623,6 +5625,137 @@ const canvas = document.getElementById("game");
       hasOpeningProgress: hasFirstMinuteHudProgress(),
       hasModalOpen: anyModalOpen(),
     });
+  }
+
+  function buildOpeningObjectiveSnapshot(options = {}) {
+    const regionProfile = options.regionProfile || getRegionVisualIdentity(state.regions.activeRegion);
+    const activeJob = options.activeJob || getActiveJobSummary(state.world.jobs);
+    const openingObjective = resolveOpeningObjective({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      inventory: state.inventory,
+      quests: state.quests,
+    });
+    const firstMinutePressure = resolveFirstMinutePressure({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      regionId: state.regions.activeRegion,
+      player: state.player,
+      inventory: state.inventory,
+      quests: state.quests,
+    });
+    const openingFightCue = resolveOpeningFightCue({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      regionId: state.regions.activeRegion,
+      player: state.player,
+      inventory: state.inventory,
+      quests: state.quests,
+      pressure: firstMinutePressure,
+      enemies: options.activeEnemies || state.enemies,
+    });
+    const explorationLead = !state.player.inHouse && state.regions?.activeRegion
+      ? resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 32 })
+      : null;
+    const roadDiscoveryLead = !state.player.inHouse && state.regions?.activeRegion
+      ? resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 34 })
+      : null;
+    const roadSignPrompt = getRoadSignPrompt();
+    const roadRouteObjective = getRoadRouteObjective();
+    const jobMarker = getJobRouteMarker();
+    const boardProp = getActiveJobBoardProp();
+    const jobObjective = buildJobObjective({ activeJob, jobMarker });
+    const openingRouteGuide = resolveOpeningRouteGuide({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      regionId: state.regions.activeRegion,
+      regionLabel: regionProfile.label,
+      player: state.player,
+      inventory: state.inventory,
+      quests: state.quests,
+      pressure: firstMinutePressure,
+      fightCue: openingFightCue,
+      activeJob,
+      jobMarker,
+      boardProp,
+    });
+    const goldenPath = resolveGoldenPathStatus({
+      jobState: state.world.jobs,
+      inventory: state.inventory,
+      house: state.house,
+      regionId: state.regions.activeRegion,
+    });
+    const firstRoadMemory = getFirstRoadMemoryStatus();
+    const firstFiveMinuteLoop = resolveFirstFiveMinuteLoop({
+      mode: state.mode,
+      time: state.time,
+      inHouse: state.player.inHouse,
+      regionId: state.regions.activeRegion,
+      regionLabel: regionProfile.label,
+      player: state.player,
+      inventory: state.inventory,
+      quests: state.quests,
+      activeJob,
+      jobMarker,
+      boardProp,
+      pressure: firstMinutePressure,
+      fightCue: openingFightCue,
+      roadDiscoveryLead,
+      firstRoadMemory,
+      goldenPath,
+      chest: {
+        opened: state.chest.opened,
+        firstRewardClaimed: state.chest.firstRewardClaimed,
+      },
+    });
+    const liveObjective = selectLiveObjective([
+      firstFiveMinuteLoop,
+      openingRouteGuide,
+      firstMinutePressure,
+      jobObjective,
+      roadSignPrompt,
+      roadRouteObjective,
+      openingObjective,
+      roadDiscoveryLead,
+      explorationLead,
+    ]);
+    const firstSessionNextStep = resolveFirstSessionNextStep({
+      mode: state.mode,
+      inHouse: state.player.inHouse,
+      regionLabel: regionProfile.label,
+      player: state.player,
+      inventory: state.inventory,
+      house: state.house,
+      liveObjective,
+      activeJob,
+      boardProp,
+      goldenPath,
+    });
+    const objectiveDisplay = buildObjectiveDisplay(firstSessionNextStep || liveObjective);
+    return {
+      activeJob,
+      openingObjective,
+      firstMinutePressure,
+      openingFightCue,
+      explorationLead,
+      roadDiscoveryLead,
+      roadSignPrompt,
+      roadRouteObjective,
+      jobMarker,
+      boardProp,
+      jobObjective,
+      openingRouteGuide,
+      goldenPath,
+      firstRoadMemory,
+      firstFiveMinuteLoop,
+      liveObjective,
+      firstSessionNextStep,
+      objectiveDisplay,
+    };
   }
 
   function grantEnemyKillRewards(enemy) {
@@ -7668,7 +7801,8 @@ const canvas = document.getElementById("game");
       ctx.fillRect(spriteWidth * 0.46, spriteHeight * 0.2, spriteWidth * 0.08, spriteHeight * 0.5);
     } else if (sprite.kind === "chest") {
       const pulse = 0.5 + Math.sin(state.time * 4.9) * 0.5;
-      drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.44, spriteWidth * (0.42 + pulse * 0.12), "#ffd77b", 0.12 + pulse * 0.12);
+      drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.44, spriteWidth * (0.5 + pulse * 0.16), "#ffd77b", 0.16 + pulse * 0.16);
+      drawSpriteGlow(spriteWidth * 0.42, spriteHeight * 0.82, spriteWidth * (0.22 + pulse * 0.08), "#ff8f3d", 0.18 + pulse * 0.16);
       const wood = getCachedGradient(
         `sprite-chest-wood|${sizeKey}`,
         () => {
@@ -7687,11 +7821,14 @@ const canvas = document.getElementById("game");
       ctx.fillStyle = "#8b6c3e";
       ctx.fillRect(spriteWidth * 0.18, spriteHeight * 0.42, spriteWidth * 0.64, spriteHeight * 0.08);
       ctx.fillStyle = `rgba(226, 216, 190, ${0.14 + pulse * 0.1})`;
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 6; i++) {
         ctx.beginPath();
-        ctx.ellipse(spriteWidth * (0.36 + i * 0.08), spriteHeight * (0.32 - i * 0.045), spriteWidth * 0.1, spriteHeight * 0.07, 0, 0, TAU);
+        ctx.ellipse(spriteWidth * (0.32 + i * 0.07), spriteHeight * (0.34 - i * 0.055), spriteWidth * (0.12 - i * 0.005), spriteHeight * 0.075, 0, 0, TAU);
         ctx.fill();
       }
+      ctx.strokeStyle = "rgba(255, 230, 160, 0.44)";
+      ctx.lineWidth = Math.max(1, spriteWidth * 0.022);
+      ctx.strokeRect(spriteWidth * 0.18, spriteHeight * 0.45, spriteWidth * 0.64, spriteHeight * 0.45);
     } else if (sprite.kind === "pressure") {
       const pulse = 0.5 + Math.sin(state.time * 5) * 0.5;
       drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.5, spriteWidth * (0.5 + pulse * 0.12), "#ffd77b", 0.17 + pulse * 0.14);
@@ -8087,6 +8224,7 @@ const canvas = document.getElementById("game");
         ctx.fillStyle = "rgba(255, 221, 139, 0.32)";
         ctx.fillRect(spriteWidth * 0.21, spriteHeight * 0.3, spriteWidth * 0.58, spriteHeight * 0.025);
       } else if (sprite.propKind === "road-sign") {
+        drawSpriteGlow(spriteWidth * 0.5, spriteHeight * 0.32, spriteWidth * 0.28, color, 0.08);
         ctx.fillStyle = "#4a3323";
         ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.34, spriteWidth * 0.06, spriteHeight * 0.54);
         ctx.fillStyle = shadeHex(color, 0.62);
@@ -8102,6 +8240,13 @@ const canvas = document.getElementById("game");
         ctx.fillStyle = "rgba(32, 22, 10, 0.42)";
         ctx.fillRect(spriteWidth * 0.3, spriteHeight * 0.28, spriteWidth * 0.28, spriteHeight * 0.03);
         ctx.fillRect(spriteWidth * 0.34, spriteHeight * 0.48, spriteWidth * 0.24, spriteHeight * 0.03);
+        ctx.fillStyle = "rgba(255, 246, 205, 0.48)";
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.66, spriteHeight * 0.3);
+        ctx.lineTo(spriteWidth * 0.78, spriteHeight * 0.24);
+        ctx.lineTo(spriteWidth * 0.78, spriteHeight * 0.36);
+        ctx.closePath();
+        ctx.fill();
       } else if (sprite.propKind === "sign") {
         ctx.fillStyle = "#5b402b";
         ctx.fillRect(spriteWidth * 0.47, spriteHeight * 0.36, spriteWidth * 0.06, spriteHeight * 0.52);
@@ -8109,6 +8254,43 @@ const canvas = document.getElementById("game");
         ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.24, spriteWidth * 0.56, spriteHeight * 0.2);
         ctx.strokeStyle = "rgba(28, 18, 12, 0.5)";
         ctx.strokeRect(spriteWidth * 0.22, spriteHeight * 0.24, spriteWidth * 0.56, spriteHeight * 0.2);
+      } else if (sprite.propKind === "wagon") {
+        const pulse = 0.5 + Math.sin(state.time * 3.9) * 0.5;
+        drawSpriteGlow(spriteWidth * 0.34, spriteHeight * 0.38, spriteWidth * 0.24, "#ffd27a", 0.18 + pulse * 0.12);
+        ctx.save();
+        ctx.translate(spriteWidth * 0.5, spriteHeight * 0.5);
+        ctx.rotate(-0.12);
+        ctx.translate(-spriteWidth * 0.5, -spriteHeight * 0.5);
+        ctx.fillStyle = "#301d14";
+        ctx.fillRect(spriteWidth * 0.14, spriteHeight * 0.5, spriteWidth * 0.72, spriteHeight * 0.18);
+        ctx.fillStyle = shadeHex(color, 0.54);
+        ctx.fillRect(spriteWidth * 0.22, spriteHeight * 0.38, spriteWidth * 0.54, spriteHeight * 0.16);
+        ctx.fillStyle = shadeHex(color, 0.78);
+        ctx.fillRect(spriteWidth * 0.34, spriteHeight * 0.28, spriteWidth * 0.28, spriteHeight * 0.12);
+        ctx.strokeStyle = "#21140d";
+        ctx.lineWidth = Math.max(1.8, spriteWidth * 0.05);
+        ctx.beginPath();
+        ctx.arc(spriteWidth * 0.28, spriteHeight * 0.76, spriteWidth * 0.14, 0, TAU);
+        ctx.arc(spriteWidth * 0.72, spriteHeight * 0.78, spriteWidth * 0.12, 0.25, TAU * 0.7);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(255, 204, 116, 0.5)";
+        ctx.lineWidth = Math.max(1, spriteWidth * 0.02);
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.28, spriteHeight * 0.42);
+        ctx.lineTo(spriteWidth * 0.48, spriteHeight * 0.7);
+        ctx.moveTo(spriteWidth * 0.58, spriteHeight * 0.38);
+        ctx.lineTo(spriteWidth * 0.7, spriteHeight * 0.68);
+        ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = "#fff0b8";
+        ctx.fillRect(spriteWidth * 0.31, spriteHeight * 0.32, spriteWidth * 0.055, spriteHeight * 0.085);
+        ctx.fillStyle = "rgba(255, 245, 190, 0.5)";
+        ctx.beginPath();
+        ctx.moveTo(spriteWidth * 0.36, spriteHeight * 0.33);
+        ctx.lineTo(spriteWidth * 0.52, spriteHeight * 0.27);
+        ctx.lineTo(spriteWidth * 0.5, spriteHeight * 0.39);
+        ctx.closePath();
+        ctx.fill();
       } else if (sprite.propKind === "cart") {
         ctx.fillStyle = shadeHex(color, 0.48);
         ctx.fillRect(spriteWidth * 0.2, spriteHeight * 0.48, spriteWidth * 0.6, spriteHeight * 0.18);
@@ -9675,11 +9857,11 @@ const canvas = document.getElementById("game");
       };
     }
 
-    function drawMarker(wx, wy, color, size, shape = "diamond") {
+    function drawMarker(wx, wy, color, size, shape = "diamond", focused = false) {
       const point = worldToMap(wx, wy);
       const distFromCenter = Math.sqrt((point.x - cx) ** 2 + (point.y - cy) ** 2);
       if (distFromCenter > mapRadius - 2) return;
-      const markerStyle = resolveMinimapMarkerStyle(size, minimapNightStrength);
+      const markerStyle = resolveMinimapMarkerStyle(size, minimapNightStrength, { focus: focused });
       ctx.fillStyle = withAlpha(color, markerStyle.glowAlpha);
       ctx.beginPath();
       ctx.arc(point.x, point.y, markerStyle.glowSize, 0, TAU);
@@ -9693,28 +9875,29 @@ const canvas = document.getElementById("game");
       }
       ctx.fillStyle = color;
       ctx.beginPath();
+      const coreSize = size * (markerStyle.coreScale || 1);
       if (shape === "triangle") {
-        ctx.moveTo(point.x, point.y - size);
-        ctx.lineTo(point.x + size * 0.9, point.y + size * 0.75);
-        ctx.lineTo(point.x - size * 0.9, point.y + size * 0.75);
+        ctx.moveTo(point.x, point.y - coreSize);
+        ctx.lineTo(point.x + coreSize * 0.9, point.y + coreSize * 0.75);
+        ctx.lineTo(point.x - coreSize * 0.9, point.y + coreSize * 0.75);
       } else if (shape === "square") {
-        ctx.rect(point.x - size * 0.72, point.y - size * 0.72, size * 1.44, size * 1.44);
+        ctx.rect(point.x - coreSize * 0.72, point.y - coreSize * 0.72, coreSize * 1.44, coreSize * 1.44);
       } else {
-        ctx.moveTo(point.x, point.y - size);
-        ctx.lineTo(point.x + size, point.y);
-        ctx.lineTo(point.x, point.y + size);
-        ctx.lineTo(point.x - size, point.y);
+        ctx.moveTo(point.x, point.y - coreSize);
+        ctx.lineTo(point.x + coreSize, point.y);
+        ctx.lineTo(point.x, point.y + coreSize);
+        ctx.lineTo(point.x - coreSize, point.y);
       }
       ctx.closePath();
       ctx.fill();
     }
 
-    function drawPolyline(points, color, alpha, lineWidth = 2) {
+    function drawPolyline(points, color, alpha, lineWidth = 2, focused = false) {
       const route = points
         .filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y))
         .map((point) => worldToMap(point.x, point.y));
       if (route.length < 2) return;
-      const routeStyle = resolveMinimapPolylineStyle({ alpha, lineWidth, nightStrength: minimapNightStrength });
+      const routeStyle = resolveMinimapPolylineStyle({ alpha, lineWidth, nightStrength: minimapNightStrength, focus: focused });
       ctx.strokeStyle = withAlpha(color, routeStyle.alpha);
       ctx.lineWidth = routeStyle.lineWidth;
       ctx.shadowColor = withAlpha(color, routeStyle.shadowAlpha);
@@ -9778,7 +9961,7 @@ const canvas = document.getElementById("game");
       });
       if (pressure?.marker) {
         const blink = 0.5 + (Math.sin(state.time * 5) + 1) * 0.5;
-        drawMarker(pressure.marker.x, pressure.marker.y, pressure.marker.color || "#ffd77b", 2.8 + blink * 0.6, "triangle");
+        drawMarker(pressure.marker.x, pressure.marker.y, pressure.marker.color || "#ffd77b", 2.8 + blink * 0.6, "triangle", true);
       }
       const jobMarker = getJobRouteMarker();
       if (jobMarker) {
@@ -9786,8 +9969,8 @@ const canvas = document.getElementById("game");
         drawPolyline([
           { x: state.player.x, y: state.player.y },
           { x: jobMarker.x, y: jobMarker.y },
-        ], jobMarker.color || "#ffd77b", 0.28, 1.6);
-        drawMarker(jobMarker.x, jobMarker.y, jobMarker.color || "#ffd77b", 3 + blink * 0.7, "triangle");
+        ], jobMarker.color || "#ffd77b", 0.28, 1.6, true);
+        drawMarker(jobMarker.x, jobMarker.y, jobMarker.color || "#ffd77b", 3 + blink * 0.7, "triangle", true);
       }
       const roadRoute = getRoadRouteObjective();
       if (roadRoute && Number.isFinite(roadRoute.x) && Number.isFinite(roadRoute.y)) {
@@ -9795,8 +9978,8 @@ const canvas = document.getElementById("game");
         drawPolyline([
           { x: state.player.x, y: state.player.y },
           { x: roadRoute.x, y: roadRoute.y },
-        ], "#ffde91", 0.22, 1.4);
-        drawMarker(roadRoute.x, roadRoute.y, "#ffde91", 2.8 + blink * 0.6, "diamond");
+        ], "#ffde91", 0.22, 1.4, true);
+        drawMarker(roadRoute.x, roadRoute.y, "#ffde91", 2.8 + blink * 0.6, "diamond", true);
       }
       const roadDiscoveryLead = resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 28 });
       if (roadDiscoveryLead) {
@@ -9983,7 +10166,8 @@ const canvas = document.getElementById("game");
   function drawHud() {
     const hudChromeMode = getOpeningHudChromeMode();
     const lowChromeHud = hudChromeMode === "first-minute-low-chrome";
-    const activeJob = getActiveJobSummary(state.world.jobs);
+    const objectiveSnapshot = buildOpeningObjectiveSnapshot();
+    const activeJob = objectiveSnapshot.activeJob;
     const questLines = buildQuestHudLines({
       quests: state.quests,
       inventory: state.inventory,
@@ -10075,81 +10259,11 @@ const canvas = document.getElementById("game");
       drawClippedText(m.text, topX + 10, msgY, topW - 20, "#f3e8cf");
       msgY += 12;
     }
-    const openingObjective = resolveOpeningObjective({
-      mode: state.mode,
-      time: state.time,
-      inHouse: state.player.inHouse,
-      inventory: state.inventory,
-      quests: state.quests,
-    });
-    const firstPressure = resolveFirstMinutePressure({
-      mode: state.mode,
-      time: state.time,
-      inHouse: state.player.inHouse,
-      regionId: state.regions.activeRegion,
-      player: state.player,
-      inventory: state.inventory,
-      quests: state.quests,
-    });
-    const openingFightCue = resolveOpeningFightCue({
-      mode: state.mode,
-      time: state.time,
-      inHouse: state.player.inHouse,
-      regionId: state.regions.activeRegion,
-      player: state.player,
-      inventory: state.inventory,
-      quests: state.quests,
-      pressure: firstPressure,
-      enemies: state.enemies,
-    });
-    const explorationLead = !state.player.inHouse && state.regions?.activeRegion
-      ? resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 32 })
-      : null;
-    const roadDiscoveryLead = !state.player.inHouse && state.regions?.activeRegion
-      ? resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 34 })
-      : null;
-    const roadSignPrompt = getRoadSignPrompt();
-    const roadRouteObjective = getRoadRouteObjective();
-    const jobMarker = getJobRouteMarker();
-    const boardProp = getActiveJobBoardProp();
-    const jobObjective = buildJobObjective({ activeJob, jobMarker });
-    const openingRouteGuide = resolveOpeningRouteGuide({
-      mode: state.mode,
-      time: state.time,
-      inHouse: state.player.inHouse,
-      regionId: state.regions.activeRegion,
-      regionLabel: regionProfile.label,
-      player: state.player,
-      inventory: state.inventory,
-      quests: state.quests,
-      pressure: firstPressure,
-      fightCue: openingFightCue,
-      activeJob,
-      jobMarker,
-      boardProp,
-    });
-    const goldenPath = resolveGoldenPathStatus({
-      jobState: state.world.jobs,
-      inventory: state.inventory,
-      house: state.house,
-      regionId: state.regions.activeRegion,
-    });
-    const liveObjective = selectLiveObjective([openingRouteGuide, firstPressure, jobObjective, roadSignPrompt, roadRouteObjective, openingObjective, roadDiscoveryLead, explorationLead]);
-    const firstSessionNextStep = resolveFirstSessionNextStep({
-      mode: state.mode,
-      inHouse: state.player.inHouse,
-      regionLabel: regionProfile.label,
-      player: state.player,
-      inventory: state.inventory,
-      house: state.house,
-      liveObjective,
-      activeJob,
-      boardProp,
-      goldenPath,
-    });
+    const liveObjective = objectiveSnapshot.liveObjective;
+    const firstSessionNextStep = objectiveSnapshot.firstSessionNextStep;
+    const objectiveDisplay = objectiveSnapshot.objectiveDisplay;
     const displayedObjective = firstSessionNextStep || liveObjective;
     const liveObjectiveLine = firstSessionNextStep?.actionLine || resolveLiveObjectiveLine(liveObjective);
-    const objectiveDisplay = buildObjectiveDisplay(displayedObjective);
     const primaryObjectiveLine = objectiveDisplay?.displayPrimary || String(liveObjectiveLine || "").replace(/\s+•\s+\+.*/, "");
     if (displayedObjective) {
       const hasMetaLine = Boolean(objectiveDisplay?.displayMeta?.length);
@@ -10318,7 +10432,7 @@ const canvas = document.getElementById("game");
     }
 
     const hintSpace = canvas.width - hudW - margin * 3;
-    if (!compact && hintSpace > 300) {
+    if (!compact && hintSpace > 300 && !(lowChromeHud && displayedObjective)) {
       const hx = hudX + hudW + margin;
       const hy = canvas.height - 36;
       drawSoftPanel(hx, hy, hintSpace, 24, {
@@ -11209,22 +11323,9 @@ const canvas = document.getElementById("game");
     const firstRoadMemory = getFirstRoadMemoryStatus();
     const runSummary = buildRunSummary(state.world, state.narrative, state.player, state.companion, state.time, houseProgressSummary, firstRoadMemory);
     const explorationRenown = resolveExplorationRenownStatus(state.regions.poisDiscovered?.length || 0);
-    const openingObjective = resolveOpeningObjective({
-      mode: state.mode,
-      time: state.time,
-      inHouse: state.player.inHouse,
-      inventory: state.inventory,
-      quests: state.quests,
-    });
-    const firstMinutePressure = resolveFirstMinutePressure({
-      mode: state.mode,
-      time: state.time,
-      inHouse: state.player.inHouse,
-      regionId: state.regions.activeRegion,
-      player: state.player,
-      inventory: state.inventory,
-      quests: state.quests,
-    });
+    const objectiveSnapshot = buildOpeningObjectiveSnapshot({ activeEnemies });
+    const openingObjective = objectiveSnapshot.openingObjective;
+    const firstMinutePressure = objectiveSnapshot.firstMinutePressure;
     const firstMinuteCache = resolveFirstMinuteCache({
       mode: state.mode,
       time: state.time,
@@ -11235,12 +11336,8 @@ const canvas = document.getElementById("game");
       opened: state.chest.opened,
       claimed: state.chest.firstRewardClaimed,
     });
-    const explorationLead = !state.player.inHouse && state.regions?.activeRegion
-      ? resolvePOILead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 32 })
-      : null;
-    const roadDiscoveryLead = !state.player.inHouse && state.regions?.activeRegion
-      ? resolveRoadDiscoveryLead(state.regions, state.regions.activeRegion, state.player.x, state.player.y, { maxDistance: 34 })
-      : null;
+    const explorationLead = objectiveSnapshot.explorationLead;
+    const roadDiscoveryLead = objectiveSnapshot.roadDiscoveryLead;
     const nearbyRoadsideDiscoveries = !state.player.inHouse && state.regions?.activeRegion
       ? findNearbyRoadsideDiscoveries(state.regions, state.regions.activeRegion, state.player.x, state.player.y, 14).slice(0, 3)
       : [];
@@ -11272,11 +11369,9 @@ const canvas = document.getElementById("game");
         intensity: Number(light.intensity.toFixed(2)),
         color: light.color,
       }));
-    const roadSignPrompt = !state.player.inHouse && state.regions?.activeRegion
-      ? resolveRoadSignPrompt(worldPresentation.roadSigns, state.player.x, state.player.y)
-      : null;
-    const roadRouteObjective = getRoadRouteObjective();
-    const activeJob = getActiveJobSummary(state.world.jobs);
+    const roadSignPrompt = objectiveSnapshot.roadSignPrompt;
+    const roadRouteObjective = objectiveSnapshot.roadRouteObjective;
+    const activeJob = objectiveSnapshot.activeJob;
     const jobListings = getJobListings({
       regionId: state.regions.activeRegion,
       playerLevel: state.player.level,
@@ -11284,25 +11379,10 @@ const canvas = document.getElementById("game");
       inventory: state.inventory,
       narrative: state.narrative,
     });
-    const jobRouteMarker = getJobRouteMarker();
-    const boardProp = getActiveJobBoardProp();
-    const goldenPath = resolveGoldenPathStatus({
-      jobState: state.world.jobs,
-      inventory: state.inventory,
-      house: state.house,
-      regionId: state.regions.activeRegion,
-    });
-    const openingFightCue = resolveOpeningFightCue({
-      mode: state.mode,
-      time: state.time,
-      inHouse: state.player.inHouse,
-      regionId: state.regions.activeRegion,
-      player: state.player,
-      inventory: state.inventory,
-      quests: state.quests,
-      pressure: firstMinutePressure,
-      enemies: activeEnemies,
-    });
+    const jobRouteMarker = objectiveSnapshot.jobMarker;
+    const boardProp = objectiveSnapshot.boardProp;
+    const goldenPath = objectiveSnapshot.goldenPath;
+    const openingFightCue = objectiveSnapshot.openingFightCue;
     const combatReadability = resolveCombatEncounterReadability({
       enemies: state.player.inHouse ? [] : activeEnemies,
       player: state.player,
@@ -11310,46 +11390,27 @@ const canvas = document.getElementById("game");
       recentEvent: combatReadabilityNotice,
       subtitlesEnabled: state.graphics.accessibility?.combatSubtitles !== false,
     });
-    const openingRouteGuide = resolveOpeningRouteGuide({
-      mode: state.mode,
-      time: state.time,
-      inHouse: state.player.inHouse,
-      regionId: state.regions.activeRegion,
-      regionLabel: regionProfile.label,
-      player: state.player,
-      inventory: state.inventory,
-      quests: state.quests,
-      pressure: firstMinutePressure,
-      fightCue: openingFightCue,
-      activeJob,
-      jobMarker: jobRouteMarker,
-      boardProp,
-    });
-    const jobObjective = buildJobObjective({ activeJob, jobMarker: jobRouteMarker });
-    const liveObjective = selectLiveObjective([
-      openingRouteGuide,
-      firstMinutePressure,
-      jobObjective,
-      roadSignPrompt,
-      roadRouteObjective,
-      openingObjective,
-      roadDiscoveryLead,
-      explorationLead,
-    ]);
-    const firstSessionNextStep = resolveFirstSessionNextStep({
-      mode: state.mode,
-      inHouse: state.player.inHouse,
-      regionLabel: regionProfile.label,
-      player: state.player,
-      inventory: state.inventory,
-      house: state.house,
-      liveObjective,
-      activeJob,
-      boardProp,
-      goldenPath,
-    });
-    const firstSessionObjectiveDisplay = buildObjectiveDisplay(firstSessionNextStep || liveObjective);
+    const openingRouteGuide = objectiveSnapshot.openingRouteGuide;
+    const liveObjective = objectiveSnapshot.liveObjective;
+    const firstSessionNextStep = objectiveSnapshot.firstSessionNextStep;
+    const firstSessionObjectiveDisplay = objectiveSnapshot.objectiveDisplay;
+    const firstFiveMinuteLoop = objectiveSnapshot.firstFiveMinuteLoop;
     const hudChromeMode = getOpeningHudChromeMode();
+    const interactionPrompt = getInteractionPrompt();
+    const promptLine = formatInteractionPrompt(interactionPrompt);
+    const firstLoopPromptKinds = {
+      find_board: ["job-board"],
+      accept_bounty: ["job-board"],
+      follow_road: ["job-route", "poi", "job-board", "road-sign"],
+      open_cache: ["poi", "job-route"],
+      fight_slime: ["job-route", "poi"],
+      inspect_wagon: ["poi", "job-route"],
+      return_to_boone: ["job-board", "job-route", "npc"],
+      claim_reward: ["job-board", "job-route", "npc"],
+      survey_followup: ["job-board", "job-route", "npc"],
+    };
+    const promptMatchesFirstLoop = !firstFiveMinuteLoop || !interactionPrompt
+      || (firstLoopPromptKinds[firstFiveMinuteLoop.phase] || []).includes(interactionPrompt.kind);
     const presentationLabels = [
       ...(worldPresentation.props || []),
       ...(worldPresentation.vegetation || []),
@@ -11371,8 +11432,12 @@ const canvas = document.getElementById("game");
       has_single_primary_objective: Boolean(firstSessionObjectiveDisplay?.displayPrimary && firstSessionObjectiveDisplay?.displayMeta?.length),
       objective_display_mode: firstSessionObjectiveDisplay ? "single-strip" : "none",
       has_low_chrome_hud: hudChromeMode === "first-minute-low-chrome",
+      has_uncluttered_opening_hud: hudChromeMode === "first-minute-low-chrome" && Boolean(firstSessionObjectiveDisplay),
+      hud_panel_count: hudChromeMode === "first-minute-low-chrome" && firstSessionObjectiveDisplay ? 3 : 4,
       hud_display_mode: hudChromeMode,
       hud_focus_line: firstSessionNextStep?.actionLine || liveObjective?.objectiveLine || liveObjective?.line || null,
+      prompt_line: promptLine,
+      prompt_matches_objective: promptMatchesFirstLoop,
     };
     openingSceneProof.proof_score = [
       openingSceneProof.has_dusk_sky,
@@ -11384,6 +11449,7 @@ const canvas = document.getElementById("game");
       openingSceneProof.has_first_enemy_cue,
       openingSceneProof.has_single_primary_objective,
       openingSceneProof.has_low_chrome_hud,
+      openingSceneProof.has_uncluttered_opening_hud,
     ].filter(Boolean).length;
     const quests = {
       crystal: {
@@ -11458,6 +11524,8 @@ const canvas = document.getElementById("game");
       gameplay_feel: {
         next_step: firstSessionNextStep,
         live_objective: liveObjective,
+        first_five_minute_loop: firstFiveMinuteLoop,
+        interaction_prompt: interactionPrompt,
         opening_objective: openingObjective,
         opening_fight_cue: openingFightCue,
         combat_readability: combatReadability,
