@@ -13,15 +13,18 @@ export function resolveMinimapDotStyle(size = 2, nightStrength = 0) {
   };
 }
 
-export function resolveMinimapMarkerStyle(size = 3, nightStrength = 0) {
+export function resolveMinimapMarkerStyle(size = 3, nightStrength = 0, options = {}) {
   const night = normalizeNightStrength(nightStrength);
-  const glowSize = size + 2.2 + night * 2.6;
+  const focus = Boolean(options.focus);
+  const focusBoost = focus ? 1.35 : 1;
+  const glowSize = (size + 2.2 + night * 2.6) * focusBoost;
   return {
     glowSize,
-    glowAlpha: 0.28 + night * 0.2,
-    ringVisible: night > 0.18,
-    ringSize: glowSize + 1.8,
-    ringAlpha: 0.18 + night * 0.2,
+    glowAlpha: clamp(0.28 + night * 0.2 + (focus ? 0.18 : 0), 0, 0.76),
+    ringVisible: focus || night > 0.18,
+    ringSize: glowSize + (focus ? 3.2 : 1.8),
+    ringAlpha: clamp(0.18 + night * 0.2 + (focus ? 0.22 : 0), 0, 0.72),
+    coreScale: focus ? 1.18 : 1,
   };
 }
 
@@ -29,10 +32,11 @@ export function resolveMinimapPolylineStyle(options = {}) {
   const night = normalizeNightStrength(options.nightStrength);
   const alpha = Number.isFinite(options.alpha) ? options.alpha : 0.3;
   const lineWidth = Number.isFinite(options.lineWidth) ? options.lineWidth : 2;
+  const focus = Boolean(options.focus);
   return {
-    alpha: clamp(alpha + night * 0.18, 0, 0.82),
-    lineWidth: lineWidth + night * 0.55,
-    shadowAlpha: 0.24 + night * 0.22,
-    shadowBlur: night * 5,
+    alpha: clamp(alpha + night * 0.18 + (focus ? 0.18 : 0), 0, focus ? 0.88 : 0.82),
+    lineWidth: lineWidth + night * 0.55 + (focus ? 0.8 : 0),
+    shadowAlpha: clamp(0.24 + night * 0.22 + (focus ? 0.2 : 0), 0, 0.72),
+    shadowBlur: night * 5 + (focus ? 5 : 0),
   };
 }

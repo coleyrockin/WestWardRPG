@@ -57,6 +57,7 @@ describe("regionVisualIdentity", () => {
     expect(presentation.props.filter((prop: any) => prop.kind === "lamp").length).toBeGreaterThanOrEqual(2);
     expect(presentation.roads.some((road: any) => road.label.includes("Marshal"))).toBe(true);
     expect(presentation.roads.some((road: any) => road.label.includes("Broken Wagon"))).toBe(true);
+    expect(new Set([...presentation.props, ...presentation.vegetation, ...presentation.vistas].map((item: any) => item.depthLane).filter(Boolean)).size).toBeGreaterThanOrEqual(3);
   });
 
   it("surfaces explicit readability cues for the Dustward visual pass", () => {
@@ -144,7 +145,7 @@ describe("regionVisualIdentity", () => {
   });
 
   it("moves props to map-valid visible tiles when a generated coordinate is blocked", () => {
-    const blocked = new Set(["11.24,9.12"]);
+    const blocked = new Set(["11.12,9.24"]);
     const isPassable = (x: number, y: number) => !blocked.has(`${x.toFixed(2)},${y.toFixed(2)}`);
     const isVisible = (x: number, y: number) => x >= 9 && x <= 16 && y >= 6 && y <= 11;
     const presentation = buildRegionWorldPresentation("frontier", {

@@ -54,6 +54,8 @@ describe("regionArtKits", () => {
     expect(resolveWallMaterial(5, "ironlantern")).toMatchObject({ key: "neon", material: "signal glass" });
     expect(resolveWallMaterial(2, "frontier").visualHeight).toBeLessThan(resolveWallMaterial(3, "frontier").visualHeight);
     expect(resolveWallMaterial(1, "frontier").visualHeight).toBeLessThan(resolveWallMaterial(4, "frontier").visualHeight);
+    expect(resolveWallMaterial(1, "frontier").visualHeight).toBeLessThan(0.5);
+    expect(resolveWallMaterial(2, "frontier").visualHeight).toBeLessThan(0.25);
   });
 
   it("returns sprite art variants for trees, cache, job board, wagon, and enemies", () => {
@@ -62,6 +64,8 @@ describe("regionArtKits", () => {
     expect(resolveSpriteArtVariant({ kind: "chest", label: "Smoke Cache" }, "frontier").variant).toBe("smoke-cache");
     expect(resolveSpriteArtVariant({ kind: "job-board" }, "frontier").variant).toBe("lit-notice-board");
     expect(resolveSpriteArtVariant({ poiKind: "wagon", label: "Broken Wagon" }, "frontier").variant).toBe("broken-wagon-hero");
-    expect(resolveSpriteArtVariant({ kind: "enemy" }, "frontier").variant).toBe("readable-slime");
+    const enemy = resolveSpriteArtVariant({ kind: "enemy" }, "frontier");
+    expect(enemy.variant).toBe("readable-slime");
+    expect(enemy.silhouette).toContain("windup tell");
   });
 });

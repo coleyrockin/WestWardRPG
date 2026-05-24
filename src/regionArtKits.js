@@ -45,29 +45,29 @@ export const REGION_ART_KITS = {
       detail: ["bright wagon ruts", "dusty shoulder", "fence shadows", "marshal chevrons", "lantern road posts"],
     },
     walls: {
-      stone: { material: "low marsh fieldstone", visualHeight: 0.52, trim: "#c89654", contact: "#171522", decal: "#41503c", highlight: "#ffd18a" },
-      water: { material: "reeded dusk marsh", visualHeight: 0.24, trim: "#8ebc9f", contact: "#101726", decal: "#334c4e", highlight: "#c9ebd5" },
+      stone: { material: "low marsh fieldstone", visualHeight: 0.42, trim: "#c89654", contact: "#171522", decal: "#41503c", highlight: "#ffd18a" },
+      water: { material: "reeded dusk marsh", visualHeight: 0.18, trim: "#8ebc9f", contact: "#101726", decal: "#334c4e", highlight: "#c9ebd5" },
       timber: { material: "sun-cut timber", visualHeight: 0.96, trim: "#e1b46f", contact: "#25170f", decal: "#6c4528", highlight: "#ffe0a1" },
       plaster: { material: "dust plaster", visualHeight: 0.94, trim: "#f0d19b", contact: "#2d2418", decal: "#a4774d", highlight: "#ffe4aa" },
       neon: { material: "frontier signal glass", visualHeight: 0.9, trim: "#9bd3ff", contact: "#112131", decal: "#41536d", highlight: "#e0f5ff" },
     },
     vegetation: [
-      { kind: "dead-tree", label: "Dead Cottonwood", dx: 1.08, dy: -1.12, color: "#2d211d", trunkColor: "#6f4b2d", size: 1.24 },
-      { kind: "tree", label: "Roadside Cottonwood", dx: 2.72, dy: -1.18, color: "#5d7c43", trunkColor: "#7a5231", size: 1.08 },
-      { kind: "tree", label: "Marsh Willow", dx: 4.72, dy: 1.04, color: "#596f3e", trunkColor: "#6b4d31", size: 0.92 },
-      { kind: "scrub", label: "Sage Scrub", dx: 1.48, dy: 1.36, color: "#789062", size: 0.54 },
-      { kind: "scrub", label: "Road Grass", dx: 2.3, dy: 1.54, color: "#91a65d", size: 0.48 },
-      { kind: "scrub", label: "Wildflower Patch", dx: 3.52, dy: 1.22, color: "#e8c56b", size: 0.46 },
-      { kind: "dead-tree", label: "Town Gallows Tree", dx: 0.52, dy: -0.56, color: "#2d211d", trunkColor: "#70472b", size: 0.84 },
+      { kind: "dead-tree", label: "Dead Cottonwood", dx: 0.72, dy: -1.42, color: "#2d211d", trunkColor: "#6f4b2d", size: 1.3, depthLane: "background" },
+      { kind: "tree", label: "Roadside Cottonwood", dx: 2.72, dy: -1.22, color: "#5d7c43", trunkColor: "#7a5231", size: 1.08, depthLane: "midground" },
+      { kind: "tree", label: "Marsh Willow", dx: 4.84, dy: 1.18, color: "#596f3e", trunkColor: "#6b4d31", size: 0.92, depthLane: "foreground" },
+      { kind: "scrub", label: "Sage Scrub", dx: 1.26, dy: 1.62, color: "#789062", size: 0.54, depthLane: "foreground" },
+      { kind: "scrub", label: "Road Grass", dx: 2.3, dy: 1.72, color: "#91a65d", size: 0.48, depthLane: "foreground" },
+      { kind: "scrub", label: "Wildflower Patch", dx: 3.52, dy: 1.36, color: "#e8c56b", size: 0.46, depthLane: "foreground" },
+      { kind: "dead-tree", label: "Town Gallows Tree", dx: 0.42, dy: -0.72, color: "#2d211d", trunkColor: "#70472b", size: 0.84, depthLane: "midground" },
     ],
     props: [
-      { kind: "lantern-post", label: "Road Lantern", dx: 0.84, dy: -0.34, color: "#ffbf68", size: 0.62 },
-      { kind: "wanted-board", label: "Wanted Board", dx: 1.2, dy: 0.54, color: "#d19a58", size: 0.78 },
-      { kind: "barrel", label: "Water Barrel", dx: 1.02, dy: 0.72, color: "#8a5b35", size: 0.5 },
-      { kind: "hitching-post", label: "Hitching Post", dx: 1.94, dy: -0.52, color: "#9b6a3f", size: 0.52 },
-      { kind: "banner", label: "Marshal Pennant", dx: 2.84, dy: -0.66, color: "#ffd77b", size: 0.52 },
-      { kind: "flower", label: "Road Wildflowers", dx: 3.12, dy: 1.36, color: "#e8c56b", size: 0.42 },
-      { kind: "trail-stone", label: "Road Shoulder Stones", dx: 4.34, dy: 1.22, color: "#ada08e", size: 0.48 },
+      { kind: "lantern-post", label: "Road Lantern", dx: 0.84, dy: -0.46, color: "#ffbf68", size: 0.62, depthLane: "midground" },
+      { kind: "wanted-board", label: "Wanted Board", dx: 1.2, dy: 0.66, color: "#d19a58", size: 0.86, depthLane: "midground" },
+      { kind: "barrel", label: "Water Barrel", dx: 0.86, dy: 1.0, color: "#8a5b35", size: 0.46, depthLane: "foreground" },
+      { kind: "hitching-post", label: "Hitching Post", dx: 1.94, dy: -0.68, color: "#9b6a3f", size: 0.52, depthLane: "background" },
+      { kind: "banner", label: "Marshal Pennant", dx: 2.84, dy: -0.82, color: "#ffd77b", size: 0.52, depthLane: "background" },
+      { kind: "flower", label: "Road Wildflowers", dx: 3.12, dy: 1.48, color: "#e8c56b", size: 0.42, depthLane: "foreground" },
+      { kind: "trail-stone", label: "Road Shoulder Stones", dx: 4.34, dy: 1.36, color: "#ada08e", size: 0.48, depthLane: "foreground" },
     ],
     landmark: {
       hero: "North Watchtower Beacon",
@@ -239,7 +239,7 @@ export function resolveSpriteArtVariant(sprite = {}, regionId) {
     return { variant: "smoke-cache", silhouette: "glowing cache with smoke plume", outline: "#4b2f1e", accent: kit.road.sign, detailLevel: kit.quality };
   }
   if (kind === "enemy") {
-    return { variant: "readable-slime", silhouette: "bright core and heavy shadow", outline: "#102312", accent: "#92f0a3", detailLevel: kit.quality };
+    return { variant: "readable-slime", silhouette: "dark marsh body, hostile rim, windup tell, and reward pop", outline: "#102312", accent: "#92f0a3", detailLevel: kit.quality };
   }
   return { variant: `${kit.id}-${kind}`, silhouette: "grounded prop", outline: kit.horizon.near, accent: kit.road.sign, detailLevel: kit.quality };
 }

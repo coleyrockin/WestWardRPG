@@ -239,14 +239,24 @@ for (const key of ["has_dusk_sky", "has_road_cue", "has_landmark", "has_job_boar
     throw new Error(`golden-path smoke visual proof missing ${key}`);
   }
 }
-if (!String(visualProof.hud_focus_line || "").includes("Smoke Cache")) {
-  throw new Error("golden-path smoke visual proof missing Smoke Cache HUD focus");
+const firstLoop = state.gameplay_feel?.first_five_minute_loop;
+if (!firstLoop || !["find_board", "accept_bounty", "follow_road", "open_cache", "fight_slime", "inspect_wagon", "return_to_boone", "claim_reward", "survey_followup"].includes(firstLoop.phase)) {
+  throw new Error(`golden-path smoke missing first-five-minute loop phase, got ${firstLoop?.phase}`);
+}
+if (!String(visualProof.hud_focus_line || "").match(/Boone|Smoke Cache|Road Slime|Broken Wagon|Old Road Survey/)) {
+  throw new Error("golden-path smoke visual proof missing first-loop HUD focus");
 }
 if (visualProof.has_single_primary_objective !== true || visualProof.objective_display_mode !== "single-strip") {
   throw new Error("golden-path smoke visual proof missing single-strip objective HUD");
 }
 if (visualProof.has_low_chrome_hud !== true || visualProof.hud_display_mode !== "first-minute-low-chrome") {
   throw new Error("golden-path smoke visual proof missing first-minute low-chrome HUD");
+}
+if (visualProof.has_uncluttered_opening_hud !== true || visualProof.hud_panel_count > 3) {
+  throw new Error("golden-path smoke visual proof missing uncluttered opening HUD");
+}
+if (visualProof.prompt_matches_objective !== true) {
+  throw new Error(`golden-path smoke prompt disagrees with objective: ${visualProof.prompt_line}`);
 }
 if (goldenPath.phase !== "available" || !goldenPath.routeLine || !goldenPath.threatLine) {
   throw new Error("golden-path smoke missing route/threat guidance");
