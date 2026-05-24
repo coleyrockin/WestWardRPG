@@ -232,7 +232,11 @@ structure takes over. Do not move everything at once.
 
 ## Milestone 0: Rewrite Prep And Repo Hygiene
 
-Status: active.
+Status: **done (2026-05-24).** Canvas game-feel/minimap/region polish committed
+as the final reference-build pass (`2a8d3e2`); stale pre-refactor autostash
+dropped; reference build verified green (996 tests, typecheck, syntax, build);
+spike branch `rewrite/threejs-spike` created from a known baseline; README notes
+the rewrite spike is the active direction.
 
 Goal: Make the rewrite safe before adding the new engine.
 
@@ -256,6 +260,8 @@ Acceptance:
 3. The rewrite branch starts from a known baseline.
 
 ## Milestone 1: Three.js Spike
+
+Status: **done (2026-05-24) — Three.js confirmed as the rewrite path.**
 
 Goal: Prove that the new visual direction can beat the current screenshot fast.
 
@@ -294,6 +300,31 @@ Stop condition:
 If the Three.js spike does not produce a visibly better first screenshot within
 one focused slice, do not continue blindly. Re-evaluate PlayCanvas or a 2.5D
 authored-art direction.
+
+### Spike Outcome
+
+The spike cleared the gate: the Three.js dusk frontier opening is obviously more
+dimensional and atmospheric than the flat Canvas raycaster (which on the same
+view is dominated by a text-heavy job-board overlay). **Decision: Three.js is
+the engine.**
+
+What shipped (all behind a dev route; the Canvas game is byte-for-byte unchanged):
+
+1. `render3d.html` — dev route serving the spike (`npm run dev` → `/render3d.html`).
+2. `src/render3d/spike.js` — `startSpike(canvas)`: WebGL renderer (ACES tone map,
+   PCF soft shadows), dusk gradient sky-dome shader, `FogExp2` haze, hemisphere +
+   low warm directional sun + per-lamp point lights, and per-`kind` placeholder
+   builders (building, watchtower beacon, lamp, fence, sign, job board, smoke
+   cache + plume, broken wagon, road slime). Sets `window.__spikeReady` after
+   first frame for capture.
+3. `src/render3d/frontierLayout.js` — data-driven placement: world coords mirror
+   the real frontier (`REGION_PRESENTATION.frontier` offsets + `poiSystem.js` hero
+   positions), spread by `depthLane` so background reads as horizon silhouettes.
+4. `scripts/spike_compare.mjs` — Playwright capture of old vs new
+   (`output/spike-compare/`); reports console errors. Spike renders error-free.
+
+Known and intentional limits (these define the work below): placeholder
+primitives, no GLB art, no animation, no gameplay wiring, frontier only.
 
 ## Milestone 2: State Adapter
 
@@ -525,6 +556,99 @@ Acceptance:
 3. A developer can understand the architecture.
 4. The first five minutes look and feel like the new WestWard.
 
+## Graphics: Next-Level Plan
+
+The spike proves depth and mood with primitives. This is the playbook to take it
+from "promising blocks" to "show the screenshot without apologizing." Work it
+roughly top-down — each tier multiplies the ones below it. Everything here is
+Three.js-native and reduced-motion-safe.
+
+### 1. Rendering & post-processing (biggest win per hour)
+
+Add `postprocessing` (`EffectComposer`) on top of the existing ACES tone map:
+
+1. **Selective bloom** on emissive lanterns, beacon, reward sparkle, slime eyes —
+   the single highest-impact upgrade for the dusk-lantern fantasy. Keep it
+   selective so the whole frame doesn't wash out (the spike's first pass blew the
+   lamps to white; emissive intensity is now tuned, but bloom is the real fix).
+2. **Color-grade LUT** to lock the Weird West palette — purple shadows, warm
+   mids, desaturated dust. One graded look beats per-material color-picking.
+3. **Outline / edge pass** (or inverted-hull) for readable silhouettes — directly
+   serves the "recognize the slime/wagon before the HUD explains it" goal and the
+   low-poly graphic-novel target.
+4. **SMAA/FXAA**, subtle vignette, filmic grain at low strength.
+5. **Contact/blob shadows** under actors in addition to the sun shadow map, so
+   characters feel planted.
+
+### 2. Lighting & atmosphere
+
+1. Real **sun + sky** (Three `Sky` shader or a tuned gradient dome with a sun
+   disc) driven by a single time-of-day value; wire it to the existing game time.
+2. **Volumetric haze / god-rays** from the low sun and lantern cones (cheap
+   additive cones or a light-shaft post pass — not full volumetrics).
+3. Layered **fog** (near dust + far depth fade) so the road reads into distance.
+4. Lantern flicker via noise on intensity (reduced-motion: hold steady).
+
+### 3. Art direction & materials (retire programmer art — Milestone 4)
+
+1. Replace box/cone placeholders with **low-poly GLB models** (vertex-colored or
+   lightly textured), loaded via `GLTFLoader` + **DRACO/meshopt** compression.
+2. Decide the shading language with a quick A/B: **stylized PBR low-poly** vs
+   **toon ramp** (`MeshToonMaterial` + gradient map) — the toon look may hit the
+   "graphic novel" target faster. Pick one and commit.
+3. Central **palette module** (extend `regionVisualIdentity` color language) so
+   every asset and the LUT share one source of truth.
+4. `assets/manifest.json` with stable IDs, one-unit scale, centered pivots, named
+   collision proxies, animation-clip names, texture-size + palette rules, and
+   asset validation. Missing assets fail gracefully to a tagged primitive.
+
+### 4. World depth & density
+
+1. Real **terrain mesh** with the road carved/vertex-painted in, dust ruts via
+   normal map — replaces the flat ground plane.
+2. **InstancedMesh** sage/grass/rocks/fence-rails for density at near-zero draw
+   cost; **merge** static town geometry.
+3. **Distant silhouette billboards** for far hills/mesas/treeline behind the fog.
+4. LOD for hero props; cull offscreen.
+
+### 5. Characters, enemies & animation (game-to-next-level)
+
+1. Rigged GLB characters through `AnimationMixer` with the clip set the roadmap
+   already names: idle, walk-bob, interact glow, enemy aggro, windup, lunge, hit
+   flash, stagger, death, reward pop.
+2. **Telegraph enemy intent visually** — the Road Slime's windup/lunge must be
+   readable without text (squash-stretch + tell). This is a core MVP success
+   criterion, not polish.
+3. Boone with an idle pose and board-facing placement; weapon/hand presentation
+   that isn't a pasted shape.
+
+### 6. VFX & game feel
+
+1. Real **particle systems**: smoke-cache plume, footstep dust, hit impact,
+   reward sparkle (replace the stacked-cone plume placeholder).
+2. **Hit-pause + camera impulse** on combat, gentle **head-bob** on walk — all
+   gated by `prefers-reduced-motion` and the settings menu.
+3. **Audio** is a force-multiplier the roadmap under-weights: ambient dusk bed,
+   lantern crackle, footsteps, slime SFX, reward sting. Low effort, high "alive."
+
+### 7. Performance & quality tiers
+
+1. Set **asset/draw-call/texture budgets**; cap `pixelRatio` (≤2); KTX2/Basis
+   textures.
+2. Map **low/balanced/high** presets onto existing `graphicsSettings` concepts:
+   shadow resolution, bloom on/off, particle density, instancing distance,
+   post-stack depth. Provide a mobile/narrow-viewport fallback.
+3. Add an FPS/draw-call debug overlay (stats) gated to dev.
+
+### 8. Tooling & guardrails
+
+1. Extend visual-regression to the **3D route**: screenshot `/render3d.html`
+   (build on `scripts/spike_compare.mjs`) and gate it like the Canvas captures.
+2. Keep `render_game_to_text()` and the `opening_scene_proof` contract authoritative
+   for QA as the renderer changes.
+3. Consider **diegetic UI**: Boone's board as a real approachable in-world object
+   that opens the DOM panel — closes the prompt/objective/world gap by construction.
+
 ## Risk Register
 
 | Risk | Why It Matters | Guardrail |
@@ -539,20 +663,40 @@ Acceptance:
 
 ## Immediate Action Plan
 
-Do this next, in order:
+Steps 1–7 are **done** (Milestones 0–1: prep, Three.js spike, screenshot gate,
+decision = Three.js). What remains, in order:
 
-1. Finish or shelve the current dirty Canvas visual-pass changes intentionally.
-2. Run the current verification gate so the reference build is known-good.
-3. Install Three.js on a rewrite branch.
-4. Add a `render3d` dev route or feature flag.
-5. Build the static Dustward opening scene.
-6. Capture side-by-side screenshots:
-   - old Canvas opening
-   - new Three.js opening
-7. Decide from screenshots whether Three.js is the rewrite path.
-8. If approved, wire the first render snapshot.
-9. Rebuild the first five-minute loop.
-10. Only then migrate broader systems.
+8. Wire the first **render snapshot** (Milestone 2).
+9. Rebuild the **first five-minute loop** in the new renderer (Milestone 3).
+10. Only then migrate broader systems (Milestones 4–9), pulling from the
+    **Graphics: Next-Level Plan** as each scene/character lands.
+
+### Next Agent — Start Here
+
+Branch is merged to `main`. The spike is on `main` and runnable today.
+
+- **Run it:** `npm run dev` → open `http://127.0.0.1:5173/render3d.html`.
+- **Compare:** `node scripts/spike_compare.mjs` (dev server up) → writes
+  `output/spike-compare/{old,new}.png` and asserts no console errors.
+- **Verify (before any commit):** `npm test` · `npm run typecheck:ts` ·
+  `npm run test:syntax` · `npm run build` (must still emit `index.html` **and**
+  `render3d.html`). The Canvas game must stay untouched and green.
+
+**First task — Milestone 2 (State Adapter):**
+
+1. Create `src/bridge/stateSnapshot.js` exporting `createRenderSnapshot(state)`
+   that returns a plain, serializable object: player `{x, y, angle}`, region,
+   time, weather, active objective, interactables, visible NPCs/enemies/POIs,
+   route markers, lights, and combat cues. **No Three.js objects in it; it must
+   never touch save data** (Rewrite Rules #4–5).
+2. Add Vitest coverage proving the snapshot is JSON-serializable and stable across
+   the first-road phases (reuse `resolveFirstFiveMinuteLoop` in `gameFeel.js`).
+3. Have `spike.js` consume the snapshot instead of the static `frontierLayout`
+   (keep `frontierLayout` as the fallback/seed). Leave Canvas reading old state.
+4. Keep `render_game_to_text()` intact as the QA contract.
+
+Then proceed to Milestone 3 (movement, camera, collision proxies, interaction
+prompts, the playable board→bounty→road→cache→slime→wagon→reward→return loop).
 
 ## Verification Gates
 
@@ -589,10 +733,10 @@ npm run package:itch
 
 ## Current Repo Note
 
-As of the engine rewrite decision, local work includes a dirty Canvas
-first-five-minute clarity/visual pass. Treat that work as either:
+As of 2026-05-24, Milestones 0–1 are landed on `main`: the Canvas polish pass is
+committed as the reference build, and the Three.js spike lives behind the
+`render3d.html` dev route. The Canvas renderer (`src/main.js`) is the reference
+and remains untouched by spike work.
 
-1. the final reference-build polish before the rewrite branch, or
-2. disposable renderer-specific work after explicit approval.
-
-Do not mix renderer rewrite work with unreviewed Canvas polish in one commit.
+Do not delete the Canvas renderer or mix Canvas changes with renderer-rewrite
+work in one commit until Milestone 8 (System Parity proven, then retire).
