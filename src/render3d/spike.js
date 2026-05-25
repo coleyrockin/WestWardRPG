@@ -322,7 +322,9 @@ function syncObjectiveDom(snapshot) {
 export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   syncObjectiveDom(snapshot);
   window.__westwardRenderSnapshot = snapshot;
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  // preserveDrawingBuffer lets the spike-compare script grab a frame via
+  // canvas.toDataURL() between RAF frames. Minimal cost for a spike route.
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
