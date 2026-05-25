@@ -365,7 +365,7 @@ Outcome:
 
 ## Milestone 3: First Five-Minute Rewrite
 
-Status: **active next (2026-05-25).**
+Status: **active — Milestone 3A (art proof) complete 2026-05-25. Gameplay wiring is next.**
 
 Goal: Rebuild the first playable slice in the new renderer.
 
@@ -680,82 +680,237 @@ Add `postprocessing` (`EffectComposer`) on top of the existing ACES tone map:
 
 ## Immediate Action Plan
 
-Steps 1–8 are **done** (Milestones 0–2: prep, Three.js spike, screenshot gate,
-decision = Three.js, render snapshot bridge). What remains, in order:
+Steps 1–9 and Milestone 3A are **done**:
 
-9. Fix the visual comparison gate so it compares old in-world Canvas gameplay
-   against new Three.js gameplay, not title/menu state.
-10. Rebuild the **first five-minute loop** in the new renderer (Milestone 3).
+- Steps 1–8: Milestones 0–2 (prep, Three.js spike, screenshot gate, decision = Three.js, render snapshot bridge).
+- Step 9 (PR #18): Compare gate now asserts old Canvas capture is real in-world Dustward gameplay (mode "playing", no modal, region "frontier").
+- Milestone 3A (PR #19): Art proof landed — purple dusk sky, road-level camera, backface outlines, contact shadows, vignette, sickly green slime, larger job board, smoke plume.
+
+What remains:
+
+10. Wire the **first five-minute gameplay loop** in the new renderer (Milestone 3B).
 11. Only then migrate broader systems (Milestones 4–9), pulling from the
     **Graphics: Next-Level Plan** as each scene/character lands.
 
-### Tomorrow Agent Handoff — Start Here
+---
 
-Branch is merged to `main`. The spike is on `main` and runnable today.
+### Next Agent Handoff — Milestone 3B: First Gameplay Loop
 
-- **Run it:** `npm run dev` → open `http://127.0.0.1:5173/render3d.html`.
-- **Compare:** `node scripts/spike_compare.mjs` (dev server up) → writes
-  `output/spike-compare/{old,new}.png`, asserts no console errors, and verifies
-  the Three.js route publishes a `westward-render-snapshot`.
-- **Verify (before any commit):** `npm test` · `npm run typecheck:ts` ·
-  `npm run test:syntax` · `npm run dev:lint` · `npm run build` (must still emit
-  `index.html` **and** `render3d.html`). The Canvas game must stay untouched and
-  green.
+**Start here.** The scene looks right. Now make it playable.
 
-**Critical first task — fix the comparison proof:**
+#### Orientation
 
-The current compare script verifies the new 3D snapshot correctly, but the old
-Canvas screenshot can still land on title/save/menu UI. That makes the old-vs-new
-claim weaker than it should be. Before polishing the scene, make the comparison
-apples-to-apples:
+```
+npm run dev          # starts Vite dev server at http://127.0.0.1:5173
+open render3d.html   # Three.js scene — currently static (no player input)
+open index.html      # Canvas reference build — untouched, always green
+node scripts/spike_compare.mjs  # (dev server up) compare gate — must still pass
+```
 
-1. Capture old Canvas in an actual in-world Dustward gameplay state.
-2. Assert the old capture is not title, save, settings, job-board modal, or any
-   other non-gameplay screen.
-3. Keep the new route assertion:
-   `window.__westwardRenderSnapshot.kind === "westward-render-snapshot"` and
-   `objective.phase === "accept_bounty"`.
-4. Store captures in `output/spike-compare/` only; do not commit screenshots
-   until the owner approves them.
+Verification gates before every commit:
 
-**Then do Milestone 3A — art proof before gameplay wiring:**
+```bash
+npm test && npm run typecheck:ts && npm run test:syntax && npm run dev:lint && npm run build
+```
 
-The five-agent review agreed on the same point: the Three.js spike is the right
-path, but it still reads like programmer-art blockout. Tomorrow should make one
-first-frame screenshot undeniable before adding broader systems.
+`build` must still emit both `dist/index.html` and `dist/render3d.html`.
+The Canvas renderer (`src/main.js`) must never be modified by 3D work.
 
-1. Recompose the spawn frame around the road:
-   - road centered and readable
-   - Boone/job board as a near-left landmark
-   - Smoke Cache visible down-road
-   - Broken Wagon as a shoulder discovery
-   - Road Slime as a clear threat
-   - watchtower/mesa/town silhouette on the horizon
-2. Push buildings out of the camera's face; use them to frame the road instead
-   of dominating the frame.
-3. Add a stronger palette:
-   - purple dusk shadows
-   - amber lantern light
-   - muted dusty road
-   - sickly green slime glow
-   - pale smoke plume
-4. Add graphic-novel readability:
-   - bolder silhouettes
-   - contact/blob shadows
-   - selective emissive glow
-   - subtle vignette/post tone
-5. Remove prototype language from the public frame. No visible "render3d spike"
-   label in screenshots meant for review.
+#### Architecture
 
-Acceptance for tomorrow:
+All new Milestone 3B code lives in `src/render3d/`. Do not create top-level
+files for render logic. Do not import from `src/render3d/` inside `src/main.js`.
 
-1. `old.png` is real Canvas gameplay and `new.png` is the Three.js opening.
-2. The first 3D screenshot clearly beats the Canvas screenshot without needing
-   explanation.
-3. A reviewer can identify road, town, Boone board, Smoke Cache, Broken Wagon,
-   Road Slime, and horizon landmark without reading debug text.
-4. Canvas remains playable and untouched.
-5. Full gates pass before commit.
+```
+src/render3d/
+  spike.js            existing — scene builder, camera, RAF loop
+  frontierLayout.js   existing — placement data
+  playerController.js NEW — WASD movement + mouse look + camera follow
+  worldProxies.js     NEW — AABB collision boxes derived from frontierLayout
+  interactionSystem.js NEW — proximity detection, prompt DOM, action dispatch
+  encounterSystem.js  NEW — slime aggro trigger, combat pass, death/reward
+  animationHelpers.js NEW — walk bob, idle, interact glow, hit flash helpers
+  gameLoop.js         NEW — composes everything, owns the RAF, replaces spike loop
+```
+
+`spike.js` currently owns the RAF loop. Once `gameLoop.js` exists, `spike.js`
+becomes a scene-builder only (no loop). Move the `requestAnimationFrame` call
+into `gameLoop.js` during that step.
+
+#### Step-by-step order
+
+**Step 1 — Player controller** (`src/render3d/playerController.js`)
+
+Export `createPlayerController(camera, scene, options)`. Returns `{ update(dt) }`.
+
+- WASD moves the camera forward/back/strafe in the XZ plane.
+- Mouse drag rotates look direction (pointer lock optional; drag is fine).
+- Speed: 4 units/sec walk, 8 units/sec with shift.
+- No collision yet — add it in Step 2.
+- Test file: `tests/render3d-player-controller.test.ts`. Assert: `update(dt)` moves
+  position by `speed * dt` in the correct direction for each key combo; no
+  movement when no keys held.
+
+**Step 2 — World collision proxies** (`src/render3d/worldProxies.js`)
+
+Export `buildProxies(placements)`. Returns `AABB[]` derived from `buildFrontierPlacements()`.
+Each placement with a physical presence gets a box: `{ minX, maxX, minZ, maxZ }`.
+
+Integrate with `playerController`: before applying movement, slide-resolve against
+all proxies. Use simple AABB-vs-point with radius 0.3 for the player capsule.
+
+Test: `tests/render3d-world-proxies.test.ts`. Assert: a proxy exists for each
+building/landmark/fence in the placements; collision resolves player away from
+box boundary.
+
+**Step 3 — Interaction system** (`src/render3d/interactionSystem.js`)
+
+Export `createInteractionSystem(scene, snapshot)`. Returns `{ update(playerPos, dt) }`.
+
+Interaction targets (pulled from snapshot.worldObjects):
+- `jobBoard` — radius 2.5 → prompt "E — Open Boone's Board"
+- `smokeCache` — radius 2.0 → prompt "E — Open Smoke Cache"
+- `brokenWagon` — radius 2.5 → prompt "E — Inspect Wagon"
+- `roadSlime` — handled by encounterSystem, not interactionSystem
+
+Prompt DOM: `#prompt` div in `render3d.html`. Show/hide text based on nearest target.
+
+Action dispatch on `E` keydown: call the appropriate handler registered via
+`registerHandler(kind, fn)`.
+
+Test: `tests/render3d-interaction.test.ts`. Assert: nearest target changes as
+player position changes; prompt text matches the nearest interactable; handler
+fires on action key.
+
+**Step 4 — Objective strip** (`src/render3d/gameLoop.js`, partial)
+
+Wire `__westwardRenderSnapshot.objective` to the existing `#objective .label` and
+`#objective .text` DOM elements (already in `render3d.html`).
+
+Pull phase progression through a local state machine inside `gameLoop.js`:
+
+```
+spawn → accept_bounty → road_walk → cache_open → slime_fight →
+scrap_earned → board_return → survey_offered
+```
+
+Each phase transition fires when the corresponding interaction or encounter
+completes. The DOM updates immediately.
+
+Test: `tests/render3d-objective-phases.test.ts`. Assert phase transitions in
+sequence; assert DOM text matches expected phase labels.
+
+**Step 5 — Job board modal**
+
+When the player presses E at the job board in `accept_bounty` phase:
+1. Pause movement.
+2. Show a modal overlay (`#board-modal` in `render3d.html`) with the slime
+   bounty title, description, and an "Accept" button.
+3. On Accept: transition phase → `road_walk`, close modal, resume movement.
+4. Board emissive pulses to "accepted" amber.
+
+No Canvas state is modified. The modal reads from `snapshot.worldObjects` data
+only.
+
+Test: `tests/render3d-board-modal.test.ts`. Assert modal DOM appears on action;
+phase transitions on accept; modal closes.
+
+**Step 6 — Slime encounter** (`src/render3d/encounterSystem.js`)
+
+Export `createEncounterSystem(scene, snapshot)`. Returns `{ update(playerPos, dt) }`.
+
+Slime state machine: `patrol → aggro → attack → dead`.
+
+- `patrol`: slime bobs gently (animationHelpers.idleBob). No movement.
+- `aggro` (player within 4 units): slime faces player, plays approach animation.
+- `attack` (player within 1.5 units): trigger hit. Player takes 8 HP. Slime
+  staggers back 1 unit.
+- Dead (player presses E while slime is within 2 units and aggro): slime plays
+  death animation (scale collapse), emissive fades, green glow extinguishes.
+  Calls registered `onSlimeDeath` callback.
+
+Test: `tests/render3d-encounter.test.ts`. Assert state transitions; death callback
+fires; dead slime no longer aggros.
+
+**Step 7 — Reward + Map Scrap**
+
+On `onSlimeDeath`:
+1. Phase → `scrap_earned`.
+2. `+1 Map Scrap` floating text appears over slime position.
+3. Smoke Cache lid animates open (scale Y ×1.2 on lid mesh).
+4. `smokeCache` interaction becomes active; prompt changes to "E — Open Cache".
+5. On cache open: phase → `board_return`, objective strip updates.
+
+Test: `tests/render3d-rewards.test.ts`. Assert Map Scrap count increments; phase
+transitions correctly; cache interaction enabled after death.
+
+**Step 8 — Animation helpers** (`src/render3d/animationHelpers.js`)
+
+Export pure functions that take a mesh + time and return nothing (mutate in place):
+
+```js
+idleBob(mesh, t, amplitude = 0.04)      // gentle y sine
+walkBob(mesh, t, speed)                 // lateral + vertical walk cycle
+interactGlow(mesh, t)                   // emissive pulse on interactable
+hitFlash(mesh, intensity = 3.0)         // one-frame emissive spike
+stagger(mesh, direction, t)             // knockback lerp
+deathCollapse(mesh, progress)           // scale Y → 0 over 0.4s
+rewardPop(scene, position, text)        // floating +text sprite (CSS3D or DOM)
+```
+
+Test: `tests/render3d-animation-helpers.test.ts`. Assert each helper mutates the
+expected mesh property by the correct amount.
+
+**Step 9 — Game loop composition** (`src/render3d/gameLoop.js`)
+
+`gameLoop.js` owns the `requestAnimationFrame` loop. Remove it from `spike.js`.
+
+```js
+export function startGameLoop(canvas, snapshot) {
+  const scene = buildScene(snapshot);          // extracted from spike.js
+  const camera = buildCamera(snapshot);        // extracted from spike.js
+  const renderer = buildRenderer(canvas);      // extracted from spike.js
+  const player = createPlayerController(camera, scene);
+  const proxies = buildProxies(snapshot.worldObjects);
+  const interaction = createInteractionSystem(scene, snapshot);
+  const encounter = createEncounterSystem(scene, snapshot);
+  const phases = createPhaseStateMachine(snapshot);
+
+  let prev = performance.now();
+  function loop(now) {
+    const dt = Math.min((now - prev) / 1000, 0.05);
+    prev = now;
+    player.update(dt, proxies);
+    interaction.update(player.position, dt);
+    encounter.update(player.position, dt);
+    phases.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+```
+
+`spike.js` becomes: import `startGameLoop`, call it, export nothing new.
+
+**Step 10 — Smoke suite extension**
+
+Extend `scripts/spike_compare.mjs` (or add `scripts/render3d_smoke.mjs`) to drive
+the new gameplay loop and assert:
+- Player can move (position changes after synthetic key events).
+- Job board modal opens and closes.
+- Phase transitions from `spawn` to `survey_offered` complete.
+- No console errors throughout.
+
+#### Acceptance for Milestone 3B
+
+1. A tester can complete steps 1–11 of the Milestone 3 player path listed above.
+2. Prompt and objective always agree — impossible by construction (single phase
+   state machine drives both).
+3. The smoke suite asserts objective, prompt, job state, Map Scrap reward, and
+   phase sequence.
+4. Canvas build is untouched, all 1001+ tests still pass.
+5. `node scripts/spike_compare.mjs` still exits 0.
 
 ## Verification Gates
 
@@ -792,11 +947,19 @@ npm run package:itch
 
 ## Current Repo Note
 
-As of 2026-05-24, Milestones 0–2 are landed on `main`: the Canvas polish pass is
-committed as the reference build, the Three.js spike lives behind the
-`render3d.html` dev route, and the first plain render snapshot bridge feeds that
-spike without coupling game state to Three.js. The Canvas renderer
-(`src/main.js`) is the reference and remains untouched by spike work.
+As of 2026-05-25, Milestones 0–2 and Milestone 3A are landed on `main`:
 
-Do not delete the Canvas renderer or mix Canvas changes with renderer-rewrite
-work in one commit until Milestone 8 (System Parity proven, then retire).
+- **Milestone 0–2**: Canvas polish reference build, Three.js spike behind `render3d.html`,
+  render snapshot bridge, visual baselines (18 PNGs, strict gate).
+- **Milestone 3A** (PR #19, `4c30262`): Art proof — purple dusk 3-stop sky, road-level
+  camera (FOV 65°), backface-expansion outlines, contact shadows, vignette overlay,
+  sickly green slime, larger job board, 6-cone smoke plume.
+- **Compare gate** (PR #18): `scripts/spike_compare.mjs` asserts old Canvas is real
+  in-world Dustward gameplay (mode "playing", no modal, region "frontier") before
+  writing `output/spike-compare/old.png`. Both PNGs captured via `canvas.toDataURL()`
+  to bypass Playwright's RAF-idle deadlock.
+- **Smoke probe**: `window.__westwardSmoke.getGameplayState()` added to Canvas build.
+
+The Canvas renderer (`src/main.js`) is the reference and must remain untouched by
+3D rewrite work. Do not delete it or mix Canvas changes with renderer-rewrite commits
+until Milestone 8 (System Parity proven, then retire).
