@@ -56,7 +56,7 @@ const HERO_OBJECTS = [
 // Depth lanes spread along the offset direction so background vistas read as
 // distant horizon silhouettes and foreground dressing stays near the road,
 // instead of every element crowding the same few tiles in front of the camera.
-const DEPTH_SPREAD = { background: 3.4, midground: 1.85, foreground: 1.2 };
+const DEPTH_SPREAD = { background: 3.4, midground: 2.1, foreground: 1.7 };
 
 function world(anchor, dx, dy, depthLane) {
   const s = DEPTH_SPREAD[depthLane] ?? 1.5;

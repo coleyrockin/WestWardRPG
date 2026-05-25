@@ -15,9 +15,9 @@ import { buildFrontierPlacements, PLAYER_SPAWN } from "./frontierLayout.js";
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
 const col = (hex) => new THREE.Color(hex);
 
-const DUSK_TOP = "#2a1d3a"; // deep purple zenith
-const DUSK_HORIZON = "#e8915a"; // warm sunset band
-const GROUND_TINT = "#6f5536"; // dusty road dirt
+const DUSK_TOP = "#1a0f33"; // deep purple zenith
+const DUSK_HORIZON = "#d0784a"; // warm amber horizon
+const GROUND_TINT = "#4e3c26"; // muted dusty brown
 
 function makeSkyDome() {
   const geo = new THREE.SphereGeometry(120, 32, 16);
@@ -26,6 +26,7 @@ function makeSkyDome() {
     depthWrite: false,
     uniforms: {
       topColor: { value: col(DUSK_TOP) },
+      midColor: { value: col("#472a6b") },
       horizonColor: { value: col(DUSK_HORIZON) },
     },
     vertexShader: `
@@ -38,12 +39,15 @@ function makeSkyDome() {
     fragmentShader: `
       varying vec3 vPos;
       uniform vec3 topColor;
+      uniform vec3 midColor;
       uniform vec3 horizonColor;
       void main() {
         float t = clamp(pow(max(vPos.y, 0.0), 0.55), 0.0, 1.0);
-        vec3 c = mix(horizonColor, topColor, t);
-        // subtle warm glow lifting from the horizon
-        c += horizonColor * (1.0 - t) * 0.18;
+        // 3-stop: warm amber horizon → purple mid → deep purple zenith
+        vec3 c = t < 0.35
+          ? mix(horizonColor, midColor, t / 0.35)
+          : mix(midColor, topColor, (t - 0.35) / 0.65);
+        c += horizonColor * (1.0 - t) * 0.12;
         gl_FragColor = vec4(c, 1.0);
       }
     `,
@@ -74,35 +78,66 @@ function addBox(group, w, h, d, mat, pos) {
   return m;
 }
 
+// Backface-expansion outline for graphic-novel silhouettes.
+function addOutline(group, mesh, scale = 1.07) {
+  const m = new THREE.Mesh(
+    mesh.geometry,
+    new THREE.MeshBasicMaterial({ color: col("#0a0408"), side: THREE.BackSide }),
+  );
+  m.position.copy(mesh.position);
+  m.rotation.copy(mesh.rotation);
+  m.scale.copy(mesh.scale).multiplyScalar(scale);
+  group.add(m);
+}
+
+// Blob shadow projected under a world-space point.
+function addContactShadow(group, x, z, rx = 1.0, rz = 0.7) {
+  const m = new THREE.Mesh(
+    new THREE.CircleGeometry(1, 24),
+    new THREE.MeshBasicMaterial({ color: col("#000000"), transparent: true, opacity: 0.38, depthWrite: false }),
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.scale.set(rx, 1, rz);
+  m.position.set(x, 0.012, z);
+  group.add(m);
+}
+
 // --- per-kind placeholder builders ---------------------------------------
 
 function buildBuilding(group, p, heightScale) {
   const h = 2.4 * heightScale;
   const w = 1.3 * p.size;
-  addBox(group, w, h, w, standard(p.color, { roughness: 0.95 }), toVec(p.x, p.y));
-  // roof cap, slightly darker, for a readable silhouette ridge
+  // Slightly cooler/darker for background depth cue
+  const wallColor = p.depthLane === "background" ? "#6a4a30" : p.color;
+  const box = addBox(group, w, h, w, standard(wallColor, { roughness: 0.95 }), toVec(p.x, p.y));
+  addOutline(group, box, 1.06);
+  // dark triangular silhouette roof
   const roof = new THREE.Mesh(
-    new THREE.ConeGeometry(w * 0.82, h * 0.45, 4),
-    standard("#3c2c1e"),
+    new THREE.ConeGeometry(w * 0.82, h * 0.48, 4),
+    standard("#241810"),
   );
   roof.rotation.y = Math.PI / 4;
-  roof.position.copy(toVec(p.x, p.y, h + h * 0.225));
+  roof.position.copy(toVec(p.x, p.y, h + h * 0.24));
   roof.castShadow = true;
   group.add(roof);
+  addOutline(group, roof, 1.08);
+  addContactShadow(group, p.x, p.y, w * 0.9, w * 0.9);
 }
 
 function buildWatchtower(group, p) {
   const h = 5.5 * (p.size / 1.84);
-  addBox(group, 1.1, h, 1.1, standard("#4a3526"), toVec(p.x, p.y));
-  // glowing beacon at the top
+  const tower = addBox(group, 1.1, h, 1.1, standard("#3a2718"), toVec(p.x, p.y));
+  addOutline(group, tower, 1.06);
+  addContactShadow(group, p.x, p.y, 1.4, 1.4);
+  // glowing amber beacon at the top
   const beacon = new THREE.Mesh(
-    new THREE.SphereGeometry(0.34, 16, 12),
-    standard("#ffcf7a", { emissive: "#ffb84d", emissiveIntensity: 1.5 }),
+    new THREE.SphereGeometry(0.42, 16, 12),
+    standard("#ffcf7a", { emissive: "#ffb030", emissiveIntensity: 2.2 }),
   );
-  beacon.position.copy(toVec(p.x, p.y, h + 0.4));
+  beacon.position.copy(toVec(p.x, p.y, h + 0.5));
   group.add(beacon);
-  const light = new THREE.PointLight(col(p.color), 14, 18, 2);
-  light.position.copy(toVec(p.x, p.y, h + 0.4));
+  const light = new THREE.PointLight(col("#ffcc80"), 18, 22, 1.8);
+  light.position.copy(toVec(p.x, p.y, h + 0.5));
   group.add(light);
 }
 
@@ -147,47 +182,51 @@ function buildSign(group, p) {
 }
 
 function buildJobBoard(group, p) {
-  const mat = standard("#5a4128");
-  addBox(group, 0.14, 1.3, 0.14, mat, toVec(p.x - 0.5, p.y));
-  addBox(group, 0.14, 1.3, 0.14, mat, toVec(p.x + 0.5, p.y));
+  const mat = standard("#4a3218");
+  addBox(group, 0.14, 1.6, 0.14, mat, toVec(p.x - 0.56, p.y));
+  addBox(group, 0.14, 1.6, 0.14, mat, toVec(p.x + 0.56, p.y));
   const board = new THREE.Mesh(
-    new THREE.BoxGeometry(1.35, 0.95, 0.1),
-    standard(p.color, { emissive: p.color, emissiveIntensity: 0.45 }),
+    new THREE.BoxGeometry(1.55, 1.08, 0.1),
+    standard(p.color, { emissive: p.color, emissiveIntensity: 0.72 }),
   );
-  board.position.copy(toVec(p.x, p.y, 1.05));
+  board.position.copy(toVec(p.x, p.y, 1.14));
   board.castShadow = true;
   group.add(board);
-  // warm reading light over the board
-  const light = new THREE.PointLight(col("#ffd9a0"), 6, 6, 2);
-  light.position.copy(toVec(p.x, p.y, 1.9));
+  // warm reading lantern over the board
+  const light = new THREE.PointLight(col("#ffd090"), 9, 7, 1.8);
+  light.position.copy(toVec(p.x, p.y, 2.3));
   group.add(light);
+  addContactShadow(group, p.x, p.y, 0.8, 0.8);
 }
 
 function buildSmokeCache(group, p) {
   // chest
-  addBox(group, 0.7, 0.5, 0.5, standard(p.color, { emissive: "#5a3a12", emissiveIntensity: 0.3 }), toVec(p.x, p.y));
-  // rising smoke plume — stacked translucent cones
-  for (let i = 0; i < 4; i++) {
+  addBox(group, 0.72, 0.54, 0.54, standard(p.color, { emissive: "#5a3a12", emissiveIntensity: 0.4 }), toVec(p.x, p.y));
+  addContactShadow(group, p.x, p.y, 0.55, 0.55);
+  // pale smoke plume — wider stacked translucent cones drifting upward
+  for (let i = 0; i < 6; i++) {
     const cone = new THREE.Mesh(
-      new THREE.ConeGeometry(0.4 - i * 0.06, 0.7, 10, 1, true),
-      standard("#cdbfa6", { transparent: true, opacity: 0.32 - i * 0.05, roughness: 1 }),
+      new THREE.ConeGeometry(0.36 + i * 0.12, 0.72, 10, 1, true),
+      standard("#ddd5c8", { transparent: true, opacity: Math.max(0.05, 0.38 - i * 0.06), roughness: 1 }),
     );
-    cone.position.copy(toVec(p.x, p.y, 0.8 + i * 0.55));
+    cone.position.copy(toVec(p.x + i * 0.04, p.y, 0.7 + i * 0.56));
     group.add(cone);
   }
 }
 
 function buildWagon(group, p) {
-  // tilted bed
-  const bed = addBox(group, 1.4, 0.6, 0.8, standard(p.color), toVec(p.x, p.y, 0.4));
-  bed.rotation.z = -0.25;
-  // wheels
-  for (const dx of [-0.55, 0.55]) {
-    const wheel = new THREE.Mesh(
-      new THREE.TorusGeometry(0.42, 0.09, 8, 16),
-      standard("#2c2118"),
-    );
-    wheel.position.copy(toVec(p.x + dx, p.y + 0.45, 0.45));
+  // broken/tilted bed
+  const bed = addBox(group, 1.4, 0.6, 0.8, standard(p.color), toVec(p.x, p.y, 0.34));
+  bed.rotation.z = -0.38;
+  addOutline(group, bed, 1.06);
+  addContactShadow(group, p.x, p.y, 1.2, 0.9);
+  // wheels — one intact, one splayed to sell the broken read
+  const wheelGeo = new THREE.TorusGeometry(0.42, 0.09, 8, 16);
+  const wheelMat = standard("#261c10");
+  for (const [dx, rx] of [[-0.55, 0], [0.55, 0.38]]) {
+    const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+    wheel.position.copy(toVec(p.x + dx, p.y + 0.45, 0.42));
+    wheel.rotation.x = rx;
     wheel.castShadow = true;
     group.add(wheel);
   }
@@ -195,20 +234,26 @@ function buildWagon(group, p) {
 
 function buildSlime(group, p) {
   const body = new THREE.Mesh(
-    new THREE.SphereGeometry(0.6, 18, 14, 0, Math.PI * 2, 0, Math.PI / 1.8),
-    standard(p.color, { emissive: "#1f4d18", emissiveIntensity: 0.6, roughness: 0.4 }),
+    new THREE.SphereGeometry(0.72, 18, 14, 0, Math.PI * 2, 0, Math.PI / 1.75),
+    standard(p.color, { emissive: "#2a6820", emissiveIntensity: 1.1, roughness: 0.35 }),
   );
-  body.scale.set(1.1, 0.8, 1.1);
-  body.position.copy(toVec(p.x, p.y, 0.05));
+  body.scale.set(1.2, 0.82, 1.2);
+  body.position.copy(toVec(p.x, p.y, 0.04));
   body.castShadow = true;
   group.add(body);
+  addOutline(group, body, 1.08);
+  addContactShadow(group, p.x, p.y, 1.0, 0.8);
+  // sickly green ambient glow
+  const slimeLight = new THREE.PointLight(col("#58d040"), 5, 5, 2);
+  slimeLight.position.copy(toVec(p.x, p.y, 0.6));
+  group.add(slimeLight);
   // hostile glowing eyes
-  for (const dx of [-0.16, 0.16]) {
+  for (const dx of [-0.18, 0.18]) {
     const eye = new THREE.Mesh(
-      new THREE.SphereGeometry(0.07, 8, 6),
-      standard("#fff2c0", { emissive: "#ffd24d", emissiveIntensity: 3 }),
+      new THREE.SphereGeometry(0.085, 8, 6),
+      standard("#fff2c0", { emissive: "#ffd24d", emissiveIntensity: 4 }),
     );
-    eye.position.copy(toVec(p.x + dx, p.y - 0.45, 0.5));
+    eye.position.copy(toVec(p.x + dx, p.y - 0.52, 0.6));
     group.add(eye);
   }
 }
@@ -316,7 +361,7 @@ function syncObjectiveDom(snapshot) {
   if (text) text.textContent = snapshot.objective?.currentTarget
     ? `${snapshot.objective.currentTarget} - ${snapshot.objective.nextAction}`
     : "Open Boone's board - accept the Marsh Slime Bounty.";
-  if (tag) tag.textContent = `WestWard - render3d spike - ${snapshot.region.label} - ${snapshot.objective?.phase || "static"}`;
+  if (tag) tag.textContent = `WestWard · ${snapshot.region.label} · Dusk`;
 }
 
 export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
@@ -334,13 +379,13 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   renderer.toneMappingExposure = 1.05;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(col("#c39a72"), 0.02);
+  scene.fog = new THREE.FogExp2(col("#8a6a9a"), 0.022);
 
   scene.add(makeSkyDome());
 
-  // lighting: dim warm ambient + low sunset key + cool sky fill
-  scene.add(new THREE.HemisphereLight(col("#c9a6ff"), col("#4a3826"), 0.55));
-  const sun = new THREE.DirectionalLight(col("#ffae6a"), 1.6);
+  // lighting: cool purple sky fill + warm low sun
+  scene.add(new THREE.HemisphereLight(col("#5a2890"), col("#1e0e04"), 0.6));
+  const sun = new THREE.DirectionalLight(col("#ffae6a"), 1.3);
   sun.position.set(snapshot.player.x - 8, 6, snapshot.player.y - 5); // low west sun
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -360,11 +405,12 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   for (const p of snapshot.worldObjects) buildPlacement(props, p);
   scene.add(props);
 
-  // hero vista: pulled back behind spawn and raised, looking east down the road
-  // toward the board / cache / wagon / slime cluster and the watchtower beacon.
-  const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 200);
-  camera.position.set(snapshot.player.x - 4.0, 3.4, snapshot.player.y + 0.3);
-  camera.lookAt(snapshot.player.x + 6.0, 0.6, snapshot.player.y + 0.5);
+  // hero vista: low road-level view looking east down the road.
+  // Buildings flank the sides; hero objects read clearly down-road;
+  // watchtower beacon silhouette reads on the horizon.
+  const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(snapshot.player.x - 5.5, 1.8, snapshot.player.y + 0.0);
+  camera.lookAt(snapshot.player.x + 8.0, 0.5, snapshot.player.y - 0.3);
 
   function onResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -372,6 +418,17 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     renderer.setSize(window.innerWidth, window.innerHeight);
   }
   window.addEventListener("resize", onResize);
+
+  // Vignette overlay — graphic-novel post tone without EffectComposer.
+  const vigEl = document.createElement("div");
+  Object.assign(vigEl.style, {
+    position: "fixed",
+    inset: "0",
+    pointerEvents: "none",
+    zIndex: "10",
+    background: "radial-gradient(ellipse at 50% 48%, transparent 38%, rgba(5,2,18,0.76) 100%)",
+  });
+  document.body.appendChild(vigEl);
 
   let frames = 0;
   function loop() {
