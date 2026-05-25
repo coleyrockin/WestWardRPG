@@ -11303,6 +11303,19 @@ const canvas = document.getElementById("game");
       };
       return smokeSaveRecoveryProof;
     },
+    getGameplayState() {
+      return {
+        mode: state.mode,
+        hasModalOpen: anyModalOpen(),
+        regionId: state.regions.activeRegion,
+        inHouse: !!state.player.inHouse,
+        regionInterior: state.player.regionInterior || null,
+        playerX: Number((state.player.x || 0).toFixed(2)),
+        playerY: Number((state.player.y || 0).toFixed(2)),
+        playerAngle: Number((state.player.angle || 0).toFixed(3)),
+        time: Number((state.time || 0).toFixed(2)),
+      };
+    },
   };
 
   window.render_game_to_text = () => {
