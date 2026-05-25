@@ -10,6 +10,9 @@
 import * as THREE from "three";
 import { createRenderSnapshot } from "../bridge/stateSnapshot.js";
 import { buildFrontierPlacements, PLAYER_SPAWN } from "./frontierLayout.js";
+import { createPlayerController } from "./playerController.js";
+import { buildProxies } from "./worldProxies.js";
+import { createInteractionSystem } from "./interactionSystem.js";
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
@@ -405,9 +408,10 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   for (const p of snapshot.worldObjects) buildPlacement(props, p);
   scene.add(props);
 
-  // hero vista: low road-level view looking east down the road.
-  // Buildings flank the sides; hero objects read clearly down-road;
-  // watchtower beacon silhouette reads on the horizon.
+  // Hero camera pose from Milestone 3A: low road-level view 5.5 west of spawn
+  // looking east down the road. The playerController seeds itself from this
+  // position so the spike-compare screenshot keeps its framing; once the
+  // player walks they advance toward the board.
   const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
   camera.position.set(snapshot.player.x - 5.5, 1.8, snapshot.player.y + 0.0);
   camera.lookAt(snapshot.player.x + 8.0, 0.5, snapshot.player.y - 0.3);
@@ -430,8 +434,39 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   });
   document.body.appendChild(vigEl);
 
+  // Ensure the world matrix is current so getWorldDirection() reads the
+  // correct forward vector when seeding yaw/pitch from the hero pose lookAt.
+  camera.updateMatrixWorld();
+
+  // Milestone 3B step 1–3: walkable, collidable, promptable.
+  // Player owns input + camera each frame; proxies block movement; interaction
+  // surfaces the nearest prompt and dispatches handlers on E.
+  const player = createPlayerController(camera, { canvas });
+  const proxies = buildProxies(snapshot.worldObjects);
+  const promptEl = document.getElementById("prompt");
+  const setPromptText = (t) => {
+    if (!promptEl) return;
+    if (promptEl.textContent !== t) promptEl.textContent = t;
+    promptEl.hidden = !t;
+  };
+  const interaction = createInteractionSystem({
+    worldObjects: snapshot.worldObjects,
+    setPromptText,
+  });
+  // Stub handlers — Step 5 (job board modal) and Step 6 (slime encounter)
+  // will replace these with real flows.
+  interaction.registerHandler("jobBoard",    (t) => console.log("[3B] open board", t?.label));
+  interaction.registerHandler("smokeCache",  (t) => console.log("[3B] open cache", t?.label));
+  interaction.registerHandler("brokenWagon", (t) => console.log("[3B] inspect wagon", t?.label));
+
   let frames = 0;
-  function loop() {
+  let prevTs = performance.now();
+  function loop(now = performance.now()) {
+    // dt in seconds, clamped to keep big tab-resume jumps from teleporting.
+    const dt = Math.min((now - prevTs) / 1000, 0.05);
+    prevTs = now;
+    player.update(dt, proxies);
+    interaction.update(player.position);
     renderer.render(scene, camera);
     frames++;
     if (frames === 2) window.__spikeReady = true; // captured after a settled frame
@@ -439,7 +474,7 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   }
   loop();
 
-  return { scene, camera, renderer, snapshot };
+  return { scene, camera, renderer, snapshot, player, proxies, interaction };
 }
 
 // Auto-start when loaded as the render3d.html entry.

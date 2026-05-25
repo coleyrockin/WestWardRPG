@@ -47,11 +47,32 @@
         background: rgba(24, 16, 30, 0.5);
         padding: 6px 10px; border-radius: 6px;
       }
+
+      /* Interaction prompt — sits just above the objective strip, smaller. */
+      #prompt {
+        position: fixed;
+        left: 50%;
+        bottom: 96px;
+        transform: translateX(-50%);
+        font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+        font-size: 15px;
+        letter-spacing: 0.3px;
+        color: #f6e4c4;
+        background: rgba(24, 16, 30, 0.78);
+        border: 1px solid rgba(216, 168, 79, 0.7);
+        border-radius: 8px;
+        padding: 8px 14px;
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(3px);
+        pointer-events: none;
+      }
+      #prompt[hidden] { display: none; }
     </style>
   </head>
   <body>
     <canvas id="scene"></canvas>
     <div id="tag">WestWard · render3d spike · Dustward opening (static)</div>
+    <div id="prompt" hidden></div>
     <div id="objective">
       <span class="pip"></span>
       <span>
