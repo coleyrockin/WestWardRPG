@@ -102,11 +102,14 @@ describe("worldProxies — resolveCollision", () => {
 
   it("snaps strictly-inside points out to the closest inflated edge", () => {
     // Stuck point sits 0.5 east of minX and further from every other edge.
+    // The fallback pushes the player a tiny epsilon past the inflated minX
+    // so next-frame strict-less-than sweep tests see them as outside.
     const out = resolveCollision(
       { from: { x: 1.2, z: 1.5 }, to: { x: 1.2, z: 1.5 } },
       [box],
     );
-    expect(out.x).toBeCloseTo(0.7, 6);
+    expect(out.x).toBeLessThan(0.7); // epsilon nudge past the boundary
+    expect(out.x).toBeCloseTo(0.7, 3);
     expect(out.z).toBeCloseTo(1.5, 6);
   });
 
@@ -138,5 +141,44 @@ describe("worldProxies — resolveCollision", () => {
         expect(strict).toBe(false);
       }
     }
+  });
+});
+
+describe("worldProxies — diagonal sprint tunneling", () => {
+  // One small box at the origin; player approaches diagonally from the SW.
+  // Step distance is larger than the box's extent so a naive endpoint test
+  // skips the wall entirely. The swept Z-overlap guard must catch it.
+  const proxies = [{ minX: -0.1, maxX: 0.1, minZ: -0.1, maxZ: 0.1, source: { kind: "sign", x: 0, y: 0, size: 0.3 } as any }];
+
+  it("diagonal step from outside swept-Z to inside swept-Z is stopped along X", () => {
+    // from: (-0.6, -0.6) — well outside Z extent (-0.4 .. 0.4 inflated).
+    // to:   ( 0.6,  0.6) — past the box on both axes. Without the swept
+    // guard, the X sweep would skip because from.z = -0.6 is outside.
+    const out = resolveCollision({ from: { x: -0.6, z: -0.6 }, to: { x: 0.6, z: 0.6 } }, proxies);
+    // X must clamp at the inflated minX (-0.1 - 0.3 = -0.4). Z is free to
+    // slide once X is sitting on the wall (player is no longer "inside" along X).
+    expect(out.x).toBeLessThanOrEqual(-0.4 + 1e-9);
+  });
+
+  it("post-snap point is strictly outside every inflated proxy", () => {
+    const out = resolveCollision({ from: { x: -0.6, z: -0.6 }, to: { x: 0.6, z: 0.6 } }, proxies);
+    for (const p of proxies) {
+      const inside =
+        out.x > p.minX - 0.3 && out.x < p.maxX + 0.3 &&
+        out.z > p.minZ - 0.3 && out.z < p.maxZ + 0.3;
+      expect(inside).toBe(false);
+    }
+  });
+
+  it("stuck-inside fallback ejects the point past the boundary (next-frame safe)", () => {
+    // Start the player slightly inside the inflated extent — fallback should
+    // push to inf.minX - ε so a re-run sees the point as outside.
+    const p = proxies[0];
+    const out = resolveCollision({ from: { x: 0, z: 0 }, to: { x: 0, z: 0 } }, proxies);
+    const inflated = { minX: p.minX - 0.3, maxX: p.maxX + 0.3, minZ: p.minZ - 0.3, maxZ: p.maxZ + 0.3 };
+    const stillInside =
+      out.x > inflated.minX && out.x < inflated.maxX &&
+      out.z > inflated.minZ && out.z < inflated.maxZ;
+    expect(stillInside).toBe(false);
   });
 });

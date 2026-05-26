@@ -65,6 +65,8 @@
         box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
         backdrop-filter: blur(3px);
         pointer-events: none;
+        /* Above the vignette overlay (z=10) so prompt text isn't dimmed. */
+        z-index: 20;
       }
       #prompt[hidden] { display: none; }
     </style>

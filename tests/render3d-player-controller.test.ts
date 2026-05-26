@@ -250,4 +250,20 @@ describe("playerController — DOM shell", () => {
     ctrl.update(1);
     expect(camera.position.z).toBe(0);
   });
+
+  it("window blur clears held movement keys (no stuck-key after focus loss)", () => {
+    const doc = makeFakeDocument();
+    const win = makeFakeDocument(); // same shape works as a fake window
+    const camera = makeFakeCamera();
+    const ctrl = createPlayerController(camera, { document: doc as any, window: win as any });
+    doc.dispatch("keydown", { code: "KeyW" });
+    ctrl.update(1);
+    expect(approx(camera.position.z, -4, 1e-6)).toBe(true);
+    win.dispatch("blur", {});
+    const zAfterBlur = camera.position.z;
+    ctrl.update(1);
+    // No movement after blur — forward was force-released.
+    expect(camera.position.z).toBe(zAfterBlur);
+    ctrl.dispose();
+  });
 });

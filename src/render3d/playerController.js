@@ -119,6 +119,7 @@ export function createPlayerController(camera, opts = {}) {
   const {
     canvas,
     document: doc = globalThis.document,
+    window: win = globalThis.window,
     eyeHeight = DEFAULT_EYE_HEIGHT,
     speeds = DEFAULT_SPEEDS,
     sensitivity = DEFAULT_SENSITIVITY,
@@ -200,8 +201,8 @@ export function createPlayerController(camera, opts = {}) {
     doc.addEventListener("mousemove", onMouseMove);
     doc.addEventListener("mouseup", onMouseUp);
   }
-  if (globalThis.window?.addEventListener) {
-    globalThis.window.addEventListener("blur", onBlur);
+  if (win?.addEventListener) {
+    win.addEventListener("blur", onBlur);
   }
 
   function update(dt, proxies = null) {
@@ -245,8 +246,8 @@ export function createPlayerController(camera, opts = {}) {
     if (canvas?.removeEventListener) {
       canvas.removeEventListener("mousedown", onMouseDown);
     }
-    if (globalThis.window?.removeEventListener) {
-      globalThis.window.removeEventListener("blur", onBlur);
+    if (win?.removeEventListener) {
+      win.removeEventListener("blur", onBlur);
     }
   }
 

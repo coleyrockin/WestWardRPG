@@ -71,12 +71,19 @@ function inflated(aabb, r) {
   };
 }
 
+// Treat the boundary as outside — the stuck-inside fallback pushes points to
+// the boundary, so re-running detection on a snapped point must not flag it
+// as still inside (would oscillate the next frame).
 function strictlyInside(point, aabb) {
   return (
     point.x > aabb.minX && point.x < aabb.maxX &&
     point.z > aabb.minZ && point.z < aabb.maxZ
   );
 }
+
+// Tiny nudge applied when pushing a stuck point out so the next frame's
+// sweep test (which uses from.x < inf.minX) sees the player as outside.
+const BOUNDARY_EPSILON = 1e-4;
 
 // Slide-resolve a movement step against a list of AABB proxies.
 //   { from, to }   — start point and intended destination in world (X, Z).
@@ -90,13 +97,15 @@ export function resolveCollision({ from, to }, proxies, radius = PLAYER_RADIUS_D
   let x = from.x;
   let z = from.z;
 
-  // X-axis sweep. For each proxy whose Z extent overlaps the current row,
-  // snap attemptX to the wall the path is crossing. Sweep (not endpoint)
-  // testing prevents tunneling at sprint speed.
+  // X-axis sweep. The Z-overlap guard tests the *swept* Z interval, not
+  // just from.z — a diagonal sprint step where from.z is outside but to.z is
+  // inside would otherwise skip the wall and tunnel through it.
   let attemptX = to.x;
+  const zLo = Math.min(from.z, to.z);
+  const zHi = Math.max(from.z, to.z);
   for (const p of proxies || []) {
     const inf = inflated(p, radius);
-    if (z <= inf.minZ || z >= inf.maxZ) continue;
+    if (zHi <= inf.minZ || zLo >= inf.maxZ) continue;
     if (to.x > from.x && from.x < inf.minX && attemptX > inf.minX) {
       attemptX = Math.min(attemptX, inf.minX);
     } else if (to.x < from.x && from.x > inf.maxX && attemptX < inf.maxX) {
@@ -105,11 +114,14 @@ export function resolveCollision({ from, to }, proxies, radius = PLAYER_RADIUS_D
   }
   x = attemptX;
 
-  // Z-axis sweep using the post-X X (enables slide along walls).
+  // Z-axis sweep using the post-X X (enables slide along walls). Same swept
+  // X-overlap guard so the orthogonal-axis tunnel case is symmetric.
   let attemptZ = to.z;
+  const xLo = Math.min(from.x, x);
+  const xHi = Math.max(from.x, x);
   for (const p of proxies || []) {
     const inf = inflated(p, radius);
-    if (x <= inf.minX || x >= inf.maxX) continue;
+    if (xHi <= inf.minX || xLo >= inf.maxX) continue;
     if (to.z > from.z && from.z < inf.minZ && attemptZ > inf.minZ) {
       attemptZ = Math.min(attemptZ, inf.minZ);
     } else if (to.z < from.z && from.z > inf.maxZ && attemptZ < inf.maxZ) {
@@ -130,10 +142,12 @@ export function resolveCollision({ from, to }, proxies, radius = PLAYER_RADIUS_D
         const dzMin = z - inf.minZ;
         const dzMax = inf.maxZ - z;
         const min = Math.min(dxLeft, dxRight, dzMin, dzMax);
-        if (min === dxLeft) x = inf.minX;
-        else if (min === dxRight) x = inf.maxX;
-        else if (min === dzMin) z = inf.minZ;
-        else z = inf.maxZ;
+        // Push fractionally past the boundary so next-frame sweep tests
+        // (strict <, >) see this point as outside the inflated extent.
+        if (min === dxLeft) x = inf.minX - BOUNDARY_EPSILON;
+        else if (min === dxRight) x = inf.maxX + BOUNDARY_EPSILON;
+        else if (min === dzMin) z = inf.minZ - BOUNDARY_EPSILON;
+        else z = inf.maxZ + BOUNDARY_EPSILON;
         pushed = true;
       }
     }

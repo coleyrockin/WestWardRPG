@@ -5,7 +5,7 @@ export default defineConfig({
   publicDir: 'public',
   appType: 'spa',
   server: {
-    port: 5173,
+    port: 5180,
     strictPort: false,
     open: false,
     host: '127.0.0.1',

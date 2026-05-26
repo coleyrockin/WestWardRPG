@@ -32,6 +32,7 @@ export function stepPlayer(args: StepPlayerArgs): StepPlayerResult;
 export interface CreatePlayerControllerOptions {
   canvas?: any;
   document?: any;
+  window?: any;
   eyeHeight?: number;
   speeds?: Speeds;
   sensitivity?: number;
