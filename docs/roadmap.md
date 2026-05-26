@@ -1,864 +1,330 @@
-# WestWard Engine Rewrite Roadmap
+# WestWardRPG Execution Roadmap
 
-A compact dark western RPG rebuilt for a richer browser-native presentation.
+Single source of truth. Do not create parallel `TODO.md`, `PLAN.md`, `ROADMAP-*.md`,
+or another roadmap file.
+This document is for planning and coordination only and includes no gameplay
+feature implementation details.
 
-This roadmap is the single source of truth. Do not create parallel TODO, PLAN,
-ROADMAP, rewrite, or engine-spike planning files. Update this file when scope
-changes.
+Last updated: `2026-05-26`
+Branch: `main`
 
-## Decision
+## 1. Project Summary
 
-WestWard has outgrown the current Canvas raycasting renderer.
+WestWardRPG is a browser RPG prototype with a large systems backbone already in place:
+job boards/quests, deterministic save/reload, gear and crafting foundations,
+housing/workbench loops, NPC memory, POI/loot systems, run summaries, and
+strong smoke/visual testing coverage.
 
-The existing game proves that the project has valuable RPG systems: jobs, loot,
-gear, housing, NPC memory, save recovery, run summaries, and deterministic
-browser tests. The weak point is the visual engine. The game still looks too
-flat, too samey, and too procedural for the target fantasy.
+Its current execution risk is no longer "core systems missing" but "presentation and
+delivery polish plus maintainer readiness." The first objective is to make the
+repo understandable, auditable, and safe for the next agent before new systems.
 
-The next major project direction is an engine rewrite focused on presentation,
-scene depth, characters, animation, and art direction.
+## 2. Current Product Vision
 
-The current Canvas build becomes the **reference build**:
+Deliver a compact, polished first five-to-ten minute frontier RPG slice with:
 
-1. It remains playable while the rewrite is built.
-2. It remains the source of truth for shipped gameplay behavior.
-3. It protects the project from losing working RPG systems during the rewrite.
-4. It can be removed only after the new version proves the same vertical slice.
+- Obvious first objective and road direction.
+- Stable first-run UX from run start → job objective → combat encounter → meaningful
+  return loop.
+- Deterministic, inspectable systems for easy playtest and deterministic debugging.
+- A stronger visual/polish identity without introducing unmanaged engine migration risk.
 
-## Creative Target
+## 3. Target Users
 
-WestWard should feel like:
+1. Recruiters and hiring managers evaluating engineering depth.
+2. Human playtesters expecting a short but coherent game loop.
+3. Future agents continuing the build from a clear and stable baseline.
+4. Portfolio viewers who may not understand the implementation details but
+   can judge scope and quality from docs and scripts.
 
-1. A stylized dark western RPG.
-2. Oblivion-style road wandering, scaled down.
-3. Weird West mood.
-4. Low-poly graphic novel scenery.
-5. A haunted frontier town at dusk.
-6. Dusty roads, warm lanterns, foggy marshes, strange creatures, wanted boards,
-   rough timber, purple shadows, and readable silhouettes.
+## 4. Current Strengths
 
-The goal is not realism. The goal is beauty, clarity, mood, and playability.
+- Strong test coverage in repository (`91` files, `1057` tests passing).
+- Deterministic browser-test contract (`window.render_game_to_text`, smoke actions).
+- Clear domain feature ownership across jobs, loot, gear, housing, NPC memory, save,
+  and route logic.
+- CI pipeline already includes typecheck/lint/tests/build/smoke/visual pass.
+- Existing release artifact workflow (`npm run package:itch`) and deploy config
+  (`vercel.json`).
+- Solid screenshot/test evidence surface under `output/` and `tests/`.
 
-## Research Summary
+## 5. Current Weaknesses
 
-Recent web RPG and engine research points to one practical conclusion:
+- Visual direction is still heavily debated and can feel inconsistent across
+  commits, especially in first-minute readability.
+- Documentation and code are currently denser than the actual public narrative:
+  some files describe old direction and some command notes are stale.
+- Smoke tests are hard to run in this environment because local server startup is
+  constrained (EPERM on port binding).
+- `src/main.js` is very large and is a known risk concentration point.
+- Security hardening exists, but CSP and inline script posture still need tighter
+  alignment for production review quality.
 
-WestWard should not keep trying to look like a modern RPG inside the old
-raycaster. Browser games that feel visually richer use one of two paths:
+## 6. Current Verification Status
 
-1. A serious 2D engine with strong authored art.
-2. A real 3D/WebGL renderer with scene depth, lighting, models, animation, and
-   post-processing.
+Executed in this repo state before documentation edits:
 
-WestWard wants first-person exploration, readable roads, scenery depth, skies,
-landmarks, character silhouettes, and animated enemies. That makes a 3D/WebGL
-presentation layer the better fit.
-
-Useful references:
-
-1. Hordes.io proves a browser RPG can run as a 3D HTML5/WebGL experience.
-2. BrowserQuest proves HTML5/Canvas can ship multiplayer RPG structure, but its
-   visual ambition is 2D and classic.
-3. CrossCode proves HTML5/JavaScript can support a serious RPG, but it succeeds
-   through strong 2D authored art rather than first-person 3D.
-4. Mad World shows the value of a strong art identity in browser RPGs.
-5. RPGJS and RPG Paper Maker are useful reminders that RPG tools matter, but
-   they are not the best fit for WestWard's first-person dark western target.
-6. Phaser is excellent for 2D browser games, but its own docs say it is not the
-   right choice for fully 3D games.
-7. Godot can export to web, but its web path adds deployment and browser
-   constraints that fight this project's current JavaScript/Vite foundation.
-8. PlayCanvas is powerful, but it moves the project toward another engine
-   ecosystem and editor model.
-9. Three.js is the best first rewrite target because it fits the current Vite
-   project, supports glTF/GLB assets, gives direct renderer control, and lets
-   the existing game state remain outside the scene graph.
-
-## Engine Direction
-
-Use **Three.js** for the first rewrite spike.
-
-This is not a full commitment to ship the final game in Three.js until the spike
-proves the first five minutes look dramatically better.
-
-Why Three.js first:
-
-1. It fits the current web stack.
-2. It keeps the game local-first and browser-native.
-3. It supports GLB/glTF models, animation clips, lighting, fog, particles, and
-   post-processing.
-4. It allows custom low-poly Weird West art direction without adopting a
-   heavier editor workflow.
-5. It lets the DOM remain the right home for HUD, menus, accessibility text,
-   save recovery, job boards, inventory, and settings.
-6. It can coexist beside the current Canvas renderer during migration.
-
-Do not start with Babylon, PlayCanvas, Godot, Unity WebGL, or Phaser unless the
-Three.js spike fails for a specific written reason.
-
-## Rewrite Rules
-
-1. Player-visible improvement beats architecture theater.
-2. Preserve working RPG systems until the replacement proves parity.
-3. Do not delete the Canvas version until the new renderer completes the same
-   first-road loop.
-4. Simulation state must not live inside Three.js meshes.
-5. Renderer objects must never become save data.
-6. HUD and menus stay DOM-first unless a visual effect truly belongs in 3D.
-7. Use GLB/glTF as the asset format for real 3D assets.
-8. Keep procedural placeholder assets only as scaffolding, not final proof.
-9. No new pets, LLM dialogue, economy expansion, second-region expansion, or
-   feature creep during the rewrite.
-10. Every phase needs screenshot proof, browser smoke proof, and clear rollback
-    safety.
-
-## Product Definition
-
-The rewrite is successful when a new player can play the first 20 to 40 minutes
-and say:
-
-1. I can tell where I am.
-2. I can tell where the road goes.
-3. I can tell who Boone is and what the board does.
-4. I can see Smoke Cache before the HUD explains it.
-5. I can recognize Broken Wagon from its silhouette.
-6. I can tell the Road Slime is dangerous before it hits me.
-7. I understand my reward and why it matters.
-8. I can return to town and see the world react.
-9. I can save, reload, recover, and continue.
-10. I would show the first screenshot to someone without apologizing.
-
-## Keep, Replace, Rebuild
-
-### Keep
-
-These systems are valuable and should be preserved or adapted:
-
-1. `jobBoard.js`
-2. `firstRoadMemory.js`
-3. `gameFeel.js` derived first-session helpers
-4. `interactionPrompt.js`
-5. `lootSystem.js`
-6. `gearCrafting.js`
-7. `craftingStation.js`
-8. `npcMemory.js`
-9. `runSummary.js`
-10. `saveMigration.js`
-11. `savePersistence.js`
-12. `graphicsSettings.js` concepts
-13. `combatReadability.js`
-14. browser smoke/test-action infrastructure
-15. `render_game_to_text()` as a QA/debug contract
-
-### Replace
-
-These areas should be rewritten rather than endlessly patched:
-
-1. The current raycast world renderer.
-2. Wall-column scenery.
-3. Procedural flat sprite character rendering.
-4. Canvas-only HUD density.
-5. Near-wall visual treatment.
-6. Fake scenery depth.
-7. Flat prop lineups.
-8. The current first-person visual composition.
-
-### Rebuild Carefully
-
-These systems need new boundaries but should preserve behavior:
-
-1. Input routing.
-2. Camera control.
-3. Collision and interaction queries.
-4. Entity presentation.
-5. Combat animation feedback.
-6. Minimap and objective presentation.
-7. Save/load UI.
-8. Settings and accessibility.
-
-## Target Architecture
-
-The rewrite should move toward this structure:
-
-```text
-src/
-  core/
-    state/
-    save/
-    math/
-    events/
-  systems/
-    jobs/
-    loot/
-    gear/
-    housing/
-    npc/
-    combat/
-    progression/
-    narrative/
-  world/
-    maps/
-    regions/
-    collisions/
-    spawns/
-    interactions/
-  render3d/
-    app/
-    camera/
-    scene/
-    materials/
-    objects/
-    actors/
-    terrain/
-    fx/
-    loaders/
-    debug/
-  ui/
-    hud/
-    menus/
-    dialogue/
-    job-board/
-    save-recovery/
-    settings/
-  bridge/
-    stateSnapshot.js
-    rendererAdapter.js
-    interactionAdapter.js
-    qaSnapshot.js
-```
-
-The current `src/main.js` should shrink into a runtime bootstrap while the new
-structure takes over. Do not move everything at once.
-
-## Milestone 0: Rewrite Prep And Repo Hygiene
-
-Status: **done (2026-05-24).** Canvas game-feel/minimap/region polish committed
-as the final reference-build pass (`2a8d3e2`); stale pre-refactor autostash
-dropped; reference build verified green (996 tests, typecheck, syntax, build);
-spike branch `rewrite/threejs-spike` created from a known baseline; README notes
-the rewrite spike is the active direction.
-
-Goal: Make the rewrite safe before adding the new engine.
-
-Required work:
-
-1. Decide what to do with the current dirty Canvas visual pass.
-   - Either commit it as the final Canvas reference polish.
-   - Or discard only the rewrite-obsolete visual polish after explicit owner
-     approval.
-   - Do not silently lose gameplay, test, smoke, or objective-clarity work.
-2. Freeze the Canvas build as the reference path.
-3. Add a short README note that a renderer rewrite spike is the active next
-   direction.
-4. Keep all tests green before installing new rendering dependencies.
-5. Add an architectural note inside this roadmap only; no extra plan file.
-
-Acceptance:
-
-1. `main` is clean or intentionally dirty with known scope.
-2. Current Canvas game still passes tests and smoke.
-3. The rewrite branch starts from a known baseline.
-
-## Milestone 1: Three.js Spike
-
-Status: **done (2026-05-24) — Three.js confirmed as the rewrite path.**
-
-Goal: Prove that the new visual direction can beat the current screenshot fast.
-
-Scope:
-
-1. Install Three.js.
-2. Add a separate `render3d` bootstrap behind a feature flag or dev route.
-3. Render one static Dustward opening scene.
-4. Use placeholder low-poly geometry first: terrain, road, fences, buildings,
-   job board, lamps, trees, Smoke Cache plume, Broken Wagon, Road Slime.
-5. Do not connect full gameplay yet.
-6. Keep the existing Canvas game playable.
-
-Required first scene:
-
-1. Dusk skybox or gradient dome.
-2. Fog and atmospheric haze.
-3. Warm lantern lights.
-4. Dusty road with readable edges.
-5. Town buildings with silhouettes.
-6. Boone/job-board landmark.
-7. Smoke Cache visible down the road.
-8. Broken Wagon visible as a distinct object.
-9. One Road Slime with hostile silhouette.
-10. DOM objective strip over the scene.
-
-Acceptance:
-
-1. The first screenshot is obviously better than the Canvas screenshot.
-2. The scene runs in browser without gameplay regressions.
-3. The scene can be captured by the existing visual tooling or a new equivalent.
-4. No save schema changes.
-
-Stop condition:
-
-If the Three.js spike does not produce a visibly better first screenshot within
-one focused slice, do not continue blindly. Re-evaluate PlayCanvas or a 2.5D
-authored-art direction.
-
-### Spike Outcome
-
-The spike cleared the strategic gate: the Three.js dusk frontier opening is more
-dimensional and atmospheric than the old raycaster can realistically become.
-**Decision: Three.js is the engine.** The visual comparison script still needs a
-fair in-world Canvas capture before it becomes a strict proof gate.
-
-What shipped (all behind a dev route; the Canvas game is byte-for-byte unchanged):
-
-1. `render3d.html` — dev route serving the spike (`npm run dev` → `/render3d.html`).
-2. `src/render3d/spike.js` — `startSpike(canvas)`: WebGL renderer (ACES tone map,
-   PCF soft shadows), dusk gradient sky-dome shader, `FogExp2` haze, hemisphere +
-   low warm directional sun + per-lamp point lights, and per-`kind` placeholder
-   builders (building, watchtower beacon, lamp, fence, sign, job board, smoke
-   cache + plume, broken wagon, road slime). Sets `window.__spikeReady` after
-   first frame for capture.
-3. `src/render3d/frontierLayout.js` — data-driven placement: world coords mirror
-   the real frontier (`REGION_PRESENTATION.frontier` offsets + `poiSystem.js` hero
-   positions), spread by `depthLane` so background reads as horizon silhouettes.
-4. `scripts/spike_compare.mjs` — Playwright capture of old vs new
-   (`output/spike-compare/`); reports console errors. Spike renders error-free.
-
-Known and intentional limits (these define the work below): placeholder
-primitives, no GLB art, no animation, no gameplay wiring, frontier only.
-
-## Milestone 2: State Adapter
-
-Status: **done (2026-05-24)** — the render snapshot bridge is in place. The 3D
-spike consumes a plain `westward-render-snapshot`, exposes it for browser proof,
-and keeps the static frontier layout only as fallback/seed data.
-
-Goal: Feed the new renderer from existing game state without coupling gameplay
-to Three.js.
-
-Required work:
-
-1. Add `createRenderSnapshot(state)` or equivalent.
-2. Include player position, heading, region, time, weather, active objective,
-   interactables, visible NPCs, enemies, POIs, route markers, lights, and
-   combat cues.
-3. Add tests proving the snapshot is serializable.
-4. Keep `render_game_to_text()` intact.
-5. Keep the old Canvas renderer reading the old state until replacement is
-   proven.
-
-Acceptance:
-
-1. Three.js scene reads from a plain object snapshot.
-2. No Three.js object is stored in save data.
-3. Snapshot tests cover the first-road loop phases.
-
-Outcome:
-
-1. `src/bridge/stateSnapshot.js` exports `createRenderSnapshot(state, options)`.
-2. Snapshot output is JSON-safe and includes player, region, weather, objective,
-   first-road memory, interactables, enemies, route markers, combat cues, lights,
-   and world objects.
-3. `src/render3d/spike.js` now consumes that snapshot and publishes
-   `window.__westwardRenderSnapshot` for browser proof.
-4. `tests/state-snapshot.test.ts` covers serialization, starting board objective,
-   active bounty route state, combat cue state, and Old Road Survey availability.
-
-## Milestone 3: First Five-Minute Rewrite
-
-Status: **active — Milestone 3A complete; Milestone 3B first-loop phase spine
-started 2026-05-26.**
-
-Goal: Rebuild the first playable slice in the new renderer.
-
-Player path:
-
-1. Spawn in Dustward.
-2. See town, Boone, job board, road, and Smoke Cache.
-3. Open Boone board.
-4. Accept Marsh Slime Bounty.
-5. Follow the road.
-6. Reach/open Smoke Cache.
-7. Fight Road Slime.
-8. Inspect Broken Wagon.
-9. Earn Map Scrap.
-10. Return to Boone.
-11. See Old Road Survey follow-up.
-
-Required work:
-
-1. Player movement and camera in Three.js.
-2. Collision against simplified world proxies.
-3. Interaction prompts tied to actual scene objects.
-4. Objective strip tied to existing first-five-minute helper.
-5. Route markers rendered as physical world signs plus minimap/DOM support.
-6. Smoke Cache, Broken Wagon, Boone board, and Road Slime as distinct hero
-   objects.
-7. Basic animation states: idle, walk bob, interact glow, enemy aggro, windup,
-   hit, stagger, death, reward pop.
-
-Acceptance:
-
-1. A tester can complete the first five-minute loop in the new renderer.
-2. Prompt/objective disagreement is impossible by construction.
-3. Browser smoke asserts objective, prompt, job state, reward, memory, and
-   first-road status.
-4. Screenshots show a dramatic visual improvement.
-
-Current Milestone 3B outcome:
-
-1. `src/render3d/phaseState.js` owns the local, non-persisted 3D loop phases:
-   spawn, accept bounty, road walk, cache open, slime fight, wagon inspect, Map
-   Scrap reward, Boone return, and Old Road Survey offered.
-2. `render3d.html` has a Boone board modal and low-chrome objective/prompt shell.
-3. `src/render3d/spike.js` wires the phase state into objective text, prompt
-   gating, board accept, Smoke Cache, Road Slime, Broken Wagon, Map Scrap preview,
-   and Boone return.
-4. `scripts/render3d_loop_smoke.mjs` drives the browser route through the first
-   loop with a dev-only `window.__westward3dTest` hook. The key-input probe can
-   warn in headless Chromium, but controller unit tests still cover movement.
-
-## Milestone 4: Art Pipeline
-
-Goal: Stop relying on programmer art.
-
-Required work:
-
-1. Define `assets/manifest.json` with stable IDs.
-2. Use GLB/glTF for 3D models.
-3. Keep temporary procedural primitives only for missing assets.
-4. Add low-poly asset conventions:
-   - one unit scale
-   - centered pivots
-   - named collision proxies
-   - animation clip names
-   - texture size limits
-   - palette rules
-5. Add asset validation.
-6. Add asset budget:
-   - first scene loads quickly
-   - mobile fallback available
-   - no uncompressed giant textures
-
-First asset set:
-
-1. Dustward road terrain.
-2. Frontier building kit.
-3. Boone board.
-4. Lantern.
-5. Fence.
-6. Dead tree / cottonwood.
-7. Smoke Cache.
-8. Broken Wagon.
-9. Road Slime.
-10. Boone placeholder character.
-
-Acceptance:
-
-1. The first scene uses named assets through the manifest.
-2. Missing assets fail gracefully.
-3. Asset size and load time are measured.
-
-## Milestone 5: Combat And Character Feel
-
-Goal: Make the first enemy and NPCs feel alive.
-
-Required work:
-
-1. Replace rectangle/sprite characters with stylized low-poly or billboarded
-   character rigs.
-2. Add Boone idle pose and board-facing placement.
-3. Add Road Slime animation states:
-   - idle
-   - alert
-   - windup
-   - lunge
-   - hit flash
-   - stagger
-   - death
-   - reward drop
-4. Add weapon/hand presentation that does not look like a pasted shape.
-5. Add hit pause, camera impulse, particles, and reward sparkle with settings
-   respect for reduced motion.
-
-Acceptance:
-
-1. The player can read enemy intent without reading text.
-2. Combat looks better in motion than in the old Canvas build.
-3. Combat accessibility cues remain available.
-
-## Milestone 6: UI Rebuild
-
-Goal: Make the interface feel like a premium game shell, not debug overlay.
-
-Required work:
-
-1. Move text-heavy HUD and menus into DOM modules.
-2. Keep the live scene low-chrome.
-3. Build:
-   - objective strip
-   - interaction prompt
-   - vitals strip
-   - minimap
-   - Boone job board
-   - dialogue
-   - inventory/equipment
-   - house/workbench
-   - save/recovery
-   - settings/pause
-4. Use a dark western command-panel style.
-5. Support keyboard, pointer, narrow viewport, and reduced motion.
-
-Acceptance:
-
-1. The HUD no longer competes with the scene.
-2. Job board and dialogue feel like RPG UI.
-3. Mobile/narrow viewport stays readable.
-
-## Milestone 7: System Parity
-
-Goal: Move the real game loop onto the new presentation without losing systems.
-
-Required parity:
-
-1. Save/load.
-2. Boone jobs.
-3. First-road memory.
-4. Loot and inventory.
-5. Gear and armor.
-6. House/workbench.
-7. NPC memory.
-8. Region identity.
-9. Run summary.
-10. Browser smoke and visual tests.
-
-Acceptance:
-
-1. The new renderer completes everything the MVP Canvas loop completes.
-2. `render_game_to_text()` remains useful.
-3. Existing unit tests still pass or are migrated with equivalent coverage.
-
-## Milestone 8: Retire The Old Renderer
-
-Goal: Remove the old visual architecture only after the new version earns it.
-
-Required work:
-
-1. Compare old and new first-road smoke scenarios.
-2. Compare save/load behavior.
-3. Compare run-summary output.
-4. Remove obsolete Canvas-only renderer code.
-5. Keep pure game systems.
-6. Shrink `main.js` into runtime/bootstrap.
-7. Update README screenshots, commands, and architecture map.
-
-Acceptance:
-
-1. No visible gameplay regression.
-2. No save regression.
-3. No roadmap/docs contradiction.
-4. New screenshots are good enough for a public repo.
-
-## Milestone 9: Release Rewrite MVP
-
-Goal: Ship the rewritten vertical slice as the new project identity.
-
-Required work:
-
-1. Build offline package.
-2. Add public screenshots and short gameplay GIF/video.
-3. Update README with engine rewrite status.
-4. Update known limitations.
-5. Run full QA:
-   - unit tests
-   - typecheck
-   - syntax
-   - lint
-   - build
-   - smoke
-   - visual capture
-   - visual diff
-   - offline package
-6. Playtest on desktop and narrow viewport.
-
-Acceptance:
-
-1. A non-developer can launch and play.
-2. A recruiter can see the project quality from screenshots.
-3. A developer can understand the architecture.
-4. The first five minutes look and feel like the new WestWard.
-
-## Graphics: Next-Level Plan
-
-The spike proves depth and mood with primitives. This is the playbook to take it
-from "promising blocks" to "show the screenshot without apologizing." Work it
-roughly top-down — each tier multiplies the ones below it. Everything here is
-Three.js-native and reduced-motion-safe.
-
-### 1. Rendering & post-processing (biggest win per hour)
-
-Add `postprocessing` (`EffectComposer`) on top of the existing ACES tone map:
-
-1. **Selective bloom** on emissive lanterns, beacon, reward sparkle, slime eyes —
-   the single highest-impact upgrade for the dusk-lantern fantasy. Keep it
-   selective so the whole frame doesn't wash out (the spike's first pass blew the
-   lamps to white; emissive intensity is now tuned, but bloom is the real fix).
-2. **Color-grade LUT** to lock the Weird West palette — purple shadows, warm
-   mids, desaturated dust. One graded look beats per-material color-picking.
-3. **Outline / edge pass** (or inverted-hull) for readable silhouettes — directly
-   serves the "recognize the slime/wagon before the HUD explains it" goal and the
-   low-poly graphic-novel target.
-4. **SMAA/FXAA**, subtle vignette, filmic grain at low strength.
-5. **Contact/blob shadows** under actors in addition to the sun shadow map, so
-   characters feel planted.
-
-### 2. Lighting & atmosphere
-
-1. Real **sun + sky** (Three `Sky` shader or a tuned gradient dome with a sun
-   disc) driven by a single time-of-day value; wire it to the existing game time.
-2. **Volumetric haze / god-rays** from the low sun and lantern cones (cheap
-   additive cones or a light-shaft post pass — not full volumetrics).
-3. Layered **fog** (near dust + far depth fade) so the road reads into distance.
-4. Lantern flicker via noise on intensity (reduced-motion: hold steady).
-
-### 3. Art direction & materials (retire programmer art — Milestone 4)
-
-1. Replace box/cone placeholders with **low-poly GLB models** (vertex-colored or
-   lightly textured), loaded via `GLTFLoader` + **DRACO/meshopt** compression.
-2. Decide the shading language with a quick A/B: **stylized PBR low-poly** vs
-   **toon ramp** (`MeshToonMaterial` + gradient map) — the toon look may hit the
-   "graphic novel" target faster. Pick one and commit.
-3. Central **palette module** (extend `regionVisualIdentity` color language) so
-   every asset and the LUT share one source of truth.
-4. `assets/manifest.json` with stable IDs, one-unit scale, centered pivots, named
-   collision proxies, animation-clip names, texture-size + palette rules, and
-   asset validation. Missing assets fail gracefully to a tagged primitive.
-
-### 4. World depth & density
-
-1. Real **terrain mesh** with the road carved/vertex-painted in, dust ruts via
-   normal map — replaces the flat ground plane.
-2. **InstancedMesh** sage/grass/rocks/fence-rails for density at near-zero draw
-   cost; **merge** static town geometry.
-3. **Distant silhouette billboards** for far hills/mesas/treeline behind the fog.
-4. LOD for hero props; cull offscreen.
-
-### 5. Characters, enemies & animation (game-to-next-level)
-
-1. Rigged GLB characters through `AnimationMixer` with the clip set the roadmap
-   already names: idle, walk-bob, interact glow, enemy aggro, windup, lunge, hit
-   flash, stagger, death, reward pop.
-2. **Telegraph enemy intent visually** — the Road Slime's windup/lunge must be
-   readable without text (squash-stretch + tell). This is a core MVP success
-   criterion, not polish.
-3. Boone with an idle pose and board-facing placement; weapon/hand presentation
-   that isn't a pasted shape.
-
-### 6. VFX & game feel
-
-1. Real **particle systems**: smoke-cache plume, footstep dust, hit impact,
-   reward sparkle (replace the stacked-cone plume placeholder).
-2. **Hit-pause + camera impulse** on combat, gentle **head-bob** on walk — all
-   gated by `prefers-reduced-motion` and the settings menu.
-3. **Audio** is a force-multiplier the roadmap under-weights: ambient dusk bed,
-   lantern crackle, footsteps, slime SFX, reward sting. Low effort, high "alive."
-
-### 7. Performance & quality tiers
-
-1. Set **asset/draw-call/texture budgets**; cap `pixelRatio` (≤2); KTX2/Basis
-   textures.
-2. Map **low/balanced/high** presets onto existing `graphicsSettings` concepts:
-   shadow resolution, bloom on/off, particle density, instancing distance,
-   post-stack depth. Provide a mobile/narrow-viewport fallback.
-3. Add an FPS/draw-call debug overlay (stats) gated to dev.
-
-### 8. Tooling & guardrails
-
-1. Extend visual-regression to the **3D route**: screenshot `/render3d.html`
-   (build on `scripts/spike_compare.mjs`) and gate it like the Canvas captures.
-2. Keep `render_game_to_text()` and the `opening_scene_proof` contract authoritative
-   for QA as the renderer changes.
-3. Consider **diegetic UI**: Boone's board as a real approachable in-world object
-   that opens the DOM panel — closes the prompt/objective/world gap by construction.
-
-## Risk Register
-
-| Risk | Why It Matters | Guardrail |
+| Command | Result | Summary |
 | --- | --- | --- |
-| Rewrite sinkhole | Full rewrites can stall forever | Spike first, ship first five minutes before broader migration |
-| Losing working RPG systems | The current systems are the project value | Keep game state and tests as source of truth |
-| Three.js becomes messy | Three.js is a renderer, not a full game engine | Build clear core/systems/render/ui boundaries |
-| Asset bottleneck | Better engine still needs better art | Start with low-poly kit + manifest + validation |
-| Performance regression | WebGL scenes can get expensive | Set asset budgets, quality settings, screenshot and FPS checks |
-| Save corruption | Renderer changes must not affect save state | Renderer snapshots only; no renderer objects in saves |
-| UI clutter returns | RPG systems can crowd the screen | DOM UI, low-chrome default, objective-first HUD |
+| `npm run dev:lint` | **Pass** | JS/TS/Python syntax checks passed, dependencies found |
+| `npm test` | **Pass** | `91` files, `1057` tests passed |
+| `npm run test:syntax` | **Pass** | `web_game_playwright_client.mjs`, visual smoke scripts valid |
+| `npm run build` | **Pass** | `vite` build successful |
+| `npm run test:smoke` | **Fail** | Server failed to start on default port (`EPERM` 5173) |
+| `WESTWARD_PORT=5211 npm run test:smoke` | **Fail** | Server failed to start on explicit port (`EPERM`) |
 
-## Immediate Action Plan
+Recommended next-agent action: run smoke against an explicitly controllable
+environment (or document the port-binding constraint and include pre-flight checks
+in test scripts).
 
-Milestones 0–2 and the 3A/3B foundations are now live.
+## 7. Current Completion Status
 
-### Milestone 3B — First-Loop Playability Finish
+### Completed/Stable
 
-Goal: make the existing Three.js first-road state machine feel like a playable 3D slice without adding broader systems.
+- Core systems baseline + deterministic flows.
+- Test framework and smoke/visual tooling.
+- Three.js spike entrypoint present (`render3d.html`) while preserving Canvas as
+  gameplay reference.
+- Save migration v3 and run-state snapshots in code/tests.
 
-1) Remove fragility in movement proof and keep smoke deterministic.
-- Keep `tests/render3d-phase-state.test.ts`, `tests/render3d-interaction.test.ts`, and `tests/render3d-player-controller.test.ts` passing.
-- Confirm `scripts/render3d_loop_smoke.mjs` completes end-to-end from spawn to survey offer in headless and non-headless modes.
-- If deterministic teleport fallback is still used, log it as expected recovery behavior and add a short note in the smoke output.
+### In-Progress / Not Finished
 
-2) Extract loop orchestration from `src/render3d/spike.js`.
-- Create `src/render3d/firstRoadLoop.js` with pure-or-near-pure helpers for phase wiring.
-- Keep `spike.js` responsible for scene/bootstrap only.
-- Preserve `window.__westward3dTest` for compatibility.
-- Export a small loop action map for future parity with save/recovery work.
+- Final visual quality and readability pass for first-five-minute presentation.
+- Recruiter-facing presentation polish (README clarity, roadmap confidence, entry
+  path).
+- Playbook quality for "agent handoff without ambiguity."
+- Controlled hardening of browser debug/testing global surface.
 
-3) Make world objects visibly stateful.
-- Add phase-reactive visuals for board, smoke cache, slime, and wagon.
-- Minimum states:
-  - Board: cold, active, complete.
-  - Cache: idle, opened, threatened.
-  - Slime: idle, alert, windup, hit, stagger, defeat.
-  - Wagon: untouched, inspected, reward-ready.
-- No gameplay logic changes; only rendering cues and animation flags.
+## 8. Production Readiness Scorecard
 
-4) Improve combat readability in the first loop.
-- Add distinct visual telegraph states to Road Slime:
-  - hostile color pulse
-  - windup grow/squash
-  - hit flash
-  - short camera or world-space recoil
-  - reward pop marker
-- Keep combat deterministic and timing-tested in the 3D loop test path.
+- **Code behavior:** good (existing tests pass in app scope)
+- **Playability:** partial (first-road loops are present; visual quality and first
+  objective hierarchy still need polish)
+- **Documentation readiness:** medium (strong base docs, but drift and stale claims)
+- **Security posture:** partial (no critical findings, but CSP inline script debt and
+  debug surface could be tightened)
+- **Operational readiness:** medium (automation exists, but smoke needs deterministic
+  local startup path)
 
-5) UI and first-minute clarity.
-- Keep one mission strip and one prompt.
-- Confirm objective meta chips match target/why/reward for each phase.
-- Ensure prompt text and active target can never disagree by construction.
+## 9. Architecture Recommendations
 
-Acceptance for 3B:
-- A human can complete board → bounty → cache → slime → wagon → return on `render3d.html`.
-- Objective, prompt, and interactable target always agree.
-- Smoked path verifies: phase, inventory preview (`Map Scrap`), and Boone return state.
-- No regressions in existing Canvas build (`src/main.js` untouched).
+- Keep the current **Canvas renderer + 3D spike** model as a reference/experimental
+  split until parity proof is written.
+- Treat `src/main.js` as the bootstrap/orchestration file for now; avoid a full
+  split until roadmap items require it.
+- Preserve pure helper/testability boundaries around:
+  `gameFeel`, `jobBoard`, `firstRoadMemory`, `interactionPrompt`,
+  `render_game_to_text` payload, and save migration helpers.
+- Add docs-level dependency maps (system → tests → file owners) in this roadmap.
 
-### Milestone 3C — 3D Visual Baseline Hardening
+## 10. Refactor Recommendations (Documentation-Led, No App Refactor Now)
 
-Goal: make screenshots say “professional RPG slice” in the first 60 seconds.
+1. **Do not refactor gameplay systems yet.**
+   The next push is planning/housekeeping; technical refactors belong to a
+   later milestone after the roadmap is stabilized.
+2. **Introduce "system ownership matrix."**
+   One short entry per critical subsystem with owner, tests, data contract, and
+   risk notes.
+3. **Create explicit documentation checkpoints.**
+   Every subsystem page should list: "how it behaves", "what it depends on", and
+   "what breaks if changed."
+4. **Keep runtime logic untouched.**
+   This roadmap commit stays on docs only.
 
-1) Add cheap but meaningful polish in scene composition:
-- stronger road-leading silhouette rhythm,
-- stronger lantern contrast,
-- more recognizable silhouettes,
-- stronger dusk/sky gradation consistency.
+## 11. UI and UX Recommendations (non-implementation planning)
 
-2) Add a first visual capture checklist:
-- spawn,
-- Boone and board,
-- road toward Smoke Cache,
-- Road Slime encounter,
-- Broken Wagon reward,
-- return beat.
+- Define a public-facing "first-play flow" and map every required UI state to one
+  text source (`HUD`, `job board`, `prompt`, `summary`, `house/job reaction`).
+- Keep the opening HUD objective as the top cognitive load; avoid duplicated
+  mission states.
+- Validate controls and objective clarity on small viewport as part of current
+  smoke/test documentation.
+- Add explicit UX review checklist fields:
+  1. Can a player read first objective in 10s?
+  2. Can they identify next danger in 15s?
+  3. Can they understand reward consequence before combat ends?
 
-3) Add a smoke/visual check gate for one frame of each phase if capture tooling supports it.
-- If strict image diff is too noisy, use route-level pass/fail plus explicit assertions.
+## 12. Performance Recommendations
 
-Acceptance for 3C:
-- New capture set is visibly better than prior pass.
-- No extra dependencies beyond Three.js and existing tooling.
-- Performance remains stable for simple local play.
+- Keep `main.js` risk concentration documented: record hotspots and known
+  non-blocking responsibilities.
+- Track build size warnings (`vite` chunk >500 KB) as a long-term milestone item:
+  acceptable now, but not ignored.
+- Add `render3d` inclusion policy in docs: when to build it, when to ignore it in
+  local runs, and expected runtime cost.
 
-### Milestone 4 — Asset pipeline only after loop feel is proven
+## 13. Security Recommendations
 
-Goal: move from placeholders to real placeholders-to-assets only when phase flow is solid.
+- Inline script cleanup:
+  - Move inline scripts in `index.html` into external modules or add strict CSP
+    and nonce strategy.
+- Debug globals (`window.advanceTime`, `window.render_game_to_text`) should remain
+  test-accessible but explicitly documented and gated for non-production use.
+- Keep all local save migration and recovery logic defensive and reject malformed
+  payloads with explicit error states.
+- Keep third-party dependencies explicit and avoid adding new external runtime calls.
 
-1) Freeze `assets/manifest.schema.json` + `assets/manifest.json` with `id`, `kind`, `pivot`, `collisionProxy`.
-2) Add replacement candidates for:
-- Boone job board
-- road markers/signs
-- smoke cache
-- broken wagon
-- road slime
-3) Keep procedural fallback for missing assets until manifest is complete.
+## 14. Accessibility Recommendations
 
-Acceptance for 4:
-- No save schema changes.
-- Snapshot contract remains stable.
-- New assets render without breaking first-loop flow.
+- Document keyboard-only mission flow and focus order in README/roadmap.
+- Add explicit reduced-motion and text contrast checks to verification checklist.
+- Audit ARIA and control labels for mission-critical UI: board dialog, job board,
+  route marker copy, and recovery controls.
+- Ensure onboarding text has the same semantic meaning across locales.
 
-### Current checkpoint (for handoff)
+## 15. SEO / Public Visibility Recommendations
 
-- Done: 3D snapshot bridge, phase state machine, interaction shell, local first-road loop, smoke helper, HUD metadata.
-- In-progress: combat/readability and phase-state visual polish.
-- Blocked: full 3D art replacement is intentionally paused until these loops are visibly playable.
+- Keep Open Graph metadata consistent with deployed URL and actual features.
+- Add explicit public screenshot path references that do not require local build
+  assumptions.
+- Update README "demo link" and deployment link only if consistently valid.
 
-### For the next agent only
+## 16. Testing Strategy
 
-Start with:
-1. `src/render3d/firstRoadLoop.js` extraction.
-2. `src/render3d/spike.js` cleanup to scene bootstrap only.
-3. Phase-state-driven visual cues for board/cache/slime/wagon.
-4. One stable smoke pass proving loop completion and `Map Scrap` reward.
-5. Screenshot checklist in `output/` and short note in roadmap once pass is complete.
+### Required before changing docs only
 
-Recommended command order:
+- `npm run dev:lint`
+- `npm test`
+- `npm run typecheck:ts`
+- `npm run test:syntax`
+- `npm run build`
+
+### Required before code changes in next milestone
+
+- Smoke proof at explicit port once server startup constraint is controlled.
+- Visual proof checklist and `npm run test:visual:review`.
+- At least one browser QA pass with first-road objective + reward + return path visible.
+
+## 17. CI/CD and Deployment Recommendations
+
+- Keep existing GitHub Actions but add branch protections for direct pushes after
+  roadmap lock.
+- Document explicit environment assumptions in QA commands (port availability, headless
+  dependencies).
+- Maintain release output docs for Vercel and offline package flow.
+
+## 18. Documentation Improvements
+
+- Make `README.md` and this roadmap the only canonical narrative layer.
+- Add "what is in and out of scope" to every major section.
+- Remove ambiguous claims like "no engine"/ "all new work done" unless literally true.
+- Add a short "what changed last run" section in README for quick continuity.
+
+## 19. GitHub Presentation Improvements
+
+- Add a concise opening summary for recruiters:
+  project objective, tech stack, test coverage, demo path, and current milestone.
+- Add consistent badge set tied to current scripts (`vitest`, `playwright`, `build`).
+- Keep screenshot gallery lean and relevant to first playable slice.
+
+## 20. Future Feature Ideas (Not in Current Scope)
+
+These are intentionally deferred until documentation/release baseline is stable:
+
+- Full 3D migration.
+- New world/region expansion.
+- NPC LLM integration.
+- New economy systems beyond proofed vertical loop.
+
+## 21. Production Readiness Checklist
+
+Before shipping to a portfolio-ready proof:
+
+- [ ] Documentation and roadmap are consistent with runtime behavior.
+- [ ] Test gates pass in a clean environment.
+- [ ] Smoke checks are reproducible with explicit URL + port inputs.
+- [ ] README tells first-run flow and known limitations clearly.
+- [ ] Release package command and output location are current.
+- [ ] Security posture documented with explicit known risks and mitigations.
+- [ ] First five-minute loop behavior remains stable and understandable.
+
+## 22. Suggested Milestone Order
+
+1. **Handoff Consolidation (docs + verification first)**
+   - Fix documentation drift, add explicit status checks, lock roadmap/scope.
+2. **Delivery Reliability**
+   - Make smoke reproducibility deterministic for the environment used by the next
+     agent.
+3. **First-play Clarity (non-code checks first)**
+   - Define objective hierarchy and visibility checks in writing and confirm against
+     existing UI behavior.
+4. **Security and Accessibility Baseline Hardening**
+   - Formalize risk surface and create gating checks for global debug surface/CSP.
+5. **Review and Pause Gate**
+   - Stop before any new gameplay feature is introduced; confirm new-doc plan quality.
+
+## 23. Next Agent Instructions
+
+### First 5 tasks
+
+1. Sync branch state and confirm the docs-only change context.
+2. Read this roadmap end-to-end, then verify `README.md`, `ROADMAP`, and `package.json`
+   for consistency.
+3. Validate that no non-doc file changes are committed.
+4. Add first-play objective proof checklist to docs with explicit acceptance criteria.
+5. Re-run verification commands and update the "Current Verification Status" section.
+
+### Files likely involved
+
+- `docs/roadmap.md` (primary)
+- `README.md` (canonical public summary)
+- `CONTRIBUTING.md` (only if setup steps need precision)
+- `scripts/README.md` (command matrix alignment)
+
+### Commands to run before making changes
 
 ```bash
-npm run test:render3d
-WESTWARD_URL=http://127.0.0.1:5173 npm run test:smoke # optional full run only after loop is complete
-npm run test:visual:capture
-npm run test:visual:review
-```
-
-## Verification Gates
-
-Run before meaningful commits:
-
-```bash
-git diff --check
+git status --short --branch
+npm run dev:lint
 npm test
 npm run typecheck:ts
 npm run test:syntax
-npm run dev:lint
 npm run build
 ```
 
-Run when player flow, UI, save, or renderer behavior changes:
+### Commands to run after docs updates
 
 ```bash
-npm run test:smoke
+git status --short --branch
+git diff --check
 ```
 
-Run when visuals change:
+### Tests/checks the next agent should run
 
-```bash
-npm run test:visual:capture
-npm run test:visual:review
-npm run test:visual
-```
+- Full command suite listed in **Section 16** (or failures must be documented).
+- A manual smoke attempt with explicit URL/port (if the environment permits).
+- Optional visual review pass if the roadmap claims visual quality evidence.
 
-Run before release handoff:
+### What must not be broken
 
-```bash
-npm run package:itch
-```
+- Do not change gameplay behavior in this planning phase.
+- Do not alter `src` application logic.
+- Do not expand scope beyond this documentation pass.
 
-## Current Repo Note
+### When to stop and ask for human review
 
-As of 2026-05-26, milestones up to the current 3B first-loop finish are landed on `main`:
+Stop immediately if you see:
 
-- **Milestone 0–2**: Canvas polish reference build, Three.js spike behind `render3d.html`,
-  render snapshot bridge, visual baselines (18 PNGs, strict gate).
-- **Milestone 3A** (PR #19, `4c30262`): Art proof — purple dusk 3-stop sky, road-level
-  camera (FOV 65°), backface-expansion outlines, contact shadows, vignette overlay,
-  sickly green slime, larger job board, 6-cone smoke plume.
-- **Milestone 3B** (commit `444e264`): phase-state HUD polish and smoke stability pass:
-  objective metadata, phase metadata in loop state, deterministic fallback for headless
-  movement in smoke only when key input does not register.
-- **Compare gate** (PR #18): `scripts/spike_compare.mjs` asserts old Canvas is real
-  in-world Dustward gameplay (mode "playing", no modal, region "frontier") before
-  writing `output/spike-compare/old.png`. Both PNGs captured via `canvas.toDataURL()`
-  to bypass Playwright's RAF-idle deadlock.
-- **Smoke probe**: `window.__westwardSmoke.getGameplayState()` added to Canvas build.
+- Any conflict between code behavior and roadmap claims.
+- Any command output showing real regressions in existing tests.
+- Any documentation edit that requires behavioral interpretation (those should be
+  deferred to the next engineering milestone).
 
-The Canvas renderer (`src/main.js`) is the reference and must remain untouched by
-3D rewrite work. Do not delete it or mix Canvas changes with renderer-rewrite commits
-until Milestone 8 (System Parity proven, then retire).
+### Recommended first commit message
+
+`docs: add roadmap for next agent`
+
+## 24. Appendix: Action Template (for all roadmap items)
+
+Use this exact template for future work packages:
+
+- **What needs to be done**
+- **Why it matters**
+- **Expected impact**
+- **Difficulty** (`Low` / `Medium` / `High`)
+- **Risk** (`Low` / `Medium` / `High`)
+- **Dependencies**
+- **Files/Folders likely involved**
+- **Suggested implementation order**
+- **Acceptance criteria**
+- **Tests/checks the next agent should run**

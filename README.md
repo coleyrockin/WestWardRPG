@@ -8,9 +8,9 @@
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat)
 
 Story-first open-world frontier RPG built on a custom Canvas raycasting stack.
-No engine. No framework lock-in. Just readable systems code, deterministic helpers, and a growing RPG loop.
+The repository also keeps a Three.js first-road spike (`render3d.html`) while the Canvas build remains the gameplay reference.
 
-The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction with a new visual target: a stylized dark western RPG, closer to Oblivion meets Weird West meets a low-poly graphic novel.
+The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction with a new visual target: a stylized dark western RPG, closer to *Oblivion meets Weird West meets a low-poly graphic novel*.
 
 ## Preview
 
@@ -94,7 +94,7 @@ The current build contains the Shattered Frontier v3 foundation plus several ope
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual direction**: redesigned title screen, region visual identities, combat feedback, and an active Dustward Canvas art-kit pass with dusk sky, warmer road language, town silhouettes, lantern/wanted-board props, lower marsh barriers, and less placeholder-heavy opening composition.
 
-Latest local fast gate: `npm test` reports **984 passing tests across 86 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **1057 passing tests across 91 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
@@ -104,7 +104,7 @@ Latest local fast gate: `npm test` reports **984 passing tests across 86 files**
 > the playable source of truth for shipped gameplay until the new renderer proves
 > the same first-road slice. The spike lives behind the `render3d.html` dev route
 > (`npm run dev` → open `/render3d.html`) and does not touch the Canvas game. See
-> [`docs/roadmap.md`](docs/roadmap.md) (Milestones 0–9).
+> [`docs/roadmap.md`](docs/roadmap.md).
 
 The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the single source of truth. The high-level active build order is:
 
@@ -170,10 +170,10 @@ expansion is intentionally post-MVP.
 git clone https://github.com/coleyrockin/WestWardRPG.git
 cd WestWardRPG
 npm ci
-npm run dev          # Vite dev server with HMR on port 5173
+npm run dev          # Vite dev server with HMR (default `127.0.0.1:5180` from `vite.config.js`)
 ```
 
-Then open [http://localhost:5173](http://localhost:5173).
+Then open [http://127.0.0.1:5180](http://127.0.0.1:5180) (or the exact Vite output URL).
 
 For a production build:
 
@@ -189,7 +189,7 @@ For an offline-playable ZIP (itch.io style — runs by double-clicking
 npm run package:itch  # writes releases/westward-rpg-offline-v<version>.zip
 ```
 
-If port `5173` is already used on your machine, Vite will automatically pick the next available port.
+If port `5180` is already in use, Vite will automatically pick the next available port.
 
 ## Controls
 
@@ -218,6 +218,7 @@ If port `5173` is already used on your machine, Vite will automatically pick the
 ```text
 WestWard/
 ├── index.html
+├── render3d.html
 ├── src/
 │   ├── main.js              # orchestration loop + rendering + input
 │   ├── constants.js         # tuning constants and static system values
@@ -247,9 +248,9 @@ WestWard/
 │   ├── influenceMap.js      # faction influence coefficients → spawn density + tint
 │   ├── runHistory.js        # localStorage-backed run history + playtest metrics
 │   ├── fogOfWar.js          # 32×32 per-region fog grid; minimap reveals on movement
-│   ├── sideJobGenerator.js  # CSP side-job generator seeded by region + faction state
+│   ├── sideJobGenerator.js  # side-job generator seeded by region + faction state
 │   ├── wfcInteriors.js      # Wave Function Collapse cave/mine/ruin interior generator
-│   ├── languagePacks.js     # 8-language locale strings (extracted from main.js)
+│   ├── languagePacks.js     # locale strings used across localized copy
 │   ├── gameState.d.ts       # GameState type hierarchy (PlayerState, NarrativeState…)
 │   ├── saveMigration.js     # v1/v2 -> v3 save migration
 │   └── storyContent.js      # flagship dialogue and narrative flavor text
@@ -310,7 +311,7 @@ The on-disk payload schema version field tracks compatibility:
 
 ## Troubleshooting
 
-- **Wrong app appears on localhost**: another process or service worker may be using `5173`; run smoke on a clean explicit port, for example `WESTWARD_PORT=5201 WESTWARD_URL=http://127.0.0.1:5201/index.html npm run test:smoke`.
+- **Wrong app appears on localhost**: another process may be using the port; run smoke on an explicit URL, for example `WESTWARD_PORT=5211 WESTWARD_URL=http://127.0.0.1:5211/index.html npm run test:smoke`.
 - **No audio at start**: click canvas first to unlock browser audio context.
 - **QA creates local artifacts**: smoke and visual checks write to ignored `output/`; remove it when you want a clean workspace.
 - **Roadmap seems ahead of README**: use [`docs/roadmap.md`](docs/roadmap.md) as the detailed current plan; this README is the high-level project entry point.
