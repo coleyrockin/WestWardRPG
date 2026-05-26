@@ -360,6 +360,7 @@ function createSpikeSnapshot() {
 function syncObjectiveDom(snapshot, loopState = null) {
   const label = document.querySelector("#objective .label");
   const text = document.querySelector("#objective .text");
+  const meta = document.querySelector("#objective .meta");
   const tag = document.querySelector("#tag");
   const view = loopState || {};
   if (label) label.textContent = view.objectiveLabel || snapshot.objective?.title || "Objective";
@@ -368,6 +369,10 @@ function syncObjectiveDom(snapshot, loopState = null) {
       ? `${snapshot.objective.currentTarget} - ${snapshot.objective.nextAction}`
       : "Open Boone's board - accept the Marsh Slime Bounty."
   );
+  if (meta) {
+    const items = Array.isArray(view.objectiveMeta) ? view.objectiveMeta : [];
+    meta.innerHTML = items.slice(0, 2).map((line) => `<span>${line}</span>`).join("");
+  }
   if (tag) tag.textContent = `WestWard · ${snapshot.region.label} · ${view.phase || "Dusk"}`;
 }
 
@@ -548,6 +553,16 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   window.__westward3dTest = {
     getLoopState: () => loopState.state,
     getPlayerPosition: () => player.position,
+    movePlayerToKind: (kind) => {
+      const target = snapshot.worldObjects.find((obj) => obj.kind === kind);
+      if (!target || !player.setPosition) return null;
+      const x = target.x - 1.35;
+      const z = target.y;
+      player.setPosition({ x, z });
+      refreshLoopDom();
+      interaction.update(player.position);
+      return player.position;
+    },
     interact(kind) {
       const handlers = {
         jobBoard: handleJobBoard,

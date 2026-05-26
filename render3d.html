@@ -38,7 +38,21 @@
         flex: none;
       }
       #objective .label { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #d8a84f; }
-      #objective .text { font-size: 17px; }
+      #objective .text { font-size: 17px; display: block; margin-top: 3px; }
+      #objective .meta {
+        display: flex;
+        gap: 8px;
+        margin-top: 6px;
+        flex-wrap: wrap;
+        font-size: 11px;
+        color: #e6ca97;
+        opacity: 0.9;
+      }
+      #objective .meta span {
+        padding: 3px 8px;
+        border: 1px solid rgba(216, 168, 79, 0.4);
+        border-radius: 999px;
+      }
 
       #tag {
         position: fixed; top: 14px; left: 16px;
@@ -133,6 +147,7 @@
       <span>
         <span class="label">Objective</span><br />
         <span class="text">Open Boone's board — accept the Marsh Slime Bounty.</span>
+        <div class="meta" aria-live="polite"></div>
       </span>
     </div>
     <div id="board-modal" hidden>

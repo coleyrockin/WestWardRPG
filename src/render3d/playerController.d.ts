@@ -40,6 +40,7 @@ export interface CreatePlayerControllerOptions {
 
 export interface PlayerController {
   update(dt: number, proxies?: any[] | null): void;
+  setPosition(position: Vec2): void;
   dispose(): void;
   readonly position: Vec2;
   readonly yaw: number;

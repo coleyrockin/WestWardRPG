@@ -236,6 +236,18 @@ export function createPlayerController(camera, opts = {}) {
     }
   }
 
+  function setPosition(nextPosition = {}) {
+    const incoming = {
+      x: Number.isFinite(nextPosition.x) ? nextPosition.x : position.x,
+      z: Number.isFinite(nextPosition.z) ? nextPosition.z : position.z,
+    };
+    position = { x: incoming.x, z: incoming.z };
+    if (camera) {
+      camera.position.x = incoming.x;
+      camera.position.z = incoming.z;
+    }
+  }
+
   function dispose() {
     if (doc?.removeEventListener) {
       doc.removeEventListener("keydown", onKeyDown);
@@ -253,6 +265,7 @@ export function createPlayerController(camera, opts = {}) {
 
   return {
     update,
+    setPosition,
     dispose,
     get position() { return { x: position.x, z: position.z }; },
     get yaw() { return yaw; },

@@ -12,56 +12,65 @@ export const LOOP_PHASES = Object.freeze([
 
 const PHASE_COPY = {
   spawn: {
-    label: "Dustward Road",
+    label: "Follow the road",
     text: "Find Boone's lit job board by the road.",
+    meta: ["Target: Boone's job board", "Action: Open board"],
     targetKind: "jobBoard",
     prompt: "E — Read Boone's Board",
   },
   accept_bounty: {
     label: "Marsh Slime Bounty",
     text: "Open Boone's board and accept the Marsh Slime Bounty.",
+    meta: ["Target: Smoke Cache", "Reward: Route clarity + job line"],
     targetKind: "jobBoard",
     prompt: "E — Open Boone's Board",
   },
   road_walk: {
     label: "Follow The Marshal Road",
     text: "Follow the lantern road to Smoke Cache.",
+    meta: ["Target: Smoke Cache", "Threat: Unknown in marsh"],
     targetKind: "smokeCache",
     prompt: "E — Open Smoke Cache",
   },
   cache_open: {
     label: "Smoke Cache",
     text: "Smoke Cache is open. Something is moving in the marsh.",
+    meta: ["Objective: Survive the ambush", "Reward: Map Scrap lead"],
     targetKind: "smokeCache",
     prompt: "Cache opened",
   },
   slime_fight: {
     label: "Road Slime",
     text: "Strike the Road Slime before it reaches the cache.",
+    meta: ["Action: Strike until it falls", "Threat: Road Slime"],
     targetKind: "roadSlime",
     prompt: "E — Strike Road Slime",
   },
   wagon_inspect: {
     label: "Broken Wagon",
     text: "Inspect the broken wagon for whatever the slime was guarding.",
+    meta: ["Action: Inspect wagon", "Reward: Map Scrap"],
     targetKind: "brokenWagon",
     prompt: "E — Inspect Broken Wagon",
   },
   scrap_earned: {
     label: "Map Scrap Found",
     text: "+1 Map Scrap. This points to an old road survey.",
+    meta: ["Status: Map Scrap secured", "Next: Return to Boone"],
     targetKind: "brokenWagon",
     prompt: "Map Scrap recovered",
   },
   return_to_boone: {
     label: "Return To Boone",
     text: "Bring the Map Scrap back to Boone's board.",
+    meta: ["Action: Return promptly", "Reward: Survey opportunity"],
     targetKind: "jobBoard",
     prompt: "E — Report To Boone",
   },
   survey_offered: {
     label: "Old Road Survey",
     text: "Old Road Survey is unlocked as the next Boone follow-up.",
+    meta: ["Status: Open on board", "Next: Follow-up loop active"],
     targetKind: "jobBoard",
     prompt: "E — View Old Road Survey",
   },
@@ -135,6 +144,7 @@ export function getPhaseView(phase) {
     phase: LOOP_PHASES.includes(phase) ? phase : "spawn",
     label: copy.label,
     objectiveText: copy.text,
+    objectiveMeta: copy.meta,
     activeTargetKind: copy.targetKind,
     promptText: copy.prompt,
   };
@@ -173,6 +183,7 @@ export function createLoopStateMachine(overrides = {}) {
       activeTargetKind: view.activeTargetKind,
       objectiveText: view.objectiveText,
       objectiveLabel: view.label,
+      objectiveMeta: view.objectiveMeta,
     };
   }
 
