@@ -694,95 +694,119 @@ Add `postprocessing` (`EffectComposer`) on top of the existing ACES tone map:
 
 ## Immediate Action Plan
 
-Milestones 0–2 and Milestone 3A are done. Milestone 3B is now partially built:
-the Three.js route has movement/collision/prompt foundations plus a local,
-non-persisted first-road phase spine that can step through Boone board, bounty
-acceptance, Smoke Cache, Road Slime, Broken Wagon, Map Scrap preview, Boone
-return, and Old Road Survey offered.
+Milestones 0–2 and the 3A/3B foundations are now live.
 
-What remains is not more planning. The next agent should turn this phase spine
-into visible game feel.
+### Milestone 3B — First-Loop Playability Finish
 
----
+Goal: make the existing Three.js first-road state machine feel like a playable 3D slice without adding broader systems.
 
-### Next Agent Handoff — Milestone 3B Finish
+1) Remove fragility in movement proof and keep smoke deterministic.
+- Keep `tests/render3d-phase-state.test.ts`, `tests/render3d-interaction.test.ts`, and `tests/render3d-player-controller.test.ts` passing.
+- Confirm `scripts/render3d_loop_smoke.mjs` completes end-to-end from spawn to survey offer in headless and non-headless modes.
+- If deterministic teleport fallback is still used, log it as expected recovery behavior and add a short note in the smoke output.
 
-**Start here.** The route has a playable skeleton. Make it feel like a game.
+2) Extract loop orchestration from `src/render3d/spike.js`.
+- Create `src/render3d/firstRoadLoop.js` with pure-or-near-pure helpers for phase wiring.
+- Keep `spike.js` responsible for scene/bootstrap only.
+- Preserve `window.__westward3dTest` for compatibility.
+- Export a small loop action map for future parity with save/recovery work.
 
-#### Orientation
+3) Make world objects visibly stateful.
+- Add phase-reactive visuals for board, smoke cache, slime, and wagon.
+- Minimum states:
+  - Board: cold, active, complete.
+  - Cache: idle, opened, threatened.
+  - Slime: idle, alert, windup, hit, stagger, defeat.
+  - Wagon: untouched, inspected, reward-ready.
+- No gameplay logic changes; only rendering cues and animation flags.
 
-```
-npm run dev          # starts Vite dev server at http://127.0.0.1:5173
-open render3d.html   # Three.js first-road route
-open index.html      # Canvas reference build — untouched, always green
-npm run test:render3d # (dev server up) browser smoke for the local 3D phase spine
-node scripts/spike_compare.mjs # (dev server up) old Canvas vs new Three.js proof
-```
+4) Improve combat readability in the first loop.
+- Add distinct visual telegraph states to Road Slime:
+  - hostile color pulse
+  - windup grow/squash
+  - hit flash
+  - short camera or world-space recoil
+  - reward pop marker
+- Keep combat deterministic and timing-tested in the 3D loop test path.
 
-Verification gates before every commit:
+5) UI and first-minute clarity.
+- Keep one mission strip and one prompt.
+- Confirm objective meta chips match target/why/reward for each phase.
+- Ensure prompt text and active target can never disagree by construction.
+
+Acceptance for 3B:
+- A human can complete board → bounty → cache → slime → wagon → return on `render3d.html`.
+- Objective, prompt, and interactable target always agree.
+- Smoked path verifies: phase, inventory preview (`Map Scrap`), and Boone return state.
+- No regressions in existing Canvas build (`src/main.js` untouched).
+
+### Milestone 3C — 3D Visual Baseline Hardening
+
+Goal: make screenshots say “professional RPG slice” in the first 60 seconds.
+
+1) Add cheap but meaningful polish in scene composition:
+- stronger road-leading silhouette rhythm,
+- stronger lantern contrast,
+- more recognizable silhouettes,
+- stronger dusk/sky gradation consistency.
+
+2) Add a first visual capture checklist:
+- spawn,
+- Boone and board,
+- road toward Smoke Cache,
+- Road Slime encounter,
+- Broken Wagon reward,
+- return beat.
+
+3) Add a smoke/visual check gate for one frame of each phase if capture tooling supports it.
+- If strict image diff is too noisy, use route-level pass/fail plus explicit assertions.
+
+Acceptance for 3C:
+- New capture set is visibly better than prior pass.
+- No extra dependencies beyond Three.js and existing tooling.
+- Performance remains stable for simple local play.
+
+### Milestone 4 — Asset pipeline only after loop feel is proven
+
+Goal: move from placeholders to real placeholders-to-assets only when phase flow is solid.
+
+1) Freeze `assets/manifest.schema.json` + `assets/manifest.json` with `id`, `kind`, `pivot`, `collisionProxy`.
+2) Add replacement candidates for:
+- Boone job board
+- road markers/signs
+- smoke cache
+- broken wagon
+- road slime
+3) Keep procedural fallback for missing assets until manifest is complete.
+
+Acceptance for 4:
+- No save schema changes.
+- Snapshot contract remains stable.
+- New assets render without breaking first-loop flow.
+
+### Current checkpoint (for handoff)
+
+- Done: 3D snapshot bridge, phase state machine, interaction shell, local first-road loop, smoke helper, HUD metadata.
+- In-progress: combat/readability and phase-state visual polish.
+- Blocked: full 3D art replacement is intentionally paused until these loops are visibly playable.
+
+### For the next agent only
+
+Start with:
+1. `src/render3d/firstRoadLoop.js` extraction.
+2. `src/render3d/spike.js` cleanup to scene bootstrap only.
+3. Phase-state-driven visual cues for board/cache/slime/wagon.
+4. One stable smoke pass proving loop completion and `Map Scrap` reward.
+5. Screenshot checklist in `output/` and short note in roadmap once pass is complete.
+
+Recommended command order:
 
 ```bash
-npm test && npm run typecheck:ts && npm run test:syntax && npm run dev:lint && npm run build
+npm run test:render3d
+WESTWARD_URL=http://127.0.0.1:5173 npm run test:smoke # optional full run only after loop is complete
+npm run test:visual:capture
+npm run test:visual:review
 ```
-
-`build` must still emit both `dist/index.html` and `dist/render3d.html`.
-The Canvas renderer (`src/main.js`) must never be modified by 3D work.
-
-#### Current checkpoint
-
-Done:
-
-1. Movement/collision/prompt foundation is in `playerController`,
-   `worldProxies`, and `interactionSystem`.
-2. `phaseState` owns the local 3D loop state: spawn, accept bounty, road walk,
-   cache open, slime fight, wagon inspect, Map Scrap, Boone return, survey
-   offered.
-3. `render3d.html` has the Boone board modal and low-chrome 3D-route shell.
-4. `spike.js` wires phase copy, prompt gating, board accept, cache, slime,
-   wagon, Map Scrap preview, and Boone return.
-5. `npm run test:render3d` drives the local phase spine with
-   `window.__westward3dTest`.
-
-Known caveat:
-
-1. The render3d browser smoke can warn that synthetic keyboard movement did not
-   move the player in headless Chromium. Movement is still covered by unit tests,
-   and a manual/in-browser pass should verify keyboard feel before calling 3B
-   finished.
-
-#### Next build plan
-
-1. Make the Road Slime encounter visual, not just phase-driven:
-   - idle bob
-   - aggro glow
-   - windup squash
-   - hit flash
-   - death collapse
-   - reward pop
-2. Add visible state changes to hero objects:
-   - board warms after bounty accept
-   - Smoke Cache opens or glows after use
-   - Broken Wagon emits a map-scrap glint
-   - Boone return marker is obvious
-3. Extract the growing render3d loop out of `spike.js`:
-   - keep `spike.js` as scene/bootstrap
-   - move phase wiring into `gameLoop.js`
-   - keep state pure and non-persisted
-4. Tighten browser proof:
-   - keep `npm run test:render3d`
-   - add a real visual assertion or screenshot for the phase sequence
-   - remove or fix the headless keyboard warning after the input probe is stable
-5. Only after the 3D loop feels playable, start Milestone 4 asset work with a
-   GLB manifest and replacement assets.
-
-Acceptance for the next agent:
-
-1. A human can play through the 3D board → cache → slime → wagon → Boone return
-   loop without using test hooks.
-2. Prompt and objective always agree.
-3. Slime, cache, wagon, reward, and return states are visible in the world.
-4. Canvas reference build remains untouched.
-5. Full gates pass, plus `npm run test:render3d` and `node scripts/spike_compare.mjs`.
 
 ## Verification Gates
 
@@ -819,13 +843,16 @@ npm run package:itch
 
 ## Current Repo Note
 
-As of 2026-05-25, Milestones 0–2 and Milestone 3A are landed on `main`:
+As of 2026-05-26, milestones up to the current 3B first-loop finish are landed on `main`:
 
 - **Milestone 0–2**: Canvas polish reference build, Three.js spike behind `render3d.html`,
   render snapshot bridge, visual baselines (18 PNGs, strict gate).
 - **Milestone 3A** (PR #19, `4c30262`): Art proof — purple dusk 3-stop sky, road-level
   camera (FOV 65°), backface-expansion outlines, contact shadows, vignette overlay,
   sickly green slime, larger job board, 6-cone smoke plume.
+- **Milestone 3B** (commit `444e264`): phase-state HUD polish and smoke stability pass:
+  objective metadata, phase metadata in loop state, deterministic fallback for headless
+  movement in smoke only when key input does not register.
 - **Compare gate** (PR #18): `scripts/spike_compare.mjs` asserts old Canvas is real
   in-world Dustward gameplay (mode "playing", no modal, region "frontier") before
   writing `output/spike-compare/old.png`. Both PNGs captured via `canvas.toDataURL()`
