@@ -13,6 +13,7 @@ import { buildFrontierPlacements, PLAYER_SPAWN } from "./frontierLayout.js";
 import { createPlayerController } from "./playerController.js";
 import { buildProxies } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
+import { createLoopStateMachine } from "./phaseState.js";
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
@@ -356,20 +357,25 @@ function createSpikeSnapshot() {
   });
 }
 
-function syncObjectiveDom(snapshot) {
+function syncObjectiveDom(snapshot, loopState = null) {
   const label = document.querySelector("#objective .label");
   const text = document.querySelector("#objective .text");
   const tag = document.querySelector("#tag");
-  if (label) label.textContent = snapshot.objective?.title || "Objective";
-  if (text) text.textContent = snapshot.objective?.currentTarget
-    ? `${snapshot.objective.currentTarget} - ${snapshot.objective.nextAction}`
-    : "Open Boone's board - accept the Marsh Slime Bounty.";
-  if (tag) tag.textContent = `WestWard · ${snapshot.region.label} · Dusk`;
+  const view = loopState || {};
+  if (label) label.textContent = view.objectiveLabel || snapshot.objective?.title || "Objective";
+  if (text) text.textContent = view.objectiveText || (
+    snapshot.objective?.currentTarget
+      ? `${snapshot.objective.currentTarget} - ${snapshot.objective.nextAction}`
+      : "Open Boone's board - accept the Marsh Slime Bounty."
+  );
+  if (tag) tag.textContent = `WestWard · ${snapshot.region.label} · ${view.phase || "Dusk"}`;
 }
 
 export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
-  syncObjectiveDom(snapshot);
+  const loopState = createLoopStateMachine();
+  syncObjectiveDom(snapshot, loopState.state);
   window.__westwardRenderSnapshot = snapshot;
+  window.__westward3dLoop = loopState.state;
   // preserveDrawingBuffer lets the spike-compare script grab a frame via
   // canvas.toDataURL() between RAF frames. Minimal cost for a spike route.
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
@@ -452,12 +458,112 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const interaction = createInteractionSystem({
     worldObjects: snapshot.worldObjects,
     setPromptText,
+    isTargetEnabled: (target) => loopState.isTargetEnabled(target),
+    getPromptText: (target) => loopState.getPromptForTarget(target),
   });
-  // Stub handlers — Step 5 (job board modal) and Step 6 (slime encounter)
-  // will replace these with real flows.
-  interaction.registerHandler("jobBoard",    (t) => console.log("[3B] open board", t?.label));
-  interaction.registerHandler("smokeCache",  (t) => console.log("[3B] open cache", t?.label));
-  interaction.registerHandler("brokenWagon", (t) => console.log("[3B] inspect wagon", t?.label));
+  const boardModal = document.getElementById("board-modal");
+  const boardAccept = document.getElementById("board-accept");
+  const boardClose = document.getElementById("board-close");
+  let modalOpen = false;
+
+  const refreshLoopDom = () => {
+    const state = loopState.state;
+    window.__westward3dLoop = state;
+    syncObjectiveDom(snapshot, state);
+    interaction.update(player.position);
+  };
+
+  const openBoardModal = () => {
+    modalOpen = true;
+    if (boardModal) boardModal.hidden = false;
+    setPromptText("");
+  };
+  const closeBoardModal = () => {
+    modalOpen = false;
+    if (boardModal) boardModal.hidden = true;
+    refreshLoopDom();
+  };
+
+  const advance = (event) => {
+    const state = loopState.transition(event);
+    window.__westward3dLoop = state;
+    syncObjectiveDom(snapshot, state);
+    interaction.update(player.position);
+    return state;
+  };
+
+  if (boardAccept) {
+    boardAccept.addEventListener("click", () => {
+      advance("accept_bounty");
+      closeBoardModal();
+    });
+  }
+  if (boardClose) boardClose.addEventListener("click", closeBoardModal);
+
+  const handleJobBoard = () => {
+    if (loopState.phase === "spawn") {
+      advance("board_reached");
+      openBoardModal();
+      return;
+    }
+    if (loopState.phase === "accept_bounty") {
+      openBoardModal();
+      return;
+    }
+    if (loopState.phase === "return_to_boone") {
+      advance("report_to_boone");
+      return;
+    }
+    if (loopState.phase === "survey_offered") {
+      syncObjectiveDom(snapshot, {
+        ...loopState.state,
+        objectiveText: "Old Road Survey is ready. This is tomorrow's next playable job.",
+      });
+    }
+  };
+  const handleSmokeCache = () => {
+    if (loopState.phase !== "road_walk") return;
+    advance("open_cache");
+    window.setTimeout(() => {
+      if (loopState.phase === "cache_open") advance("slime_appeared");
+    }, 500);
+  };
+  const handleRoadSlime = () => {
+    if (loopState.phase !== "slime_fight") return;
+    advance("defeat_slime");
+  };
+  const handleBrokenWagon = () => {
+    if (loopState.phase !== "wagon_inspect") return;
+    advance("inspect_wagon");
+    window.setTimeout(() => {
+      if (loopState.phase === "scrap_earned") advance("acknowledge_scrap");
+    }, 900);
+  };
+
+  interaction.registerHandler("jobBoard", handleJobBoard);
+  interaction.registerHandler("smokeCache", handleSmokeCache);
+  interaction.registerHandler("roadSlime", handleRoadSlime);
+  interaction.registerHandler("brokenWagon", handleBrokenWagon);
+
+  window.__westward3dTest = {
+    getLoopState: () => loopState.state,
+    getPlayerPosition: () => player.position,
+    interact(kind) {
+      const handlers = {
+        jobBoard: handleJobBoard,
+        smokeCache: handleSmokeCache,
+        roadSlime: handleRoadSlime,
+        brokenWagon: handleBrokenWagon,
+      };
+      handlers[kind]?.();
+      return loopState.state;
+    },
+    acceptBoard() {
+      boardAccept?.click();
+      return loopState.state;
+    },
+    closeBoard: closeBoardModal,
+  };
 
   let frames = 0;
   let prevTs = performance.now();
@@ -465,7 +571,7 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     // dt in seconds, clamped to keep big tab-resume jumps from teleporting.
     const dt = Math.min((now - prevTs) / 1000, 0.05);
     prevTs = now;
-    player.update(dt, proxies);
+    if (!modalOpen) player.update(dt, proxies);
     interaction.update(player.position);
     renderer.render(scene, camera);
     frames++;
@@ -474,7 +580,7 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   }
   loop();
 
-  return { scene, camera, renderer, snapshot, player, proxies, interaction };
+  return { scene, camera, renderer, snapshot, player, proxies, interaction, loopState };
 }
 
 // Auto-start when loaded as the render3d.html entry.

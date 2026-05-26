@@ -32,9 +32,9 @@ function makeFakeDocument() {
 }
 
 describe("interactionSystem — INTERACTABLE_KINDS", () => {
-  it("includes the three Step-3 interactables and excludes roadSlime", () => {
+  it("includes first-road loop interactables", () => {
     expect(new Set(INTERACTABLE_KINDS)).toEqual(
-      new Set(["jobBoard", "smokeCache", "brokenWagon"]),
+      new Set(["jobBoard", "smokeCache", "brokenWagon", "roadSlime"]),
     );
   });
 });
@@ -52,11 +52,17 @@ describe("interactionSystem — pickNearest", () => {
     expect(pickNearest(pos, WORLD)).toBeNull();
   });
 
-  it("ignores roadSlime placements even when standing on one", () => {
-    // Construct a tiny world with ONLY a slime so no other prop can shadow
-    // the assertion. Sit on top — expect null.
+  it("can select roadSlime during the combat phase", () => {
     const slime = { kind: "roadSlime", label: "Road Slime", x: 5, y: 5 };
-    expect(pickNearest({ x: 5, z: 5 }, [slime])).toBeNull();
+    expect(pickNearest({ x: 5, z: 5 }, [slime])).toBe(slime);
+  });
+
+  it("honors phase gating when supplied", () => {
+    expect(pickNearest(
+      { x: SMOKE_CACHE.x, z: SMOKE_CACHE.y },
+      WORLD,
+      (target: any) => target.kind === "jobBoard",
+    )).toBe(JOB_BOARD);
   });
 
   it("breaks ties by actual distance, not array order", () => {
@@ -81,7 +87,7 @@ describe("interactionSystem — promptFor", () => {
 
   it("returns empty string for null or non-interactable targets", () => {
     expect(promptFor(null)).toBe("");
-    expect(promptFor(ROAD_SLIME)).toBe("");
+    expect(promptFor(ROAD_SLIME)).toBe("E — Strike Road Slime");
   });
 });
 
@@ -101,6 +107,26 @@ describe("interactionSystem — createInteractionSystem", () => {
 
     sys.update({ x: 0, z: 0 });
     expect(setPromptText).toHaveBeenLastCalledWith("");
+
+    sys.dispose();
+  });
+
+  it("uses supplied phase prompt copy and target gating", () => {
+    const doc = makeFakeDocument();
+    const setPromptText = vi.fn();
+    const sys = createInteractionSystem({
+      worldObjects: WORLD,
+      setPromptText,
+      document: doc as any,
+      isTargetEnabled: (target: any) => target.kind === "smokeCache",
+      getPromptText: (target: any) => `phase prompt: ${target.label}`,
+    });
+
+    sys.update({ x: 0, z: 0 });
+    expect(setPromptText).toHaveBeenLastCalledWith("");
+
+    sys.update({ x: SMOKE_CACHE.x, z: SMOKE_CACHE.y });
+    expect(setPromptText).toHaveBeenLastCalledWith("phase prompt: Smoke Cache");
 
     sys.dispose();
   });

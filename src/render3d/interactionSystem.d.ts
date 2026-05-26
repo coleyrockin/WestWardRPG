@@ -5,6 +5,7 @@ export const INTERACTABLE_KINDS: ReadonlyArray<string>;
 export function pickNearest(
   playerPos: { x: number; z: number } | null | undefined,
   worldObjects: any[] | null | undefined,
+  isTargetEnabled?: (target: any) => boolean,
 ): any | null;
 
 export function promptFor(target: any | null): string;
@@ -12,6 +13,8 @@ export function promptFor(target: any | null): string;
 export interface CreateInteractionSystemOptions {
   worldObjects?: any[];
   setPromptText?: (text: string) => void;
+  isTargetEnabled?: (target: any) => boolean;
+  getPromptText?: (target: any) => string;
   document?: any;
 }
 

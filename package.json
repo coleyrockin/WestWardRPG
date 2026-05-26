@@ -16,6 +16,7 @@
     "test:coverage": "vitest run --coverage",
     "test:syntax": "node --check web_game_playwright_client.mjs && node --check scripts/visual_diff.mjs && bash -n scripts/visual_regression_capture.sh && bash -n scripts/smoke_suite.sh",
     "test:smoke": "bash scripts/smoke_suite.sh",
+    "test:render3d": "node scripts/render3d_loop_smoke.mjs",
     "test:visual:capture": "bash scripts/visual_regression_capture.sh",
     "test:visual": "node scripts/visual_diff.mjs",
     "test:visual:review": "node scripts/visual_diff.mjs --allow-missing-baselines",

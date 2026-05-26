@@ -14,7 +14,7 @@ const PROMPTS = {
   jobBoard:    { radius: 2.5, text: "E — Open Boone's Board" },
   smokeCache:  { radius: 2.0, text: "E — Open Smoke Cache" },
   brokenWagon: { radius: 2.5, text: "E — Inspect Wagon" },
-  // roadSlime intentionally absent — encounterSystem (Step 6) owns it.
+  roadSlime:   { radius: 2.2, text: "E — Strike Road Slime" },
 };
 
 // All interactable kinds, exported for spike.js / debug overlays.
@@ -32,13 +32,14 @@ function distance2(ax, az, bx, bz) {
 //
 // `worldObjects` use the placement shape (x/y/kind) — y is the world Y axis
 // which maps to 3D Z.
-export function pickNearest(playerPos, worldObjects) {
+export function pickNearest(playerPos, worldObjects, isTargetEnabled = () => true) {
   if (!playerPos || !worldObjects?.length) return null;
   let best = null;
   let bestD2 = Infinity;
   for (const obj of worldObjects) {
     const cfg = PROMPTS[obj?.kind];
     if (!cfg) continue;
+    if (!isTargetEnabled(obj)) continue;
     const d2 = distance2(playerPos.x, playerPos.z, obj.x, obj.y);
     if (d2 > cfg.radius * cfg.radius) continue;
     if (d2 < bestD2) { best = obj; bestD2 = d2; }
@@ -58,10 +59,14 @@ export function promptFor(target) {
 // Options:
 //   worldObjects   — placements array (snapshot.worldObjects).
 //   setPromptText  — (text: string) => void; called on every update().
+//   isTargetEnabled — (target) => boolean; gates targets by current game phase.
+//   getPromptText  — (target) => string; lets a phase machine override copy.
 //   document       — overridable for tests (defaults to globalThis.document).
 export function createInteractionSystem({
   worldObjects,
   setPromptText = () => {},
+  isTargetEnabled = () => true,
+  getPromptText = promptFor,
   document: doc = globalThis.document,
 } = {}) {
   const handlers = new Map();
@@ -77,8 +82,8 @@ export function createInteractionSystem({
   if (doc?.addEventListener) doc.addEventListener("keydown", onKeyDown);
 
   function update(playerPos) {
-    nearest = pickNearest(playerPos, worldObjects);
-    setPromptText(promptFor(nearest));
+    nearest = pickNearest(playerPos, worldObjects, isTargetEnabled);
+    setPromptText(nearest ? getPromptText(nearest) : "");
   }
 
   function registerHandler(kind, fn) {

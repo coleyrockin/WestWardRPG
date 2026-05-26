@@ -365,7 +365,8 @@ Outcome:
 
 ## Milestone 3: First Five-Minute Rewrite
 
-Status: **active — Milestone 3A (art proof) complete 2026-05-25. Gameplay wiring is next.**
+Status: **active — Milestone 3A complete; Milestone 3B first-loop phase spine
+started 2026-05-26.**
 
 Goal: Rebuild the first playable slice in the new renderer.
 
@@ -402,6 +403,19 @@ Acceptance:
 3. Browser smoke asserts objective, prompt, job state, reward, memory, and
    first-road status.
 4. Screenshots show a dramatic visual improvement.
+
+Current Milestone 3B outcome:
+
+1. `src/render3d/phaseState.js` owns the local, non-persisted 3D loop phases:
+   spawn, accept bounty, road walk, cache open, slime fight, wagon inspect, Map
+   Scrap reward, Boone return, and Old Road Survey offered.
+2. `render3d.html` has a Boone board modal and low-chrome objective/prompt shell.
+3. `src/render3d/spike.js` wires the phase state into objective text, prompt
+   gating, board accept, Smoke Cache, Road Slime, Broken Wagon, Map Scrap preview,
+   and Boone return.
+4. `scripts/render3d_loop_smoke.mjs` drives the browser route through the first
+   loop with a dev-only `window.__westward3dTest` hook. The key-input probe can
+   warn in headless Chromium, but controller unit tests still cover movement.
 
 ## Milestone 4: Art Pipeline
 
@@ -680,31 +694,29 @@ Add `postprocessing` (`EffectComposer`) on top of the existing ACES tone map:
 
 ## Immediate Action Plan
 
-Steps 1–9 and Milestone 3A are **done**:
+Milestones 0–2 and Milestone 3A are done. Milestone 3B is now partially built:
+the Three.js route has movement/collision/prompt foundations plus a local,
+non-persisted first-road phase spine that can step through Boone board, bounty
+acceptance, Smoke Cache, Road Slime, Broken Wagon, Map Scrap preview, Boone
+return, and Old Road Survey offered.
 
-- Steps 1–8: Milestones 0–2 (prep, Three.js spike, screenshot gate, decision = Three.js, render snapshot bridge).
-- Step 9 (PR #18): Compare gate now asserts old Canvas capture is real in-world Dustward gameplay (mode "playing", no modal, region "frontier").
-- Milestone 3A (PR #19): Art proof landed — purple dusk sky, road-level camera, backface outlines, contact shadows, vignette, sickly green slime, larger job board, smoke plume.
-
-What remains:
-
-10. Wire the **first five-minute gameplay loop** in the new renderer (Milestone 3B).
-11. Only then migrate broader systems (Milestones 4–9), pulling from the
-    **Graphics: Next-Level Plan** as each scene/character lands.
+What remains is not more planning. The next agent should turn this phase spine
+into visible game feel.
 
 ---
 
-### Next Agent Handoff — Milestone 3B: First Gameplay Loop
+### Next Agent Handoff — Milestone 3B Finish
 
-**Start here.** The scene looks right. Now make it playable.
+**Start here.** The route has a playable skeleton. Make it feel like a game.
 
 #### Orientation
 
 ```
 npm run dev          # starts Vite dev server at http://127.0.0.1:5173
-open render3d.html   # Three.js scene — currently static (no player input)
+open render3d.html   # Three.js first-road route
 open index.html      # Canvas reference build — untouched, always green
-node scripts/spike_compare.mjs  # (dev server up) compare gate — must still pass
+npm run test:render3d # (dev server up) browser smoke for the local 3D phase spine
+node scripts/spike_compare.mjs # (dev server up) old Canvas vs new Three.js proof
 ```
 
 Verification gates before every commit:
@@ -716,201 +728,61 @@ npm test && npm run typecheck:ts && npm run test:syntax && npm run dev:lint && n
 `build` must still emit both `dist/index.html` and `dist/render3d.html`.
 The Canvas renderer (`src/main.js`) must never be modified by 3D work.
 
-#### Architecture
+#### Current checkpoint
 
-All new Milestone 3B code lives in `src/render3d/`. Do not create top-level
-files for render logic. Do not import from `src/render3d/` inside `src/main.js`.
+Done:
 
-```
-src/render3d/
-  spike.js            existing — scene builder, camera, RAF loop
-  frontierLayout.js   existing — placement data
-  playerController.js NEW — WASD movement + mouse look + camera follow
-  worldProxies.js     NEW — AABB collision boxes derived from frontierLayout
-  interactionSystem.js NEW — proximity detection, prompt DOM, action dispatch
-  encounterSystem.js  NEW — slime aggro trigger, combat pass, death/reward
-  animationHelpers.js NEW — walk bob, idle, interact glow, hit flash helpers
-  gameLoop.js         NEW — composes everything, owns the RAF, replaces spike loop
-```
+1. Movement/collision/prompt foundation is in `playerController`,
+   `worldProxies`, and `interactionSystem`.
+2. `phaseState` owns the local 3D loop state: spawn, accept bounty, road walk,
+   cache open, slime fight, wagon inspect, Map Scrap, Boone return, survey
+   offered.
+3. `render3d.html` has the Boone board modal and low-chrome 3D-route shell.
+4. `spike.js` wires phase copy, prompt gating, board accept, cache, slime,
+   wagon, Map Scrap preview, and Boone return.
+5. `npm run test:render3d` drives the local phase spine with
+   `window.__westward3dTest`.
 
-`spike.js` currently owns the RAF loop. Once `gameLoop.js` exists, `spike.js`
-becomes a scene-builder only (no loop). Move the `requestAnimationFrame` call
-into `gameLoop.js` during that step.
+Known caveat:
 
-#### Step-by-step order
+1. The render3d browser smoke can warn that synthetic keyboard movement did not
+   move the player in headless Chromium. Movement is still covered by unit tests,
+   and a manual/in-browser pass should verify keyboard feel before calling 3B
+   finished.
 
-**Step 1 — Player controller** (`src/render3d/playerController.js`)
+#### Next build plan
 
-Export `createPlayerController(camera, scene, options)`. Returns `{ update(dt) }`.
+1. Make the Road Slime encounter visual, not just phase-driven:
+   - idle bob
+   - aggro glow
+   - windup squash
+   - hit flash
+   - death collapse
+   - reward pop
+2. Add visible state changes to hero objects:
+   - board warms after bounty accept
+   - Smoke Cache opens or glows after use
+   - Broken Wagon emits a map-scrap glint
+   - Boone return marker is obvious
+3. Extract the growing render3d loop out of `spike.js`:
+   - keep `spike.js` as scene/bootstrap
+   - move phase wiring into `gameLoop.js`
+   - keep state pure and non-persisted
+4. Tighten browser proof:
+   - keep `npm run test:render3d`
+   - add a real visual assertion or screenshot for the phase sequence
+   - remove or fix the headless keyboard warning after the input probe is stable
+5. Only after the 3D loop feels playable, start Milestone 4 asset work with a
+   GLB manifest and replacement assets.
 
-- WASD moves the camera forward/back/strafe in the XZ plane.
-- Mouse drag rotates look direction (pointer lock optional; drag is fine).
-- Speed: 4 units/sec walk, 8 units/sec with shift.
-- No collision yet — add it in Step 2.
-- Test file: `tests/render3d-player-controller.test.ts`. Assert: `update(dt)` moves
-  position by `speed * dt` in the correct direction for each key combo; no
-  movement when no keys held.
+Acceptance for the next agent:
 
-**Step 2 — World collision proxies** (`src/render3d/worldProxies.js`)
-
-Export `buildProxies(placements)`. Returns `AABB[]` derived from `buildFrontierPlacements()`.
-Each placement with a physical presence gets a box: `{ minX, maxX, minZ, maxZ }`.
-
-Integrate with `playerController`: before applying movement, slide-resolve against
-all proxies. Use simple AABB-vs-point with radius 0.3 for the player capsule.
-
-Test: `tests/render3d-world-proxies.test.ts`. Assert: a proxy exists for each
-building/landmark/fence in the placements; collision resolves player away from
-box boundary.
-
-**Step 3 — Interaction system** (`src/render3d/interactionSystem.js`)
-
-Export `createInteractionSystem(scene, snapshot)`. Returns `{ update(playerPos, dt) }`.
-
-Interaction targets (pulled from snapshot.worldObjects):
-- `jobBoard` — radius 2.5 → prompt "E — Open Boone's Board"
-- `smokeCache` — radius 2.0 → prompt "E — Open Smoke Cache"
-- `brokenWagon` — radius 2.5 → prompt "E — Inspect Wagon"
-- `roadSlime` — handled by encounterSystem, not interactionSystem
-
-Prompt DOM: `#prompt` div in `render3d.html`. Show/hide text based on nearest target.
-
-Action dispatch on `E` keydown: call the appropriate handler registered via
-`registerHandler(kind, fn)`.
-
-Test: `tests/render3d-interaction.test.ts`. Assert: nearest target changes as
-player position changes; prompt text matches the nearest interactable; handler
-fires on action key.
-
-**Step 4 — Objective strip** (`src/render3d/gameLoop.js`, partial)
-
-Wire `__westwardRenderSnapshot.objective` to the existing `#objective .label` and
-`#objective .text` DOM elements (already in `render3d.html`).
-
-Pull phase progression through a local state machine inside `gameLoop.js`:
-
-```
-spawn → accept_bounty → road_walk → cache_open → slime_fight →
-scrap_earned → board_return → survey_offered
-```
-
-Each phase transition fires when the corresponding interaction or encounter
-completes. The DOM updates immediately.
-
-Test: `tests/render3d-objective-phases.test.ts`. Assert phase transitions in
-sequence; assert DOM text matches expected phase labels.
-
-**Step 5 — Job board modal**
-
-When the player presses E at the job board in `accept_bounty` phase:
-1. Pause movement.
-2. Show a modal overlay (`#board-modal` in `render3d.html`) with the slime
-   bounty title, description, and an "Accept" button.
-3. On Accept: transition phase → `road_walk`, close modal, resume movement.
-4. Board emissive pulses to "accepted" amber.
-
-No Canvas state is modified. The modal reads from `snapshot.worldObjects` data
-only.
-
-Test: `tests/render3d-board-modal.test.ts`. Assert modal DOM appears on action;
-phase transitions on accept; modal closes.
-
-**Step 6 — Slime encounter** (`src/render3d/encounterSystem.js`)
-
-Export `createEncounterSystem(scene, snapshot)`. Returns `{ update(playerPos, dt) }`.
-
-Slime state machine: `patrol → aggro → attack → dead`.
-
-- `patrol`: slime bobs gently (animationHelpers.idleBob). No movement.
-- `aggro` (player within 4 units): slime faces player, plays approach animation.
-- `attack` (player within 1.5 units): trigger hit. Player takes 8 HP. Slime
-  staggers back 1 unit.
-- Dead (player presses E while slime is within 2 units and aggro): slime plays
-  death animation (scale collapse), emissive fades, green glow extinguishes.
-  Calls registered `onSlimeDeath` callback.
-
-Test: `tests/render3d-encounter.test.ts`. Assert state transitions; death callback
-fires; dead slime no longer aggros.
-
-**Step 7 — Reward + Map Scrap**
-
-On `onSlimeDeath`:
-1. Phase → `scrap_earned`.
-2. `+1 Map Scrap` floating text appears over slime position.
-3. Smoke Cache lid animates open (scale Y ×1.2 on lid mesh).
-4. `smokeCache` interaction becomes active; prompt changes to "E — Open Cache".
-5. On cache open: phase → `board_return`, objective strip updates.
-
-Test: `tests/render3d-rewards.test.ts`. Assert Map Scrap count increments; phase
-transitions correctly; cache interaction enabled after death.
-
-**Step 8 — Animation helpers** (`src/render3d/animationHelpers.js`)
-
-Export pure functions that take a mesh + time and return nothing (mutate in place):
-
-```js
-idleBob(mesh, t, amplitude = 0.04)      // gentle y sine
-walkBob(mesh, t, speed)                 // lateral + vertical walk cycle
-interactGlow(mesh, t)                   // emissive pulse on interactable
-hitFlash(mesh, intensity = 3.0)         // one-frame emissive spike
-stagger(mesh, direction, t)             // knockback lerp
-deathCollapse(mesh, progress)           // scale Y → 0 over 0.4s
-rewardPop(scene, position, text)        // floating +text sprite (CSS3D or DOM)
-```
-
-Test: `tests/render3d-animation-helpers.test.ts`. Assert each helper mutates the
-expected mesh property by the correct amount.
-
-**Step 9 — Game loop composition** (`src/render3d/gameLoop.js`)
-
-`gameLoop.js` owns the `requestAnimationFrame` loop. Remove it from `spike.js`.
-
-```js
-export function startGameLoop(canvas, snapshot) {
-  const scene = buildScene(snapshot);          // extracted from spike.js
-  const camera = buildCamera(snapshot);        // extracted from spike.js
-  const renderer = buildRenderer(canvas);      // extracted from spike.js
-  const player = createPlayerController(camera, scene);
-  const proxies = buildProxies(snapshot.worldObjects);
-  const interaction = createInteractionSystem(scene, snapshot);
-  const encounter = createEncounterSystem(scene, snapshot);
-  const phases = createPhaseStateMachine(snapshot);
-
-  let prev = performance.now();
-  function loop(now) {
-    const dt = Math.min((now - prev) / 1000, 0.05);
-    prev = now;
-    player.update(dt, proxies);
-    interaction.update(player.position, dt);
-    encounter.update(player.position, dt);
-    phases.update();
-    renderer.render(scene, camera);
-    requestAnimationFrame(loop);
-  }
-  requestAnimationFrame(loop);
-}
-```
-
-`spike.js` becomes: import `startGameLoop`, call it, export nothing new.
-
-**Step 10 — Smoke suite extension**
-
-Extend `scripts/spike_compare.mjs` (or add `scripts/render3d_smoke.mjs`) to drive
-the new gameplay loop and assert:
-- Player can move (position changes after synthetic key events).
-- Job board modal opens and closes.
-- Phase transitions from `spawn` to `survey_offered` complete.
-- No console errors throughout.
-
-#### Acceptance for Milestone 3B
-
-1. A tester can complete steps 1–11 of the Milestone 3 player path listed above.
-2. Prompt and objective always agree — impossible by construction (single phase
-   state machine drives both).
-3. The smoke suite asserts objective, prompt, job state, Map Scrap reward, and
-   phase sequence.
-4. Canvas build is untouched, all 1001+ tests still pass.
-5. `node scripts/spike_compare.mjs` still exits 0.
+1. A human can play through the 3D board → cache → slime → wagon → Boone return
+   loop without using test hooks.
+2. Prompt and objective always agree.
+3. Slime, cache, wagon, reward, and return states are visible in the world.
+4. Canvas reference build remains untouched.
+5. Full gates pass, plus `npm run test:render3d` and `node scripts/spike_compare.mjs`.
 
 ## Verification Gates
 
