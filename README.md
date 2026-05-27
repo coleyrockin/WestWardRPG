@@ -10,7 +10,7 @@
 
 Story-first browser frontier RPG built on a custom Canvas raycasting stack, deterministic gameplay systems, and a growing Three.js renderer spike.
 
-The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction with a new visual target: a stylized dark western RPG, closer to *Oblivion meets Weird West meets a low-poly graphic novel*. The Canvas game is the playable reference build; `render3d.html` is the in-progress 3D first-road slice.
+The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction with a new visual target: a stylized dark western RPG, closer to *Oblivion meets Weird West meets a low-poly graphic novel*. The Canvas game is the playable reference build; `spikes/render3d.html` is the in-progress 3D first-road slice.
 
 ## Preview
 
@@ -116,13 +116,13 @@ Latest local fast gate: `npm test` reports **1085 passing tests across 96 files*
 Current playable path:
 
 - `index.html` is the current playable/reference RPG build.
-- `render3d.html` is an experimental Three.js first-road slice.
+- `spikes/render3d.html` is an experimental Three.js first-road slice.
 - New 3D work should stay under `src/render3d/` until it reaches parity with the Canvas first-road loop.
 
 The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the single source of truth. The high-level active build order is:
 
 1. **3D foundation hardening** — keep Canvas stable while the Three.js spike becomes modular, testable, and smoke-gated.
-2. **First-road 3D loop** — finish the board, cache, slime, wagon, Map Scrap, and return-to-Boone sequence in `render3d.html`.
+2. **First-road 3D loop** — finish the board, cache, slime, wagon, Map Scrap, and return-to-Boone sequence in `spikes/render3d.html`.
 3. **Visual and accessibility proof** — add screenshot review, HUD readability, prompt semantics, and modal focus polish.
 4. **System parity planning** — design the safe bridge from 3D phase completions back to save-safe Canvas systems.
 5. **Release polish** — package the strongest playable path honestly, with known limits and current screenshots.
@@ -230,47 +230,56 @@ If port `5180` is already in use, Vite will automatically pick the next availabl
 
 ```text
 WestWard/
-├── index.html
-├── render3d.html
+├── index.html                  # Canvas RPG entry (shipped)
+├── spikes/
+│   └── render3d.html           # Three.js first-road slice (in-progress)
 ├── src/
-│   ├── main.js              # orchestration loop + rendering + input
-│   ├── constants.js         # tuning constants and static system values
-│   ├── math.js              # shared math utilities
-│   ├── decisionEngine.js    # chapters, axes, choices, ending resolution
-│   ├── combatLoadout.js     # combat doctrines, perks, stance effects
-│   ├── enemyArchetypes.js   # enemy families and combat profiles
-│   ├── combatMilestones.js  # boss phases, parry chains, charged-attack helpers
-│   ├── statusEffects.js     # burn/bleed/shock/frost runtime effects
-│   ├── questDefinitions.js  # data-driven quest metadata/state helpers
-│   ├── visualProfile.js     # atmosphere/quality + biome grading
-│   ├── regionVisualIdentity.js # region mood, landmarks, props, identity lines
-│   ├── gameFeel.js          # hit feedback and first-minute pressure helpers
-│   ├── characterIdentity.js # origins, attributes, role summaries
-│   ├── gearCrafting.js      # weapon families, armor, crafting economy hooks
-│   ├── craftingStation.js   # house/workbench action resolution
-│   ├── lootSystem.js        # deterministic loot tables and application
-│   ├── jobBoard.js          # deterministic Boone jobs, route markers, rewards
-│   ├── npcMemory.js         # deterministic NPC memory and reactive lines
-│   ├── runSummary.js        # kill/resource/victory summary helpers
-│   ├── progressionSystem.js # skill branches, weapon tiers, armor mods, traits
-│   ├── regionSystem.js      # regions, weather pools, region events
-│   ├── graphicsSettings.js  # presets, auto-detect, accessibility, postFx toggle
-│   ├── postProcess.js       # WebGL2 post-process layer (vignette + color grade)
-│   ├── behaviorTree.js      # minimal BT runtime (sequence/selector/action/condition)
-│   ├── npcBehaviors.js      # townsperson day-wander / dusk-return-home tree
-│   ├── influenceMap.js      # faction influence coefficients → spawn density + tint
-│   ├── runHistory.js        # localStorage-backed run history + playtest metrics
-│   ├── fogOfWar.js          # 32×32 per-region fog grid; minimap reveals on movement
-│   ├── sideJobGenerator.js  # side-job generator seeded by region + faction state
-│   ├── wfcInteriors.js      # Wave Function Collapse cave/mine/ruin interior generator
-│   ├── languagePacks.js     # locale strings used across localized copy
-│   ├── gameState.d.ts       # GameState type hierarchy (PlayerState, NarrativeState…)
-│   ├── saveMigration.js     # v1/v2 -> v3 save migration
-│   └── storyContent.js      # flagship dialogue and narrative flavor text
-│   └── atmosphere.ts        # typed atmosphere model (single source — bundled by Vite)
-├── tests/                   # vitest system tests
-├── test-actions/            # deterministic scripted behavior checks
-├── docs/                    # flagship diagrams/screenshots
+│   ├── main.js                 # composition root: state, system wiring, loop
+│   ├── devOverlayPayload.js    # window.render_game_to_text() JSON assembly
+│   ├── input.js                # pointer/mouse/blur/fullscreen handlers
+│   ├── ui/
+│   │   ├── controlsDisclosure.js  # title-screen controls reveal (loaded by index.html)
+│   │   └── serviceWorkerRegister.js  # SW registration + update prompt
+│   ├── render3d/                # Three.js renderer spike (entry: spikes/render3d.html)
+│   ├── constants.js             # tuning constants and static system values
+│   ├── math.js                  # shared math utilities
+│   ├── decisionEngine.js        # chapters, axes, choices, ending resolution
+│   ├── combatLoadout.js         # combat doctrines, perks, stance effects
+│   ├── enemyArchetypes.js       # enemy families and combat profiles
+│   ├── combatMilestones.js      # boss phases, parry chains, charged-attack helpers
+│   ├── statusEffects.js         # burn/bleed/shock/frost runtime effects
+│   ├── questDefinitions.js      # data-driven quest metadata/state helpers
+│   ├── visualProfile.js         # atmosphere/quality + biome grading
+│   ├── regionVisualIdentity.js  # region mood, landmarks, props, identity lines
+│   ├── gameFeel.js              # hit feedback and first-minute pressure helpers
+│   ├── characterIdentity.js     # origins, attributes, role summaries
+│   ├── gearCrafting.js          # weapon families, armor, crafting economy hooks
+│   ├── craftingStation.js       # house/workbench action resolution
+│   ├── lootSystem.js            # deterministic loot tables and application
+│   ├── jobBoard.js              # deterministic Boone jobs, route markers, rewards
+│   ├── npcMemory.js             # deterministic NPC memory and reactive lines
+│   ├── runSummary.js            # kill/resource/victory summary helpers
+│   ├── progressionSystem.js     # skill branches, weapon tiers, armor mods, traits
+│   ├── regionSystem.js          # regions, weather pools, region events
+│   ├── graphicsSettings.js      # presets, auto-detect, accessibility, postFx toggle
+│   ├── postProcess.js           # WebGL2 post-process layer (vignette + color grade)
+│   ├── behaviorTree.js          # minimal BT runtime (sequence/selector/action/condition)
+│   ├── npcBehaviors.js          # townsperson day-wander / dusk-return-home tree
+│   ├── influenceMap.js          # faction influence coefficients → spawn density + tint
+│   ├── runHistory.js            # localStorage-backed run history + playtest metrics
+│   ├── fogOfWar.js              # 32×32 per-region fog grid; minimap reveals on movement
+│   ├── sideJobGenerator.js      # side-job generator seeded by region + faction state
+│   ├── wfcInteriors.js          # Wave Function Collapse cave/mine/ruin interior generator
+│   ├── languagePacks.js         # locale strings used across localized copy
+│   ├── gameState.d.ts           # GameState type hierarchy (PlayerState, NarrativeState…)
+│   ├── saveMigration.js         # v1/v2 -> v3 save migration
+│   ├── atmosphere.ts            # typed atmosphere model (single source — bundled by Vite)
+│   └── storyContent.js          # flagship dialogue and narrative flavor text
+├── tests/                       # vitest system tests
+├── test-actions/                # deterministic scripted behavior checks
+├── tools/
+│   └── playwright-client.mjs    # smoke / visual-regression driver
+├── docs/                        # flagship diagrams/screenshots/security review
 └── package.json
 ```
 
