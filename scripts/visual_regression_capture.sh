@@ -6,8 +6,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 CLIENT="$PROJECT_ROOT/web_game_playwright_client.mjs"
-PORT="${WESTWARD_PORT:-5173}"
-BASE_URL="${WESTWARD_URL:-http://localhost:${PORT}/index.html}"
+PORT="${WESTWARD_PORT:-5180}"
+URL_OVERRIDE="${WESTWARD_URL:-}"
+BASE_URL="${URL_OVERRIDE:-http://localhost:${PORT}/index.html}"
 OUTPUT_ROOT="$PROJECT_ROOT/output"
 OUT_ROOT="${WESTWARD_VISUAL_OUT:-$OUTPUT_ROOT/visual-regression}"
 OUTPUT_ROOT="$(node -e 'console.log(require("node:path").resolve(process.argv[1]))' "$OUTPUT_ROOT")"
@@ -32,6 +33,40 @@ mkdir -p "$OUT_ROOT"
 if [ ! -f "$CLIENT" ]; then
   echo "[ERROR] Playwright client not found at: $CLIENT" >&2
   exit 1
+fi
+
+SERVER_PID=""
+
+cleanup() {
+  if [ -n "$SERVER_PID" ]; then
+    kill "$SERVER_PID" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+if [ -z "$URL_OVERRIDE" ] && ! curl -g -sSf "$BASE_URL" >/dev/null 2>&1; then
+  cd "$PROJECT_ROOT"
+  npx --no-install vite --port "$PORT" --host 127.0.0.1 --strictPort \
+    >/tmp/westward-visual-server.log 2>&1 &
+  SERVER_PID="$!"
+
+  started=0
+  for _ in $(seq 1 30); do
+    if curl -g -sSf "$BASE_URL" >/dev/null 2>&1; then
+      started=1
+      break
+    fi
+    if ! kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.5
+  done
+
+  if [ "$started" -ne 1 ]; then
+    echo "[ERROR] Visual capture server did not become reachable at $BASE_URL." >&2
+    sed 's/^/[server] /' /tmp/westward-visual-server.log >&2 || true
+    exit 1
+  fi
 fi
 
 actions_for() {

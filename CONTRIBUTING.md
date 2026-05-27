@@ -14,7 +14,7 @@ Thanks for contributing.
    npm run dev
    ```
 4. Open:
-   - http://127.0.0.1:5173/index.html
+   - http://127.0.0.1:5180/index.html
 
 ## Before Opening a PR
 
@@ -47,7 +47,7 @@ You can run a scenario with:
 
 ```bash
 node ./web_game_playwright_client.mjs \
-  --url http://localhost:5173/index.html \
+  --url http://127.0.0.1:5180/index.html \
   --actions-file ./test-actions/realism_smoke.json \
   --click-selector "#start-btn" \
   --iterations 1 \

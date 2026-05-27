@@ -6,10 +6,12 @@ on:
   pull_request:
     branches: [main]
 
-# Cancel in-progress runs of the same workflow on the same ref.
-# Static group name avoids any expression interpolation.
+permissions:
+  contents: read
+
+# Cancel in-progress runs of this workflow on the same ref.
 concurrency:
-  group: qa
+  group: qa-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -75,6 +77,31 @@ jobs:
 
       - name: Run smoke suite
         run: npm run test:smoke
+
+      - name: Run 3D first-road smoke and screenshot gate
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 5180 > /tmp/westward-render3d.log 2>&1 &
+          SERVER_PID=$!
+          cleanup() {
+            kill "$SERVER_PID" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          for _ in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:5180/render3d.html >/dev/null; then
+              WESTWARD_URL=http://127.0.0.1:5180 npm run test:render3d
+              WESTWARD_URL=http://127.0.0.1:5180 node scripts/spike_compare.mjs
+              exit 0
+            fi
+            if ! kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+              cat /tmp/westward-render3d.log
+              exit 1
+            fi
+            sleep 0.5
+          done
+
+          cat /tmp/westward-render3d.log
+          exit 1
 
       - name: Upload smoke artifacts on failure
         if: failure()

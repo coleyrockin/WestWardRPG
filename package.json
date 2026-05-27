@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Story-first open-world frontier RPG with raycast combat, regional identity, gear progression, housing, and deterministic job-board systems.",
   "main": "src/main.js",
+  "homepage": "https://westward-rpg.vercel.app",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "start": "vite",
     "dev": "vite",
@@ -55,7 +59,6 @@
   "bugs": {
     "url": "https://github.com/coleyrockin/WestWardRPG/issues"
   },
-  "homepage": "https://github.com/coleyrockin/WestWardRPG#readme",
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.4",
     "fake-indexeddb": "^6.2.5",

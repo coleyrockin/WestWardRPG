@@ -1,7 +1,7 @@
 // WestWard service worker — cache-first for assets, network-first for navigation.
 // Version bumps clear old caches and trigger an update toast in the game.
 
-const CACHE = "westward-v1";
+const CACHE = "westward-v2";
 const PRECACHE = ["/", "/index.html"];
 
 self.addEventListener("install", (e) => {

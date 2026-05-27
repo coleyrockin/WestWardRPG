@@ -1,7 +1,7 @@
 {
   "name": "WestWard",
   "short_name": "WestWard",
-  "description": "Story-first open-world frontier RPG. No engine, no account, no install. Works offline.",
+  "description": "Story-first browser frontier RPG with deterministic jobs, combat, saves, and regional pressure.",
   "start_url": "/",
   "display": "fullscreen",
   "orientation": "landscape",

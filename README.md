@@ -5,12 +5,12 @@
 ![HTML5](https://img.shields.io/badge/HTML5-Canvas-E34F26?style=flat&logo=html5&logoColor=white)
 ![Vitest](https://img.shields.io/badge/Vitest-Tests-6E9F18?style=flat&logo=vitest&logoColor=white)
 ![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33?style=flat&logo=playwright&logoColor=white)
+![QA](https://github.com/coleyrockin/WestWardRPG/actions/workflows/qa.yml/badge.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat)
 
-Story-first open-world frontier RPG built on a custom Canvas raycasting stack.
-The repository also keeps a Three.js first-road spike (`render3d.html`) while the Canvas build remains the gameplay reference.
+Story-first browser frontier RPG built on a custom Canvas raycasting stack, deterministic gameplay systems, and a growing Three.js renderer spike.
 
-The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction with a new visual target: a stylized dark western RPG, closer to *Oblivion meets Weird West meets a low-poly graphic novel*.
+The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction with a new visual target: a stylized dark western RPG, closer to *Oblivion meets Weird West meets a low-poly graphic novel*. The Canvas game is the playable reference build; `render3d.html` is the in-progress 3D first-road slice.
 
 ## Preview
 
@@ -52,6 +52,13 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 - Treats narrative as gameplay logic, not only dialogue flavor.
 - Uses automated tests for core systems and progression logic.
 - Keeps future work in one roadmap: [`docs/roadmap.md`](docs/roadmap.md).
+
+## What Reviewers Should Notice
+
+- **Playable now**: the Canvas build has a full Dustward first-road loop with Boone's board, bounty flow, rewards, save recovery, and run memory.
+- **Engineering depth**: 96 Vitest files cover combat, saves, jobs, progression, visual profiles, accessibility settings, and the 3D spike seams.
+- **Browser QA discipline**: Playwright smoke scripts exercise golden-path, save-recovery, combat, weather, settings, and the Three.js first-road route.
+- **Clear migration path**: the Three.js renderer is isolated under `src/render3d/`, with the Canvas game kept stable until parity is proven.
 
 ## Reviewer Quick Path
 
@@ -122,7 +129,7 @@ The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the
 
 ## MVP Test Path
 
-For a Steve-ready MVP review, use the first-road vertical slice:
+For a portfolio-ready MVP review, use the first-road vertical slice:
 
 1. Start in Dustward Frontier and find Marshal Boone's job board.
 2. Accept **Marsh Slime Bounty** and follow the road/marker toward the marsh threat.
