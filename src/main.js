@@ -431,6 +431,7 @@ import {
 } from "./companion.js";
 import { computeAtmosphere } from "./atmosphere.ts";
 import { buildDevOverlayPayload } from "./devOverlayPayload.js";
+import { installPointerInputHandlers } from "./input.js";
 
 const OPENING_CACHE_SEED = resolveFirstMinuteCache({
   mode: "playing",
@@ -10913,68 +10914,7 @@ const canvas = document.getElementById("game");
     }
   });
 
-  document.addEventListener("keyup", (event) => {
-    state.keys[event.code] = false;
-  });
-
-  document.addEventListener("pointerlockchange", () => {
-    if (document.pointerLockElement !== canvas) {
-      state.mouseLook = 0;
-      state.mouseButtons.right = false;
-    }
-  });
-
-  canvas.addEventListener("click", () => {
-    if (state.mode === "playing") {
-      try {
-        const maybePromise = canvas.requestPointerLock?.();
-        if (maybePromise && typeof maybePromise.catch === "function") {
-          maybePromise.catch(() => { });
-        }
-      } catch {
-        // Pointer lock is optional in automation/headless contexts.
-      }
-    }
-  });
-
-  canvas.addEventListener("contextmenu", (event) => {
-    event.preventDefault();
-  });
-
-  document.addEventListener("mousedown", (event) => {
-    if (state.mode !== "playing") return;
-    if (event.button === 0) {
-      state.mouseButtons.left = true;
-      attack();
-      event.preventDefault();
-    } else if (event.button === 2) {
-      state.mouseButtons.right = true;
-      event.preventDefault();
-    }
-  });
-
-  document.addEventListener("mouseup", (event) => {
-    if (event.button === 0) {
-      state.mouseButtons.left = false;
-    }
-    if (event.button === 2) {
-      state.mouseButtons.right = false;
-    }
-  });
-
-  window.addEventListener("blur", () => {
-    state.mouseButtons.left = false;
-    state.mouseButtons.right = false;
-    state.player.blocking = false;
-  });
-
-  document.addEventListener("mousemove", (event) => {
-    if (document.pointerLockElement === canvas && state.mode === "playing") {
-      state.mouseLook += event.movementX * 0.00195;
-    }
-  });
-
-  document.addEventListener("fullscreenchange", resize);
+  installPointerInputHandlers({ canvas, state, attack, resize });
 
   function frame(now) {
     if (!frame.last) frame.last = now;
