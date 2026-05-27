@@ -94,7 +94,7 @@ The current build contains the Shattered Frontier v3 foundation plus several ope
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual direction**: redesigned title screen, region visual identities, combat feedback, and an active Dustward Canvas art-kit pass with dusk sky, warmer road language, town silhouettes, lantern/wanted-board props, lower marsh barriers, and less placeholder-heavy opening composition.
 
-Latest local fast gate: `npm test` reports **1057 passing tests across 91 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **1085 passing tests across 96 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
@@ -106,13 +106,19 @@ Latest local fast gate: `npm test` reports **1057 passing tests across 91 files*
 > (`npm run dev` → open `/render3d.html`) and does not touch the Canvas game. See
 > [`docs/roadmap.md`](docs/roadmap.md).
 
+Current playable path:
+
+- `index.html` is the current playable/reference RPG build.
+- `render3d.html` is an experimental Three.js first-road slice.
+- New 3D work should stay under `src/render3d/` until it reaches parity with the Canvas first-road loop.
+
 The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the single source of truth. The high-level active build order is:
 
-1. **Golden Path 1** — one complete Boone road-job loop from town to road to reward to consequence.
-2. **Hardcore visual readability** — finish the first-five-minutes Dustward rescue pass: dark western dusk palette, clearer NPC/enemy/interactable silhouettes, cleaner HUD, near-wall/marsh readability, and visual regression gates.
-3. **Core RPG loop fusion** — jobs, loot, gear, crafting, housing, economy, and consequences feeding one repeatable loop.
-4. **Playtest hardening** — per-slot recovery/export UI, stronger browser assertions, feedback capture, and clean run history.
-5. **Architecture finish** — extract HUD, input, modal, save, combat, and renderer runtime from the remaining `main.js` pressure.
+1. **3D foundation hardening** — keep Canvas stable while the Three.js spike becomes modular, testable, and smoke-gated.
+2. **First-road 3D loop** — finish the board, cache, slime, wagon, Map Scrap, and return-to-Boone sequence in `render3d.html`.
+3. **Visual and accessibility proof** — add screenshot review, HUD readability, prompt semantics, and modal focus polish.
+4. **System parity planning** — design the safe bridge from 3D phase completions back to save-safe Canvas systems.
+5. **Release polish** — package the strongest playable path honestly, with known limits and current screenshots.
 
 ## MVP Test Path
 
@@ -277,6 +283,7 @@ npm run typecheck:ts
 npm run test:syntax
 npm run dev:lint
 npm run test:smoke
+npm run test:render3d # requires a running dev server, defaults to http://127.0.0.1:5180
 npm run qa
 
 # Visual capture + diff

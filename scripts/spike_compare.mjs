@@ -4,17 +4,44 @@
 // opening from the running dev server, side by side, for the decision gate.
 //
 // Usage: node scripts/spike_compare.mjs   (dev server must be running)
-// Env:   WESTWARD_URL (default http://127.0.0.1:5173)
+// Env:   WESTWARD_URL (default http://127.0.0.1:5180)
 
 import fs from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
 
-const BASE = process.env.WESTWARD_URL || "http://127.0.0.1:5173";
+const BASE = process.env.WESTWARD_URL || "http://127.0.0.1:5180";
 const OUT = path.resolve("output/spike-compare");
 const VIEWPORT = { width: 1280, height: 720 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function withTimeout(promise, label, ms = 20000) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+async function assertServerAvailable() {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(`${BASE}/index.html`, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+  } catch (error) {
+    throw new Error(
+      `Dev server is not reachable at ${BASE}. Start it with ` +
+      "`npm run dev -- --host 127.0.0.1 --port 5180` before running this script. " +
+      `Cause: ${error.message}`,
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function launch() {
   const common = { headless: true, args: ["--use-gl=angle", "--use-angle=swiftshader"] };
@@ -37,11 +64,19 @@ function collectConsole(page, bucket) {
   page.on("pageerror", (e) => bucket.push(String(e)));
 }
 
-// Pull a single canvas frame via toDataURL inside the page, then write it
-// from Node. Avoids Playwright's screenshot path which waits on the page
-// being idle — Westward's RAF loop never goes idle.
+// Capture the canvas element directly first. If Playwright cannot capture the
+// element, fall back to reading the canvas pixels in-page. Keeping both paths
+// avoids false negatives from either browser screenshot quirks or canvas
+// readback stalls.
 async function screenshotCanvas(page, selector, outPath) {
-  const dataUrl = await page.evaluate((sel) => {
+  try {
+    await page.locator(selector).screenshot({ path: outPath, timeout: 10000 });
+    return;
+  } catch (screenshotError) {
+    console.warn(`[warn] element screenshot failed for ${selector}; trying canvas readback: ${screenshotError.message}`);
+  }
+
+  const dataUrl = await withTimeout(page.evaluate((sel) => {
     const canvas = document.querySelector(sel);
     if (!canvas) return null;
     // For WebGL canvases (#scene) the framebuffer may be cleared after the
@@ -49,7 +84,7 @@ async function screenshotCanvas(page, selector, outPath) {
     // preserveDrawingBuffer; the Canvas2D game has no such caveat.
     try { return canvas.toDataURL("image/png"); }
     catch { return null; }
-  }, selector);
+  }, selector), `read ${selector} canvas`, 10000);
   if (!dataUrl || !dataUrl.startsWith("data:image/png;base64,")) {
     throw new Error(`screenshotCanvas: could not read canvas ${selector}`);
   }
@@ -61,6 +96,7 @@ async function captureOld(context) {
   const errors = [];
   const page = await context.newPage();
   collectConsole(page, errors);
+  console.log("[capture] old canvas: loading index.html");
   await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
   await page.waitForSelector("#game");
   // Wait for the smoke probe surface — proves the Canvas build booted.
@@ -99,6 +135,7 @@ async function captureOld(context) {
   console.log(`[probe] old gameplay state: ${JSON.stringify(probe)}`);
 
   await screenshotCanvas(page, "#game", path.join(OUT, "old.png"));
+  console.log("[capture] old canvas: wrote old.png");
   await page.close();
   return errors;
 }
@@ -107,22 +144,32 @@ async function captureNew(context) {
   const errors = [];
   const page = await context.newPage();
   collectConsole(page, errors);
-  await page.goto(`${BASE}/render3d.html`, { waitUntil: "load" });
+  console.log("[capture] new spike: loading render3d.html");
+  await withTimeout(page.goto(`${BASE}/render3d.html`, { waitUntil: "load" }), "load render3d.html", 15000);
   await page.waitForSelector("#scene");
   await page.waitForFunction(() => window.__spikeReady === true, { timeout: 15000 });
+  await page.waitForFunction(() => Boolean(window.__westward3dTest?.getHeroVisibility), { timeout: 15000 });
   const snapshot = await page.evaluate(() => window.__westwardRenderSnapshot || null);
   if (!snapshot || snapshot.kind !== "westward-render-snapshot" || snapshot.objective?.phase !== "accept_bounty") {
     errors.push(`render3d snapshot missing or wrong phase: ${snapshot?.objective?.phase || "none"}`);
   }
+  const heroVisibility = await page.evaluate(() => window.__westward3dTest.getHeroVisibility());
+  console.log(`[probe] new hero visibility: ${JSON.stringify(heroVisibility)}`);
+  const visibleKinds = Object.entries(heroVisibility).filter(([, view]) => view.inFrame).map(([kind]) => kind);
+  if (!heroVisibility.jobBoard?.inFrame || visibleKinds.length < 2) {
+    errors.push(`render3d first frame does not show the first-road hero cluster; visible=${visibleKinds.join(",") || "none"}`);
+  }
   await sleep(300);
   await screenshotCanvas(page, "#scene", path.join(OUT, "new.png"));
+  console.log("[capture] new spike: wrote new.png");
   await page.close();
   return errors;
 }
 
 async function main() {
+  await assertServerAvailable();
   fs.mkdirSync(OUT, { recursive: true });
-  const browser = await launch();
+  const browser = await withTimeout(launch(), "launch browser", 20000);
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
   try {
     const oldErrors = await captureOld(context);

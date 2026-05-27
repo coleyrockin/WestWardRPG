@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  LOOP_PHASES,
   createInitialLoopState,
   createLoopStateMachine,
   getPhaseView,
@@ -89,5 +90,13 @@ describe("render3d phase state", () => {
     expect(machine.phase).toBe("slime_fight");
     expect(machine.isTargetEnabled(slime)).toBe(true);
     expect(machine.getPromptForTarget(slime)).toContain("Strike");
+  });
+
+  it("gives every first-road phase objective metadata", () => {
+    for (const phase of LOOP_PHASES) {
+      const view = getPhaseView(phase);
+      expect(view.objectiveMeta.length).toBeGreaterThan(0);
+      expect(view.objectiveMeta.every((line: string) => line.trim().length > 0)).toBe(true);
+    }
   });
 });

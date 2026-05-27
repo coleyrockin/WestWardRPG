@@ -14,6 +14,9 @@ import { createPlayerController } from "./playerController.js";
 import { buildProxies } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
 import { createLoopStateMachine } from "./phaseState.js";
+import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
+import { createBoardModalController } from "./boardModal.js";
+import { createEncounterSystem } from "./encounterSystem.js";
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
@@ -201,11 +204,12 @@ function buildJobBoard(group, p) {
   light.position.copy(toVec(p.x, p.y, 2.3));
   group.add(light);
   addContactShadow(group, p.x, p.y, 0.8, 0.8);
+  return board;
 }
 
 function buildSmokeCache(group, p) {
   // chest
-  addBox(group, 0.72, 0.54, 0.54, standard(p.color, { emissive: "#5a3a12", emissiveIntensity: 0.4 }), toVec(p.x, p.y));
+  const chest = addBox(group, 0.72, 0.54, 0.54, standard(p.color, { emissive: "#5a3a12", emissiveIntensity: 0.4 }), toVec(p.x, p.y));
   addContactShadow(group, p.x, p.y, 0.55, 0.55);
   // pale smoke plume — wider stacked translucent cones drifting upward
   for (let i = 0; i < 6; i++) {
@@ -216,6 +220,7 @@ function buildSmokeCache(group, p) {
     cone.position.copy(toVec(p.x + i * 0.04, p.y, 0.7 + i * 0.56));
     group.add(cone);
   }
+  return chest;
 }
 
 function buildWagon(group, p) {
@@ -234,6 +239,7 @@ function buildWagon(group, p) {
     wheel.castShadow = true;
     group.add(wheel);
   }
+  return bed;
 }
 
 function buildSlime(group, p) {
@@ -260,6 +266,7 @@ function buildSlime(group, p) {
     eye.position.copy(toVec(p.x + dx, p.y - 0.52, 0.6));
     group.add(eye);
   }
+  return body;
 }
 
 function buildGeneric(group, p, h = 0.6) {
@@ -285,6 +292,38 @@ function buildPlacement(group, p) {
     case "crate": return buildGeneric(group, p, 0.7);
     default: return buildGeneric(group, p);
   }
+}
+
+function markJobBoardAccepted(mesh) {
+  const mat = mesh?.material;
+  if (!mat) return;
+  if (mat.color?.set) mat.color.set("#e1a34c");
+  if (mat.emissive?.set) mat.emissive.set("#ffb84a");
+  if ("emissiveIntensity" in mat) mat.emissiveIntensity = 1.35;
+}
+
+function getHeroVisibility(heroMeshes, camera) {
+  camera.updateMatrixWorld();
+  camera.updateProjectionMatrix();
+  camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+  const box = new THREE.Box3();
+  const center = new THREE.Vector3();
+  return Object.fromEntries(
+    Object.entries(heroMeshes).map(([kind, mesh]) => {
+      box.setFromObject(mesh);
+      box.getCenter(center);
+      const projected = center.clone().project(camera);
+      return [kind, {
+        inFrame: Math.abs(projected.x) <= 0.92 && Math.abs(projected.y) <= 0.92 && projected.z >= -1 && projected.z <= 1,
+        ndc: {
+          x: Number(projected.x.toFixed(3)),
+          y: Number(projected.y.toFixed(3)),
+          z: Number(projected.z.toFixed(3)),
+        },
+        distance: Number(camera.position.distanceTo(center).toFixed(2)),
+      }];
+    }),
+  );
 }
 
 function buildGround(scene, snapshot) {
@@ -357,30 +396,18 @@ function createSpikeSnapshot() {
   });
 }
 
-function syncObjectiveDom(snapshot, loopState = null) {
-  const label = document.querySelector("#objective .label");
-  const text = document.querySelector("#objective .text");
-  const meta = document.querySelector("#objective .meta");
-  const tag = document.querySelector("#tag");
-  const view = loopState || {};
-  if (label) label.textContent = view.objectiveLabel || snapshot.objective?.title || "Objective";
-  if (text) text.textContent = view.objectiveText || (
-    snapshot.objective?.currentTarget
-      ? `${snapshot.objective.currentTarget} - ${snapshot.objective.nextAction}`
-      : "Open Boone's board - accept the Marsh Slime Bounty."
-  );
-  if (meta) {
-    const items = Array.isArray(view.objectiveMeta) ? view.objectiveMeta : [];
-    meta.innerHTML = items.slice(0, 2).map((line) => `<span>${line}</span>`).join("");
-  }
-  if (tag) tag.textContent = `WestWard · ${snapshot.region.label} · ${view.phase || "Dusk"}`;
-}
-
 export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const loopState = createLoopStateMachine();
-  syncObjectiveDom(snapshot, loopState.state);
-  window.__westwardRenderSnapshot = snapshot;
-  window.__westward3dLoop = loopState.state;
+  const objectiveRefs = createObjectiveDomRefs(document);
+  syncObjectiveDom(objectiveRefs, snapshot, loopState.state);
+  const publishLoopDebug = (state) => {
+    if (!import.meta.env.DEV || typeof window === "undefined") return;
+    window.__westward3dLoop = state;
+  };
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    window.__westwardRenderSnapshot = snapshot;
+    publishLoopDebug(loopState.state);
+  }
   // preserveDrawingBuffer lets the spike-compare script grab a frame via
   // canvas.toDataURL() between RAF frames. Minimal cost for a spike route.
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
@@ -416,16 +443,21 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   buildGround(scene, snapshot);
 
   const props = new THREE.Group();
-  for (const p of snapshot.worldObjects) buildPlacement(props, p);
+  const heroMeshes = {};
+  for (const p of snapshot.worldObjects) {
+    const mesh = buildPlacement(props, p);
+    if (["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(p.kind) && mesh) {
+      heroMeshes[p.kind] = mesh;
+    }
+  }
   scene.add(props);
 
-  // Hero camera pose from Milestone 3A: low road-level view 5.5 west of spawn
-  // looking east down the road. The playerController seeds itself from this
-  // position so the spike-compare screenshot keeps its framing; once the
-  // player walks they advance toward the board.
+  // Start at the real road spawn and aim at Boone's board cluster. This keeps
+  // first-load framing honest for both play and spike_compare screenshots.
   const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
-  camera.position.set(snapshot.player.x - 5.5, 1.8, snapshot.player.y + 0.0);
-  camera.lookAt(snapshot.player.x + 8.0, 0.5, snapshot.player.y - 0.3);
+  const openingTarget = snapshot.worldObjects.find((p) => p.kind === "jobBoard") || snapshot.player;
+  camera.position.set(snapshot.player.x, 1.8, snapshot.player.y);
+  camera.lookAt(openingTarget.x + 0.3, 1.0, openingTarget.y + 0.12);
 
   function onResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -469,50 +501,55 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const boardModal = document.getElementById("board-modal");
   const boardAccept = document.getElementById("board-accept");
   const boardClose = document.getElementById("board-close");
-  let modalOpen = false;
 
   const refreshLoopDom = () => {
     const state = loopState.state;
-    window.__westward3dLoop = state;
-    syncObjectiveDom(snapshot, state);
+    publishLoopDebug(state);
+    syncObjectiveDom(objectiveRefs, snapshot, state);
     interaction.update(player.position);
-  };
-
-  const openBoardModal = () => {
-    modalOpen = true;
-    if (boardModal) boardModal.hidden = false;
-    setPromptText("");
-  };
-  const closeBoardModal = () => {
-    modalOpen = false;
-    if (boardModal) boardModal.hidden = true;
-    refreshLoopDom();
   };
 
   const advance = (event) => {
     const state = loopState.transition(event);
-    window.__westward3dLoop = state;
-    syncObjectiveDom(snapshot, state);
+    publishLoopDebug(state);
+    syncObjectiveDom(objectiveRefs, snapshot, state);
     interaction.update(player.position);
     return state;
   };
 
-  if (boardAccept) {
-    boardAccept.addEventListener("click", () => {
+  const boardModalController = createBoardModalController({
+    modal: boardModal,
+    acceptButton: boardAccept,
+    closeButton: boardClose,
+    setPromptText,
+    onAccept: () => {
       advance("accept_bounty");
-      closeBoardModal();
-    });
-  }
-  if (boardClose) boardClose.addEventListener("click", closeBoardModal);
+      markJobBoardAccepted(heroMeshes.jobBoard);
+    },
+    onClose: refreshLoopDom,
+  });
+
+  const encounter = createEncounterSystem(scene, snapshot, {
+    slimeMesh: heroMeshes.roadSlime,
+    getPhase: () => loopState.phase,
+    onSlimeEngage: () => {
+      if (loopState.phase !== "cache_open") return false;
+      advance("slime_appeared");
+      return true;
+    },
+    onSlimeDeath: () => {
+      if (loopState.phase === "slime_fight") advance("defeat_slime");
+    },
+  });
 
   const handleJobBoard = () => {
     if (loopState.phase === "spawn") {
       advance("board_reached");
-      openBoardModal();
+      boardModalController.open();
       return;
     }
     if (loopState.phase === "accept_bounty") {
-      openBoardModal();
+      boardModalController.open();
       return;
     }
     if (loopState.phase === "return_to_boone") {
@@ -520,7 +557,7 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       return;
     }
     if (loopState.phase === "survey_offered") {
-      syncObjectiveDom(snapshot, {
+      syncObjectiveDom(objectiveRefs, snapshot, {
         ...loopState.state,
         objectiveText: "Old Road Survey is ready. This is tomorrow's next playable job.",
       });
@@ -529,13 +566,11 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const handleSmokeCache = () => {
     if (loopState.phase !== "road_walk") return;
     advance("open_cache");
-    window.setTimeout(() => {
-      if (loopState.phase === "cache_open") advance("slime_appeared");
-    }, 500);
+    encounter.engage();
   };
   const handleRoadSlime = () => {
     if (loopState.phase !== "slime_fight") return;
-    advance("defeat_slime");
+    encounter.strike(player.position);
   };
   const handleBrokenWagon = () => {
     if (loopState.phase !== "wagon_inspect") return;
@@ -550,35 +585,40 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   interaction.registerHandler("roadSlime", handleRoadSlime);
   interaction.registerHandler("brokenWagon", handleBrokenWagon);
 
-  window.__westward3dTest = {
-    getLoopState: () => loopState.state,
-    getPlayerPosition: () => player.position,
-    movePlayerToKind: (kind) => {
-      const target = snapshot.worldObjects.find((obj) => obj.kind === kind);
-      if (!target || !player.setPosition) return null;
-      const x = target.x - 1.35;
-      const z = target.y;
-      player.setPosition({ x, z });
-      refreshLoopDom();
-      interaction.update(player.position);
-      return player.position;
-    },
-    interact(kind) {
-      const handlers = {
-        jobBoard: handleJobBoard,
-        smokeCache: handleSmokeCache,
-        roadSlime: handleRoadSlime,
-        brokenWagon: handleBrokenWagon,
-      };
-      handlers[kind]?.();
-      return loopState.state;
-    },
-    acceptBoard() {
-      boardAccept?.click();
-      return loopState.state;
-    },
-    closeBoard: closeBoardModal,
-  };
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    window.__westward3dTest = {
+      getLoopState: () => loopState.state,
+      getPlayerPosition: () => player.position,
+      movePlayerToKind: (kind) => {
+        const target = snapshot.worldObjects.find((obj) => obj.kind === kind);
+        if (!target || !player.setPosition) return null;
+        const x = target.x - 1.35;
+        const z = target.y;
+        player.setPosition({ x, z });
+        refreshLoopDom();
+        interaction.update(player.position);
+        return player.position;
+      },
+      interact(kind) {
+        const handlers = {
+          jobBoard: handleJobBoard,
+          smokeCache: handleSmokeCache,
+          roadSlime: handleRoadSlime,
+          brokenWagon: handleBrokenWagon,
+        };
+        handlers[kind]?.();
+        return loopState.state;
+      },
+      acceptBoard() {
+        boardModalController.accept();
+        return loopState.state;
+      },
+      closeBoard: boardModalController.close,
+      isBoardModalOpen: () => boardModalController.isOpen(),
+      getEncounterState: () => encounter.getState(),
+      getHeroVisibility: () => getHeroVisibility(heroMeshes, camera),
+    };
+  }
 
   let frames = 0;
   let prevTs = performance.now();
@@ -586,8 +626,9 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     // dt in seconds, clamped to keep big tab-resume jumps from teleporting.
     const dt = Math.min((now - prevTs) / 1000, 0.05);
     prevTs = now;
-    if (!modalOpen) player.update(dt, proxies);
+    if (!boardModalController.isOpen()) player.update(dt, proxies);
     interaction.update(player.position);
+    encounter.update(player.position, dt);
     renderer.render(scene, camera);
     frames++;
     if (frames === 2) window.__spikeReady = true; // captured after a settled frame
@@ -595,7 +636,7 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   }
   loop();
 
-  return { scene, camera, renderer, snapshot, player, proxies, interaction, loopState };
+  return { scene, camera, renderer, snapshot, player, proxies, interaction, loopState, encounter };
 }
 
 // Auto-start when loaded as the render3d.html entry.

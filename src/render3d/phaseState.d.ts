@@ -23,6 +23,7 @@ export interface LoopStateView extends LoopState {
   activeTargetKind: string;
   objectiveText: string;
   objectiveLabel: string;
+  objectiveMeta: string[];
 }
 
 export function createInitialLoopState(overrides?: Partial<LoopState>): LoopState;
@@ -31,6 +32,7 @@ export function getPhaseView(phase: LoopPhase | string): {
   phase: LoopPhase;
   label: string;
   objectiveText: string;
+  objectiveMeta: string[];
   activeTargetKind: string;
   promptText: string;
 };

@@ -195,6 +195,25 @@ describe("playerController — DOM shell", () => {
     ctrl.dispose();
   });
 
+  it("seeds yaw and pitch from a real Three-style getWorldDirection target", () => {
+    const doc = makeFakeDocument();
+    const camera = {
+      ...makeFakeCamera(),
+      getWorldDirection(out: {
+        set: (x: number, y: number, z: number) => any;
+        normalize: () => any;
+        negate: () => any;
+      }) {
+        return out.set(-1, 0.25, 0).normalize().negate();
+      },
+    };
+    const ctrl = createPlayerController(camera as any, { document: doc as any });
+
+    expect(approx(ctrl.yaw, -Math.PI / 2, 1e-9)).toBe(true);
+    expect(ctrl.pitch).toBeLessThan(0);
+    ctrl.dispose();
+  });
+
   it("keydown W moves the camera forward over time", () => {
     const doc = makeFakeDocument();
     const camera = makeFakeCamera();
@@ -216,6 +235,20 @@ describe("playerController — DOM shell", () => {
     const zBefore = camera.position.z;
     ctrl.update(1);
     expect(camera.position.z).toBe(zBefore);
+    ctrl.dispose();
+  });
+
+  it("setPosition updates the controller and camera without changing eye height", () => {
+    const doc = makeFakeDocument();
+    const camera = makeFakeCamera();
+    const ctrl = createPlayerController(camera, { document: doc as any });
+
+    ctrl.setPosition({ x: 5, z: 7 });
+
+    expect(ctrl.position).toEqual({ x: 5, z: 7 });
+    expect(camera.position.x).toBe(5);
+    expect(camera.position.z).toBe(7);
+    expect(camera.position.y).toBe(0);
     ctrl.dispose();
   });
 

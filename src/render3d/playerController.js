@@ -130,7 +130,30 @@ export function createPlayerController(camera, opts = {}) {
   // XZ for yaw, then use its Y component for pitch.
   const initialForward = (() => {
     if (camera && typeof camera.getWorldDirection === "function") {
-      const out = { x: 0, y: 0, z: -1 };
+      const out = {
+        x: 0,
+        y: 0,
+        z: -1,
+        set(x, y, z) {
+          this.x = x;
+          this.y = y;
+          this.z = z;
+          return this;
+        },
+        normalize() {
+          const len = Math.hypot(this.x, this.y, this.z) || 1;
+          this.x /= len;
+          this.y /= len;
+          this.z /= len;
+          return this;
+        },
+        negate() {
+          this.x = -this.x;
+          this.y = -this.y;
+          this.z = -this.z;
+          return this;
+        },
+      };
       try {
         const v = camera.getWorldDirection(out);
         return { x: v?.x ?? out.x, y: v?.y ?? out.y, z: v?.z ?? out.z };

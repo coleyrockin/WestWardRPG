@@ -1,11 +1,11 @@
 // Browser smoke for the Three.js first-road loop.
 //
 // Usage: node scripts/render3d_loop_smoke.mjs
-// Env:   WESTWARD_URL (default http://127.0.0.1:5173)
+// Env:   WESTWARD_URL (default http://127.0.0.1:5180)
 
 import { chromium } from "playwright";
 
-const BASE = process.env.WESTWARD_URL || "http://127.0.0.1:5173";
+const BASE = process.env.WESTWARD_URL || "http://127.0.0.1:5180";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -75,12 +75,26 @@ async function main() {
     await expectPhase(page, "accept_bounty");
     const modalOpen = await page.evaluate(() => !document.getElementById("board-modal")?.hidden);
     if (!modalOpen) throw new Error("job board modal did not open");
+    const beforeModalMove = await page.evaluate(() => window.__westward3dTest.getPlayerPosition());
+    await page.keyboard.down("w");
+    await page.waitForTimeout(200);
+    await page.keyboard.up("w");
+    const afterModalMove = await page.evaluate(() => window.__westward3dTest.getPlayerPosition());
+    if (Math.hypot(afterModalMove.x - beforeModalMove.x, afterModalMove.z - beforeModalMove.z) > 0.05) {
+      throw new Error("player moved while job board modal was open");
+    }
 
     await page.evaluate(() => window.__westward3dTest.acceptBoard());
     await expectPhase(page, "road_walk");
+    const modalClosed = await page.evaluate(() => document.getElementById("board-modal")?.hidden === true);
+    if (!modalClosed) throw new Error("job board modal did not close after accept");
     await interact(page, "smokeCache");
-    await expectPhase(page, "cache_open");
-    await waitForPhase(page, "slime_fight");
+    const afterCache = await getState(page);
+    if (!["cache_open", "slime_fight"].includes(afterCache?.phase)) {
+      throw new Error(`expected cache_open or slime_fight after cache, got ${afterCache?.phase || "none"}`);
+    }
+    if (afterCache.phase === "cache_open") await waitForPhase(page, "slime_fight");
+    await page.evaluate(() => window.__westward3dTest.movePlayerToKind?.("roadSlime"));
     await interact(page, "roadSlime");
     await expectPhase(page, "wagon_inspect");
     await interact(page, "brokenWagon");
