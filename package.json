@@ -10,7 +10,6 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "dev:py": "echo 'dev:py removed; atmosphere is bundled via Vite. Use \"npm run dev\" or \"npm run preview\" instead.' && exit 1",
     "build": "vite build",
     "build:itch": "vite build --base=./ --outDir dist-itch",
     "package:itch": "bash scripts/itch_package.sh",
@@ -18,7 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:syntax": "node --check web_game_playwright_client.mjs && node --check scripts/visual_diff.mjs && bash -n scripts/visual_regression_capture.sh && bash -n scripts/smoke_suite.sh",
+    "test:syntax": "node --check tools/playwright-client.mjs && node --check scripts/visual_diff.mjs && bash -n scripts/visual_regression_capture.sh && bash -n scripts/smoke_suite.sh",
     "test:smoke": "bash scripts/smoke_suite.sh",
     "test:render3d": "node scripts/render3d_loop_smoke.mjs",
     "test:visual:capture": "bash scripts/visual_regression_capture.sh",

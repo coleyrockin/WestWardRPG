@@ -51,7 +51,7 @@ async function main() {
   collectConsole(page, errors);
 
   try {
-    await page.goto(`${BASE}/render3d.html`, { waitUntil: "load" });
+    await page.goto(`${BASE}/spikes/render3d.html`, { waitUntil: "load" });
     await page.waitForSelector("#scene");
     await page.waitForFunction(() => window.__spikeReady === true, { timeout: 15000 });
     await page.waitForFunction(() => Boolean(window.__westward3dTest), { timeout: 5000 });

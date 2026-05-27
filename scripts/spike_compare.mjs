@@ -144,8 +144,8 @@ async function captureNew(context) {
   const errors = [];
   const page = await context.newPage();
   collectConsole(page, errors);
-  console.log("[capture] new spike: loading render3d.html");
-  await withTimeout(page.goto(`${BASE}/render3d.html`, { waitUntil: "load" }), "load render3d.html", 15000);
+  console.log("[capture] new spike: loading spikes/render3d.html");
+  await withTimeout(page.goto(`${BASE}/spikes/render3d.html`, { waitUntil: "load" }), "load spikes/render3d.html", 15000);
   await page.waitForSelector("#scene");
   await page.waitForFunction(() => window.__spikeReady === true, { timeout: 15000 });
   await page.waitForFunction(() => Boolean(window.__westward3dTest?.getHeroVisibility), { timeout: 15000 });

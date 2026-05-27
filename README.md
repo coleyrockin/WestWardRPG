@@ -109,8 +109,8 @@ Latest local fast gate: `npm test` reports **1085 passing tests across 96 files*
 > presentation layer to a **Three.js** engine for richer scene depth, lighting,
 > and characters. The current Canvas build is the **reference build** — it stays
 > the playable source of truth for shipped gameplay until the new renderer proves
-> the same first-road slice. The spike lives behind the `render3d.html` dev route
-> (`npm run dev` → open `/render3d.html`) and does not touch the Canvas game. See
+> the same first-road slice. The spike lives behind the `spikes/render3d.html` dev route
+> (`npm run dev` → open `/spikes/render3d.html`) and does not touch the Canvas game. See
 > [`docs/roadmap.md`](docs/roadmap.md).
 
 Current playable path:

@@ -25,8 +25,9 @@ export default defineConfig({
       input: {
         main: 'index.html',
         // Engine-rewrite spike dev route (Milestone 1). Keeps build coverage of
-        // the Three.js page; the Canvas game entry (main) is unchanged.
-        render3d: 'render3d.html',
+        // the Three.js page; the Canvas game entry (main) is unchanged. The
+        // spike HTML lives under spikes/ to keep the repo root quiet.
+        render3d: 'spikes/render3d.html',
       },
     },
   },

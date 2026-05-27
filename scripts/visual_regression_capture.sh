@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-CLIENT="$PROJECT_ROOT/web_game_playwright_client.mjs"
+CLIENT="$PROJECT_ROOT/tools/playwright-client.mjs"
 PORT="${WESTWARD_PORT:-5180}"
 URL_OVERRIDE="${WESTWARD_URL:-}"
 BASE_URL="${URL_OVERRIDE:-http://localhost:${PORT}/index.html}"

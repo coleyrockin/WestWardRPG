@@ -46,7 +46,7 @@ Thanks for contributing.
 You can run a scenario with:
 
 ```bash
-node ./web_game_playwright_client.mjs \
+node ./tools/playwright-client.mjs \
   --url http://127.0.0.1:5180/index.html \
   --actions-file ./test-actions/realism_smoke.json \
   --click-selector "#start-btn" \

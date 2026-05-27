@@ -66,7 +66,7 @@ lint_code() {
     fi
     log_success "Game JavaScript syntax check passed"
 
-    if ! node --check web_game_playwright_client.mjs; then
+    if ! node --check tools/playwright-client.mjs; then
         log_error "Playwright client syntax check failed"
         exit 1
     fi

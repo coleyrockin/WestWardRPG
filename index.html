@@ -1063,54 +1063,10 @@
     </div>
   </div>
 
-  <script>
-    // Disclosure for controls sheet — vanilla, accessible, reduced-motion-safe.
-    (function () {
-      var btn = document.querySelector(".disclosure");
-      var sheet = document.getElementById("controls-sheet");
-      if (!btn || !sheet) return;
-      function close() {
-        btn.setAttribute("aria-expanded", "false");
-        sheet.setAttribute("aria-hidden", "true");
-      }
-      function open() {
-        btn.setAttribute("aria-expanded", "true");
-        sheet.setAttribute("aria-hidden", "false");
-      }
-      btn.addEventListener("click", function () {
-        var expanded = btn.getAttribute("aria-expanded") === "true";
-        if (expanded) close(); else open();
-      });
-      document.addEventListener("keydown", function (e) {
-        if (e.key === "Escape" && btn.getAttribute("aria-expanded") === "true") close();
-      });
-    })();
-  </script>
+  <script type="module" src="/src/ui/controlsDisclosure.js"></script>
 
   <script type="module" src="/src/main.js"></script>
-  <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").then((reg) => {
-        reg.addEventListener("updatefound", () => {
-          const incoming = reg.installing;
-          if (!incoming) return;
-          incoming.addEventListener("statechange", () => {
-            if (incoming.state === "installed" && navigator.serviceWorker.controller) {
-              // New version available — surface a simple reload prompt
-              const banner = document.createElement("div");
-              banner.style.cssText = "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#2a1a08;color:#f5e6c8;border:1px solid #c87941;border-radius:8px;padding:10px 18px;font-family:monospace;font-size:13px;z-index:9999;cursor:pointer;";
-              banner.textContent = "Update available — click to reload";
-              banner.addEventListener("click", () => {
-                incoming.postMessage("skipWaiting");
-                window.location.reload();
-              });
-              document.body.appendChild(banner);
-            }
-          });
-        });
-      }).catch(() => {});
-    }
-  </script>
+  <script type="module" src="/src/ui/serviceWorkerRegister.js"></script>
 </body>
 
 </html>
