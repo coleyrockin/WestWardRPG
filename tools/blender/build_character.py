@@ -101,17 +101,32 @@ def build_character(name="character", textured=True):
     coat = _mat("coat", (0.42, 0.29, 0.18))
     dark = _mat("dark", (0.17, 0.12, 0.08))
     hat = _mat("hat", (0.16, 0.10, 0.06))
+    eyem = _mat("eye", (0.06, 0.05, 0.04))
+    band = _mat("band", (0.11, 0.07, 0.04))
+    kerch = _mat("kerch", (0.58, 0.20, 0.15))
+    buckle = _mat("buckle", (0.74, 0.62, 0.30))
+    boot = _mat("boot", (0.10, 0.07, 0.05))
 
     # body parts (front = +Y). Joined into one mesh for a single SkinnedMesh.
+    # Richer detail: features the ink-edge + cel pass traces — eyes, hat band,
+    # neckerchief, belt buckle, boots, coat-front seam.
     parts = [
-        _box("legL", (0.17, 0.18, 0.72), (-0.12, 0, 0.36), dark),
-        _box("legR", (0.17, 0.18, 0.72), (0.12, 0, 0.36), dark),
+        _box("legL", (0.17, 0.18, 0.72), (-0.12, 0, 0.40), dark),
+        _box("legR", (0.17, 0.18, 0.72), (0.12, 0, 0.40), dark),
+        _box("bootL", (0.19, 0.24, 0.2), (-0.12, 0.03, 0.1), boot),
+        _box("bootR", (0.19, 0.24, 0.2), (0.12, 0.03, 0.1), boot),
         _box("torso", (0.44, 0.27, 0.62), (0, 0, 1.02), coat),
+        _box("lapel", (0.05, 0.02, 0.5), (0, 0.14, 1.02), dark),  # coat-front seam
+        _box("kerchief", (0.3, 0.3, 0.12), (0, 0.02, 1.3), kerch),
         _box("belt", (0.46, 0.29, 0.1), (0, 0, 0.74), dark),
+        _box("buckle", (0.1, 0.05, 0.08), (0, 0.16, 0.74), buckle),
         _box("armL", (0.13, 0.15, 0.56), (-0.3, 0, 1.04), coat),
         _box("armR", (0.13, 0.15, 0.56), (0.3, 0, 1.04), coat),
         _box("head", (0.25, 0.25, 0.25), (0, 0, 1.46), skin),
+        _box("eyeL", (0.055, 0.04, 0.05), (-0.06, 0.13, 1.48), eyem),
+        _box("eyeR", (0.055, 0.04, 0.05), (0.06, 0.13, 1.48), eyem),
         _box("hatbrim", (0.54, 0.54, 0.06), (0, 0, 1.58), hat),
+        _box("hatband", (0.34, 0.34, 0.05), (0, 0, 1.62), band),
         _box("hatcrown", (0.32, 0.32, 0.18), (0, 0, 1.69), hat),
     ]
     for o in parts:
