@@ -17,50 +17,17 @@ import { createLoopStateMachine } from "./phaseState.js";
 import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
 import { createBoardModalController } from "./boardModal.js";
 import { createEncounterSystem } from "./encounterSystem.js";
+import { createAtmosphere } from "./atmosphere.js";
+import { getPalette, nextTimeKey, lerpPalette } from "./timeOfDay.js";
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
 const col = (hex) => new THREE.Color(hex);
 
-const DUSK_TOP = "#1a0f33"; // deep purple zenith
-const DUSK_HORIZON = "#d0784a"; // warm amber horizon
 const GROUND_TINT = "#4e3c26"; // muted dusty brown
 
-function makeSkyDome() {
-  const geo = new THREE.SphereGeometry(120, 32, 16);
-  const mat = new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    depthWrite: false,
-    uniforms: {
-      topColor: { value: col(DUSK_TOP) },
-      midColor: { value: col("#472a6b") },
-      horizonColor: { value: col(DUSK_HORIZON) },
-    },
-    vertexShader: `
-      varying vec3 vPos;
-      void main() {
-        vPos = normalize(position);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      varying vec3 vPos;
-      uniform vec3 topColor;
-      uniform vec3 midColor;
-      uniform vec3 horizonColor;
-      void main() {
-        float t = clamp(pow(max(vPos.y, 0.0), 0.55), 0.0, 1.0);
-        // 3-stop: warm amber horizon → purple mid → deep purple zenith
-        vec3 c = t < 0.35
-          ? mix(horizonColor, midColor, t / 0.35)
-          : mix(midColor, topColor, (t - 0.35) / 0.65);
-        c += horizonColor * (1.0 - t) * 0.12;
-        gl_FragColor = vec4(c, 1.0);
-      }
-    `,
-  });
-  return new THREE.Mesh(geo, mat);
-}
+// Sky dome, sun/rim/hemi lights, fog, and clouds now live in atmosphere.js,
+// driven by the time-of-day palettes in timeOfDay.js.
 
 function standard(hex, opts = {}) {
   return new THREE.MeshStandardMaterial({
@@ -566,25 +533,17 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   renderer.toneMappingExposure = 1.05;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(col("#8a6a9a"), 0.022);
 
-  scene.add(makeSkyDome());
-
-  // lighting: cool purple sky fill + warm low sun
-  scene.add(new THREE.HemisphereLight(col("#5a2890"), col("#1e0e04"), 0.6));
-  const sun = new THREE.DirectionalLight(col("#ffae6a"), 1.3);
-  sun.position.set(snapshot.player.x - 8, 6, snapshot.player.y - 5); // low west sun
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.near = 0.5;
-  sun.shadow.camera.far = 80;
-  sun.shadow.camera.left = -30;
-  sun.shadow.camera.right = 30;
-  sun.shadow.camera.top = 30;
-  sun.shadow.camera.bottom = -30;
-  sun.target.position.set(snapshot.player.x + 6, 0, snapshot.player.y);
-  scene.add(sun);
-  scene.add(sun.target);
+  // Atmosphere shell owns the sky dome, sun/rim/hemi lights, fog, and clouds,
+  // all driven by a time-of-day palette. Default to dusk so first-load framing
+  // (and the spike_compare screenshot) matches the established art-proof look.
+  const atmosphere = createAtmosphere(scene, renderer, {
+    anchor: { x: snapshot.player.x, y: snapshot.player.y },
+    playCore: { x: snapshot.player.x + 6, y: snapshot.player.y },
+  });
+  let timeKey = "dusk";
+  let appliedPalette = getPalette(timeKey);
+  atmosphere.applyPalette(appliedPalette);
 
   buildGround(scene, snapshot);
 
@@ -626,6 +585,43 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // Ensure the world matrix is current so getWorldDirection() reads the
   // correct forward vector when seeding yaw/pitch from the hero pose lookAt.
   camera.updateMatrixWorld();
+
+  // Day/night cycle — press T to drift dusk → golden hour → night → dusk.
+  // A tween smoothstep-blends the live palette so the sky, lights, fog, and
+  // exposure ease across instead of hard-cutting. KeyT is free of the player
+  // controller's WASD/shift map, so this never fights movement input.
+  const TOD_TWEEN_SECONDS = 1.6;
+  let todTween = null; // { fromPalette, toKey, t }
+  const cycleTimeOfDay = () => {
+    const toKey = nextTimeKey(timeKey);
+    todTween = { fromPalette: appliedPalette, toKey, t: 0 };
+    timeKey = toKey;
+    return timeKey;
+  };
+  // Snap straight to a palette with no tween — used by dev tooling/tests to jump
+  // between times of day without waiting on the RAF-paced blend.
+  const setTimeOfDay = (key) => {
+    todTween = null;
+    timeKey = getPalette(key).key;
+    appliedPalette = getPalette(timeKey);
+    atmosphere.applyPalette(appliedPalette);
+    return timeKey;
+  };
+  const stepTimeOfDay = (dt) => {
+    if (!todTween) return;
+    todTween.t = Math.min(1, todTween.t + dt / TOD_TWEEN_SECONDS);
+    const e = todTween.t * todTween.t * (3 - 2 * todTween.t); // smoothstep
+    appliedPalette = lerpPalette(todTween.fromPalette, getPalette(todTween.toKey), e);
+    atmosphere.applyPalette(appliedPalette);
+    if (todTween.t >= 1) {
+      appliedPalette = getPalette(todTween.toKey);
+      atmosphere.applyPalette(appliedPalette);
+      todTween = null;
+    }
+  };
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "KeyT") cycleTimeOfDay();
+  });
 
   // Milestone 3B step 1–3: walkable, collidable, promptable.
   // Player owns input + camera each frame; proxies block movement; interaction
@@ -763,6 +759,9 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       isBoardModalOpen: () => boardModalController.isOpen(),
       getEncounterState: () => encounter.getState(),
       getHeroVisibility: () => getHeroVisibility(heroMeshes, camera),
+      cycleTimeOfDay,
+      setTimeOfDay,
+      getTimeOfDay: () => timeKey,
     };
   }
 
@@ -775,6 +774,7 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (!boardModalController.isOpen()) player.update(dt, proxies);
     interaction.update(player.position);
     encounter.update(player.position, dt);
+    stepTimeOfDay(dt);
     renderer.render(scene, camera);
     frames++;
     if (frames === 2) window.__spikeReady = true; // captured after a settled frame
@@ -782,7 +782,7 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   }
   loop();
 
-  return { scene, camera, renderer, snapshot, player, proxies, interaction, loopState, encounter };
+  return { scene, camera, renderer, snapshot, player, proxies, interaction, loopState, encounter, atmosphere, cycleTimeOfDay };
 }
 
 // Auto-start when loaded as the render3d.html entry.
