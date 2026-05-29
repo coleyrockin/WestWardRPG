@@ -1,560 +1,561 @@
-# WestWardRPG Execution Roadmap
+# WestWardRPG Execution Roadmap — 3D Hardcore Rebuild
 
 Single source of truth. Do not create parallel `TODO.md`, `PLAN.md`, `ROADMAP-*.md`,
 or another roadmap file.
 
-Last updated: `2026-05-27`
-Branch: `main` @ `ba24094` plus local foundation-hardening edits
+Last updated: `2026-05-28`
+Branch: `refactor/decompose-main-and-csp`
 
 ---
 
-## 1. Project Summary
+## 1. Summary — what we are building and why
 
-WestWardRPG is a browser RPG prototype with a large systems backbone already in place:
-job boards/quests, deterministic save/reload, gear and crafting foundations,
-housing/workbench loops, NPC memory, POI/loot systems, run summaries, and
-strong smoke/visual testing coverage.
+WestWard is being **rebuilt from scratch as a full 3D hardcore western RPG** in Three.js.
+The Three.js renderer (`src/render3d/`, today a placeholder-geometry spike) becomes **the
+game**. The previous plan — keep the Canvas game as the reference and *migrate* it to 3D
+parity over Milestones 4–9 — is **superseded** (kept for the record in the Legacy appendix).
 
-There are **two active renderers**:
+Four decisions define this roadmap:
 
-- **Canvas renderer** (`src/main.js` + `index.html`) — the current playable/reference build.
-  Keep it stable while 3D work proves parity.
-- **Three.js spike** (`src/render3d/` + `render3d.html`) — the new renderer in progress.
-  Milestone 3A art proof done; Milestone 3B gameplay in progress.
+1. **Game identity** — the new game *is* WestWard: Dustward frontier, three factions
+   (workers' guild / civic council / market cartel), the 8-quest story chain, 10+ endings
+   driven by three ideology axes (controlVsFreedom, truthVsComfort, solidarityVsStatus).
+2. **Rebuild fresh in 3D** — the Canvas `src/main.js` (11.3k lines, ~100 modules, 1101 tests)
+   is a **design reference and behavioral oracle**, not code to port wholesale. Native 3D
+   systems replace it; Canvas is frozen as `legacy/`.
+3. **"Hardcore" = both** — the *game* is hardcore (permadeath/ironman, survival stakes,
+   brutal/scarce economy, punishing deterministic combat) **and** the *build* is ambitious,
+   no-shortcuts quality.
+4. **Full game** — all three regions (Frontier, Ashfall, Ironlantern), the complete story,
+   mini-bosses, NG+, commercial-scope content.
 
-The goal: make the Three.js spike a complete, playable first-five-minute slice, then
-migrate the Canvas renderer to parity (Milestones 4–9).
-
----
-
-## 2. Milestone History
-
-### Milestone 0 — Rewrite Prep & Repo Hygiene ✅
-
-Clean repo, CI gates, Vite build, Canvas smoke passing.
-
-### Milestone 1 — Three.js Spike ✅
-
-`render3d.html` entry; purple-dusk scene builder; `spike_compare.mjs` screenshot gate.
-
-### Milestone 2 — State Adapter ✅
-
-`src/bridge/stateSnapshot.js` bridge: Canvas game state → snapshot object consumed by 3D spike.
-`createRenderSnapshot` imports from canvas-side modules (`firstRoadMemory`, `gameFeel`, etc.).
-
-### Milestone 3A — Art Proof ✅ `PR #19 / 4c30262`
-
-Purple 3-stop dusk sky shader, road-level hero camera, backface-expansion outlines,
-blob contact shadows, vignette overlay, sickly-green emissive slime, larger job board,
-smoke plume animation.
-`spike_compare.mjs` screenshot gate passes.
-
-### Milestone 3B — First Gameplay Loop 🟡 in progress
-
-**Steps 1–6 foundation + board modal + Road Slime encounter done.**
-**Step 8 animation helper baseline done. Steps 7, 9, and 10 remain** — see Section 5.
+The two non-negotiables carried over from the prototype: the **pure-logic + thin-shell
+testing discipline** and the **layered quality-gate stack**. The biggest risk of a fresh
+rebuild — losing the correctness encoded in 1101 tests — is managed by the **port-ledger**
+(§8) and by using the Canvas build as a **golden oracle**.
 
 ---
 
-## 3. Current Repo State
+## 2. Cross-cutting principles (apply to every phase)
 
-| Gate | Status |
-|---|---|
-| `npm test` | ✅ 96 files, 1 085 tests |
-| `npm run typecheck:ts` | ✅ |
-| `npm run dev:lint` | ✅ |
-| `npm run test:syntax` | ✅ |
-| `npm run build` | ✅ both `dist/index.html` and `dist/render3d.html`; Vite chunk warning remains |
-| `WESTWARD_URL=http://127.0.0.1:5180 npm run test:render3d` | ✅ with dev server running |
-| `node scripts/spike_compare.mjs` | ✅ with dev server running; wrote old/new proof screenshots |
-| `npm run test:smoke` (Canvas) | Not rerun in this pass; use explicit `WESTWARD_PORT` if local port binding is restricted |
+### Three axes of "hardcore," independently tunable
+Keep this vocabulary so every later decision lands in the right bank:
 
----
+- **Run-rules (meta-permanence)** — ironman / permadeath / save-scummability. A *save-model*
+  property; immutable for the life of a run.
+- **Lethality (combat math)** — time-to-die, poise/posture, stamina economy, healing scarcity.
+  A *combat-model* property; continuous.
+- **Pressure (world/economy)** — survival drain, scarcity, danger-scaling by region/time/weather.
+  A *world+economy* property; continuous.
 
-## 4. Architecture Constraints
+The **identity (un-multiplied) tuning IS the lethal one**; "assists" multiply *toward*
+survivability. This inverts the Canvas default (forgiving base + difficulty multipliers) — which
+is precisely why a fresh build, not a port, is correct.
 
-- **`src/main.js` is never modified for 3D work.** The Canvas renderer is the reference.
-- **All new 3D code lives in `src/render3d/`.** No top-level files for render logic.
-- **No imports from `src/render3d/` inside `src/main.js`.** Bridge flows one direction: Canvas → snapshot → 3D.
-- **Tests are `environment: "node"` (vitest).** No jsdom, no WebGL, no real DOM. All modules expose pure-logic seams.
-- **Pure / shell split.** Every render3d module has a pure exported function (tested in Node) and an optional thin DOM/Three.js shell (not unit-tested, covered by smoke).
+### Pure / shell discipline (non-negotiable)
+Every module = a pure exported function (unit-tested in node, no WebGL/DOM) + an optional thin
+Three.js/DOM shell (covered by smoke). Logic living in a shell is rejected in review. Vitest stays
+`environment: "node"`. The seed modules already model this: `playerController.stepPlayer`,
+`worldProxies.resolveCollision`, `phaseState.transitionLoopPhase`.
 
-### Current `src/render3d/` module map
+### Correctness via port-ledger + golden oracle
+Maintain the §8 ledger (`module · canonical test · tier · ported? · green?`). **Port the test
+file first, then make it pass.** Where rules are re-tuned (Tier B), keep the Canvas module as
+`…Legacy` in the test harness and write **differential/characterization tests** — identical where
+behavior should match, lethality invariants where it diverges.
 
-```
-frontierLayout.js     placement data (world-map coordinates → 3D positions)
-playerController.js   WASD walk + shift sprint + mouse-drag look; pure stepPlayer() + DOM shell
-worldProxies.js       AABB collision from frontierLayout; resolveCollision() sweep
-interactionSystem.js  proximity picker + E-key dispatch + setPromptText seam
-phaseState.js         9-phase state machine (spawn → survey_offered)
-objectiveDom.js       cached DOM refs + safe objective/meta rendering
-boardModal.js         testable job-board modal state + button wiring
-animationHelpers.js   pure mesh mutation helpers for bob/glow/hit/collapse/reward descriptors
-encounterSystem.js    Road Slime proximity, engage, strike, death state machine
-spike.js              Three.js scene assembly + RAF loop + modal handlers
-                      ⚠️ still broad — geometry builders need extraction (see §5 Step 9)
-```
+### Signature over fidelity (the look is the engine's identity)
+The render path is **non-photorealistic by design** — a stylized "moving graphic novel," not a race
+toward realism we can't win solo (see §3). The NPR uber-shader, ink edges, and per-region post stack
+are *core architecture*, not late polish, and they serve gameplay readability (parry / stamina /
+hazard), not decoration.
 
-### Coordinate convention
+### Three new standing gates (enforced every phase)
+- **Determinism gate** — because the sim is event-sourced (§3, Bet 2), a recorded `(seed, input-log)`
+  replays to an identical state hash, headless (no renderer). This *is* the architecture, not an
+  add-on test.
+- **Perf gate** — draw-call / frame-time / triangle / light-count budget asserted in the render
+  smoke; build fails on regression.
+- **Golden-image gate** — per-shader and per-region post-stack snapshots (extends the pixelmatch
+  `test:visual`) so the signature look can't silently regress.
 
-- World `(x, y)` (frontierLayout) → 3D `(X=x, Z=y, Y=up)`.
-- `yaw = 0` → camera looks toward −Z. `yaw = −π/2` → looks +X (east).
-- Player position always stored as `{ x, z }` (3D coords).
-- **`interactionSystem.pickNearest`** uses `playerPos.z` vs `obj.y` — asymmetric but correct.
-  Any caller passing a placement record as `playerPos` would silently get wrong distance.
-
-### Naming landmine: "Boone" vs "warden"
-
-The 3D layer uses `"Boone"` everywhere (prompt text, phase labels, `return_to_boone` phase).
-The Canvas layer uses `npcId: "warden"` — `npcMemory.js` maps it to "Marshal Boone".
-The `phaseState.js` emits `"frontier_slime_bounty_accepted"` etc.; `firstRoadMemory.js`
-checks `FIRST_ROAD_STARTER_JOB_ID = "frontier_slime_bounty"`.
-These do not intersect yet (3D phase machine is local spike state, not written to save).
-**Must be reconciled before any write-bridge integration** (Step 9 / Milestone 7 save sync).
+### Preserve the existing gate stack & infra
+`npm test` (vitest) · `typecheck:ts` · `test:syntax` · `dev:lint` · `build` · `test:smoke`
+(Playwright + its *semantic* state assertions — port those invariants) · `test:render3d` (loop
+smoke) · `test:visual` (pixelmatch). Keep Vite dual-entry, Vercel (CSP-strict) + itch.io offline
+ZIP, and the multi-language maintenance scripts.
 
 ---
 
-## 5. Milestone 3B — Remaining Steps (6–10)
+## 3. Graphics Engine & Code Architecture (the elevated layer)
 
-All code in `src/render3d/`. Run all gates before every commit:
+The throughline: **an event-sourced, render-decoupled core is what makes a GPU-heavy stylized
+look testable, deterministic, and hardcore-anti-cheat-friendly at once.** Architecture and
+aesthetic are one decision here, not two. Four committed bets, threaded into the phases below.
+
+### Bet 1 — A signature NPR look ("a moving graphic novel")
+The engine's *core render path* is non-photorealistic, not a post-hoc filter:
+- A **TSL uber-shader**: cel/toon ramp + rim light + **ink edges from depth/normal discontinuity**
+  (a real edge-detect post pass — retires the backface-expansion hack) + cross-hatch / halftone
+  shadow fills + paper grain.
+- **Per-region post identity** (promote each palette's `grade` to a full stack): Frontier = golden
+  dust + bloom + grain; Ashfall = heat-haze refraction + bleached LUT + chromatic edges;
+  Ironlantern = scanline/CRT surveillance vignette + neon-rain.
+- **Graphics serve the hardcore design:** ink-edge flare on a successful parry; halftone darkens as
+  stamina drains — the look *is* combat readability and hazard pressure, not decoration.
+
+### Bet 2 — Event-sourced, data-oriented core (game = pure fn of `(seed, input-log)`)
+- **Fixed-timestep, command/event-sourced simulation.** Entire game state is reconstructable from
+  seed + input-log. From this one commitment fall: first-class **replay** (building on
+  `replayRecorder`), time-travel debugging, a trivial **determinism gate**, **save = seed + input
+  tail** (tiny, tamper-evident → the ironman anti-cheat posture), and netcode-readiness.
+- **ECS** (archetype-based, systems in fixed order) for cache-friendly hardcore swarms / projectiles
+  / particles and deterministic ordering — composition over the 11.3k-line monolith.
+- **Render-command abstraction:** the sim emits an immutable render-state; the renderer is a *pure
+  consumer*. The pure/shell split at macro scale — the sim is fully node-testable and
+  **headless-runnable** (balance/soak with no GPU); the renderer is swappable.
+
+### Bet 3 — WebGPU + TSL (with a WebGL2 fallback)
+Build on Three's **WebGPURenderer + TSL** (shaders authored in JS → WGSL *and* GLSL). Unlocks
+**compute shaders** (GPU particles, GPU culling, slices of sim) and a single authoring path for the
+uber-shader. A **Phase-1 decision** — the material system sits on it. Keep the WebGL2 fallback so
+itch.io / Vercel / older GPUs still run.
+
+### Bet 4 — Atmosphere & lighting as the western's soul
+- **Clustered / forward+ lighting** — retire the "keep light budget tight" constraint; lanterns, the
+  watchtower beacon, muzzle flashes, slime glow coexist. **Light becomes a night-survival resource**
+  (darkness = danger → hardcore pillar).
+- **Volumetric god-rays** through mesa silhouettes, height fog + aerial-perspective desaturation,
+  **GPU dust motes** in light beams, heat shimmer, embers.
+- Evolve `atmosphere.js` / `timeOfDay.js` from 3 discrete palettes to a **continuous sun/moon arc**
+  with color-temperature scattering.
+
+**Guardrail:** "no shortcuts" must not curdle into "never ships." The signature look has to be
+provable in **one region** (the Phase-3 slice gate, now a *fun AND beautiful* gate) before mass
+production.
+
+---
+
+## 4. The 7 Phases
+
+> Per phase: **Goal · Deliverables · Exit criteria (testable) · Dependencies.**
+> Critical path: **P1 → P2 → P3 (slice gate) → P5 → P6 → P7.** P4's pure half (4a) runs
+> *parallel* to P2/P3.
+
+### Phase 1 — Foundation, Engine Spine & Hardcore Substrate
+**Goal:** Promote `src/render3d/` from spike to *the* engine — a fixed-timestep, save-backed,
+input-complete, perf-budgeted runtime with the asset pipeline and all hardcore *state contracts*
+in place, so no pillar is retrofitted later.
+
+**Deliverables**
+- **Event-sourced fixed-timestep sim** (§3, Bet 2): pure `stepSimulation(state, cmds, dt)` driven by
+  a seed + command/input-log so the whole game state is reconstructable; thin RAF shell. Replaces the
+  RAF-driven `spike.js` loop.
+- **ECS / data-oriented store** (archetype-based; systems run in fixed, deterministic order).
+- **Render-command abstraction:** the sim emits an immutable render-state; the renderer is a *pure,
+  swappable, headless-skippable* consumer.
+- **Renderer = Three `WebGPURenderer` + TSL, with a WebGL2 fallback** (§3, Bet 3) — chosen now; the
+  material system depends on it. Seed the **NPR uber-shader** (cel + rim + ink-edge post) in TSL.
+- System/world manager with an explicit **spatial-partition contract** (the seam P3 streaming
+  plugs into; single-cell impl is fine now).
+- **Ironman-native save layer:** envelope/payload split + FNV-1a integrity + slots/backups +
+  versioned **migration path from v1**; immutable `runRules {permadeath, saveScummable}` set at
+  character creation; **death = a `sealed` state transition** (not a delete, not recover-at-camp
+  respawn — preserves run-summary/NG+ data); `autosaveSeq`; autosave on-event + on-quit, single
+  ironman slot, no manual save. Payload carries **seed + input-log tail** (replay-reconstructable,
+  tamper-evident — the ironman anti-cheat posture).
+- **Seeded-RNG architecture** — all combat/loot randomness flows through one injected seedable RNG.
+- Input: **pointer-lock primary** (current drag-look degrades with WASD) + gamepad + touch, behind
+  a rebindable action-map (`keybinds.js` design).
+- Camera rig (1st/3rd-person decision made + abstracted) with collision vs world proxies.
+- Asset-pipeline foundation: glTF / material / texture / audio loaders + asset-manifest convention;
+  **assets fetched, not bundled** (bundle discipline starts here); KTX2/draco path.
+- Perf budget documented in `docs/` + perf HUD (`renderer.info`); seed the **in-engine inspector**
+  (entity browser, live hardcore-knob tuning, time-of-day scrubber, AABB/`threat`-field viz, replay
+  scrubber).
+- Directory restructure (`src/render3d/` → `src/game/`); freeze Canvas to `legacy/`; collapse to
+  **one ID namespace / one state tree** (kills the Boone↔warden split and the read-only bridge —
+  there is only one renderer now).
+
+**Exit criteria**
+- Determinism: a recorded `(seed, input-log)` replays to an identical state hash, **headless** (no
+  renderer attached).
+- Save round-trips (write→reload→identical hash); corrupted envelope recovers from backup; ironman
+  death → slot sealed + run-summary emitted (node tests on pure logic).
+- Pointer-lock engages on canvas click; WASD+look works locked (render smoke).
+- One real `.glb` + texture loads through Vite dev *and* Vercel CSP (verify `connect-src`); the
+  **WebGPU path renders the NPR uber-shader and the WebGL2 fallback renders the same scene**.
+- Perf HUD reports the budget; frozen legacy Canvas tests still green.
+
+**Dependencies:** none. Reuses *design* from `savePersistence`, `saveMigration`, `keybinds`,
+`phaseState`, `playerController`, `worldProxies`.
+
+### Phase 2 — Hardcore Combat, Feel & Enemy AI
+**Goal:** A 3D melee/ranged core that *feels* punishing, all 7 archetypes as native 3D behavior
+trees on a steering substrate, and the difficulty architecture in place. The "prove the fun"
+engine work.
+
+**Deliverables**
+- Re-derive combat math as **pure tested modules** (port `combatProcessor` structure; rewrite
+  hit-detection for 3D — capsule/sphere + 3-space swing arcs; re-tune magnitudes so identity tuning
+  is lethal). *Archaeology note:* poise/guard-break/parry rules live in the 11.3k-line `main.js`,
+  not the clean `combatProcessor.js` — budget time to mine the monolith.
+- **Symmetric poise/posture** on player *and* enemies (first-class, day one — not a perk);
+  **committal, scarce healing** (interruptible animation + cost — never the instant Canvas `Q`
+  potion); stamina economy; parry / guard-break / dodge.
+- Hit reactions: stagger, hitstop, knockback, screen shake (port `gameFeel` + `animationHelpers`).
+- **Combat VFX in TSL + GPU particles** (impacts, dust, muzzle flash); NPR **ink-edge flare on a
+  successful parry** and **halftone deepening as stamina drains** — graphics as combat readability
+  (§3, Bet 1).
+- Ranged + multi-enemy groups + lock-on; damage model (armor / resist / poise / status DoT —
+  `statusEffects`, `difficultyTuning`).
+- **Enemy steering substrate** (obstacle avoidance vs the same AABB proxies the player uses) —
+  *not* full navmesh yet. Fixes the AI-needs-navigation inversion so P2 enemies ship before P3.
+- 7 archetypes as native 3D behavior trees (`ENEMY_ARCHETYPES` + `BEHAVIOR_TUNING` +
+  `resolveBehaviorMove`; `behaviorTree.js` JSON-safe BT runtime).
+- Death wired to P1 run-rules (ironman seal / penalty).
+- **Difficulty architecture:** spine + assists as a knob-struct
+  `{ runRules, lethality, pressure, assists }`, resolved at character creation, stored in the
+  immutable save block. Tiers (Hardcore/Standard/Story) are **presets over the spine**, never a
+  different combat. Assists (aim-assist, parry-window widening, telegraph emphasis) are *allowed in
+  ironman* — they aid execution, not consequence.
+- **One real combat-art slice** (player + 1 enemy + 1 weapon: real model/anim/SFX) through the P1
+  pipeline — proves the pipeline before mass art.
+
+**Exit criteria**
+- Combat math pure + node-tested (mirror `combat-processor.test`, `status-effects.test`);
+  **differential tests vs `combatProcessorLegacy`** (identical where intended; lethality invariants
+  where re-tuned — e.g. "player dies to 3 unblocked brute hits at identity tuning").
+- All 7 archetypes spawn with distinct behavior; a charger dashing at a wall avoids/stops
+  (steering proven, render smoke).
+- Player death → correct per-mode behavior (node test).
+- One real asset animates a full idle→attack→hit→death cycle at perf budget.
+- **Named subjective checkpoint:** a playtester confirms combat "feels good and dangerous."
+
+**Dependencies:** P1 (loop, input, camera, save run-state, asset pipeline, seeded RNG).
+
+### Phase 3 — World, Survival & the Vertical-Slice Gate
+**Goal:** One **complete, shippable-quality, hardcore-survivable** region (Frontier/Dustward) —
+streaming-capable, navmeshed, with the systemic survival layer — that is *fun*. **Ends with a hard
+fun-gate that can fail and block Phases 4–7.**
+
+**Deliverables**
+- Region streaming/chunking (implements the P1 partition contract; prove load/unload).
+- Navmesh (upgrades P2 steering to real pathing) + collision at scale.
+- POI discovery + interiors (Frontier POIs from `poiSystem`; `wfcInteriors` scales interiors
+  without hand-building each).
+- **Survival/hardcore systemic layer:** a single composed **`threat` scalar**
+  (region × time-of-day × weather-hazard × faction-influence × difficulty) the encounter system
+  reads; resource scarcity; day/night *danger* (not just lighting); weather *hazards* (the
+  `chooseEnemyType` weather→archetype coupling).
+- Frontier built to **full shippable quality now in the signature NPR look** — uber-shader + ink
+  edges + the Frontier post stack (golden dust / bloom / grain), **volumetric god-rays** through the
+  mesas, height fog, **GPU dust motes**, and the **continuous day/night arc** (§3, Bets 1 & 4).
+- **Clustered / forward+ lighting** so lanterns, the watchtower beacon, and slime glow coexist; at
+  night, **carried light is a survival resource** (darkness = danger).
+- 2–3 archetypes that force different tactics + **one mini-boss phase transition**
+  (`combatMilestones`); permadeath actually wired and *felt*.
+
+**Exit criteria — the Vertical-Slice Gate, *fun AND beautiful* (hard stop)**
+- Frontier streams without hitches at perf budget; navmesh agents path around interiors/obstacles.
+- A full hardcore mini-loop is survivable-but-punishing: spawn → gear up → fight → survive a
+  night / weather hazard → bank progress (or die and lose it under ironman). The first-road
+  9-phase loop runs end-to-end in the new engine (port `render3d_loop_smoke` assertions).
+- 60fps on target integrated GPU **with the real lethality model AND the full NPR post stack
+  running**; golden-image snapshot of the Frontier look committed as the baseline.
+- **Sign-off (named, can fail):** a naive player dies, learns, and *chooses to retry*; a skilled
+  player clears the mini-boss via mastery not grind; losing a permadeath run produces "one more
+  run"; **and the region reads unmistakably as the graphic-novel signature**. **If it fails, iterate
+  P1/P2 tuning or the shader stack — do NOT proceed.** (A Frontier-only hardcore release is a viable
+  fallback ship — this gate is also a scope circuit-breaker.)
+
+**Dependencies:** P1 (partition, perf), P2 (combat, steering → navmesh). Hard gate before P4–P7.
+
+### Phase 4 — RPG Systems & Art-Pipeline Scale-Up
+**Goal:** The full character/economy/progression backbone (brutal-economy-tunable, faction-rep
+ready for P5) and the art pipeline scaled now that the loop is proven worth dressing.
+*Run 4a parallel to P2/P3; 4b after the world exists.*
+
+**Deliverables**
+- **4a (parallel, early):** port near-verbatim (with tests) — inventory/equipment, affixes
+  (`weaponAffixes`), crafting tiers (`gearCrafting`, `craftingStation`), leveling + skill tree +
+  capstones (`progressionSystem`), loot tables (`lootSystem`), durability/repair, character
+  creation (`characterIdentity`). **Faction-reputation data model + 3 ideology axes as a
+  neutral-default container** (fixes the pricing-needs-factions inversion).
+- **4b (here):** 3D-integrate — visible equipped gear, world loot pickups, vendor/crafting UI;
+  economy/vendor pricing reading the (neutral-until-P5) faction-rep model (`economyServices`);
+  **brutal-economy as data knobs** (deficit-biased base, faction/event modifiers multiply a scarce
+  base, death a primary sink, no easy "sell-everything" valve).
+- Art/material scale-up: the **TSL uber-shader matures into the shared material system** (cel / rim /
+  ink params as material data, triplanar terrain, detail maps); GPU-instanced repeated props with
+  wind; LOD policy; **clustered lighting** matured; **perf budget enforced as an acceptance gate with
+  real assets**; 3D positional audio (parry/hit/guard-break audio is combat-readability-critical).
+
+**Exit criteria**
+- All ported systems pass their node tests **unchanged in behavior** (`gear-crafting`,
+  `progression-system`, `loot-system`, `economy-services`, `crafting-station`).
+- Equip a weapon → appears on the model + changes combat stats (smoke).
+- Vendor price responds to a manually-set faction-rep value (node) — proving the P5 seam.
+- Perf budget gated with real assets loaded.
+
+**Dependencies:** P1 (save container). 4b needs P2 (combat stats) + P3 (world pickups). 4a needs
+nothing — start early.
+
+### Phase 5 — Narrative, Quests, Factions & Content Tooling
+**Goal:** The complete story spine + living NPC cast, built on **authoring formats + CI validators
+created before the content flood** so the content phases have an objective done-condition.
+
+**Deliverables**
+- **Build tooling first:** declarative **quest schema + validator** (every `branchTag` a real axis;
+  every `outcome.effects` references real factions/flags; every quest reachable);
+  **dialogue/reaction coverage checker** (`storyContent`, `dialogueChoices`, `questOutcomeEchoes`,
+  vendor-reaction tables); **encounter-sets-as-data** validated vs perf budget + archetype
+  existence; **region-dressing data packs**; **ending reachability/coverage fuzzer** (fuzz
+  axis/rep/flag space — assert every ending reachable, predicate ordering doesn't shadow one out).
+  Validators run in CI.
+- Then author *through* the tools: job board + 8 main quests + side jobs (`jobBoard`,
+  `questDefinitions`, `sideJobGenerator`); 3 factions + rep reactions wired to the 3 axes
+  (`decisionEngine`, `influenceMap` rep→spawn/tint, `factionEffects`); 7 NPCs with
+  memory/affinity/dialogue/schedules (`npcMemory`); branching outcomes; 10+ endings (port
+  `decisionEngine` **verbatim** as the regression oracle); run summary; NG+; **narrative state fully
+  persisted + migratable**.
+- **Content = a fixed manifest with a coverage test** (can't drift infinite).
+
+**Exit criteria**
+- Quest state machine, ending resolution, faction-axis math pass ported node tests
+  (`quest-definitions`, `decision-engine`, `endings-expansion`, `npc-memory`, `job-board`);
+  ending-resolver **differential test vs legacy** yields identical ending IDs for the same
+  `{axes, rep, flags}` vectors.
+- Quest completion moves a faction axis → changes a vendor price → changes spawn tint (integration
+  smoke across the P4↔P5 seam).
+- Save/reload mid-quest preserves exact narrative state (hash); old-version save migrates forward.
+- ≥2 distinct endings reachable end-to-end in the Frontier slice; single canonical NPC id (grep
+  gate — no dangling Boone/warden references).
+
+**Dependencies:** P3 (world/interiors, proven loop), P4 (faction-rep model, rewards = gear/economy).
+
+### Phase 6 — Content Build-Out (Ashfall + Ironlantern) & Hardcore Tuning
+**Goal:** Scale the proven slice to the full game — 3 regions, complete cross-region story, full
+roster + mini-bosses, the real art/audio mass pass, and the hardcore balance pass.
+
+**Deliverables**
+- Ashfall + Ironlantern authored **through P5 tooling**: dressing / POIs / enemies / quests /
+  hazards / mini-bosses (`ashfall_*` / `ironlantern_*` POI data, region job boards, resources).
+- Complete cross-region story (acts 1–3 from `decisionEngine`); full enemy roster + mini-bosses
+  (`regionSystem.miniBosses`); biome audio mass pass + music (`audio`, `musicReactivity` →
+  Three.js `PositionalAudio`); art mass pass to slice quality across all regions.
+- **Per-region shader + post identity ships** (§3, Bet 1): Ashfall heat-haze refraction + bleached
+  LUT + chromatic edges; Ironlantern scanline/CRT surveillance vignette + neon-rain — each region's
+  hazard *rendered*, with a golden-image baseline per region.
+- Full difficulty ladder (presets) validated coherent end-to-end (Story beatable, Hardcore
+  brutal-but-fair); permadeath/ironman × NG+ interaction policy; brutal-economy balance pass vs real
+  content; accessibility audit (assists allowed in ironman *by design*; canvas `aria-label`, modal
+  focus-trap, prompt `aria-live`).
+
+**Exit criteria**
+- All 3 regions stream at budget; full story completable → ending; full roster + mini-bosses spawn
+  correctly per region/weather (port `enemy-archetypes` spawn-table assertions).
+- Ironman: new-game → death → sealed verified; separate run → ending → NG+ verified.
+- Economy balance documented ("brutal but fair"); content-manifest coverage test green;
+  accessibility checklist passes.
+
+**Dependencies:** P5 (story/faction systems), P3 (region template/streaming proven on Frontier).
+
+### Phase 7 — Polish, Optimization & Ship
+**Goal:** Hit perf/quality/QA bars at full content and ship to itch.io + Vercel.
+
+**Deliverables**
+- Perf optimization at scope: LOD, instancing, draw-call batching, **bundle split** (render3d is
+  already ~549KB — code-split Three.js + lazy-load regions); enforce budget.
+- Full QA: smoke across all regions/quests, **golden-image baselines per region + per shader**
+  (pixelmatch), save-migration across versions, soak/perf; **replay-determinism as a release gate** —
+  native now that the sim is event-sourced (§3, Bet 2): a recorded `(seed, input-log)` that diverges
+  = a rules regression; ending-reachability + content-manifest as release gates.
+- **Ironman edge-case hardening:** crash-during-autosave (`autosaveSeq` pays off), quit-during-
+  combat, tab-close mid-fight; anti-tamper posture for ironman saves.
+- Tutorial/onboarding, settings, save-slot UX, **run-summary / graveyard / leaderboard** (the
+  hardcore meta-layer that makes permadeath *rewarding* — `runSummary`, `runHistory`,
+  `dailySeedMode`), PWA/offline.
+- Release: itch.io offline ZIP (`scripts/itch_package.sh`) + Vercel (verify glb/ktx2/audio
+  MIME + CSP); RC → launch.
+
+**Exit criteria**
+- Perf budget met on mid-range integrated GPU at full content; bundle under target + regions
+  lazy-loaded.
+- Full smoke + visual + migration + soak + replay suites green.
+- itch ZIP runs offline; Vercel build passes CSP; RC sign-off.
+
+**Dependencies:** all prior.
+
+---
+
+## 5. Phase-1 "decide-it-now" checklist
+
+One schema field / one seam now; a cross-cutting rewrite later. Each maps to a P1 deliverable.
+
+1. `runRules {permadeath, saveScummable}` = immutable save-payload field from format v1.
+2. Death = a `sealed` state transition (not delete, not recover-at-camp respawn).
+3. One ID namespace, one state tree; the renderer reads *and writes* the authoritative save
+   (no read-only bridge, no parallel phase state, no Boone/warden split).
+4. Autosave = on-event + on-quit, single ironman slot, no manual save; `autosaveSeq` in envelope.
+5. Poise/posture is a first-class symmetric resource (player + enemies).
+6. Healing is committal + scarce (interruptible animation + cost), never instant.
+7. All combat/loot randomness flows through one injected seedable RNG.
+8. Identity (un-multiplied) tuning IS the lethal tuning; assists multiply toward survivability.
+9. Difficulty = a knob-struct across runRules / lethality / pressure + orthogonal assists — not a
+   global scalar.
+10. Encounter system reads one composed `threat` scalar.
+11. Economy base is deficit-biased; modifiers multiply a scarce base; death is a primary sink.
+12. Perf budget documented now; gated at P3, P4, P7.
+13. P3 ends at a fun-gate that can fail and block P4–P7.
+14. Content authoring formats + CI validators built at the *start* of P5; content = fixed manifest.
+15. Renderer = Three `WebGPURenderer` + TSL with a WebGL2 fallback (the material system depends on it).
+16. Sim is event-sourced — state = pure fn of `(seed, input-log)`; ECS store + render-command
+    abstraction (renderer is a pure, swappable, headless-skippable consumer).
+17. Save payload carries the `(seed, input-log)` tail (replay-reconstructable, tamper-evident).
+18. The NPR uber-shader (cel + ink edges + per-region post) is the *core render path*, not late polish.
+
+---
+
+## 6. Architecture constraints
+
+- **One renderer, one state tree.** The 3D game reads *and writes* the authoritative save. No
+  read-only bridge, no parallel phase machine, no dual naming.
+- **All game code lives under `src/game/`** (the promoted `src/render3d/`). Canvas is frozen under
+  `legacy/` and is reference-only — never imported by the new game.
+- **Pure / shell split** for every module (see §2). Tests are `environment: "node"` (vitest) — no
+  jsdom, no WebGL. Three.js/DOM shells are covered by smoke, not unit tests.
+- **Event-sourced + render-decoupled** (see §3). State = pure fn of `(seed, input-log)`; the sim
+  emits an immutable render-state the renderer consumes. Renderer = Three `WebGPURenderer` + TSL
+  (WebGL2 fallback); the NPR uber-shader is the *core* path, not a filter.
+- **Determinism, perf, and golden-image are gates, not aspirations** (see §2). All three run every
+  phase.
+- **Coordinate convention:** world `(x, y)` → 3D `(X=x, Z=y, Y=up)`. `yaw=0` looks toward −Z;
+  `yaw=−π/2` looks +X (east). Player position stored as `{ x, z }`.
+
+---
+
+## 7. Verification gates
+
+Run before every commit:
 
 ```bash
 npm test && npm run typecheck:ts && npm run test:syntax && npm run dev:lint && npm run build
 ```
 
----
-
-### Step 4 — Objective strip sync ✅ done
-
-`phaseState.js` phase output now drives the `#objective` DOM strip through
-`src/render3d/objectiveDom.js`.
-
-Completed foundation-hardening work:
-
-- DOM refs are cached at init through `createObjectiveDomRefs`.
-- Objective metadata uses `document.createElement` / `replaceChildren`, not string HTML.
-- `syncObjectiveDom` is exported and unit-tested without jsdom.
-- `objectiveMeta` is asserted for every phase.
-- `#prompt` has `role="status" aria-live="polite"` and `#tag` is `aria-hidden`.
-- Debug globals are gated behind `import.meta.env.DEV`, while dev smoke remains supported.
-
-**Test files:** `tests/render3d-objective-dom.test.ts`, `tests/render3d-phase-state.test.ts`
-
-**Acceptance:** Phase label, text, and metadata update correctly; no `innerHTML` remains in
-`src/render3d/spike.js`.
-
----
-
-### Step 5 — Job board modal ✅ done
-
-When the player presses E at the job board in `accept_bounty` phase:
-
-1. Movement pauses while the board modal is open.
-2. `#board-modal` opens with the existing bounty copy and focused Accept action.
-3. Accept advances to `road_walk`, closes the modal, and resumes movement.
-4. The job board panel shifts to a warmer accepted emissive state.
-
-**Test file:** `tests/render3d-board-modal.test.ts`
-
-The render3d smoke also asserts the modal opens, prevents movement while open, and
-closes after accept. No Canvas state is modified.
-
-**Acceptance:** Modal opens, phase advances, modal closes, movement freeze is verified,
-and board accepted state is visible.
-
----
-
-### Step 6 — Slime encounter (`src/render3d/encounterSystem.js`) ✅ done
-
-`createEncounterSystem(scene, snapshot, options)` owns Road Slime proximity, explicit
-cache-open engagement, strike/death handling, and mesh animation hooks.
-
-Slime state machine: `patrol → aggro → attack → dead`
-
-- `patrol`: slime bobs gently (`animationHelpers.idleBob`). No movement.
-- `aggro` (player within 4 units or cache-open engage): calls registered `onSlimeEngage`.
-- `attack` (player within 1.5 units): calls registered `onSlimeAttack`.
-- `dead` (E pressed while slime in strike range): calls registered `onSlimeDeath`;
-  `spike.js` advances `defeat_slime`.
-
-**Note:** `worldObjects` is captured by reference at construction time in both
-`interactionSystem` and `encounterSystem`. If a future step removes dead slimes,
-mutate the array in-place — do not replace the reference.
-
-**Test file:** `tests/render3d-encounter.test.ts`
-
-Asserted: state transitions; explicit engage; deferred engage callbacks; `onSlimeDeath`
-fires once; dead slime no longer aggros.
-
-**Acceptance:** Cache open engages slime, player can move into range → press E →
-slime dies → phase advances.
-
----
-
-### Step 7 — Reward + Map Scrap
-
-On `onSlimeDeath`:
-
-1. `advance("scrap_earned")`.
-2. `+1 Map Scrap` floating text over slime position (DOM overlay preferred over Three.js sprite).
-3. Smoke Cache lid mesh scale-Y ×1.2 (open animation).
-4. `smokeCache` interaction becomes active; prompt changes to "E — Open Cache".
-5. On cache open: `advance("board_return")`.
-
-**Prerequisite:** `interactionSystem.js` currently has no update path for enabling/disabling
-targets after construction. Before this step, either expose `setWorldObjects(arr)` on the
-system or accept an optional `worldObjects?` param in `update(playerPos, worldObjects?)`.
-
-**Test file:** `tests/render3d-rewards.test.ts`
-
-Assert: Map Scrap count increments; phase transitions correctly; cache interaction
-enabled after slime death.
-
----
-
-### Step 8 — Animation helpers (`src/render3d/animationHelpers.js`) ✅ baseline done
-
-Pure functions — no Three.js instantiation required. Take a mesh + time, mutate in place:
-
-```js
-idleBob(mesh, t, amplitude = 0.04)      // gentle y sine
-walkBob(mesh, t, speed)                 // lateral + vertical walk cycle
-interactGlow(mesh, t)                   // emissive pulse on interactable
-hitFlash(mesh, intensity = 3.0)         // one-frame emissive spike
-stagger(mesh, direction, t)             // knockback lerp
-deathCollapse(mesh, progress)           // scale Y → 0 over 0.4s
-rewardPop(scene, position, text)        // floating +text (DOM overlay preferred)
-```
-
-These are available for Steps 6 and 7. `rewardPop` currently returns and records a
-DOM-overlay-friendly reward descriptor; Step 7 still needs the actual visible reward
-overlay wiring.
-
-**Test file:** `tests/render3d-animation-helpers.test.ts`
-
-Asserted with fake meshes: each helper mutates the expected mesh property; reward
-descriptors are recorded without constructing Three.js objects.
-
----
-
-### Step 9 — Game loop extraction (`src/render3d/gameLoop.js`)
-
-`spike.js` currently owns: scene construction, lighting, geometry builders, RAF loop,
-DOM HUD sync, modal handlers, and debug surface. Split before the loop gets more complex.
-
-**`spike.js` becomes:** scene + camera + renderer construction only. No RAF, no handlers.
-
-**`gameLoop.js` owns:**
-- `requestAnimationFrame` loop.
-- `player.update(dt, proxies)`.
-- `interaction.update(playerPos)`.
-- `encounter.update(playerPos, dt)`.
-- Phase machine poll and DOM sync.
-- `window.__westward3dLoop` debug surface.
-
-**`src/render3d/propBuilders.js`:** extract geometry builders (spike.js lines ~111–288).
-
-**`src/render3d/handlers.js`:** extract `handleJobBoard`, `handleSmokeCache`,
-`handleBrokenWagon`, `handleRoadSlime` — or fold into `phaseState.js` as registered callbacks.
-
-**Debug globals — gate behind dev check:**
-
-```js
-if (import.meta.env.DEV) {
-  window.__westward3dTest = { ... };
-}
-```
-
-No new tests required for pure extraction — existing tests + smoke cover behavior.
-`npm run test:render3d` (smoke) is the acceptance gate.
-
----
-
-### Step 10 — Smoke suite hardening (`scripts/render3d_loop_smoke.mjs`)
-
-**Port default:** done. The script now defaults to `http://127.0.0.1:5180`, matching
-`vite.config.js`. It still accepts `WESTWARD_URL` for explicit smoke targets.
-
-**Remaining smoke assertions to add:**
-
-- `objectiveMeta` DOM tags render correctly each phase.
-- Visible Map Scrap reward text appears after slime death.
-- Smoke Cache/camera reward state is asserted after Step 7.
-
----
-
-### Milestone 3B Acceptance Criteria
-
-All 10 steps done when:
-
-1. A tester can walk WASD through the frontier, open the job board, defeat the slime,
-   collect Map Scrap, open the cache, and return to Boone — full `spawn → survey_offered` loop.
-2. `#prompt`, `#objective`, and `#board-modal` always agree (single phase state machine drives all three).
-3. `npm run test:render3d` (smoke) exits 0 and asserts the full phase sequence.
-4. Canvas build is untouched, all 1 085+ tests still pass.
-5. `node scripts/spike_compare.mjs` still exits 0.
-6. No `console.log` stub handlers remain — all E-press actions have real flows.
-
----
-
-## 6. Technical Debt (known, tracked)
-
-Pay down during the step that touches the affected file, not as a dedicated pass.
-
-| Debt | File | ~Line | Pay off by |
-|---|---|---|---|
-| String-based DOM mutation for meta tags | `spike.js` | paid | Done in Step 4 |
-| `window.setTimeout` phase transition — no cancel handle | `spike.js` | scrap auto-ack remains | Step 7 |
-| `document.querySelector` called at transition time (not cached) | `spike.js` | paid | Done in Step 4 |
-| Debug globals unconditionally attached to `window` | `spike.js` | paid | Done in Step 4 |
-| Stub `console.log` E-press handlers | `spike.js` | 532–544 | Steps 5–7 |
-| `worldObjects` captured by ref — no update path | `interactionSystem.js` | 62 | Step 7 |
-| `BOUNDARY_EPSILON` undocumented vs `PLAYER_RADIUS_DEFAULT` | `worldProxies.js` | 14, 86 | Next touch |
-| No `dispose()` on spike root object | `spike.js` | 598 | Step 9 |
-| Smoke script default port mismatch | `render3d_loop_smoke.mjs` | paid | Done in Step 4 |
-| `syncObjectiveDom` not exported → untestable | `objectiveDom.js` | paid | Done in Step 4 |
-
----
-
-## 7. Test Coverage Gaps
-
-| Gap | Where to add | Notes |
-|---|---|---|
-| `frontierLayout.js` — no direct tests | `tests/render3d-frontier-layout.test.ts` | Covered for hero kinds, finite coords, PLAYER_SPAWN |
-| `phaseState.js` — `objectiveMeta` not asserted | `tests/render3d-phase-state.test.ts` | Covered for every loop phase |
-| `playerController.setPosition` untested | `tests/render3d-player-controller.test.ts` | Covered because smoke uses it as fallback |
-| `playerController.update(dt, proxies)` collision path | `tests/render3d-player-controller.test.ts` | Pass a real proxy list to `update` |
-| Multi-proxy pinch (two overlapping inflated extents) | `tests/render3d-world-proxies.test.ts` | Exercises the 4-iteration stuck-fallback |
-| In-range → out-of-range → in-range crossing | `tests/render3d-interaction.test.ts` | Stateful re-entry edge case |
-| Reward overlay wiring | `tests/render3d-rewards.test.ts` (new) | Step 7 |
-
----
-
-## 8. Roadmap Omissions (not yet planned, need a milestone home)
-
-### Pointer lock
-
-`playerController.js` uses left-button-drag for look. True first-person requires
-`requestPointerLock()` — drag-to-look degrades when the player also holds WASD.
-Low risk as an optional enhancement with drag fallback.
-**Home:** Step 9 sub-task or Milestone 4 polish.
-
-### Touch / mobile input
-
-`playerController.js` has no touch event handling. `render3d.html` declares the viewport
-meta tag (mobile-responsive intent) but delivers no virtual controls.
-**Home:** Milestone 4 or dedicated sub-step. Requires joystick overlay or tilt-control design decision.
-
-### Runtime performance budget
-
-Current scene has 6 point lights, PCFSoftShadowMap at 2048×2048, and ~11 per-kind
-geometry builders. No draw-call count, triangle budget, or frame time target is documented.
-**Required before Milestone 4:** Baseline on a mid-range integrated GPU (60 fps target).
-Instrument with `renderer.info.render` in dev mode and document the budget here.
-
-### Write bridge (save/load integration)
-
-`stateSnapshot.js` is read-only. `phaseState.js` tracks its own state that parallels
-the Canvas save schema but never writes to `savePersistence.js`.
-**Required before Milestone 7 parity:** Design and implement a write bridge.
-**Prerequisite:** Reconcile "Boone" (3D) ↔ "warden" (Canvas) naming before bridge design.
-
-### Audio
-
-`src/audio.js` exists for the Canvas game. The 3D spike has no audio — no
-`THREE.AudioListener`, no interaction SFX, no ambient loop.
-**Home:** Milestone 4 polish pass. Use Three.js PositionalAudio for spatial effects,
-DOM `<audio>` element for ambient loop.
-
-### `survey_offered` continuation
-
-`phaseState.js` `survey_offered` phase has no transitions. `spike.js` shows a hardcoded
-string: "Old Road Survey is ready. This is tomorrow's next playable job."
-The loop terminates with no designed handoff. Options:
-1. Restart loop (new run).
-2. Unlock "Old Road Survey" as a new job flow.
-3. Exit to canvas game with updated save state.
-**Must be decided before Milestone 3B acceptance.**
-
-### Accessibility for 3D path
-
-Known gaps in `render3d.html`:
-- `#prompt` has no `role` or `aria-live` — prompt text won't be announced.
-- `#tag` debug overlay has no `aria-hidden="true"`.
-- `<canvas id="scene">` has no `aria-label` or `role`.
-- Focus is not trapped in `#board-modal` (buttons exist but no focus management).
-
-**Home:** `#tag` / `#prompt` quick attributes are done; full focus-trap and canvas label
-belong in Milestone 6.
-
----
-
-## 9. Quick Wins (< 1 hour each, no planning required)
-
-Do these opportunistically, not as a dedicated session:
-
-1. **Fix smoke port** — done. `render3d_loop_smoke.mjs` now defaults to `5180`.
-
-2. **`setPosition` test** — done in `render3d-player-controller.test.ts`.
-
-3. **`frontierLayout.js` direct tests** — done in `tests/render3d-frontier-layout.test.ts`.
-
-4. **`objectiveMeta` assertions** — done in `tests/render3d-phase-state.test.ts`.
-
-5. **`aria-hidden` + `aria-live`** — done in `render3d.html`.
-
-6. **Gate debug globals** — done in `spike.js`.
-
-7. **Fix Three.js camera direction seeding** — done in `playerController.js`; real
-   `PerspectiveCamera.getWorldDirection` now preserves the intended opening frame.
-
----
-
-## 10. Milestone 4+ (after 3B complete)
-
-### Milestone 4 — Art Pipeline
-
-- Material library: replace per-object `MeshStandardMaterial` literals with a shared
-  `materials.js` palette.
-- GLTF model import pipeline for at least one hero prop.
-- Post-processing: bloom pass on emissive surfaces.
-- Audio: ambient + interaction SFX.
-- Pointer lock implementation.
-
-### Milestone 5 — Combat and Character Feel
-
-- `encounterSystem.js` hardened with animation, timing, player HP.
-- Hit flash, stagger, death collapse via `animationHelpers.js`.
-- Screen shake on hit.
-
-### Milestone 6 — UI Rebuild
-
-- `#board-modal` with keyboard focus trapping and ARIA.
-- Inventory panel driven by real save state (write bridge required).
-- Phase progress indicator.
-
-### Milestone 7 — System Parity
-
-- Canvas renderer feature parity checklist (jobs, loot, gear, housing, NPC memory).
-- Write bridge: 3D phase completions → `savePersistence.js`.
-- `stateSnapshot.js` no longer uses stub time/quest values.
-- "Boone" / "warden" naming reconciled.
-
-### Milestone 8 — Retire Canvas Renderer
-
-- Canvas renderer feature-frozen.
-- `index.html` redirects to `render3d.html`.
-- All Canvas-only tests migrated or deleted.
-
-### Milestone 9 — Release MVP
-
-- Performance budget met on integrated GPU (60 fps target).
-- Accessibility audit passed.
-- `survey_offered` continuation implemented.
-- README demo link live, screenshot gallery current.
-- `npm run package:itch` produces shippable artifact.
-
----
-
-## 11. Verification Gates
-
-### Before every commit
+Plus, with a dev server running:
 
 ```bash
-npm test && npm run typecheck:ts && npm run test:syntax && npm run dev:lint && npm run build
+WESTWARD_URL=http://127.0.0.1:5180 npm run test:render3d     # loop smoke (3D)
+npm run test:smoke                                            # semantic invariants
+npm run test:visual                                           # pixelmatch baselines
 ```
 
-### Before marking a Milestone 3B step done
-
-```bash
-WESTWARD_URL=http://127.0.0.1:5180 npm run test:render3d   # smoke: full phase loop
-node scripts/spike_compare.mjs                              # screenshot gate (dev server up)
-```
-
-### Before Milestone 3B acceptance
-
-- Manual playtest: WASD, collision, prompt, board modal, slime fight, scrap reward, cache,
-  return to Boone.
-- All 9 phases confirmed in order with correct labels.
-- No `console.log` stub handlers remain.
-- `npm run test:render3d` exits 0 and asserts all smoke checks.
+New standing gates introduced by this roadmap: **determinism** (a recorded `(seed, input-log)`
+replays to a stable state hash, headless), **perf budget** (draw-call / frame-time / triangle /
+light-count, asserted in the render smoke), and **golden-image** (per-shader / per-region post-stack
+snapshots extending `test:visual`).
 
 ---
 
-## 12. Next Agent Instructions
+## 8. Port-ledger (correctness lifeline)
 
-### Immediate (before starting Step 7)
+The Canvas test suite (97 files, 1101 tests) is the behavioral spec. Re-derive against it,
+tier-by-tier. **Port the test first, then make it pass.** Update `ported?`/`green?` as the rebuild
+progresses.
 
-1. Run all gates (§11) and record results.
-2. Read `spike.js`, `phaseState.js`, `interactionSystem.js`, and `encounterSystem.js`
-   in full before touching Step 7.
-3. Confirm `WESTWARD_URL=http://127.0.0.1:5180 npm run test:render3d` passes with dev server running.
-4. Start Step 7 by wiring Map Scrap reward UI and cache/return behavior through the phase machine.
+### Tier A — port near-verbatim (renderer-agnostic pure rules)
 
-### Step 7 checklist
+| Module | Canonical test(s) | Ported? | Green? |
+|---|---|:--:|:--:|
+| `decisionEngine` (endings, ideology axes) | `decision-engine.test.ts`, `endings-expansion.test.ts` | ☐ | — |
+| `questDefinitions` | `quest-definitions.test.ts` | ☐ | — |
+| `jobBoard` / `sideJobGenerator` | `job-board.test.ts`, `side-job-generator.test.ts` | ☐ | — |
+| `lootSystem` / `weaponAffixes` | `loot-system.test.ts`, `weapon-affixes.test.ts` | ☐ | — |
+| `gearCrafting` / `craftingStation` | `gear-crafting.test.ts`, `crafting-station.test.ts` | ☐ | — |
+| `progressionSystem` (+ capstones) | `progression-system.test.ts`, `capstone-perks.test.ts` | ☐ | — |
+| `statusEffects` (+ synergies) | `status-effects.test.ts`, `status-synergies.test.ts` | ☐ | — |
+| `economyServices` | `economy-services.test.ts` | ☐ | — |
+| `regionSystem` (hazard/event model) | `region-system.test.ts` | ☐ | — |
+| `influenceMap` / `factionEffects` | `influence-map.test.ts`, `faction-effects.test.ts` | ☐ | — |
+| `npcMemory` / `dialogueChoices` / `questOutcomeEchoes` | `npc-memory.test.ts`, `dialogue-choices.test.ts`, `quest-outcome-echoes.test.ts` | ☐ | — |
+| `newGamePlus` / `runSummary` / `runHistory` | `new-game-plus.test.ts`, `run-summary.test.ts`, `run-history.test.ts` | ☐ | — |
+| `savePersistence` / `saveMigration` / `saveStateManager` | `save-persistence.test.ts`, `save-migration.test.ts`, `save-state-manager.test.ts` | ☐ | — |
+| `difficultyTuning` / `dailySeedMode` (→ knob-struct) | `difficulty-tuning.test.ts`, `daily-seed-mode.test.ts` | ☐ | — |
+| `characterIdentity` / `inventoryState` / `poiSystem` / `weatherSystem` | `character-identity.test.ts`, `inventory-state.test.ts`, `poi-system.test.ts`, `weather-system.test.ts` | ☐ | — |
 
-- [ ] Keep `phaseState.js` as the source of truth for `scrap_earned` and `return_to_boone`.
-- [ ] Add visible `+1 Map Scrap` reward feedback without writing Canvas save state.
-- [ ] Enable cache/return interactions through a tested update seam, not array replacement.
-- [ ] Add focused reward tests before broad loop extraction.
-- [ ] All gates pass.
+> Remaining Canvas *pure* modules (e.g. `combatLoadout`, `combatMilestones`, `seasonalEvents`,
+> `journalLetters`, `cursedItems`, `codex`) default to Tier A — list them here as they are scheduled.
 
-### Files involved in Steps 4–10
+### Tier B — re-derive against ported test *intent* (spatial / re-tuned)
 
-```
-src/render3d/spike.js                       Steps 5–6 done; modify next in Steps 7 and 9
-src/render3d/objectiveDom.js                done (Step 4)
-src/render3d/boardModal.js                  done (Step 5)
-src/render3d/gameLoop.js                    create (Step 9)
-src/render3d/propBuilders.js                create (Step 9 extraction)
-src/render3d/handlers.js                    create (Step 9 extraction)
-src/render3d/encounterSystem.js             done (Step 6)
-src/render3d/animationHelpers.js            baseline done (Step 8)
-render3d.html                               Step 5 accessibility/focus foundation done; modify next in Step 7
-scripts/render3d_loop_smoke.mjs             Step 5 modal + Step 6 slime proximity smoke done
-tests/render3d-objective-dom.test.ts        done (Step 4)
-tests/render3d-board-modal.test.ts          done (Step 5)
-tests/render3d-encounter.test.ts            done (Step 6)
-tests/render3d-animation-helpers.test.ts    done (Step 8)
-tests/render3d-rewards.test.ts              create (Step 7)
-```
+| Module | Canonical test(s) | Note | Ported? | Green? |
+|---|---|---|:--:|:--:|
+| `combatProcessor` | `combat-processor.test.ts` | rewrite 2D `isInSwingArc` for 3D; re-tune lethal; differential vs `…Legacy` | ☐ | — |
+| `enemyArchetypes` | `enemy-archetypes.test.ts` | behavior tuning ports; movement → 3D steering | ☐ | — |
+| `behaviorTree` / `npcBehaviors` / `patrolSystem` | `behavior-tree.test.ts`, `patrol-system.test.ts` | BT runtime ports; nav adapts to navmesh in P3 | ☐ | — |
+| `combatAccessibility` / `combatReadability` | `combat-accessibility.test.ts`, `combat-readability.test.ts` | becomes the orthogonal `assists` bank | ☐ | — |
 
-### What must not be broken
+### Tier C — rebuild fresh (engine / renderer / shell)
 
-- `src/main.js` — never touched.
-- Canvas/reference test suite (1 085+ tests) — must stay green.
-- `node scripts/spike_compare.mjs` — must stay exit 0.
+New code with new tests, same discipline: sim loop, camera rig, region streaming, navmesh, asset
+pipeline. **Do NOT carry over** the Canvas-specific renderer (`render.js`/`render.test.ts`, sprite /
+HUD / minimap / fog-of-war / post-process / particle modules), the recover-at-camp death model, the
+instant `Q` heal, the read-only `stateSnapshot` bridge + parallel `phaseState`, or the 11.3k-line
+`main.js` composition root.
 
----
-
-## 13. Production Readiness Checklist
-
-Before portfolio-ready state:
-
-- [ ] All Milestone 3B steps complete and smoke-gated.
-- [ ] No `console.log` stub handlers remain.
-- [x] Debug globals gated behind `import.meta.env.DEV`.
-- [ ] `#prompt` and `#board-modal` accessibility attributes complete.
-- [ ] Pointer lock implemented or explicitly deferred with rationale.
-- [ ] Performance budget documented (draw calls, frame time on integrated GPU).
-- [ ] Write bridge design decided (even if implementation is deferred).
-- [ ] `survey_offered` continuation designed.
-- [ ] README demo link live and correct.
-- [ ] `npm run package:itch` produces working artifact.
+The existing `src/render3d/` seed already follows the discipline and is **kept and evolved** into
+the engine: `playerController`, `worldProxies`, `interactionSystem`, `phaseState`, `encounterSystem`,
+`animationHelpers`, `objectiveDom`, `boardModal`, `atmosphere`, `timeOfDay` (tests:
+`render3d-*.test.ts`).
 
 ---
 
-## 14. Appendix — Action Template
+## 9. Critical files (reference / oracle / architecture)
 
-Use for all future work packages added to this roadmap:
+- `src/savePersistence.js` (+ `src/saveMigration.js`) — envelope/integrity/migration mechanism to
+  re-derive and **re-aim** for ironman (P1).
+- `src/difficultyTuning.js` + `src/dailySeedMode.js` (`CHALLENGE_FLAGS.ironman`) — the tier model to
+  **invert** into the P2 knob-struct; ironman concept to promote from score-flag to structural.
+- `src/combatProcessor.js` — Tier-B lift + lethality re-tune + the differential-testing oracle (P2).
+  Poise/guard-break also live in `src/main.js`.
+- `src/decisionEngine.js` — crown-jewel pure ending resolver: re-derive **verbatim**, use as a
+  regression oracle (P5).
+- `src/regionSystem.js` — hazard tags + `resolveRegionEventModifiers` severity model = the shape of
+  the composed `threat` scalar + scarce-economy modifiers (P3/P4).
+- `src/questDefinitions.js` (+ `src/enemyArchetypes.js`, `src/behaviorTree.js`,
+  `src/sideJobGenerator.js`) — data-shaped content to promote into the P5 validated authoring schema.
+- `src/render3d/playerController.js` (+ `phaseState.js`, `worldProxies.js`, `atmosphere.js`,
+  `timeOfDay.js`) — canonical pure+shell examples and the seed code P1 promotes to engine;
+  `atmosphere.js`/`timeOfDay.js` are the seed for the continuous day/night arc (§3, Bet 4) and the
+  backface-outline pass in `spike.js` is the placeholder the NPR ink-edge shader (§3, Bet 1) retires.
+- `src/replayRecorder.js` — existing replay capture to fold into the event-sourced core (§3, Bet 2);
+  a recorded `(seed, input-log)` is simultaneously a feature and the determinism gate.
+- `scripts/smoke_suite.sh` — the **semantic-invariant spec** whose assertions must be ported to guard
+  behavioral correctness across the rebuild.
 
-- **What needs to be done**
-- **Why it matters**
-- **Expected impact**
-- **Difficulty** (`Low` / `Medium` / `High`)
-- **Risk** (`Low` / `Medium` / `High`)
-- **Dependencies**
-- **Files / folders involved**
-- **Suggested implementation order**
-- **Acceptance criteria**
-- **Tests / checks the next agent should run**
+---
+
+## 10. Legacy appendix — Canvas prototype (superseded)
+
+The prototype that this rebuild draws on as a design reference and oracle. Its milestone framing
+(prove a spike → migrate Canvas → 3D parity → retire Canvas) is **superseded** by the 7-phase
+rebuild above. Recorded here so the history isn't lost.
+
+- **Milestone 0 — Rewrite Prep & Repo Hygiene** ✅ — clean repo, CI gates, Vite build, Canvas smoke.
+- **Milestone 1 — Three.js Spike** ✅ — `render3d.html` entry; purple-dusk scene; `spike_compare.mjs`.
+- **Milestone 2 — State Adapter** ✅ — `src/bridge/stateSnapshot.js` (Canvas state → read-only 3D
+  snapshot). *Now obsolete:* the rebuild has one state tree, not a bridge.
+- **Milestone 3A — Art Proof** ✅ (`PR #19 / 4c30262`) — 3-stop dusk sky, hero camera, outlines, blob
+  shadows, vignette, emissive slime, smoke plume.
+- **Milestone 3B — First Gameplay Loop** 🟡 — the 9-phase first-road loop (`phaseState.js`), board
+  modal, Road Slime encounter, animation helpers, objective strip, and the day/night
+  atmosphere/time-of-day system (`atmosphere.js` + `timeOfDay.js`). This code is the **seed** the
+  rebuild's Phase 1/3 builds on (kept, not discarded).
+- **Milestones 4–9 (planned, now superseded):** art pipeline → combat/feel → UI rebuild → system
+  parity (write bridge) → retire Canvas → release MVP. Replaced by Phases 1–7.
+
+The Canvas game itself (`src/main.js` + `index.html`) remains a **feature-complete playable
+reference**: deterministic combat, 7 enemy archetypes, 8-quest chain + 10+ endings, 3 factions, gear
+/ crafting / affixes, 3 regions, 18 POIs, 7 NPCs with memory, save/migration, time-of-day, weather,
+NG+. It is frozen as the behavioral oracle for the port-ledger (§8).
