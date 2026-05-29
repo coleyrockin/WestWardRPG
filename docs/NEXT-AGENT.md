@@ -36,13 +36,27 @@ The 3D game lives at **`/spikes/render3d.html`** → [`src/render3d/spike.js`](.
 - **Art-craft Phase 2 — texture pipeline (proven):** embedded glTF textures sample on the WebGL2
   backend; `nprMaterial.js` takes a painted `map` (texture×tint → cel ramp); `assetLoader.js` +
   `animatedCharacter.js` carry glTF textures through. The drifter (`build_character.py` `_bake_albedo`)
-  ships a UV-unwrapped, baked-weathering albedo embedded in `character.glb`.
+  ships a UV-unwrapped, baked-weathering albedo embedded in `character.glb`. Texture sweep baked
+  every non-emissive prop + the building kit (emissive kept flat via `export_glb(bake=…)`).
+- **Richer detail:** drifter has a face/eyes + western gear; buildings are false-fronts (siding,
+  framed windows + glass, door, sign).
+- **6A props + variety:** wagon plank seams/spoked wheels, ribbed cactus, lantern cage, framed sign;
+  `build_character` `variant` param (drifter/vendor/vest) → 3 `.glb`, townsfolk vary by variant +
+  tint + height scale.
+- **6B hero rig:** broader proportions + Run/Turn/Draw clips (Shift=run, F=draw);
+  `animatedCharacter` idle→walk→run blend + `playOnce()` one-shots; `loadTemplate` caches per-URL.
+- **6C interactive NPCs:** proximity → townsperson pauses, faces you, "E — Talk to <name>" →
+  memory-aware greeting via the pure `npcMemory` module (names: Mabel/Cole/Rosa/Hank/Pearl).
 
 ## Pick up next (in order)
-1. **Richer textures now that the pipe works** ([`art-craft-roadmap.md`](art-craft-roadmap.md)):
-   hand-paint real detail (face, coat folds/stitching, hat band, building trim/weathering) instead
-   of just baked noise; consider the Mixamo-hybrid hero for better proportions/anim. Re-texture the
-   building kit. NPCs reuse the character pipeline.
+1. **Systems depth** ([`roadmap.md`](roadmap.md)): the deeper 6C alternative not yet done — drive the
+   scene from the event-sourced [`sim.js`](../src/game/sim.js) (`stepSimulation`/`toRenderState`)
+   instead of the legacy snapshot (render-decoupling P1 deliverable). Then NPC schedules/quests
+   (port `patrolSystem`/`questDefinitions`/`decisionEngine`), combat (P2).
+2. **Mixamo-hybrid hero** (deferred from 6B — Adobe-login-gated, needs user-supplied FBX): retarget
+   a real humanoid + clip library onto the rig for higher-fidelity motion.
+3. **Texture atlas** if `public/models/` (~8MB of embedded albedos) needs trimming; world terrain
+   relief ([`ground.js`](../src/game/world/ground.js) TSL heightmap) per the art-craft roadmap.
 2. **NPC depth:** richer behaviour by porting Canvas `patrolSystem`/`npcBehaviors`/`npcMemory`;
    make townsfolk interactive (proximity → greeting), schedules tied to `worldClock`.
 3. **Back to systems** ([`roadmap.md`](roadmap.md) P3+): wire the event-sourced sim
