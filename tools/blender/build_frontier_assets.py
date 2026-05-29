@@ -40,6 +40,10 @@ def build_building(name, width=1.4, depth=1.55, body_h=1.85, front_h=2.55, windo
     wall = make_mat("wall", PALETTE[wall_key])
     roof = make_mat("roof", PALETTE["roof"])
     trim = make_mat("trim", PALETTE["wood_dark"])
+    frame = make_mat("frame", PALETTE["wood"])  # lighter window/door frames
+    glass = make_mat("glass", "#202b33")  # dark window glass
+    doorw = make_mat("doorw", PALETTE["post"])
+    bsign = make_mat("bsign", PALETTE["board"])
     parts = []
 
     body = add_box((width, depth, body_h), (0, 0, body_h / 2), wall, "body")
@@ -56,12 +60,31 @@ def build_building(name, width=1.4, depth=1.55, body_h=1.85, front_h=2.55, windo
     cornice = add_box((width * 1.1, 0.24, 0.14), (0, depth / 2, front_h - 0.08), trim, "cornice")
     parts.append(cornice)
 
-    # door + windows as recessed dark panels on the facade
-    parts.append(add_box((0.36, 0.06, 0.95), (0, depth / 2 + 0.06, 0.49), trim, "door"))
+    fy = depth / 2 + 0.05  # facade front plane
+
+    # board-and-batten siding: thin vertical battens across the false front (the
+    # ink-edge pass traces them → reads as wood siding, not a flat box)
+    for i in range(5):
+        bx = (-0.5 + i / 4.0) * width * 0.98
+        parts.append(add_box((0.045, 0.04, front_h * 0.94), (bx, fy + 0.02, front_h / 2), trim, "batten"))
+
+    # framed door with a handle
+    parts.append(add_box((0.46, 0.05, 1.04), (0, fy, 0.52), frame, "doorframe"))
+    parts.append(add_box((0.36, 0.05, 0.92), (0, fy + 0.02, 0.49), doorw, "door"))
+    parts.append(add_box((0.05, 0.06, 0.05), (0.12, fy + 0.05, 0.5), frame, "handle"))
+
+    # framed windows: light frame + dark glass + a mullion cross
     if windows >= 1:
         xs = [-0.44, 0.44] if windows >= 2 else [0.0]
         for dx in xs:
-            parts.append(add_box((0.32, 0.06, 0.36), (dx, depth / 2 + 0.06, 1.2), trim, "win"))
+            parts.append(add_box((0.4, 0.05, 0.46), (dx, fy, 1.2), frame, "winframe"))
+            parts.append(add_box((0.3, 0.05, 0.36), (dx, fy + 0.02, 1.2), glass, "winglass"))
+            parts.append(add_box((0.04, 0.06, 0.36), (dx, fy + 0.04, 1.2), frame, "winmullV"))
+            parts.append(add_box((0.3, 0.06, 0.04), (dx, fy + 0.04, 1.2), frame, "winmullH"))
+
+    # hanging shop sign for the larger fronts (saloon / store)
+    if windows >= 2:
+        parts.append(add_box((width * 0.7, 0.05, 0.26), (0, depth / 2 + 0.52, body_h * 0.74), bsign, "sign"))
 
     # porch awning + two posts
     parts.append(add_box((width * 1.16, 0.55, 0.06), (0, depth / 2 + 0.33, body_h * 0.8), roof, "awning"))
