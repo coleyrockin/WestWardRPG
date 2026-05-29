@@ -12,8 +12,10 @@
 
 import { createAnimatedCharacter } from "./animatedCharacter.js";
 import { createWander, stepWander } from "./npcWander.js";
-// @ts-ignore - JS module
-import { createNpcState, recordInteraction, npcGreeting } from "../../npcMemory.js";
+// NB: a self-contained greeter (below) — deliberately NOT importing the Canvas
+// npcMemory chain, which drags storyLootReactions→storyLoot into the render3d
+// bundle (and that chain has a case-sensitive import that breaks the Vercel
+// Linux build). Engine code stays decoupled from the frozen Canvas modules.
 
 const VARIANT_URL = {
   drifter: "/models/character.glb",
@@ -49,7 +51,8 @@ export async function createTownsfolk(scene, opts = {}) {
       const wander = createWander({ waypoints: s.waypoints, speed: s.speed, pause: s.pause });
       character.group.position.set(s.waypoints[0].x, 0, s.waypoints[0].z);
       scene.add(character.group);
-      return { character, wander, start: s.waypoints[0], name: s.name, id: s.id, mem: createNpcState({ id: s.id, name: s.name }) };
+      const lines = GREETINGS[s.id] || { neutral: "Howdy, stranger.", warm: "Good to see you again." };
+      return { character, wander, start: s.waypoints[0], name: s.name, id: s.id, met: 0, lines };
     }),
   );
 
@@ -96,11 +99,11 @@ export async function createTownsfolk(scene, opts = {}) {
     return interactable ? { name: interactable.name } : null;
   }
 
-  // Greet the in-range NPC: record the interaction + return their (memory-aware) line.
+  // Greet the in-range NPC: memory-aware (warms up after a few visits).
   function talk() {
     if (!interactable) return null;
-    interactable.mem = recordInteraction(interactable.mem, "greet");
-    const line = npcGreeting(interactable.mem, { greetings: GREETINGS[interactable.id] });
+    interactable.met += 1;
+    const line = interactable.met < 3 ? interactable.lines.neutral : interactable.lines.warm;
     return { name: interactable.name, line };
   }
 
