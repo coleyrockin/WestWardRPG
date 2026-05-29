@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+// @ts-expect-error — three types aren't resolved under the test tsconfig
+import * as THREE from "three";
 // @ts-expect-error — JS module, no types
 import { createNprMaterial, celGradientMap, fresnelRimNode } from "../src/game/renderer/materials/nprMaterial.js";
 
@@ -42,5 +44,20 @@ describe("NPR uber-material", () => {
 
   it("exposes a Fresnel rim node factory", () => {
     expect(fresnelRimNode(2.5)).toBeTruthy();
+  });
+
+  it("stays faceted flat-colour when no map is supplied", () => {
+    const mat = createNprMaterial("#caa66c");
+    expect(mat.flatShading).toBe(true);
+    expect(mat.colorNode == null).toBe(true); // no albedo override
+  });
+
+  it("uses a painted albedo map when supplied (textured cel, smooth by default)", () => {
+    const tex = new THREE.DataTexture(new Uint8Array([200, 150, 100, 255]), 1, 1);
+    tex.needsUpdate = true;
+    const mat = createNprMaterial("#ffffff", { map: tex });
+    expect(mat.colorNode).toBeTruthy(); // texture(uv) graph wired in
+    expect(mat.flatShading).toBe(false); // textured assets keep smooth normals
+    expect(mat.isMeshToonNodeMaterial).toBe(true); // still cel-banded
   });
 });

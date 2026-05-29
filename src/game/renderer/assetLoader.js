@@ -26,10 +26,12 @@ function applyNpr(root) {
     const src = Array.isArray(o.material) ? o.material[0] : o.material;
     const hex = src && src.color ? `#${src.color.getHexString()}` : "#9a8f80";
     const hasEmissive = src && src.emissive && src.emissive.getHexString() !== "000000";
-    o.material = createNprMaterial(
-      hex,
-      hasEmissive ? { emissive: `#${src.emissive.getHexString()}`, emissiveIntensity: src.emissiveIntensity ?? 1 } : {},
-    );
+    const opts = { map: src && src.map ? src.map : null }; // carry the painted albedo if any
+    if (hasEmissive) {
+      opts.emissive = `#${src.emissive.getHexString()}`;
+      opts.emissiveIntensity = src.emissiveIntensity ?? 1;
+    }
+    o.material = createNprMaterial(hex, opts);
   });
   return root;
 }

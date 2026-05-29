@@ -21,7 +21,7 @@ function reskin(mesh, tint) {
   const swap = (src) => {
     const c = src && src.color ? src.color.clone() : new THREE.Color("#9a8f80");
     if (tint) c.multiply(new THREE.Color(tint));
-    return createNprMaterial(`#${c.getHexString()}`, { rimStrength: 0.3 });
+    return createNprMaterial(`#${c.getHexString()}`, { rimStrength: 0.3, map: src && src.map ? src.map : null });
   };
   mesh.castShadow = true;
   mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material);

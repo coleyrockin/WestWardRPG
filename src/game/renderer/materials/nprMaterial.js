@@ -22,6 +22,8 @@ import {
   saturate,
   transformedNormalView,
   positionViewDirection,
+  texture,
+  uv,
 } from "three/tsl";
 
 const col = (hex) => new THREE.Color(hex);
@@ -64,8 +66,11 @@ function emissiveNodeFor({ emissive, emissiveIntensity, rimColor, rimPower, rimS
 
 // Drop-in replacement for the old `standard(hex, opts)` factory.
 // opts: { emissive, emissiveIntensity, transparent, opacity, flatShading,
-//         rimColor, rimPower, rimStrength }
-// roughness/metalness are accepted and ignored (toon has no microfacet term).
+//         rimColor, rimPower, rimStrength, map }
+// `map` (a THREE.Texture) is the painted albedo: sampled via TSL texture(uv) and
+// tinted by hex, then run through the cel ramp (textured cel — proven on the
+// WebGL2 backend). Flat-colour assets omit it and are unchanged. roughness/
+// metalness are accepted and ignored (toon has no microfacet term).
 export function createNprMaterial(hex, opts = {}) {
   const {
     emissive = null,
@@ -76,6 +81,7 @@ export function createNprMaterial(hex, opts = {}) {
     rimColor = "#9fb4ff",
     rimPower = 3.0,
     rimStrength = 0.5,
+    map = null,
   } = opts;
 
   const mat = new MeshToonNodeMaterial({
@@ -84,7 +90,12 @@ export function createNprMaterial(hex, opts = {}) {
     transparent,
     opacity,
   });
-  mat.flatShading = flatShading;
+  // Textured assets keep their own smooth normals; flat-colour dressing stays faceted.
+  mat.flatShading = map ? (opts.flatShading ?? false) : flatShading;
+  if (map) {
+    const c = col(hex);
+    mat.colorNode = texture(map, uv()).mul(vec3(c.r, c.g, c.b));
+  }
   mat.emissiveNode = emissiveNodeFor({ emissive, emissiveIntensity, rimColor, rimPower, rimStrength });
   return mat;
 }
