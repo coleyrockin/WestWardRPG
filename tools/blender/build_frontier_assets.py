@@ -16,6 +16,7 @@ import bpy
 from westward_kit import (
     PALETTE,
     add_box,
+    bake_albedo,
     clear_scene,
     export_glb,
     join_as,
@@ -70,6 +71,7 @@ def build_building(name, width=1.4, depth=1.55, body_h=1.85, front_h=2.55, windo
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
+    bake_albedo(obj)  # UV + baked weathering/grime → textured-cel walls
     return export_glb(obj, name)
 
 

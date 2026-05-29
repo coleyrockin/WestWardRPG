@@ -123,6 +123,77 @@ def origin_to_base(obj):
     bpy.context.scene.cursor.location = (0.0, 0.0, 0.0)
 
 
+def bake_albedo(obj, px=1024):
+    """UV-unwrap + add procedural weathering (noise mottle + a vertical grime
+    gradient, darker at the base) to every material, then bake the combined
+    albedo to one embedded image. Turns flat-colour kit pieces into textured-cel
+    surfaces. Call before export_glb. Returns the baked image."""
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.02)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    img = bpy.data.images.new(obj.name + "_albedo", px, px)
+    for slot in obj.material_slots:
+        m = slot.material
+        if not m or not m.use_nodes:
+            continue
+        nt = m.node_tree
+        bsdf = nt.nodes.get("Principled BSDF")
+        if not bsdf:
+            continue
+        base = tuple(bsdf.inputs["Base Color"].default_value)
+        # vertical grime: generated-Z → ramp (dark base → light top)
+        tc = nt.nodes.new("ShaderNodeTexCoord")
+        sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(tc.outputs["Generated"], sep.inputs[0])
+        ramp = nt.nodes.new("ShaderNodeValToRGB")
+        nt.links.new(sep.outputs["Z"], ramp.inputs["Fac"])
+        ramp.color_ramp.elements[0].color = (0.62, 0.6, 0.58, 1.0)
+        ramp.color_ramp.elements[1].color = (1.06, 1.06, 1.06, 1.0)
+        grime = nt.nodes.new("ShaderNodeMixRGB")
+        grime.blend_type = "MULTIPLY"
+        grime.inputs["Fac"].default_value = 1.0
+        grime.inputs["Color1"].default_value = base
+        nt.links.new(ramp.outputs["Color"], grime.inputs["Color2"])
+        # noise mottle on top
+        noise = nt.nodes.new("ShaderNodeTexNoise")
+        noise.inputs["Scale"].default_value = 16.0
+        noise.inputs["Detail"].default_value = 5.0
+        mottle = nt.nodes.new("ShaderNodeMixRGB")
+        mottle.blend_type = "MULTIPLY"
+        mottle.inputs["Fac"].default_value = 0.2
+        nt.links.new(grime.outputs["Color"], mottle.inputs["Color1"])
+        nt.links.new(noise.outputs["Fac"], mottle.inputs["Color2"])
+        nt.links.new(mottle.outputs["Color"], bsdf.inputs["Base Color"])
+        # bake target (active + selected per material)
+        imgn = nt.nodes.new("ShaderNodeTexImage")
+        imgn.image = img
+        imgn.select = True
+        nt.nodes.active = imgn
+
+    sc = bpy.context.scene
+    sc.render.engine = "CYCLES"
+    sc.cycles.samples = 4
+    sc.render.bake.use_pass_direct = False
+    sc.render.bake.use_pass_indirect = False
+    bpy.ops.object.bake(type="DIFFUSE")
+
+    baked = bpy.data.materials.new(obj.name + "_baked")
+    baked.use_nodes = True
+    bn = baked.node_tree.nodes.get("Principled BSDF")
+    bn.inputs["Roughness"].default_value = 0.95
+    binode = baked.node_tree.nodes.new("ShaderNodeTexImage")
+    binode.image = img
+    baked.node_tree.links.new(binode.outputs["Color"], bn.inputs["Base Color"])
+    obj.data.materials.clear()
+    obj.data.materials.append(baked)
+    return img
+
+
 def export_glb(obj, name):
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
