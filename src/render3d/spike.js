@@ -610,11 +610,25 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
 
   // Ambient townsfolk — NPCs reusing the rig, wandering the town to bring the
   // street to life. Non-blocking fallback so a load failure never breaks the scene.
-  let townsfolk = { update() {} };
+  let townsfolk = { update() {}, getInteractable: () => null, talk: () => null };
   try {
     townsfolk = await createTownsfolk(scene, { count: 5 });
   } catch (err) {
     console.warn("[render3d] townsfolk failed to load", err);
+  }
+  // 6C: greet the nearest townsperson with E. A short "speech" timer holds the
+  // line in the prompt; the loop shows the "E — Talk to …" cue when in range.
+  let npcSpeechT = 0;
+  let npcSpeechMsg = "";
+  if (typeof window !== "undefined") {
+    window.addEventListener("keydown", (e) => {
+      if (e.code !== "KeyE") return;
+      const r = townsfolk.talk?.();
+      if (r) {
+        npcSpeechMsg = `${r.name}: "${r.line}"`;
+        npcSpeechT = 3.5;
+      }
+    });
   }
 
   // Start at the real road spawn and aim at Boone's board cluster. This keeps
@@ -879,7 +893,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     interaction.update(player.position);
     encounter.update(player.position, dt);
     character.update(visualCapture ? 0 : dt, player.moving && !visualCapture, player.running && !visualCapture);
-    townsfolk.update(visualCapture ? 0 : dt, visualCapture);
+    townsfolk.update(visualCapture ? 0 : dt, visualCapture, player.position);
+    // NPC greeting prompt/speech overrides the kind prompt when near a townsperson
+    if (npcSpeechT > 0) {
+      npcSpeechT -= dt;
+      setPromptText(npcSpeechMsg);
+    } else {
+      const who = townsfolk.getInteractable();
+      if (who) setPromptText(`E — Talk to ${who.name}`);
+    }
     stepWorld(dt);
     post.render();
     frames++;
