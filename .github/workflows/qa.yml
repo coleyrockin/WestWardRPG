@@ -90,6 +90,7 @@ jobs:
           for _ in $(seq 1 40); do
             if curl -fsS http://127.0.0.1:5180/spikes/render3d.html >/dev/null; then
               WESTWARD_URL=http://127.0.0.1:5180 npm run test:render3d
+              WESTWARD_URL=http://127.0.0.1:5180 npm run test:visual:render3d
               WESTWARD_URL=http://127.0.0.1:5180 node scripts/spike_compare.mjs
               exit 0
             fi

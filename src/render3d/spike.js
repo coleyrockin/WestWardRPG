@@ -8,6 +8,11 @@
 // first frame so the comparison capture script knows when to screenshot.
 
 import * as THREE from "three";
+import { createRenderer } from "../game/renderer/createRenderer.js";
+import { createNprMaterial } from "../game/renderer/materials/nprMaterial.js";
+import { createPostProcessing } from "../game/renderer/postStacks.js";
+import { instanceModel, hashYaw } from "../game/renderer/assetLoader.js";
+import { modelFor } from "../game/renderer/assetManifest.js";
 import { createRenderSnapshot } from "../bridge/stateSnapshot.js";
 import { buildFrontierPlacements, PLAYER_SPAWN } from "./frontierLayout.js";
 import { createPlayerController } from "./playerController.js";
@@ -29,17 +34,11 @@ const GROUND_TINT = "#4e3c26"; // muted dusty brown
 // Sky dome, sun/rim/hemi lights, fog, and clouds now live in atmosphere.js,
 // driven by the time-of-day palettes in timeOfDay.js.
 
+// All opaque/translucent surfaces use the NPR cel+rim uber-material (see
+// nprMaterial.js). Kept named `standard` so the ~30 call sites read unchanged;
+// roughness/metalness opts are accepted and ignored (toon has no microfacet).
 function standard(hex, opts = {}) {
-  return new THREE.MeshStandardMaterial({
-    color: col(hex),
-    roughness: opts.roughness ?? 0.92,
-    metalness: opts.metalness ?? 0.02,
-    emissive: opts.emissive ? col(opts.emissive) : col("#000000"),
-    emissiveIntensity: opts.emissiveIntensity ?? 1.0,
-    transparent: opts.transparent ?? false,
-    opacity: opts.opacity ?? 1.0,
-    flatShading: true,
-  });
+  return createNprMaterial(hex, opts);
 }
 
 function addBox(group, w, h, d, mat, pos) {
@@ -52,17 +51,9 @@ function addBox(group, w, h, d, mat, pos) {
   return m;
 }
 
-// Backface-expansion outline for graphic-novel silhouettes.
-function addOutline(group, mesh, scale = 1.07) {
-  const m = new THREE.Mesh(
-    mesh.geometry,
-    new THREE.MeshBasicMaterial({ color: col("#0a0408"), side: THREE.BackSide }),
-  );
-  m.position.copy(mesh.position);
-  m.rotation.copy(mesh.rotation);
-  m.scale.copy(mesh.scale).multiplyScalar(scale);
-  group.add(m);
-}
+// Graphic-novel silhouettes are now real depth-discontinuity ink edges in the
+// post stack (postStacks.js, Sobel on linear depth) — the backface-expansion
+// outline hack and its per-mesh duplicate draws are retired.
 
 // Blob shadow projected under a world-space point.
 function addContactShadow(group, x, z, rx = 1.0, rz = 0.7) {
@@ -84,7 +75,6 @@ function buildBuilding(group, p, heightScale) {
   // Slightly cooler/darker for background depth cue
   const wallColor = p.depthLane === "background" ? "#6a4a30" : p.color;
   const box = addBox(group, w, h, w, standard(wallColor, { roughness: 0.95 }), toVec(p.x, p.y));
-  addOutline(group, box, 1.06);
   // dark triangular silhouette roof
   const roof = new THREE.Mesh(
     new THREE.ConeGeometry(w * 0.82, h * 0.48, 4),
@@ -94,14 +84,12 @@ function buildBuilding(group, p, heightScale) {
   roof.position.copy(toVec(p.x, p.y, h + h * 0.24));
   roof.castShadow = true;
   group.add(roof);
-  addOutline(group, roof, 1.08);
   addContactShadow(group, p.x, p.y, w * 0.9, w * 0.9);
 }
 
 function buildWatchtower(group, p) {
   const h = 5.5 * (p.size / 1.84);
   const tower = addBox(group, 1.1, h, 1.1, standard("#3a2718"), toVec(p.x, p.y));
-  addOutline(group, tower, 1.06);
   addContactShadow(group, p.x, p.y, 1.4, 1.4);
   // glowing amber beacon at the top
   const beacon = new THREE.Mesh(
@@ -178,13 +166,15 @@ function buildSmokeCache(group, p) {
   // chest
   const chest = addBox(group, 0.72, 0.54, 0.54, standard(p.color, { emissive: "#5a3a12", emissiveIntensity: 0.4 }), toVec(p.x, p.y));
   addContactShadow(group, p.x, p.y, 0.55, 0.55);
-  // pale smoke plume — wider stacked translucent cones drifting upward
-  for (let i = 0; i < 6; i++) {
+  // low soft wisp marking the cache — a few small faint cones near the chest.
+  // Kept small/low so the depth-edge ink pass can't inflate it into a central
+  // triangle and bloom can't blow it out.
+  for (let i = 0; i < 3; i++) {
     const cone = new THREE.Mesh(
-      new THREE.ConeGeometry(0.36 + i * 0.12, 0.72, 10, 1, true),
-      standard("#ddd5c8", { transparent: true, opacity: Math.max(0.05, 0.38 - i * 0.06), roughness: 1 }),
+      new THREE.ConeGeometry(0.16 + i * 0.05, 0.4, 7, 1, true),
+      standard("#7d756a", { transparent: true, opacity: Math.max(0.04, 0.16 - i * 0.04), roughness: 1, rimStrength: 0 }),
     );
-    cone.position.copy(toVec(p.x + i * 0.04, p.y, 0.7 + i * 0.56));
+    cone.position.copy(toVec(p.x + i * 0.05, p.y, 0.55 + i * 0.32));
     group.add(cone);
   }
   return chest;
@@ -194,7 +184,6 @@ function buildWagon(group, p) {
   // broken/tilted bed
   const bed = addBox(group, 1.4, 0.6, 0.8, standard(p.color), toVec(p.x, p.y, 0.34));
   bed.rotation.z = -0.38;
-  addOutline(group, bed, 1.06);
   addContactShadow(group, p.x, p.y, 1.2, 0.9);
   // wheels — one intact, one splayed to sell the broken read
   const wheelGeo = new THREE.TorusGeometry(0.42, 0.09, 8, 16);
@@ -218,7 +207,6 @@ function buildSlime(group, p) {
   body.position.copy(toVec(p.x, p.y, 0.04));
   body.castShadow = true;
   group.add(body);
-  addOutline(group, body, 1.08);
   addContactShadow(group, p.x, p.y, 1.0, 0.8);
   // sickly green ambient glow
   const slimeLight = new THREE.PointLight(col("#58d040"), 5, 5, 2);
@@ -251,10 +239,8 @@ function buildMesa(group, p) {
   const h = (isCliff ? 2.6 : 3.5) * p.size;
   const mat = standard(p.color, { roughness: 1 });
   const base = addBox(group, w, h, d, mat, toVec(p.x, p.y));
-  addOutline(group, base, 1.04);
   // inset flat-top cap for the classic mesa read
   const cap = addBox(group, w * 0.72, h * 0.4, d * 0.72, mat, toVec(p.x, p.y, h));
-  addOutline(group, cap, 1.05);
   addContactShadow(group, p.x, p.y, w * 0.62, d * 0.62);
   return base;
 }
@@ -268,7 +254,6 @@ function buildRock(group, p) {
   m.castShadow = true;
   m.receiveShadow = true;
   group.add(m);
-  addOutline(group, m, 1.06);
   addContactShadow(group, p.x, p.y, r * 1.1, r * 0.9);
   return m;
 }
@@ -278,7 +263,6 @@ function buildCactus(group, p) {
   const h = 1.4 * p.size;
   const mat = standard(p.color, { roughness: 0.85 });
   const trunk = addBox(group, 0.28 * p.size, h, 0.28 * p.size, mat, toVec(p.x, p.y));
-  addOutline(group, trunk, 1.06);
   const arm = (dir, baseY) => {
     const across = new THREE.Mesh(new THREE.BoxGeometry(0.46 * p.size, 0.16 * p.size, 0.18 * p.size), mat);
     across.position.copy(toVec(p.x + dir * 0.22 * p.size, p.y, baseY));
@@ -300,7 +284,6 @@ function buildDeadTree(group, p) {
   const h = 1.8 * p.size;
   const mat = standard(p.color, { roughness: 1 });
   const trunk = addBox(group, 0.22 * p.size, h, 0.22 * p.size, mat, toVec(p.x, p.y));
-  addOutline(group, trunk, 1.06);
   const branch = (ang, len, atY) => {
     const b = new THREE.Mesh(new THREE.BoxGeometry(len, 0.12 * p.size, 0.12 * p.size), mat);
     b.position.copy(toVec(p.x, p.y, atY));
@@ -343,7 +326,6 @@ function buildReeds(group, p) {
 function buildPorch(group, p) {
   const mat = standard(p.color, { roughness: 1 });
   const deck = addBox(group, 1.4 * p.size, 0.18 * p.size, 0.5 * p.size, mat, toVec(p.x, p.y));
-  addOutline(group, deck, 1.05);
   const postMat = standard("#3a2a1c");
   for (const dx of [-0.6 * p.size, 0.6 * p.size]) {
     for (const dz of [-0.2 * p.size, 0.2 * p.size]) {
@@ -386,12 +368,40 @@ function buildPlacement(group, p) {
   }
 }
 
-function markJobBoardAccepted(mesh) {
-  const mat = mesh?.material;
+// PointLight attached to a model placement (lamp/beacon/board). height is in the
+// model's local units; multiply by the effective scale to land in world space.
+function attachLight(group, p, light, effScale) {
+  const l = new THREE.PointLight(
+    col(light.color),
+    light.intensity,
+    light.distance ?? 0,
+    light.decay ?? 2,
+  );
+  l.position.copy(toVec(p.x, p.y, (light.height ?? 1) * effScale));
+  group.add(l);
+}
+
+function recolorAccepted(mat) {
   if (!mat) return;
   if (mat.color?.set) mat.color.set("#e1a34c");
   if (mat.emissive?.set) mat.emissive.set("#ffb84a");
   if ("emissiveIntensity" in mat) mat.emissiveIntensity = 1.35;
+}
+
+// Recolor the job board on accept. Works for the procedural mesh (has .material)
+// and for a loaded model Group (recolor its emissive board panel meshes).
+function markJobBoardAccepted(target) {
+  if (!target) return;
+  if (target.material) {
+    recolorAccepted(target.material);
+    return;
+  }
+  if (typeof target.traverse === "function") {
+    target.traverse((o) => {
+      const m = o.material;
+      if (m && m.emissive && m.emissive.getHexString() !== "000000") recolorAccepted(m);
+    });
+  }
 }
 
 function getHeroVisibility(heroMeshes, camera) {
@@ -509,7 +519,7 @@ function createSpikeSnapshot() {
   });
 }
 
-export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
+export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const loopState = createLoopStateMachine();
   const objectiveRefs = createObjectiveDomRefs(document);
   syncObjectiveDom(objectiveRefs, snapshot, loopState.state);
@@ -521,16 +531,14 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     window.__westwardRenderSnapshot = snapshot;
     publishLoopDebug(loopState.state);
   }
-  // preserveDrawingBuffer lets the spike-compare script grab a frame via
-  // canvas.toDataURL() between RAF frames. Minimal cost for a spike route.
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  // Backend-adaptive WebGPU renderer (WebGPU when available, WebGL2 fallback
+  // otherwise — see createRenderer). await init() before the loop renders
+  // anything. No preserveDrawingBuffer: under the WebGL2 backend it forces a
+  // per-frame ReadPixels stall; spike-compare screenshots the element directly.
+  const { renderer, backend } = await createRenderer(canvas);
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    window.__westward3dBackend = backend;
+  }
 
   const scene = new THREE.Scene();
 
@@ -549,12 +557,41 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
 
   const props = new THREE.Group();
   const heroMeshes = {};
+  const modelJobs = [];
   for (const p of snapshot.worldObjects) {
+    const entry = modelFor(p.kind);
+    if (entry) {
+      // Authored .glb model for this kind; fall back to the procedural builder if
+      // it fails to load so the scene is never missing a placement.
+      const effScale = (entry.scale ?? 1) * (p.size ?? 1);
+      const yaw = (entry.yaw ?? 0) + (p.yaw ?? 0) + (entry.vary ? hashYaw(p.x, p.y) : 0);
+      modelJobs.push(
+        instanceModel(entry.url, { x: p.x, z: p.y, yaw, scale: effScale })
+          .then((node) => {
+            props.add(node);
+            // lamps/beacon/board carried their PointLight inside the old builder;
+            // re-add it here for the model path (height is in local model units).
+            if (entry.light) attachLight(props, p, entry.light, effScale);
+            if (["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(p.kind)) {
+              heroMeshes[p.kind] = node;
+            }
+          })
+          .catch((err) => {
+            console.warn(`[render3d] model load failed for ${p.kind}, using fallback`, err);
+            const mesh = buildPlacement(props, p);
+            if (["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(p.kind) && mesh) {
+              heroMeshes[p.kind] = mesh;
+            }
+          }),
+      );
+      continue;
+    }
     const mesh = buildPlacement(props, p);
     if (["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(p.kind) && mesh) {
       heroMeshes[p.kind] = mesh;
     }
   }
+  await Promise.all(modelJobs);
   scene.add(props);
 
   // Start at the real road spawn and aim at Boone's board cluster. This keeps
@@ -571,20 +608,24 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   }
   window.addEventListener("resize", onResize);
 
-  // Vignette overlay — graphic-novel post tone without EffectComposer.
-  const vigEl = document.createElement("div");
-  Object.assign(vigEl.style, {
-    position: "fixed",
-    inset: "0",
-    pointerEvents: "none",
-    zIndex: "10",
-    background: "radial-gradient(ellipse at 50% 48%, transparent 38%, rgba(5,2,18,0.76) 100%)",
-  });
-  document.body.appendChild(vigEl);
-
   // Ensure the world matrix is current so getWorldDirection() reads the
   // correct forward vector when seeding yaw/pitch from the hero pose lookAt.
   camera.updateMatrixWorld();
+
+  // Post stack: depth-discontinuity ink edges + bloom + warm grade + film grain.
+  // The renderer draws THROUGH this; the grade/vignette replaces the old DOM
+  // vignette overlay. applyPostPalette re-grades the frame from the palette.
+  // The golden-image gate loads ?visual to freeze the frame: film grain is
+  // time-animated (non-deterministic), so the capture disables it for a stable
+  // pixelmatch baseline. Everything else (camera, dusk palette) is already fixed.
+  const visualCapture =
+    typeof location !== "undefined" && new URLSearchParams(location.search).has("visual");
+  const { post, applyPalette: applyPostPalette } = createPostProcessing(renderer, scene, camera, {
+    region: "frontier",
+    sunLight: atmosphere.sun,
+    ...(visualCapture ? { grainIntensity: 0 } : {}),
+  });
+  applyPostPalette(appliedPalette);
 
   // Day/night cycle — press T to drift dusk → golden hour → night → dusk.
   // A tween smoothstep-blends the live palette so the sky, lights, fog, and
@@ -605,6 +646,7 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     timeKey = getPalette(key).key;
     appliedPalette = getPalette(timeKey);
     atmosphere.applyPalette(appliedPalette);
+    applyPostPalette(appliedPalette);
     return timeKey;
   };
   const stepTimeOfDay = (dt) => {
@@ -613,9 +655,11 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     const e = todTween.t * todTween.t * (3 - 2 * todTween.t); // smoothstep
     appliedPalette = lerpPalette(todTween.fromPalette, getPalette(todTween.toKey), e);
     atmosphere.applyPalette(appliedPalette);
+    applyPostPalette(appliedPalette);
     if (todTween.t >= 1) {
       appliedPalette = getPalette(todTween.toKey);
       atmosphere.applyPalette(appliedPalette);
+      applyPostPalette(appliedPalette);
       todTween = null;
     }
   };
@@ -775,7 +819,7 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     interaction.update(player.position);
     encounter.update(player.position, dt);
     stepTimeOfDay(dt);
-    renderer.render(scene, camera);
+    post.render();
     frames++;
     if (frames === 2) window.__spikeReady = true; // captured after a settled frame
     requestAnimationFrame(loop);
@@ -787,4 +831,8 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
 
 // Auto-start when loaded as the render3d.html entry.
 const canvas = document.getElementById("scene");
-if (canvas) startSpike(canvas);
+if (canvas) {
+  startSpike(canvas).catch((err) => {
+    console.error("[render3d] startSpike failed", err);
+  });
+}

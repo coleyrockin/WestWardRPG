@@ -56,7 +56,11 @@ async function main() {
     await page.waitForFunction(() => window.__spikeReady === true, { timeout: 15000 });
     await page.waitForFunction(() => Boolean(window.__westward3dTest), { timeout: 5000 });
 
-    await page.click("#scene");
+    // force: skip actionability waits — the canvas renders continuously and, under
+    // the headless SwiftShader WebGL2 backend, the main thread is busy enough that
+    // the stability check can starve. The click only requests pointer lock (a
+    // headless no-op); movement is proven below via keys + a deterministic fallback.
+    await page.click("#scene", { force: true });
     const before = await page.evaluate(() => window.__westward3dTest.getPlayerPosition());
     await page.keyboard.down("w");
     await page.waitForTimeout(400);

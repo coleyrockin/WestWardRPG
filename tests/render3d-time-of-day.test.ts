@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   TIME_KEYS,
+  ARC_KEYS,
   PALETTES,
   getPalette,
   nextTimeKey,
   lerpColor,
   lerpPalette,
+  sunArc,
   type Palette,
   type TimeKey,
 } from "../src/render3d/timeOfDay.js";
@@ -130,5 +132,44 @@ describe("lerpPalette", () => {
   it("steps rim.dir (no lerp) across the boundary", () => {
     expect(lerpPalette(a, b, 0.25).rim.dir).toEqual(a.rim.dir);
     expect(lerpPalette(a, b, 0.75).rim.dir).toEqual(b.rim.dir);
+  });
+});
+
+describe("sunArc — continuous day/night cycle", () => {
+  it("cycles through goldenHour → dusk → night at the segment anchors", () => {
+    expect([...ARC_KEYS]).toEqual(["goldenHour", "dusk", "night"]);
+    // anchors land exactly on a source palette's scalar values
+    expect(sunArc(0).sun.intensity).toBeCloseTo(PALETTES.goldenHour.sun.intensity, 6);
+    expect(sunArc(1 / 3).sun.intensity).toBeCloseTo(PALETTES.dusk.sun.intensity, 6);
+    expect(sunArc(2 / 3).sun.intensity).toBeCloseTo(PALETTES.night.sun.intensity, 6);
+  });
+
+  it("wraps: t and t+1 (and t=1) resolve identically", () => {
+    expect(sunArc(1).sun.intensity).toBeCloseTo(sunArc(0).sun.intensity, 6);
+    expect(sunArc(1.25).bloom).toBeCloseTo(sunArc(0.25).bloom, 6);
+    expect(sunArc(-1 / 3).sun.color).toBe(sunArc(2 / 3).sun.color);
+  });
+
+  it("is continuous — a tiny step makes a tiny change (no hard cuts)", () => {
+    const p0 = sunArc(0.2);
+    const p1 = sunArc(0.205);
+    expect(Math.abs(p1.exposure - p0.exposure)).toBeLessThan(0.05);
+    expect(Math.abs(p1.sun.dir.x - p0.sun.dir.x)).toBeLessThan(1);
+  });
+
+  it("returns a well-formed palette tagged 'arc' with finite/valid fields", () => {
+    const p = sunArc(0.42);
+    expect(p.key).toBe("arc");
+    for (const stop of [p.sky.top, p.sky.mid, p.sky.horizon, p.sun.color, p.grade.tint]) {
+      expect(stop).toMatch(/^#[0-9a-fA-F]{6}$/);
+    }
+    expect(Number.isFinite(p.bloom)).toBe(true);
+    expect(Number.isFinite(p.sun.dir.y)).toBe(true);
+  });
+
+  it("guards bad input", () => {
+    expect(sunArc(NaN).key).toBe("arc");
+    // @ts-expect-error — defensive: undefined coerces to 0
+    expect(sunArc(undefined).sun.intensity).toBeCloseTo(PALETTES.goldenHour.sun.intensity, 6);
   });
 });

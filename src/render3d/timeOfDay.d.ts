@@ -2,6 +2,8 @@
 // Pure data + blend helpers (no Three.js); atmosphere.js consumes a Palette.
 
 export type TimeKey = "dusk" | "goldenHour" | "night";
+// sunArc() emits a continuously-blended palette tagged "arc".
+export type PaletteKey = TimeKey | "arc";
 
 export interface Vec3 {
   x: number;
@@ -10,7 +12,7 @@ export interface Vec3 {
 }
 
 export interface Palette {
-  key: TimeKey;
+  key: PaletteKey;
   label: string;
   sky: { top: string; mid: string; horizon: string };
   fog: { color: string; density: number };
@@ -25,9 +27,11 @@ export interface Palette {
 }
 
 export const TIME_KEYS: ReadonlyArray<TimeKey>;
+export const ARC_KEYS: ReadonlyArray<TimeKey>;
 export const PALETTES: Readonly<Record<TimeKey, Palette>>;
 
 export function getPalette(key: string): Palette;
 export function nextTimeKey(key: string): TimeKey;
 export function lerpColor(h1: string, h2: string, t: number): string;
 export function lerpPalette(p1: Palette, p2: Palette, t: number): Palette;
+export function sunArc(dayTime01: number): Palette;

@@ -64,6 +64,27 @@ export function nextTimeKey(key) {
   return TIME_KEYS[(i + 1) % TIME_KEYS.length] || "dusk";
 }
 
+// Continuous day/night arc (docs/roadmap.md §3, Bet 4) — the smooth-cycle
+// successor to the 3 discrete keys. `dayTime01` in [0,1) wraps around the clock:
+// 0 = golden hour, ~1/3 = dusk, ~2/3 = night, back to golden. Returns a palette
+// blended across the bracketing keys (smoothstep eased), so the sun colour,
+// direction, fog, exposure, bloom, and grade all drift continuously rather than
+// hard-cutting. Pure — reuses lerpPalette so it's covered by the same tests.
+export const ARC_KEYS = Object.freeze(["goldenHour", "dusk", "night"]);
+
+export function sunArc(dayTime01) {
+  const t = (((Number(dayTime01) || 0) % 1) + 1) % 1;
+  const n = ARC_KEYS.length;
+  const scaled = t * n;
+  const i = Math.floor(scaled) % n;
+  const f = scaled - Math.floor(scaled);
+  const ease = f * f * (3 - 2 * f); // smoothstep
+  const p = lerpPalette(getPalette(ARC_KEYS[i]), getPalette(ARC_KEYS[(i + 1) % n]), ease);
+  p.key = "arc";
+  p.label = "Sun Arc";
+  return p;
+}
+
 const lerp = (a, b, t) => a + (b - a) * t;
 
 function hexToRgb(h) {

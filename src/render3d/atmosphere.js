@@ -9,76 +9,74 @@
 // covers that the scene renders without console errors.
 
 import * as THREE from "three";
+import { MeshBasicNodeMaterial } from "three/webgpu";
+import {
+  Fn,
+  uniform,
+  vec3,
+  positionLocal,
+  normalize,
+  dot,
+  max,
+  pow,
+  clamp,
+  mix,
+  smoothstep,
+  step,
+  floor,
+  fract,
+  sin,
+} from "three/tsl";
 
 const col = (hex) => new THREE.Color(hex);
 
-const SKY_VERT = `
-  varying vec3 vDir;
-  void main() {
-    vDir = normalize(position);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-// 3-stop gradient + sun/moon disc + halo glow + hashed star field.
-const SKY_FRAG = `
-  varying vec3 vDir;
-  uniform vec3 topColor;
-  uniform vec3 midColor;
-  uniform vec3 horizonColor;
-  uniform vec3 sunDir;
-  uniform vec3 sunColor;
-  uniform float sunDisc;
-  uniform float sunGlow;
-  uniform float starOpacity;
-
-  float hash(vec3 p) {
-    return fract(sin(dot(floor(p), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-  }
-
-  void main() {
-    vec3 dir = normalize(vDir);
-    float t = clamp(pow(max(dir.y, 0.0), 0.55), 0.0, 1.0);
-    vec3 c = t < 0.35
-      ? mix(horizonColor, midColor, t / 0.35)
-      : mix(midColor, topColor, (t - 0.35) / 0.65);
-    c += horizonColor * (1.0 - t) * 0.12;
-
-    // sun / moon disc + soft halo
-    float d = dot(dir, normalize(sunDir));
-    c += sunColor * smoothstep(1.0 - sunDisc, 1.0 - sunDisc * 0.25, d);
-    c += sunColor * pow(max(d, 0.0), 6.0) * sunGlow;
-
-    // hashed stars in the upper sky, faded in near the zenith
-    if (starOpacity > 0.001 && dir.y > 0.02) {
-      float h = hash(dir * 190.0);
-      float star = step(0.9975, h) * starOpacity * smoothstep(0.0, 0.35, dir.y);
-      c += vec3(star) * 1.4;
-    }
-
-    gl_FragColor = vec4(c, 1.0);
-  }
-`;
-
+// Sky dome authored in TSL so it runs on the WebGPURenderer's WebGPU *and* WebGL2
+// backends from one graph (raw GLSL ShaderMaterial is rejected by the node
+// pipeline). Same look as the previous shader: a 3-stop vertical gradient +
+// sun/moon disc + halo glow + a hashed star field, all driven by palette
+// uniforms that applyPalette() mutates in place (.value.set / = number).
 function makeSkyDome() {
   const geo = new THREE.SphereGeometry(140, 32, 18);
   const uniforms = {
-    topColor: { value: col("#1a0f33") },
-    midColor: { value: col("#472a6b") },
-    horizonColor: { value: col("#d0784a") },
-    sunDir: { value: new THREE.Vector3(-8, 6, -5).normalize() },
-    sunColor: { value: col("#ffae6a") },
-    sunDisc: { value: 0.02 },
-    sunGlow: { value: 0.13 },
-    starOpacity: { value: 0.12 },
+    topColor: uniform(col("#1a0f33")),
+    midColor: uniform(col("#472a6b")),
+    horizonColor: uniform(col("#d0784a")),
+    sunDir: uniform(new THREE.Vector3(-8, 6, -5).normalize()),
+    sunColor: uniform(col("#ffae6a")),
+    sunDisc: uniform(0.02),
+    sunGlow: uniform(0.13),
+    starOpacity: uniform(0.12),
   };
-  const mat = new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    depthWrite: false,
-    uniforms,
-    vertexShader: SKY_VERT,
-    fragmentShader: SKY_FRAG,
+
+  const skyColor = Fn(() => {
+    const dir = normalize(positionLocal);
+    const t = clamp(pow(max(dir.y, 0.0), 0.55), 0.0, 1.0);
+
+    // Branchless 3-stop gradient: pick the lower (horizon→mid) or upper
+    // (mid→top) band by step(0.35, t) — exact match to the old ternary.
+    const lower = mix(uniforms.horizonColor, uniforms.midColor, clamp(t.div(0.35), 0.0, 1.0));
+    const upper = mix(uniforms.midColor, uniforms.topColor, clamp(t.sub(0.35).div(0.65), 0.0, 1.0));
+    const c = mix(lower, upper, step(0.35, t)).toVar();
+    c.addAssign(uniforms.horizonColor.mul(t.oneMinus()).mul(0.12));
+
+    // sun / moon disc + soft halo
+    const d = dot(dir, normalize(uniforms.sunDir));
+    c.addAssign(
+      uniforms.sunColor.mul(smoothstep(uniforms.sunDisc.oneMinus(), uniforms.sunDisc.mul(0.25).oneMinus(), d)),
+    );
+    c.addAssign(uniforms.sunColor.mul(pow(max(d, 0.0), 6.0)).mul(uniforms.sunGlow));
+
+    // hashed stars in the upper sky, faded in near the zenith
+    const hp = floor(dir.mul(190.0));
+    const h = fract(sin(dot(hp, vec3(12.9898, 78.233, 37.719))).mul(43758.5453));
+    const star = step(0.9975, h).mul(uniforms.starOpacity).mul(smoothstep(0.0, 0.35, dir.y)).mul(step(0.02, dir.y));
+    c.addAssign(vec3(star).mul(1.4));
+
+    return c;
   });
+
+  const mat = new MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false, fog: false });
+  mat.colorNode = skyColor();
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   return { mesh, uniforms };
