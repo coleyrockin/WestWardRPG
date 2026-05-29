@@ -123,7 +123,16 @@ export function createPlayerController(camera, opts = {}) {
     eyeHeight = DEFAULT_EYE_HEIGHT,
     speeds = DEFAULT_SPEEDS,
     sensitivity = DEFAULT_SENSITIVITY,
+    // Third-person: follow-cam orbits behind a character mesh that faces the
+    // movement heading. Falls back to first-person when thirdPerson is false.
+    thirdPerson = false,
+    character = null, // THREE.Object3D positioned at the player's feet
+    camDistance = 5.2,
+    camHeight = 2.9,
+    camLookHeight = 1.5,
+    camLookAhead = 2.2,
   } = opts;
+  let moving = false;
 
   // Seed yaw + pitch from the camera's current heading so the spike's hero
   // pose is preserved on the first frame. We project the forward vector onto
@@ -234,6 +243,8 @@ export function createPlayerController(camera, opts = {}) {
     pitch = stepped.pitch;
     let nextPos = stepped.position;
 
+    moving = !!(input.forward || input.back || input.left || input.right);
+
     // Drain mouse deltas — they're per-frame, not held state.
     input.lookDx = 0;
     input.lookDy = 0;
@@ -245,7 +256,33 @@ export function createPlayerController(camera, opts = {}) {
     }
     position = nextPos;
 
-    if (camera) {
+    // The character mesh stands at the player's feet, facing the heading
+    // (group local -Z = forward, so rotation.y = yaw aligns it). Y is left to
+    // the walk-bob in character.animate().
+    if (character) {
+      character.position.x = position.x;
+      character.position.z = position.z;
+      character.rotation.y = yaw;
+    }
+
+    if (camera && thirdPerson) {
+      // Follow-cam orbits behind the heading and looks slightly ahead of the
+      // character. Drag yaw turns the whole rig; pitch tilts the cam vertically.
+      const fwd = forwardVector(yaw);
+      const lift = Math.sin(pitch) * camDistance * 0.5;
+      camera.position.set(
+        position.x - fwd.x * camDistance,
+        camHeight - lift,
+        position.z - fwd.z * camDistance,
+      );
+      if (camera.lookAt) {
+        camera.lookAt(
+          position.x + fwd.x * camLookAhead,
+          camLookHeight + lift * 0.5,
+          position.z + fwd.z * camLookAhead,
+        );
+      }
+    } else if (camera) {
       camera.position.x = position.x;
       camera.position.y = eyeHeight;
       camera.position.z = position.z;
@@ -293,5 +330,6 @@ export function createPlayerController(camera, opts = {}) {
     get position() { return { x: position.x, z: position.z }; },
     get yaw() { return yaw; },
     get pitch() { return pitch; },
+    get moving() { return moving; },
   };
 }

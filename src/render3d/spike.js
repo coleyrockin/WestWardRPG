@@ -28,6 +28,8 @@ import { createWorldClock, tickClock, pinClock, cycleClock, dayTimeToKey } from 
 import { createWater } from "../game/world/water.js";
 import { createGroundMaterial } from "../game/world/ground.js";
 import { createScatter } from "../game/world/scatter.js";
+import { createPlaceholderCharacter } from "../game/world/character.js";
+import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
 import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
 
@@ -694,10 +696,23 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (e.code === "KeyG") cycleWeather();
   });
 
+  // Third-person: a visible rigged character the follow-cam tracks. The
+  // controller stands it at the player's feet facing the heading; the loop
+  // crossfades its Idle/Walk clips by movement. Falls back to the procedural
+  // placeholder if the glTF fails to load.
+  let character;
+  try {
+    character = await createAnimatedCharacter("/models/character.glb");
+  } catch (err) {
+    console.warn("[render3d] animated character failed, using placeholder", err);
+    character = createPlaceholderCharacter();
+  }
+  scene.add(character.group);
+
   // Milestone 3B step 1–3: walkable, collidable, promptable.
   // Player owns input + camera each frame; proxies block movement; interaction
   // surfaces the nearest prompt and dispatches handlers on E.
-  const player = createPlayerController(camera, { canvas });
+  const player = createPlayerController(camera, { canvas, thirdPerson: true, character: character.group });
   const proxies = buildProxies(snapshot.worldObjects);
   const promptEl = document.getElementById("prompt");
   const setPromptText = (t) => {
@@ -847,6 +862,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (!boardModalController.isOpen()) player.update(dt, proxies);
     interaction.update(player.position);
     encounter.update(player.position, dt);
+    character.update(visualCapture ? 0 : dt, player.moving && !visualCapture);
     stepWorld(dt);
     post.render();
     frames++;
