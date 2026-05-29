@@ -30,9 +30,9 @@ export const REGION_POST = {
     // ramps to full ink by `edgeHi`.
     edgeLo: 0.06,
     edgeHi: 0.22,
-    bloomBase: 0.16, // multiplied by palette.bloom
-    bloomRadius: 0.55,
-    bloomThreshold: 0.88, // only the brightest emissives/sun glow bloom
+    bloomBase: 0.09, // multiplied by palette.bloom
+    bloomRadius: 0.5,
+    bloomThreshold: 0.93, // only the very brightest emissives bloom (no scene wash)
     grainIntensity: 0.14,
   },
   // Scaffolded — shipped in Phase 6.

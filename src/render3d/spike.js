@@ -26,14 +26,14 @@ import { createAtmosphere } from "./atmosphere.js";
 import { sunArc } from "./timeOfDay.js";
 import { createWorldClock, tickClock, pinClock, cycleClock, dayTimeToKey } from "../game/world/worldClock.js";
 import { createWater } from "../game/world/water.js";
+import { createGroundMaterial } from "../game/world/ground.js";
+import { createScatter } from "../game/world/scatter.js";
 import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
 const col = (hex) => new THREE.Color(hex);
-
-const GROUND_TINT = "#4e3c26"; // muted dusty brown
 
 // Sky dome, sun/rim/hemi lights, fog, and clouds now live in atmosphere.js,
 // driven by the time-of-day palettes in timeOfDay.js.
@@ -438,7 +438,7 @@ function buildGround(scene, snapshot) {
   // fog margin so the plane edge never shows. One plane — one draw call.
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(120, 110),
-    standard(GROUND_TINT, { roughness: 1 }),
+    createGroundMaterial(),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(14, 0, 9);
@@ -558,6 +558,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   atmosphere.applyPalette(appliedPalette);
 
   buildGround(scene, snapshot);
+  createScatter(scene, { center: { x: 16, z: 10 }, area: 34, count: 90 });
 
   // Animated marsh water (replaces the flat plane that used to live in buildGround).
   const water = createWater({ width: 13, height: 5.5, skyTint: appliedPalette.sky.horizon });

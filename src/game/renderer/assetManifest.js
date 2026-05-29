@@ -27,8 +27,8 @@ export const MODELS = {
   // structures + lights (Batch B)
   watchtower: { url: "/models/watchtower.glb", scale: 0.55, light: { color: "#ffcc80", intensity: 18, distance: 22, decay: 1.8, height: 4.75 } },
   landmark: { url: "/models/watchtower.glb", scale: 0.55, light: { color: "#ffcc80", intensity: 18, distance: 22, decay: 1.8, height: 4.75 } },
-  lamp: { url: "/models/lamp.glb", scale: 1.6, light: { color: "#ffcaa0", intensity: 9, distance: 7, decay: 2, height: 1.55 } },
-  jobBoard: { url: "/models/jobBoard.glb", scale: 1.0, yaw: Math.PI / 2, light: { color: "#ffd090", intensity: 9, distance: 7, decay: 1.8, height: 2.3 } },
+  lamp: { url: "/models/lamp.glb", scale: 1.6, light: { color: "#ffcaa0", intensity: 5.5, distance: 7, decay: 2, height: 1.55 } },
+  jobBoard: { url: "/models/jobBoard.glb", scale: 1.0, yaw: Math.PI / 2, light: { color: "#ffd090", intensity: 6, distance: 7, decay: 1.8, height: 2.3 } },
   fence: { url: "/models/fence.glb", scale: 1.5 },
   sign: { url: "/models/sign.glb", scale: 1.2 },
   road: { url: "/models/road.glb", scale: 1.6 },
