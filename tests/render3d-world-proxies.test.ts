@@ -10,8 +10,11 @@ const KINDS_THAT_BLOCK = new Set([
   "fence", "sign", "lamp",
   "jobBoard", "smokeCache", "brokenWagon",
   "cart", "crate",
+  // bigger-world expansion
+  "mesa", "cliff", "rock", "boulder", "cactus", "deadTree",
+  "saloon", "storefront", "porch",
 ]);
-const KINDS_THAT_PASS = new Set(["road", "roadSlime"]);
+const KINDS_THAT_PASS = new Set(["road", "roadSlime", "brush", "reeds"]);
 
 describe("worldProxies — buildProxies", () => {
   const placements = buildFrontierPlacements();

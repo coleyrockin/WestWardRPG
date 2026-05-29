@@ -273,6 +273,120 @@ function buildGeneric(group, p, h = 0.6) {
   addBox(group, 0.6 * p.size, h, 0.6 * p.size, standard(p.color), toVec(p.x, p.y));
 }
 
+// --- bigger-world builders (no PointLights — keep the scene light budget tight) ---
+
+// Mesa / cliff: tall flat-top earth silhouette that frames the horizon and
+// walls the playable area. cliff uses a thinner, lower profile.
+function buildMesa(group, p) {
+  const isCliff = p.kind === "cliff";
+  const w = (isCliff ? 2.2 : 2.9) * p.size;
+  const d = (isCliff ? 1.3 : 2.9) * p.size;
+  const h = (isCliff ? 2.6 : 3.5) * p.size;
+  const mat = standard(p.color, { roughness: 1 });
+  const base = addBox(group, w, h, d, mat, toVec(p.x, p.y));
+  addOutline(group, base, 1.04);
+  // inset flat-top cap for the classic mesa read
+  const cap = addBox(group, w * 0.72, h * 0.4, d * 0.72, mat, toVec(p.x, p.y, h));
+  addOutline(group, cap, 1.05);
+  addContactShadow(group, p.x, p.y, w * 0.62, d * 0.62);
+  return base;
+}
+
+// Rock / boulder: low-poly stone lump. Deterministic tumble from position.
+function buildRock(group, p) {
+  const r = (p.kind === "boulder" ? 0.72 : 0.46) * p.size;
+  const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), standard(p.color, { roughness: 1 }));
+  m.position.copy(toVec(p.x, p.y, r * 0.6));
+  m.rotation.set(0.3, p.x, p.y * 0.5);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  group.add(m);
+  addOutline(group, m, 1.06);
+  addContactShadow(group, p.x, p.y, r * 1.1, r * 0.9);
+  return m;
+}
+
+// Saguaro-style cactus: trunk + two raised arms.
+function buildCactus(group, p) {
+  const h = 1.4 * p.size;
+  const mat = standard(p.color, { roughness: 0.85 });
+  const trunk = addBox(group, 0.28 * p.size, h, 0.28 * p.size, mat, toVec(p.x, p.y));
+  addOutline(group, trunk, 1.06);
+  const arm = (dir, baseY) => {
+    const across = new THREE.Mesh(new THREE.BoxGeometry(0.46 * p.size, 0.16 * p.size, 0.18 * p.size), mat);
+    across.position.copy(toVec(p.x + dir * 0.22 * p.size, p.y, baseY));
+    across.castShadow = true;
+    group.add(across);
+    const up = new THREE.Mesh(new THREE.BoxGeometry(0.16 * p.size, 0.46 * p.size, 0.18 * p.size), mat);
+    up.position.copy(toVec(p.x + dir * 0.4 * p.size, p.y, baseY + 0.28 * p.size));
+    up.castShadow = true;
+    group.add(up);
+  };
+  arm(1, h * 0.56);
+  arm(-1, h * 0.42);
+  addContactShadow(group, p.x, p.y, 0.42, 0.42);
+  return trunk;
+}
+
+// Bare dead tree: thin trunk with a few angled snag branches.
+function buildDeadTree(group, p) {
+  const h = 1.8 * p.size;
+  const mat = standard(p.color, { roughness: 1 });
+  const trunk = addBox(group, 0.22 * p.size, h, 0.22 * p.size, mat, toVec(p.x, p.y));
+  addOutline(group, trunk, 1.06);
+  const branch = (ang, len, atY) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(len, 0.12 * p.size, 0.12 * p.size), mat);
+    b.position.copy(toVec(p.x, p.y, atY));
+    b.rotation.z = ang;
+    b.castShadow = true;
+    group.add(b);
+  };
+  branch(0.6, 0.7 * p.size, h * 0.82);
+  branch(-0.7, 0.6 * p.size, h * 0.64);
+  branch(0.35, 0.5 * p.size, h * 0.96);
+  addContactShadow(group, p.x, p.y, 0.36, 0.36);
+  return trunk;
+}
+
+// Low desert scrub — passthrough dressing, no outline (mesh budget).
+function buildBrush(group, p) {
+  const mat = standard(p.color, { roughness: 1 });
+  for (const [dx, dz, s] of [[0, 0, 1], [0.18, 0.1, 0.72], [-0.15, -0.12, 0.78]]) {
+    const c = new THREE.Mesh(new THREE.ConeGeometry(0.22 * p.size * s, 0.42 * p.size * s, 5), mat);
+    c.position.copy(toVec(p.x + dx, p.y + dz, 0.21 * p.size * s));
+    c.castShadow = true;
+    group.add(c);
+  }
+  return null;
+}
+
+// Marsh reeds — thin emissive blades over the water, passthrough, no outline.
+function buildReeds(group, p) {
+  const mat = standard(p.color, { roughness: 1, emissive: p.color, emissiveIntensity: 0.12 });
+  for (const [dx, dz] of [[0, 0], [0.12, 0.08], [-0.1, 0.06], [0.05, -0.1]]) {
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.06 * p.size, 0.95 * p.size, 0.06 * p.size), mat);
+    blade.position.copy(toVec(p.x + dx, p.y + dz, 0.47 * p.size));
+    blade.rotation.z = dx;
+    group.add(blade);
+  }
+  return null;
+}
+
+// Wooden porch deck fronting a town building.
+function buildPorch(group, p) {
+  const mat = standard(p.color, { roughness: 1 });
+  const deck = addBox(group, 1.4 * p.size, 0.18 * p.size, 0.5 * p.size, mat, toVec(p.x, p.y));
+  addOutline(group, deck, 1.05);
+  const postMat = standard("#3a2a1c");
+  for (const dx of [-0.6 * p.size, 0.6 * p.size]) {
+    for (const dz of [-0.2 * p.size, 0.2 * p.size]) {
+      addBox(group, 0.1, 0.6 * p.size, 0.1, postMat, toVec(p.x + dx, p.y + dz));
+    }
+  }
+  addContactShadow(group, p.x, p.y, 0.7 * p.size, 0.3 * p.size);
+  return deck;
+}
+
 function buildPlacement(group, p) {
   switch (p.kind) {
     case "town":
@@ -288,6 +402,17 @@ function buildPlacement(group, p) {
     case "smokeCache": return buildSmokeCache(group, p);
     case "brokenWagon": return buildWagon(group, p);
     case "roadSlime": return buildSlime(group, p);
+    case "saloon": return buildBuilding(group, p, 1.15);
+    case "storefront": return buildBuilding(group, p, 0.95);
+    case "porch": return buildPorch(group, p);
+    case "mesa":
+    case "cliff": return buildMesa(group, p);
+    case "rock":
+    case "boulder": return buildRock(group, p);
+    case "cactus": return buildCactus(group, p);
+    case "deadTree": return buildDeadTree(group, p);
+    case "brush": return buildBrush(group, p);
+    case "reeds": return buildReeds(group, p);
     case "cart":
     case "crate": return buildGeneric(group, p, 0.7);
     default: return buildGeneric(group, p);
@@ -328,18 +453,39 @@ function getHeroVisibility(heroMeshes, camera) {
 
 function buildGround(scene, snapshot) {
   const spawn = snapshot?.player || PLAYER_SPAWN;
+  // Big enough to comfortably hold the full ~30×20 explorable rectangle plus a
+  // fog margin so the plane edge never shows. One plane — one draw call.
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(80, 80),
+    new THREE.PlaneGeometry(120, 110),
     standard(GROUND_TINT, { roughness: 1 }),
   );
   ground.rotation.x = -Math.PI / 2;
-  ground.position.set(spawn.x + 6, 0, spawn.y);
+  ground.position.set(14, 0, 9);
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // dusty road strip running east from spawn through town toward the tower
-  const ROAD_LEN = 22;
-  const ROAD_CX = spawn.x + 9;
+  // Greenish marsh apron over the southern lowland (thin tinted plane).
+  const marsh = new THREE.Mesh(
+    new THREE.PlaneGeometry(20, 9),
+    standard("#3c4a2e", { roughness: 1 }),
+  );
+  marsh.rotation.x = -Math.PI / 2;
+  marsh.position.set(16, 0.005, 15.5);
+  marsh.receiveShadow = true;
+  scene.add(marsh);
+
+  // Translucent water pool sitting just above the marsh apron.
+  const water = new THREE.Mesh(
+    new THREE.PlaneGeometry(13, 5.5),
+    standard("#2c4a52", { roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.72 }),
+  );
+  water.rotation.x = -Math.PI / 2;
+  water.position.set(17, 0.02, 16);
+  scene.add(water);
+
+  // dusty road strip running east from spawn through the cluster toward the mesas
+  const ROAD_LEN = 30;
+  const ROAD_CX = spawn.x + 11;
   const road = new THREE.Mesh(
     new THREE.PlaneGeometry(ROAD_LEN, 1.9),
     standard("#9a7c4f", { roughness: 1 }),
@@ -431,11 +577,11 @@ export function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 0.5;
-  sun.shadow.camera.far = 60;
-  sun.shadow.camera.left = -25;
-  sun.shadow.camera.right = 25;
-  sun.shadow.camera.top = 25;
-  sun.shadow.camera.bottom = -25;
+  sun.shadow.camera.far = 80;
+  sun.shadow.camera.left = -30;
+  sun.shadow.camera.right = 30;
+  sun.shadow.camera.top = 30;
+  sun.shadow.camera.bottom = -30;
   sun.target.position.set(snapshot.player.x + 6, 0, snapshot.player.y);
   scene.add(sun);
   scene.add(sun.target);

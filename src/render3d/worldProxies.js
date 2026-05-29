@@ -44,6 +44,18 @@ const FOOTPRINTS = {
   roadSlime:   null,                            // soft collision lives in encounterSystem
   cart:        (p) => box(p, 0.6 * p.size, 0.6 * p.size),
   crate:       (p) => box(p, 0.6 * p.size, 0.6 * p.size),
+  // --- bigger-world expansion (zone props) ---
+  mesa:        (p) => box(p, 3.2 * p.size, 3.2 * p.size),
+  cliff:       (p) => box(p, 2.4 * p.size, 1.4 * p.size),
+  rock:        (p) => box(p, 0.9 * p.size, 0.9 * p.size),
+  boulder:     (p) => box(p, 1.4 * p.size, 1.4 * p.size),
+  cactus:      (p) => box(p, 0.5 * p.size, 0.5 * p.size),
+  deadTree:    (p) => box(p, 0.6 * p.size, 0.6 * p.size),
+  saloon:      (p) => box(p, 1.6 * p.size, 1.6 * p.size),
+  storefront:  (p) => box(p, 1.3 * p.size, 1.3 * p.size),
+  porch:       (p) => box(p, 1.4 * p.size, 0.5 * p.size),
+  brush:       null,                            // low scrub — visual only
+  reeds:       null,                            // marsh blades — visual only
 };
 
 // Build the full proxy list from a placements array. Unknown kinds fall
