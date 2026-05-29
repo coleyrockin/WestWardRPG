@@ -124,12 +124,12 @@ def build_character(name="character", textured=True, variant="drifter"):
         _box("legR", (0.17, 0.18, 0.72), (0.12, 0, 0.40), dark),
         _box("bootL", (0.19, 0.24, 0.2), (-0.12, 0.03, 0.1), boot),
         _box("bootR", (0.19, 0.24, 0.2), (0.12, 0.03, 0.1), boot),
-        _box("torso", (0.44, 0.27, 0.62), (0, 0, 1.02), coat),
+        _box("torso", (0.5, 0.28, 0.62), (0, 0, 1.02), coat),  # broader chest
         _box("lapel", (0.05, 0.02, 0.5), (0, 0.14, 1.02), dark),  # coat-front seam
         _box("belt", (0.46, 0.29, 0.1), (0, 0, 0.74), dark),
         _box("buckle", (0.1, 0.05, 0.08), (0, 0.16, 0.74), buckle),
-        _box("armL", (0.13, 0.15, 0.56), (-0.3, 0, 1.04), coat),
-        _box("armR", (0.13, 0.15, 0.56), (0.3, 0, 1.04), coat),
+        _box("armL", (0.14, 0.16, 0.56), (-0.34, 0, 1.06), coat),
+        _box("armR", (0.14, 0.16, 0.56), (0.34, 0, 1.06), coat),
         _box("head", (0.25, 0.25, 0.25), (0, 0, 1.46), skin),
         _box("eyeL", (0.055, 0.04, 0.05), (-0.06, 0.13, 1.48), eyem),
         _box("eyeR", (0.055, 0.04, 0.05), (0.06, 0.13, 1.48), eyem),
@@ -179,8 +179,8 @@ def build_character(name="character", textured=True, variant="drifter"):
     bone("head", (0, 0, 1.34), (0, 0, 1.6), eb["spine"])
     bone("legL", (-0.12, 0, 0.72), (-0.12, 0, 0.0), hips)
     bone("legR", (0.12, 0, 0.72), (0.12, 0, 0.0), hips)
-    bone("armL", (-0.3, 0, 1.3), (-0.3, 0, 0.76), eb["spine"])
-    bone("armR", (0.3, 0, 1.3), (0.3, 0, 0.76), eb["spine"])
+    bone("armL", (-0.34, 0, 1.3), (-0.34, 0, 0.78), eb["spine"])
+    bone("armR", (0.34, 0, 1.3), (0.34, 0, 0.78), eb["spine"])
     bpy.ops.object.mode_set(mode="OBJECT")
 
     # skin (auto weights)
@@ -224,8 +224,30 @@ def build_character(name="character", textured=True, variant="drifter"):
     key(24, {"spine": (0.04, 0, 0.02), "armL": (0.02, 0, 0.05), "armR": (0.14, 0, -0.05)})
     key(48, {"spine": (0, 0, 0), "armL": (0.08, 0, 0.05), "armR": (0.08, 0, -0.05)})
 
-    # stash both clips on NLA tracks so the exporter emits both animations
-    for act in (idle, walk):
+    # Run: faster, bigger swing + forward lean (20-frame cycle).
+    run = new_action("Run")
+    sc.frame_start, sc.frame_end = 1, 20
+    rw = 0.95
+    key(1, {"legL": (rw, 0, 0), "legR": (-rw, 0, 0), "armL": (-rw, 0, 0), "armR": (rw, 0, 0), "spine": (0.2, 0, 0)})
+    key(10, {"legL": (-rw, 0, 0), "legR": (rw, 0, 0), "armL": (rw, 0, 0), "armR": (-rw, 0, 0), "spine": (0.2, 0, 0)})
+    key(20, {"legL": (rw, 0, 0), "legR": (-rw, 0, 0), "armL": (-rw, 0, 0), "armR": (rw, 0, 0), "spine": (0.2, 0, 0)})
+
+    # Turn: a quick hip/spine twist + settle (one-shot, 16 frames).
+    turn = new_action("Turn")
+    sc.frame_start, sc.frame_end = 1, 16
+    key(1, {"hips": (0, 0, 0), "spine": (0, 0, 0)})
+    key(8, {"hips": (0, 0, 0.5), "spine": (0, 0, 0.3)})
+    key(16, {"hips": (0, 0, 0), "spine": (0, 0, 0)})
+
+    # Draw: right arm snaps up + slight body twist (one-shot, 18 frames).
+    draw = new_action("Draw")
+    sc.frame_start, sc.frame_end = 1, 18
+    key(1, {"armR": (0, 0, 0), "spine": (0, 0, 0)})
+    key(7, {"armR": (-1.3, 0, 0), "spine": (0, 0, -0.15)})
+    key(18, {"armR": (-0.95, 0, 0), "spine": (0, 0, -0.1)})
+
+    # stash all clips on NLA tracks so the exporter emits each as an animation
+    for act in (idle, walk, run, turn, draw):
         track = arm.animation_data.nla_tracks.new()
         track.name = act.name
         track.strips.new(act.name, 1, act)

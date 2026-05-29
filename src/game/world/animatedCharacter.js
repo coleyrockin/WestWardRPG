@@ -40,21 +40,57 @@ export async function createAnimatedCharacter(url = "/models/character.glb", opt
   for (const clip of gltf.animations) actions[clip.name.toLowerCase()] = mixer.clipAction(clip);
   const idle = actions.idle || null;
   const walk = actions.walk || null;
+  const run = actions.run || null;
   if (idle) idle.play();
   if (walk) {
     walk.play();
     walk.setEffectiveWeight(0);
     walk.timeScale = 1.35;
   }
-
-  let w = 0; // walk weight, smoothly crossfaded
-  function update(dt, moving) {
-    const target = moving ? 1 : 0;
-    w += (target - w) * Math.min(1, (dt || 0) * 8);
-    if (walk) walk.setEffectiveWeight(w);
-    if (idle) idle.setEffectiveWeight(1 - w);
-    mixer.update(dt || 0);
+  if (run) {
+    run.play();
+    run.setEffectiveWeight(0);
   }
 
-  return { group, update, mixer };
+  let wWalk = 0;
+  let wRun = 0;
+  let oneShot = null; // { action, remaining } — draw/turn play over the locomotion
+
+  // update(dt, moving, running): blends Idle→Walk→Run; one-shots take over briefly.
+  function update(dt, moving, running) {
+    const d = dt || 0;
+    const k = Math.min(1, d * 8);
+    wWalk += ((moving && !running ? 1 : 0) - wWalk) * k;
+    wRun += ((moving && running ? 1 : 0) - wRun) * k;
+
+    let osW = 0;
+    if (oneShot) {
+      oneShot.remaining -= d;
+      if (oneShot.remaining <= 0) {
+        oneShot.action.stop();
+        oneShot = null;
+      } else {
+        osW = 1;
+      }
+    }
+    const loco = 1 - osW; // fade locomotion out while a one-shot plays
+    if (run) run.setEffectiveWeight(wRun * loco);
+    if (walk) walk.setEffectiveWeight(wWalk * loco);
+    if (idle) idle.setEffectiveWeight(Math.max(0, 1 - wWalk - wRun) * loco);
+    mixer.update(d);
+  }
+
+  // Play a one-shot clip (e.g. "draw", "turn") once over the current locomotion.
+  function playOnce(name) {
+    const a = actions[String(name).toLowerCase()];
+    if (!a) return;
+    a.setLoop(THREE.LoopOnce, 1);
+    a.clampWhenFinished = false;
+    a.reset();
+    a.setEffectiveWeight(1);
+    a.play();
+    oneShot = { action: a, remaining: a.getClip().duration };
+  }
+
+  return { group, update, playOnce, mixer };
 }

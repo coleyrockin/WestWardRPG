@@ -718,6 +718,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     character = createPlaceholderCharacter();
   }
   scene.add(character.group);
+  // F → play the one-shot "draw" clip (no-op on the placeholder fallback)
+  if (typeof window !== "undefined") {
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "KeyF") character.playOnce?.("draw");
+    });
+  }
 
   // Milestone 3B step 1–3: walkable, collidable, promptable.
   // Player owns input + camera each frame; proxies block movement; interaction
@@ -872,7 +878,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (!boardModalController.isOpen()) player.update(dt, proxies);
     interaction.update(player.position);
     encounter.update(player.position, dt);
-    character.update(visualCapture ? 0 : dt, player.moving && !visualCapture);
+    character.update(visualCapture ? 0 : dt, player.moving && !visualCapture, player.running && !visualCapture);
     townsfolk.update(visualCapture ? 0 : dt, visualCapture);
     stepWorld(dt);
     post.render();
