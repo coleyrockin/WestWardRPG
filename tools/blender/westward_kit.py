@@ -194,7 +194,12 @@ def bake_albedo(obj, px=1024):
     return img
 
 
-def export_glb(obj, name):
+def export_glb(obj, name, bake=False):
+    # bake=True: UV-unwrap + bake a weathered albedo into the .glb (textured cel).
+    # Only for NON-emissive props — baking replaces materials and would drop the
+    # emissive the loader turns into glow.
+    if bake:
+        bake_albedo(obj)
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj

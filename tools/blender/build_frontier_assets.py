@@ -71,8 +71,7 @@ def build_building(name, width=1.4, depth=1.55, body_h=1.85, front_h=2.55, windo
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
-    bake_albedo(obj)  # UV + baked weathering/grime → textured-cel walls
-    return export_glb(obj, name)
+    return export_glb(obj, name, bake=True)  # UV + baked weathering/grime → textured-cel walls
 
 
 # --- Broken wagon (hero) ----------------------------------------------------
@@ -100,7 +99,7 @@ def build_wagon(name="wagon"):
     bpy.ops.object.transform_apply(rotation=True)
     shade_flat(obj)
     origin_to_base(obj)
-    return export_glb(obj, name)
+    return export_glb(obj, name, bake=True)
 
 
 # --- Saguaro cactus ---------------------------------------------------------
@@ -118,7 +117,7 @@ def build_cactus(name="cactus"):
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
-    return export_glb(obj, name)
+    return export_glb(obj, name, bake=True)
 
 
 # --- Bare dead tree ---------------------------------------------------------
@@ -140,7 +139,7 @@ def build_dead_tree(name="dead_tree"):
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
-    return export_glb(obj, name)
+    return export_glb(obj, name, bake=True)
 
 
 # --- Angular boulder --------------------------------------------------------
@@ -160,7 +159,7 @@ def build_rock(name="rock", r=0.5, seed=1):
     o.data.materials.append(stone)
     shade_flat(o)
     origin_to_base(o)
-    return export_glb(o, name)
+    return export_glb(o, name, bake=True)
 
 
 # ============================ Batch B ======================================
@@ -179,7 +178,7 @@ def build_mesa(name="mesa", w=2.9, h=3.5):
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
-    return export_glb(obj, name)
+    return export_glb(obj, name, bake=True)
 
 
 def build_cliff(name="cliff", w=2.2, h=2.6, d=1.3):
@@ -190,7 +189,7 @@ def build_cliff(name="cliff", w=2.2, h=2.6, d=1.3):
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
-    return export_glb(obj, name)
+    return export_glb(obj, name, bake=True)
 
 
 # --- Watchtower / landmark (tall hero silhouette) ---------------------------
@@ -276,7 +275,7 @@ def build_fence(name="fence", length=1.8):
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
-    return export_glb(obj, name)
+    return export_glb(obj, name, bake=True)
 
 
 def build_sign(name="sign", post_h=1.05, pw=0.7, ph=0.4):
@@ -302,7 +301,7 @@ def build_porch(name="porch"):
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
-    return export_glb(obj, name)
+    return export_glb(obj, name, bake=True)
 
 
 def build_cart(name="cart"):
@@ -319,7 +318,7 @@ def build_cart(name="cart"):
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
-    return export_glb(obj, name)
+    return export_glb(obj, name, bake=True)
 
 
 def build_crate(name="crate"):
@@ -333,7 +332,7 @@ def build_crate(name="crate"):
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
-    return export_glb(obj, name)
+    return export_glb(obj, name, bake=True)
 
 
 def build_batch_b():
