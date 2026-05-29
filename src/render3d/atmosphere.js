@@ -187,8 +187,19 @@ export function createAtmosphere(scene, renderer, opts = {}) {
     }
   }
 
+  // Drift the cloud streaks across the sky and wrap, so the sky reads as alive.
+  // windScale lets weather speed the drift; no-op when dt is 0 (frozen capture).
+  function driftClouds(dt, windScale = 1) {
+    if (!dt) return;
+    for (const m of clouds.meshes) {
+      m.position.x += dt * 0.5 * windScale;
+      if (m.position.x > anchor.x + 55) m.position.x -= 110;
+    }
+  }
+
   return {
     applyPalette,
+    driftClouds,
     get palette() {
       return current;
     },

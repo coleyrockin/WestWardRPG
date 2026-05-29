@@ -1,0 +1,93 @@
+// Weather view — the THREE shell that renders the resolved weather state
+// (see weather.js for the pure resolution): rain streaks + drifting dust motes,
+// an occasional lightning flash. Fog/exposure are modulated by the caller.
+//
+// Implementation note (hard-won): on the WebGPURenderer WebGL2 backend used here,
+// Lines, Points, InstancedMesh, AND hand-built indexed BufferGeometry all fail to
+// render — but a regular Mesh with a built-in BoxGeometry + MeshBasicMaterial
+// renders fine. So each field is a small POOL of shared-geometry box meshes moved
+// per frame (a few hundred draw calls; perf pass is a later phase). Density scales
+// by toggling mesh.visible.
+//
+// update(resolved, dt, ctx) runs each frame; when ctx.frozen (the ?visual
+// golden-capture path) every mote hides, so the gate stays a stable 0%.
+
+import * as THREE from "three";
+
+const RAIN_N = 110;
+const DUST_N = 70;
+
+export function createWeatherSystem(scene, opts = {}) {
+  const center = { x: opts.x ?? 14, z: opts.z ?? 9 };
+  const size = opts.size ?? 44;
+  const rnd = () => Math.random();
+  const group = new THREE.Group();
+
+  const rainGeo = new THREE.BoxGeometry(0.12, 0.8, 0.12);
+  const rainMat = new THREE.MeshBasicMaterial({ color: 0x758598, transparent: true, opacity: 0.9, depthWrite: false });
+  const dustGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16);
+  const dustMat = new THREE.MeshBasicMaterial({ color: 0xcbb489, transparent: true, opacity: 0.55, depthWrite: false });
+
+  const spawn = (y) => ({ x: center.x + (rnd() - 0.5) * size, y, z: center.z + (rnd() - 0.5) * size });
+
+  // Each mote gets its OWN material clone — sharing one material across many
+  // meshes does not render on the WebGPURenderer WebGL2 backend here (geometry
+  // sharing is fine).
+  function pool(n, geo, mat, yInit) {
+    return Array.from({ length: n }, () => {
+      const m = new THREE.Mesh(geo, mat.clone());
+      const p = spawn(yInit());
+      m.position.set(p.x, p.y, p.z);
+      m.visible = false;
+      group.add(m);
+      return m;
+    });
+  }
+  const rain = pool(RAIN_N, rainGeo, rainMat, () => rnd() * 14);
+  const dust = pool(DUST_N, dustGeo, dustMat, () => 0.4 + rnd() * 5.6);
+
+  scene.add(group);
+  let flash = 0;
+
+  function update(resolved, dt, ctx = {}) {
+    const frozen = !!ctx.frozen;
+    const wind = (resolved.wind ?? 0.15) * 4;
+    const tilt = Math.atan2(wind, 18);
+
+    // rain falls in a dense column around the camera (cx,cz) so it's always
+    // near the viewer rather than scattered thinly across the whole world.
+    const cx = ctx.cx ?? center.x;
+    const cz = ctx.cz ?? center.z;
+    const R = 13;
+    const rainN = frozen ? 0 : Math.floor(RAIN_N * resolved.rain);
+    for (let i = 0; i < RAIN_N; i++) {
+      const m = rain[i];
+      if (i >= rainN) { m.visible = false; continue; }
+      m.visible = true;
+      m.material.opacity = 0.9 * resolved.rain;
+      m.rotation.z = tilt;
+      m.position.y -= (18 + (i % 5)) * dt;
+      m.position.x += wind * dt;
+      if (m.position.y < 0 || Math.abs(m.position.x - cx) > R || Math.abs(m.position.z - cz) > R) {
+        m.position.set(cx + (rnd() - 0.5) * 2 * R, 14, cz + (rnd() - 0.5) * 2 * R);
+      }
+    }
+
+    const dustN = frozen ? 0 : Math.floor(DUST_N * resolved.dust);
+    for (let i = 0; i < DUST_N; i++) {
+      const m = dust[i];
+      if (i >= dustN) { m.visible = false; continue; }
+      m.visible = true;
+      m.material.opacity = 0.55 * resolved.dust;
+      m.position.x += wind * dt * (0.6 + (i % 3) * 0.2);
+      m.position.y += Math.sin((m.position.x + i) * 0.5) * 0.1 * dt;
+      if (m.position.x > center.x + size / 2) m.position.x -= size;
+    }
+
+    if (!frozen && resolved.lightning > 0 && flash <= 0 && rnd() < resolved.lightning * dt * 0.6) flash = 1;
+    flash = Math.max(0, flash - dt * 3);
+    return { flash };
+  }
+
+  return { group, update, get flash() { return flash; } };
+}

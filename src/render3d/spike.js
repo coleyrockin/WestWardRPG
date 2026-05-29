@@ -23,7 +23,11 @@ import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
 import { createBoardModalController } from "./boardModal.js";
 import { createEncounterSystem } from "./encounterSystem.js";
 import { createAtmosphere } from "./atmosphere.js";
-import { getPalette, nextTimeKey, lerpPalette } from "./timeOfDay.js";
+import { sunArc } from "./timeOfDay.js";
+import { createWorldClock, tickClock, pinClock, cycleClock, dayTimeToKey } from "../game/world/worldClock.js";
+import { createWater } from "../game/world/water.js";
+import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
+import { createWeatherSystem } from "../game/world/weatherView.js";
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
@@ -451,14 +455,7 @@ function buildGround(scene, snapshot) {
   marsh.receiveShadow = true;
   scene.add(marsh);
 
-  // Translucent water pool sitting just above the marsh apron.
-  const water = new THREE.Mesh(
-    new THREE.PlaneGeometry(13, 5.5),
-    standard("#2c4a52", { roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.72 }),
-  );
-  water.rotation.x = -Math.PI / 2;
-  water.position.set(17, 0.02, 16);
-  scene.add(water);
+  // (Marsh water is now an animated TSL surface created in startSpike — see createWater.)
 
   // dusty road strip running east from spawn through the cluster toward the mesas
   const ROAD_LEN = 30;
@@ -549,11 +546,24 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     anchor: { x: snapshot.player.x, y: snapshot.player.y },
     playCore: { x: snapshot.player.x + 6, y: snapshot.player.y },
   });
-  let timeKey = "dusk";
-  let appliedPalette = getPalette(timeKey);
+  // Continuous day/night: a slow world clock advances dayTime; sunArc(dayTime)
+  // is the live palette so the sun arcs and colours drift. Starts at dusk. The
+  // golden-image gate loads ?visual to freeze everything time-animated (sun,
+  // clouds, water, weather, film grain) for a stable pixelmatch baseline.
+  const visualCapture =
+    typeof location !== "undefined" && new URLSearchParams(location.search).has("visual");
+  const clock = createWorldClock(); // defaults to dusk (dayTime 1/3)
+  if (visualCapture) pinClock(clock, "dusk");
+  let appliedPalette = sunArc(clock.dayTime);
   atmosphere.applyPalette(appliedPalette);
 
   buildGround(scene, snapshot);
+
+  // Animated marsh water (replaces the flat plane that used to live in buildGround).
+  const water = createWater({ width: 13, height: 5.5, skyTint: appliedPalette.sky.horizon });
+  water.mesh.rotation.x = -Math.PI / 2;
+  water.mesh.position.set(17, 0.05, 16);
+  scene.add(water.mesh);
 
   const props = new THREE.Group();
   const heroMeshes = {};
@@ -613,58 +623,74 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   camera.updateMatrixWorld();
 
   // Post stack: depth-discontinuity ink edges + bloom + warm grade + film grain.
-  // The renderer draws THROUGH this; the grade/vignette replaces the old DOM
-  // vignette overlay. applyPostPalette re-grades the frame from the palette.
-  // The golden-image gate loads ?visual to freeze the frame: film grain is
-  // time-animated (non-deterministic), so the capture disables it for a stable
-  // pixelmatch baseline. Everything else (camera, dusk palette) is already fixed.
-  const visualCapture =
-    typeof location !== "undefined" && new URLSearchParams(location.search).has("visual");
-  const { post, applyPalette: applyPostPalette } = createPostProcessing(renderer, scene, camera, {
+  // The renderer draws THROUGH this; the grade replaces the old DOM vignette.
+  // Film grain is time-animated, so ?visual capture disables it (visualCapture
+  // set above) alongside the other frozen motion for a stable baseline.
+  const { post, applyPalette: applyPostPalette, uniforms: postUniforms } = createPostProcessing(renderer, scene, camera, {
     region: "frontier",
     sunLight: atmosphere.sun,
     ...(visualCapture ? { grainIntensity: 0 } : {}),
   });
   applyPostPalette(appliedPalette);
 
-  // Day/night cycle — press T to drift dusk → golden hour → night → dusk.
-  // A tween smoothstep-blends the live palette so the sky, lights, fog, and
-  // exposure ease across instead of hard-cutting. KeyT is free of the player
-  // controller's WASD/shift map, so this never fights movement input.
-  const TOD_TWEEN_SECONDS = 1.6;
-  let todTween = null; // { fromPalette, toKey, t }
+  // Apply the clock's current dayTime to atmosphere + post (called every frame
+  // and on dev/test jumps). sunArc gives a continuously-blended palette.
+  const applyDayTime = () => {
+    appliedPalette = sunArc(clock.dayTime);
+    atmosphere.applyPalette(appliedPalette);
+    applyPostPalette(appliedPalette);
+  };
+  // Dev/test API (preserved): T cycles to the next key; setTimeOfDay pins a key
+  // (pauses auto-advance for determinism); getTimeOfDay reports the nearest key.
   const cycleTimeOfDay = () => {
-    const toKey = nextTimeKey(timeKey);
-    todTween = { fromPalette: appliedPalette, toKey, t: 0 };
-    timeKey = toKey;
-    return timeKey;
+    const key = cycleClock(clock);
+    applyDayTime();
+    return key;
   };
-  // Snap straight to a palette with no tween — used by dev tooling/tests to jump
-  // between times of day without waiting on the RAF-paced blend.
   const setTimeOfDay = (key) => {
-    todTween = null;
-    timeKey = getPalette(key).key;
-    appliedPalette = getPalette(timeKey);
-    atmosphere.applyPalette(appliedPalette);
-    applyPostPalette(appliedPalette);
-    return timeKey;
+    pinClock(clock, key);
+    applyDayTime();
+    return dayTimeToKey(clock.dayTime);
   };
-  const stepTimeOfDay = (dt) => {
-    if (!todTween) return;
-    todTween.t = Math.min(1, todTween.t + dt / TOD_TWEEN_SECONDS);
-    const e = todTween.t * todTween.t * (3 - 2 * todTween.t); // smoothstep
-    appliedPalette = lerpPalette(todTween.fromPalette, getPalette(todTween.toKey), e);
-    atmosphere.applyPalette(appliedPalette);
-    applyPostPalette(appliedPalette);
-    if (todTween.t >= 1) {
-      appliedPalette = getPalette(todTween.toKey);
-      atmosphere.applyPalette(appliedPalette);
-      applyPostPalette(appliedPalette);
-      todTween = null;
-    }
+
+  // Weather: resolve the snapshot state to visual intensities; G cycles
+  // clear → dust → storm to show it off. The particle/lightning shell lives in
+  // weatherView; fog + exposure are modulated on top of the palette here.
+  let weatherKind = snapshot.weather?.kind || "clear";
+  let weather = resolveWeather(snapshot.weather);
+  const weatherSys = createWeatherSystem(scene, { x: 14, z: 9 });
+  const cycleWeather = () => {
+    weatherKind = nextWeatherKind(weatherKind);
+    // pass only kind + wind so the preset drives rain/dust (the snapshot's stale
+    // rain:0 would otherwise override the storm preset via resolveWeather).
+    weather = resolveWeather({ kind: weatherKind, wind: snapshot.weather?.wind });
+    return weatherKind;
   };
+
+  // One call per frame: advance the world (or hold it all still under ?visual).
+  let waterTime = 0;
+  const stepWorld = (dt) => {
+    const fdt = visualCapture ? 0 : dt;
+    tickClock(clock, fdt);
+    applyDayTime();
+    atmosphere.driftClouds(fdt, 1 + weather.wind * 2);
+    waterTime += fdt;
+    water.uniforms.time.value = waterTime;
+    water.uniforms.skyTint.value.set(appliedPalette.sky.horizon);
+    const { flash } = weatherSys.update(weather, fdt, {
+      frozen: visualCapture,
+      cx: camera.position.x,
+      cz: camera.position.z,
+    });
+    if (scene.fog) scene.fog.density = appliedPalette.fog.density + weather.fogBoost;
+    // PostProcessing ignores renderer.toneMappingExposure — drive exposure via the
+    // post uniform so day/night, weather darkening, and lightning flashes show.
+    postUniforms.exposure.value = appliedPalette.exposure * weather.darken * (1 + flash * 0.8);
+  };
+
   window.addEventListener("keydown", (e) => {
     if (e.code === "KeyT") cycleTimeOfDay();
+    if (e.code === "KeyG") cycleWeather();
   });
 
   // Milestone 3B step 1–3: walkable, collidable, promptable.
@@ -805,7 +831,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       getHeroVisibility: () => getHeroVisibility(heroMeshes, camera),
       cycleTimeOfDay,
       setTimeOfDay,
-      getTimeOfDay: () => timeKey,
+      getTimeOfDay: () => dayTimeToKey(clock.dayTime),
+      cycleWeather,
+      getWeather: () => weatherKind,
     };
   }
 
@@ -818,7 +846,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (!boardModalController.isOpen()) player.update(dt, proxies);
     interaction.update(player.position);
     encounter.update(player.position, dt);
-    stepTimeOfDay(dt);
+    stepWorld(dt);
     post.render();
     frames++;
     if (frames === 2) window.__spikeReady = true; // captured after a settled frame

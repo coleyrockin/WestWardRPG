@@ -60,6 +60,9 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
     // grain is time-animated (non-deterministic) — visual-capture passes 0.
     grainIntensity: uniform(opts.grainIntensity ?? region.grainIntensity),
     godrayStrength: uniform(opts.godrayStrength ?? 0.45),
+    // Final exposure multiplier — PostProcessing ignores renderer.toneMappingExposure,
+    // so day/night exposure and weather darkening ride this uniform instead.
+    exposure: uniform(1),
   };
 
   // 1. Bloom — soft glow on the brightest emissives (lamps, beacon, slime, sun).
@@ -84,8 +87,11 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
   );
   const inked = mix(lit, vec3(uniforms.inkColor), edgeAmt);
 
-  // 3. Warm grade — brightness-preserving multiply toward the palette tint.
-  const graded = inked.mul(mix(vec3(1, 1, 1), vec3(uniforms.gradeTint).mul(1.6), uniforms.gradeAmount));
+  // 3. Warm grade — brightness-preserving multiply toward the palette tint,
+  //    then the exposure multiplier (day/night + weather darkening).
+  const graded = inked
+    .mul(mix(vec3(1, 1, 1), vec3(uniforms.gradeTint).mul(1.6), uniforms.gradeAmount))
+    .mul(uniforms.exposure);
 
   // 4. Film grain — paper-grain tooth over the whole frame.
   const grained = film(graded, uniforms.grainIntensity);
