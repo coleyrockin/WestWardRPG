@@ -33,10 +33,16 @@ The 3D game lives at **`/spikes/render3d.html`** → [`src/render3d/spike.js`](.
   loops ([`townsfolk.js`](../src/game/world/townsfolk.js) + pure
   [`npcWander.js`](../src/game/world/npcWander.js)); frozen under `?visual`.
 
+- **Art-craft Phase 2 — texture pipeline (proven):** embedded glTF textures sample on the WebGL2
+  backend; `nprMaterial.js` takes a painted `map` (texture×tint → cel ramp); `assetLoader.js` +
+  `animatedCharacter.js` carry glTF textures through. The drifter (`build_character.py` `_bake_albedo`)
+  ships a UV-unwrapped, baked-weathering albedo embedded in `character.glb`.
+
 ## Pick up next (in order)
-1. **Art-craft Phase 2/3** ([`art-craft-roadmap.md`](art-craft-roadmap.md)): de-risk embedded
-   textures on the WebGL2 backend → add UV/texture support to `nprMaterial.js` → re-author the
-   player as a textured Mixamo-hybrid hero. This is the real quality ceiling-raise. NPCs reuse it.
+1. **Richer textures now that the pipe works** ([`art-craft-roadmap.md`](art-craft-roadmap.md)):
+   hand-paint real detail (face, coat folds/stitching, hat band, building trim/weathering) instead
+   of just baked noise; consider the Mixamo-hybrid hero for better proportions/anim. Re-texture the
+   building kit. NPCs reuse the character pipeline.
 2. **NPC depth:** richer behaviour by porting Canvas `patrolSystem`/`npcBehaviors`/`npcMemory`;
    make townsfolk interactive (proximity → greeting), schedules tied to `worldClock`.
 3. **Back to systems** ([`roadmap.md`](roadmap.md) P3+): wire the event-sourced sim

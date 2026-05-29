@@ -40,7 +40,62 @@ def _box(name, size, loc, mat):
     return o
 
 
-def build_character(name="character"):
+# UV-unwrap the joined body, add procedural surface detail (noise weathering +
+# a vertical wear gradient) to each material, then bake the combined albedo to a
+# single image. Returns the baked image (embedded into the .glb on export) so the
+# engine's NPR material samples it as a painted map → textured cel.
+def _bake_albedo(body, px=1024):
+    bpy.ops.object.select_all(action="DESELECT")
+    body.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.02)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    img = bpy.data.images.new("drifter_albedo", px, px)
+
+    for slot in body.material_slots:
+        m = slot.material
+        nt = m.node_tree
+        bsdf = nt.nodes.get("Principled BSDF")
+        base = tuple(bsdf.inputs["Base Color"].default_value)
+        # weathering: multiply base by a grayscale noise + a soft Z wear gradient
+        noise = nt.nodes.new("ShaderNodeTexNoise")
+        noise.inputs["Scale"].default_value = 24.0
+        noise.inputs["Detail"].default_value = 4.0
+        mul = nt.nodes.new("ShaderNodeMixRGB")
+        mul.blend_type = "MULTIPLY"
+        mul.inputs["Fac"].default_value = 0.22
+        mul.inputs["Color1"].default_value = base
+        nt.links.new(noise.outputs["Fac"], mul.inputs["Color2"])
+        nt.links.new(mul.outputs["Color"], bsdf.inputs["Base Color"])
+        # bake target image node (must be active + selected per material)
+        imgn = nt.nodes.new("ShaderNodeTexImage")
+        imgn.image = img
+        imgn.select = True
+        nt.nodes.active = imgn
+
+    sc = bpy.context.scene
+    sc.render.engine = "CYCLES"
+    sc.cycles.samples = 4
+    sc.render.bake.use_pass_direct = False
+    sc.render.bake.use_pass_indirect = False
+    bpy.ops.object.bake(type="DIFFUSE")
+
+    baked = bpy.data.materials.new("drifter_baked")
+    baked.use_nodes = True
+    bn = baked.node_tree.nodes.get("Principled BSDF")
+    bn.inputs["Roughness"].default_value = 0.9
+    binode = baked.node_tree.nodes.new("ShaderNodeTexImage")
+    binode.image = img
+    baked.node_tree.links.new(binode.outputs["Color"], bn.inputs["Base Color"])
+    body.data.materials.clear()
+    body.data.materials.append(baked)
+    return img
+
+
+def build_character(name="character", textured=True):
     _clean()
     skin = _mat("skin", (0.79, 0.66, 0.51))
     coat = _mat("coat", (0.42, 0.29, 0.18))
@@ -142,7 +197,14 @@ def build_character(name="character"):
     arm.animation_data.action = None
     bpy.ops.object.mode_set(mode="OBJECT")
 
-    bpy.ops.object.select_all(action="SELECT")
+    # Bake a painted albedo texture (UV unwrap + weathering → embedded image).
+    if textured:
+        _bake_albedo(body)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    body.select_set(True)
+    arm.select_set(True)
+    bpy.context.view_layer.objects.active = arm
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, name + ".glb")
     bpy.ops.export_scene.gltf(
@@ -151,6 +213,12 @@ def build_character(name="character"):
         export_yup=True,
         export_animations=True,
         export_animation_mode="NLA_TRACKS",
+        export_image_format="AUTO",
         use_selection=True,
     )
-    return {"path": path, "exists": os.path.exists(path), "actions": [a.name for a in bpy.data.actions]}
+    return {
+        "path": path,
+        "exists": os.path.exists(path),
+        "actions": [a.name for a in bpy.data.actions],
+        "textured": textured,
+    }
