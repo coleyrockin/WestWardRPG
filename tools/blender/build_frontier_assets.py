@@ -105,17 +105,31 @@ def build_wagon(name="wagon"):
     parts = []
 
     parts.append(add_box((1.3, 0.72, 0.32), (0, 0, 0.52), wood, "bed"))
+    # plank seams across the bed top
+    for bx in (-0.45, -0.15, 0.15, 0.45):
+        parts.append(add_box((0.03, 0.7, 0.02), (bx, 0, 0.69), dark, "plank"))
     for sy in (-0.34, 0.34):
         parts.append(add_box((1.3, 0.06, 0.24), (0, sy, 0.74), wood, "rail"))
     parts.append(add_box((0.06, 0.72, 0.34), (-0.62, 0, 0.7), wood, "headboard"))
     parts.append(add_box((0.9, 0.08, 0.08), (0.95, 0, 0.34), wood, "tongue"))  # wagon tongue
 
-    # 3 wheels mounted (axle along Y), 1 broken wheel splayed on the ground
-    for x, y in ((0.45, -0.4), (0.45, 0.4), (-0.45, -0.4)):
-        _cyl(12, 0.4, 0.09, (x, y, 0.4), dark, rot=(math.radians(90), 0, 0))
+    # wheels: rim + hub + crossed spokes; one broken wheel splayed on the ground
+    def wheel(x, y, broken=False):
+        rot = (math.radians(18), math.radians(74), 0) if broken else (math.radians(90), 0, 0)
+        z = 0.12 if broken else 0.4
+        _cyl(12, 0.4, 0.09, (x, y, z), dark, rot=rot)
         parts.append(bpy.context.active_object)
-    broken = _cyl(12, 0.4, 0.09, (-0.78, 0.62, 0.12), dark, rot=(math.radians(18), math.radians(74), 0))
-    parts.append(broken)
+        if not broken:
+            _cyl(8, 0.12, 0.11, (x, y, z), wood, rot=rot)  # hub
+            parts.append(bpy.context.active_object)
+            for a in (0.0, math.radians(90)):  # crossed spokes in the wheel plane
+                sp = add_box((0.045, 0.045, 0.72), (x, y, z), wood, "spoke")
+                sp.rotation_euler = (0, a, 0)
+                parts.append(sp)
+
+    for x, y in ((0.45, -0.4), (0.45, 0.4), (-0.45, -0.4)):
+        wheel(x, y)
+    wheel(-0.78, 0.62, broken=True)
 
     obj = join_as(parts, name)
     obj.rotation_euler = (0, math.radians(-7), 0)  # tilt: stuck/broken
@@ -129,7 +143,12 @@ def build_wagon(name="wagon"):
 def build_cactus(name="cactus"):
     clear_scene()
     green = make_mat("cactus", PALETTE["cactus"])
+    ribm = make_mat("cactusrib", PALETTE["cactus_dark"])
     parts = [_cyl(8, 0.16, 1.3, (0, 0, 0.65), green)]
+    # vertical ribs down the trunk (saguaro ridges the ink pass traces)
+    for k in range(6):
+        ang = k * math.pi / 3
+        parts.append(add_box((0.025, 0.025, 1.26), (math.cos(ang) * 0.15, math.sin(ang) * 0.15, 0.65), ribm, "rib"))
 
     def arm(side, basez, up_len):
         parts.append(_cyl(6, 0.075, 0.32, (side * 0.18, 0, basez), green, rot=(0, math.radians(90), 0)))
@@ -137,6 +156,7 @@ def build_cactus(name="cactus"):
 
     arm(1, 0.82, 0.48)
     arm(-1, 0.64, 0.4)
+    arm(1, 1.04, 0.28)  # third, higher arm
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
@@ -257,11 +277,22 @@ def build_lamp(name="lamp"):
     dark = make_mat("lamppost", PALETTE["wood_dark"])
     cap = make_mat("lampcap", PALETTE["post"])
     glow = make_mat("lampglow", PALETTE["lamp_glow"], emissive=PALETTE["lamp_glow"], emissive_strength=1.1)
+    cx = 0.36
     parts = [add_box((0.1, 0.1, 1.7), (0, 0, 0.85), dark, "post")]
     parts.append(add_box((0.46, 0.07, 0.07), (0.18, 0, 1.6), dark, "arm"))
-    parts.append(add_box((0.26, 0.26, 0.05), (0.36, 0, 1.72), cap, "lidtop"))
-    parts.append(add_box((0.2, 0.2, 0.28), (0.36, 0, 1.55), glow, "pane"))
-    parts.append(add_box((0.28, 0.28, 0.05), (0.36, 0, 1.39), cap, "lidbot"))
+    parts.append(add_box((0.05, 0.05, 0.12), (cx, 0, 1.66), dark, "hook"))
+    parts.append(add_box((0.28, 0.28, 0.04), (cx, 0, 1.71), cap, "lidtop"))
+    # lantern cage: 4 corner posts around the glow pane
+    for ox, oy in ((-0.1, -0.1), (0.1, -0.1), (-0.1, 0.1), (0.1, 0.1)):
+        parts.append(add_box((0.025, 0.025, 0.3), (cx + ox, oy, 1.55), dark, "cagepost"))
+    parts.append(add_box((0.2, 0.2, 0.26), (cx, 0, 1.55), glow, "pane"))
+    parts.append(add_box((0.28, 0.28, 0.04), (cx, 0, 1.4), cap, "lidbot"))
+    # peaked cap on top
+    bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=0.2, radius2=0, depth=0.14, location=(cx, 0, 1.8))
+    pk = bpy.context.active_object
+    pk.rotation_euler = (0, 0, math.radians(45))
+    pk.data.materials.append(cap)
+    parts.append(pk)
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
@@ -304,8 +335,15 @@ def build_fence(name="fence", length=1.8):
 def build_sign(name="sign", post_h=1.05, pw=0.7, ph=0.4):
     clear_scene()
     wood = make_mat("signwood", PALETTE["wood"])
+    frame = make_mat("signframe", PALETTE["wood_dark"])
     panel = make_mat("signpanel", PALETTE["sign"], emissive=PALETTE["sign"], emissive_strength=0.35)
-    parts = [add_box((0.1, 0.1, post_h), (0, 0, post_h / 2), wood, "post"), add_box((pw, 0.06, ph), (0, 0.04, post_h * 0.86), panel, "plank")]
+    z = post_h * 0.86
+    parts = [
+        add_box((0.1, 0.1, post_h), (0, 0, post_h / 2), wood, "post"),
+        add_box((pw + 0.08, 0.05, ph + 0.08), (0, 0.02, z), frame, "frame"),
+        add_box((pw, 0.06, ph), (0, 0.05, z), panel, "plank"),
+        add_box((0.06, 0.06, 0.2), (0, 0.02, z + ph / 2 + 0.06), wood, "bracket"),
+    ]
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)

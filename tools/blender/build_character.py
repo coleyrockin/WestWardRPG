@@ -95,21 +95,30 @@ def _bake_albedo(body, px=1024):
     return img
 
 
-def build_character(name="character", textured=True):
+# Variants share the SAME armature + clips (so animatedCharacter + Idle/Walk work
+# for all); only gear/colour differs → real silhouette variety for townsfolk.
+VARIANTS = {
+    "drifter": dict(coat=(0.42, 0.29, 0.18), hat="full", hatw=0.54, kerch=(0.58, 0.20, 0.15), apron=None, vest=None),
+    "vendor": dict(coat=(0.30, 0.33, 0.40), hat="cap", hatw=0.0, kerch=None, apron=(0.80, 0.74, 0.62), vest=None),
+    "vest": dict(coat=(0.55, 0.42, 0.27), hat="full", hatw=0.62, kerch=(0.28, 0.40, 0.30), apron=None, vest=(0.22, 0.16, 0.10)),
+}
+
+
+def build_character(name="character", textured=True, variant="drifter"):
     _clean()
+    V = VARIANTS.get(variant) or VARIANTS["drifter"]
     skin = _mat("skin", (0.79, 0.66, 0.51))
-    coat = _mat("coat", (0.42, 0.29, 0.18))
+    coat = _mat("coat", V["coat"])
     dark = _mat("dark", (0.17, 0.12, 0.08))
     hat = _mat("hat", (0.16, 0.10, 0.06))
     eyem = _mat("eye", (0.06, 0.05, 0.04))
     band = _mat("band", (0.11, 0.07, 0.04))
-    kerch = _mat("kerch", (0.58, 0.20, 0.15))
     buckle = _mat("buckle", (0.74, 0.62, 0.30))
     boot = _mat("boot", (0.10, 0.07, 0.05))
 
     # body parts (front = +Y). Joined into one mesh for a single SkinnedMesh.
-    # Richer detail: features the ink-edge + cel pass traces — eyes, hat band,
-    # neckerchief, belt buckle, boots, coat-front seam.
+    # Common features (eyes, belt+buckle, boots, coat seam) on every variant; gear
+    # (hat/cap, neckerchief, apron, vest) varies. The ink-edge + cel pass traces them.
     parts = [
         _box("legL", (0.17, 0.18, 0.72), (-0.12, 0, 0.40), dark),
         _box("legR", (0.17, 0.18, 0.72), (0.12, 0, 0.40), dark),
@@ -117,7 +126,6 @@ def build_character(name="character", textured=True):
         _box("bootR", (0.19, 0.24, 0.2), (0.12, 0.03, 0.1), boot),
         _box("torso", (0.44, 0.27, 0.62), (0, 0, 1.02), coat),
         _box("lapel", (0.05, 0.02, 0.5), (0, 0.14, 1.02), dark),  # coat-front seam
-        _box("kerchief", (0.3, 0.3, 0.12), (0, 0.02, 1.3), kerch),
         _box("belt", (0.46, 0.29, 0.1), (0, 0, 0.74), dark),
         _box("buckle", (0.1, 0.05, 0.08), (0, 0.16, 0.74), buckle),
         _box("armL", (0.13, 0.15, 0.56), (-0.3, 0, 1.04), coat),
@@ -125,10 +133,22 @@ def build_character(name="character", textured=True):
         _box("head", (0.25, 0.25, 0.25), (0, 0, 1.46), skin),
         _box("eyeL", (0.055, 0.04, 0.05), (-0.06, 0.13, 1.48), eyem),
         _box("eyeR", (0.055, 0.04, 0.05), (0.06, 0.13, 1.48), eyem),
-        _box("hatbrim", (0.54, 0.54, 0.06), (0, 0, 1.58), hat),
-        _box("hatband", (0.34, 0.34, 0.05), (0, 0, 1.62), band),
-        _box("hatcrown", (0.32, 0.32, 0.18), (0, 0, 1.69), hat),
     ]
+    if V["kerch"]:
+        parts.append(_box("kerchief", (0.3, 0.3, 0.12), (0, 0.02, 1.3), _mat("kerch", V["kerch"])))
+    if V["apron"]:
+        parts.append(_box("apron", (0.38, 0.03, 0.66), (0, 0.15, 0.95), _mat("apron", V["apron"])))
+    if V["vest"]:
+        parts.append(_box("vest", (0.46, 0.04, 0.52), (0, 0.135, 1.04), _mat("vest", V["vest"])))
+    if V["hat"] == "full":
+        hw = V["hatw"]
+        parts += [
+            _box("hatbrim", (hw, hw, 0.06), (0, 0, 1.58), hat),
+            _box("hatband", (hw * 0.63, hw * 0.63, 0.05), (0, 0, 1.62), band),
+            _box("hatcrown", (hw * 0.59, hw * 0.59, 0.18), (0, 0, 1.69), hat),
+        ]
+    else:
+        parts.append(_box("cap", (0.28, 0.28, 0.12), (0, 0, 1.62), _mat("cap", (0.30, 0.22, 0.14))))
     for o in parts:
         o.select_set(True)
     bpy.context.view_layer.objects.active = parts[0]

@@ -11,10 +11,10 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { createNprMaterial } from "../renderer/materials/nprMaterial.js";
 
-let templatePromise = null;
+const templates = new Map(); // url -> Promise<gltf> (per-url cache, shared across instances)
 function loadTemplate(url) {
-  if (!templatePromise) templatePromise = new GLTFLoader().loadAsync(url);
-  return templatePromise;
+  if (!templates.has(url)) templates.set(url, new GLTFLoader().loadAsync(url));
+  return templates.get(url);
 }
 
 function reskin(mesh, tint) {
