@@ -30,6 +30,7 @@ import { createGroundMaterial } from "../game/world/ground.js";
 import { createScatter } from "../game/world/scatter.js";
 import { createPlaceholderCharacter } from "../game/world/character.js";
 import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
+import { createTownsfolk } from "../game/world/townsfolk.js";
 import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
 
@@ -607,6 +608,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   await Promise.all(modelJobs);
   scene.add(props);
 
+  // Ambient townsfolk — NPCs reusing the rig, wandering the town to bring the
+  // street to life. Non-blocking fallback so a load failure never breaks the scene.
+  let townsfolk = { update() {} };
+  try {
+    townsfolk = await createTownsfolk(scene, { count: 5 });
+  } catch (err) {
+    console.warn("[render3d] townsfolk failed to load", err);
+  }
+
   // Start at the real road spawn and aim at Boone's board cluster. This keeps
   // first-load framing honest for both play and spike_compare screenshots.
   const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
@@ -863,6 +873,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     interaction.update(player.position);
     encounter.update(player.position, dt);
     character.update(visualCapture ? 0 : dt, player.moving && !visualCapture);
+    townsfolk.update(visualCapture ? 0 : dt, visualCapture);
     stepWorld(dt);
     post.render();
     frames++;

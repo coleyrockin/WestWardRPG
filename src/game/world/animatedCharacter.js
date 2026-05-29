@@ -17,20 +17,22 @@ function loadTemplate(url) {
   return templatePromise;
 }
 
-function reskin(mesh) {
+function reskin(mesh, tint) {
   const swap = (src) => {
-    const hex = src && src.color ? `#${src.color.getHexString()}` : "#9a8f80";
-    return createNprMaterial(hex, { rimStrength: 0.3 });
+    const c = src && src.color ? src.color.clone() : new THREE.Color("#9a8f80");
+    if (tint) c.multiply(new THREE.Color(tint));
+    return createNprMaterial(`#${c.getHexString()}`, { rimStrength: 0.3 });
   };
   mesh.castShadow = true;
   mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material);
 }
 
-export async function createAnimatedCharacter(url = "/models/character.glb") {
+// opts.tint multiplies every base colour (per-NPC variety reusing one rig).
+export async function createAnimatedCharacter(url = "/models/character.glb", opts = {}) {
   const gltf = await loadTemplate(url);
   const group = cloneSkinned(gltf.scene);
   group.traverse((o) => {
-    if (o.isMesh || o.isSkinnedMesh) reskin(o);
+    if (o.isMesh || o.isSkinnedMesh) reskin(o, opts.tint);
   });
 
   const mixer = new THREE.AnimationMixer(group);

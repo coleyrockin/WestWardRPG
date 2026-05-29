@@ -28,14 +28,17 @@ The 3D game lives at **`/spikes/render3d.html`** → [`src/render3d/spike.js`](.
   ([`build_character.py`](../tools/blender/build_character.py) → `character.glb`), skinned loader
   with Idle↔Walk crossfade ([`animatedCharacter.js`](../src/game/world/animatedCharacter.js)),
   third-person follow-cam ([`playerController.js`](../src/render3d/playerController.js)).
+- **Living World slice 3 — townsfolk:** 5 ambient NPCs reusing the rig
+  (`SkeletonUtils.clone` + per-instance mixer, per-NPC colour tint), wandering fixed town/road
+  loops ([`townsfolk.js`](../src/game/world/townsfolk.js) + pure
+  [`npcWander.js`](../src/game/world/npcWander.js)); frozen under `?visual`.
 
 ## Pick up next (in order)
-1. **Slice 3 — Townsfolk:** 4–6 ambient NPCs reusing the rig via `SkeletonUtils.clone` +
-   per-instance `AnimationMixer`; walk/idle paths by porting Canvas `patrolSystem`/`npcBehaviors`
-   (pure logic). Non-interactive. (Loader + crossfade already exist in `animatedCharacter.js`.)
-2. **Art-craft Phase 2/3** ([`art-craft-roadmap.md`](art-craft-roadmap.md)): de-risk embedded
+1. **Art-craft Phase 2/3** ([`art-craft-roadmap.md`](art-craft-roadmap.md)): de-risk embedded
    textures on the WebGL2 backend → add UV/texture support to `nprMaterial.js` → re-author the
-   player as a textured Mixamo-hybrid hero. This is the real quality ceiling-raise.
+   player as a textured Mixamo-hybrid hero. This is the real quality ceiling-raise. NPCs reuse it.
+2. **NPC depth:** richer behaviour by porting Canvas `patrolSystem`/`npcBehaviors`/`npcMemory`;
+   make townsfolk interactive (proximity → greeting), schedules tied to `worldClock`.
 3. **Back to systems** ([`roadmap.md`](roadmap.md) P3+): wire the event-sourced sim
    (`src/game/sim.js`) to the renderer, region streaming, combat.
 
