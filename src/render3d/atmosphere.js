@@ -150,6 +150,10 @@ export function createAtmosphere(scene, renderer, opts = {}) {
   scene.add(clouds.group);
 
   let current = null;
+  // Scratch colours reused every frame — applyPalette runs each frame via the
+  // sun arc, so allocating Colors here (not inside) avoids per-frame GC churn.
+  const _cloudMid = new THREE.Color();
+  const _cloudHorizon = new THREE.Color();
 
   function applyPalette(p) {
     current = p;
@@ -180,8 +184,8 @@ export function createAtmosphere(scene, renderer, opts = {}) {
 
     renderer.toneMappingExposure = p.exposure;
 
-    // tint the cloud streaks toward the sky mid color
-    const cloudTint = col(p.sky.mid).lerp(col(p.sky.horizon), 0.4);
+    // tint the cloud streaks toward the sky mid color (reuse scratch colours)
+    const cloudTint = _cloudMid.set(p.sky.mid).lerp(_cloudHorizon.set(p.sky.horizon), 0.4);
     for (const m of clouds.meshes) {
       m.material.color.copy(cloudTint);
       m.material.opacity = p.key === "night" ? 0.16 : 0.3;

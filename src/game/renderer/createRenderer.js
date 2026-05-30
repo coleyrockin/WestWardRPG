@@ -28,7 +28,10 @@ export function webgpuAvailable() {
 export async function createRenderer(canvas, opts = {}) {
   const {
     preserveDrawingBuffer = false,
-    pixelRatioCap = 2,
+    // 1.5 caps the full post stack (Sobel+bloom+godrays+grade+grain) fragment
+    // cost on HiDPI: at 2× a 1440p panel renders 5120×2880; 1.5 ≈ −44% fragments
+    // with no perceptible NPR-look loss (cel/ink are low-frequency).
+    pixelRatioCap = 1.5,
     forceWebGL = !webgpuAvailable(),
     antialias = true,
   } = opts;

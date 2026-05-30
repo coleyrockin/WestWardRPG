@@ -55,7 +55,10 @@ export function createScatter(scene, opts = {}) {
     // phantom flat plane (groundHeight is 0 in the flat corridor/marsh zones).
     mesh.position.set(x, groundHeight(x, z) + baseY * sc, z);
     mesh.rotation.y = rnd() * Math.PI * 2;
-    mesh.castShadow = true;
+    // Sub-cm motes: their shadow is invisible at the 2048²→36m shadow res
+    // (~0.017 m/texel), so casting from ~300 of them is pure shadow-pass cost.
+    // receiveShadow keeps them sitting in the terrain's cast shadow.
+    mesh.castShadow = false;
     mesh.receiveShadow = true;
     group.add(mesh);
   }
