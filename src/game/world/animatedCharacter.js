@@ -41,6 +41,12 @@ export async function createAnimatedCharacter(url = "/models/character.glb", opt
   const idle = actions.idle || null;
   const walk = actions.walk || null;
   const run = actions.run || null;
+  // Warn when a locomotion clip is missing — the weight code below is null-guarded
+  // so it otherwise fails silently (character just won't animate), hard to diagnose.
+  if (typeof console !== "undefined" && (!idle || !walk)) {
+    const have = Object.keys(actions).join(", ") || "(none)";
+    console.warn(`[animatedCharacter] ${url} missing idle/walk clip — have: ${have}`);
+  }
   if (idle) idle.play();
   if (walk) {
     walk.play();
