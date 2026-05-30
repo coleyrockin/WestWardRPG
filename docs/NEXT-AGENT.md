@@ -48,19 +48,116 @@ The 3D game lives at **`/spikes/render3d.html`** → [`src/render3d/spike.js`](.
 - **6C interactive NPCs:** proximity → townsperson pauses, faces you, "E — Talk to <name>" →
   memory-aware greeting via the pure `npcMemory` module (names: Mabel/Cole/Rosa/Hank/Pearl).
 
+## ⚡ IMMEDIATE TASK (do this first — user is waiting on live render)
+
+**Fix the grade/light problem.** User looked at the live Vercel WebGPU render and gave this diagnosis:
+
+> "The composition fix landed (town reads, road, depth, warm pool on the left). The real problem is it's flat and pale: uniform cream values, weak shadows, only the left has drama. That's a grade/light problem — NOT a buildings problem. Push grade + contrast hard, deepen shadows, add god-ray/rim, spread the warm drama across the whole scene. Then sun-shaft motes + heat shimmer. Deploy each step so I can judge live."
+
+**Do NOT pivot to Blender.** The buildings are explicitly not the problem.
+
+### Root cause
+`postStacks.js` grade (line ~95) is a flat tint-multiply — mathematically cannot create contrast:
+```js
+const graded = inked
+  .mul(mix(vec3(1,1,1), vec3(uniforms.gradeTint).mul(1.6), uniforms.gradeAmount))
+  .mul(uniforms.exposure);
+```
+All values shift toward the tint uniformly. Drama only appears where point-lights pool.
+
+### Fix: cinematic grade chain in `src/game/renderer/postStacks.js`
+
+Replace the graded block with a 4-step chain. New TSL uniforms needed: `contrastAmount`, `saturationAmount`, `shadowTint` (Color), `highlightTint` (Color).
+
+**Step 1 — Contrast S-curve** (deepens shadows, lifts highlights):
+```js
+const contrasted = inked.sub(0.5).mul(uniforms.contrastAmount).add(0.5).clamp(0,1);
+```
+Start: `contrastAmount = 1.6`
+
+**Step 2 — Saturation** (kills cream-wash desaturation):
+```js
+const luma = contrasted.dot(vec3(0.2126, 0.7152, 0.0722));
+const saturated = mix(vec3(luma), contrasted, uniforms.saturationAmount);
+```
+Start: `saturationAmount = 1.45`
+
+**Step 3 — Split-tone** (THIS spreads drama across whole frame — cool shadows + warm highlights):
+```js
+// Shadow tint: deep blue-purple toward darks; highlight tint: amber toward lights
+const shadowW = saturated.oneMinus().pow(2);  // strongest in darks
+const highlightW = saturated.pow(2);          // strongest in lights
+const splitToned = saturated
+  .mul(mix(vec3(1,1,1), vec3(uniforms.shadowTint), shadowW))
+  .mul(mix(vec3(1,1,1), vec3(uniforms.highlightTint), highlightW));
+```
+Start: `shadowTint = "#1a0a2e"` (deep blue-purple), `highlightTint = "#ffb040"` (warm amber).
+
+**Step 4 — Exposure + existing vignette** (unchanged).
+
+### Lighting changes in `src/render3d/timeOfDay.js` (dusk palette)
+- `rim.intensity`: `0.55 → 1.0` (the rim is the main silhouette separator — crank it)
+- `sun.intensity`: `2.2 → 2.8` (low raking amber)
+- `hemi.intensity`: `0.34 → 0.18` (ambient flood is what makes everything uniform — cut harder)
+- `sun.dir.y`: `3.5 → 2.5` (lower sun = longer shadow rakes across ground)
+
+### God-ray in `postStacks.js`
+- `godrayStrength`: `0.85 → 1.3` (should be visible shafts through mesas — push hard)
+
+### Deploy workflow
+After grade fix committed:
+```bash
+npm test && npm run typecheck:ts && npm run build
+WESTWARD_URL=http://127.0.0.1:5189 npm run test:render3d
+WESTWARD_URL=http://127.0.0.1:5189 npm run test:visual:render3d:update  # re-baseline (look changed)
+WESTWARD_URL=http://127.0.0.1:5189 npm run test:visual:render3d         # MUST be PASS 0.00%
+git push origin main   # → Vercel auto-deploys → user judges live
+```
+Then lighting changes → push → user judges. Then atmosphere (below).
+
+### Atmosphere (AFTER grade is approved)
+Branch `feature/part7-atmosphere` @ `1dfbf8d` is LOCAL ONLY (not pushed to origin). It has:
+- `src/game/world/dustMotes.js` — sun-shaft motes, hidden under `?visual`
+- `src/render3d/heatShimmer.js` + test — horizon-weighted resample wobble
+- GTAO opt-in via `?ao` (OFF by default, de-risk passed on SwiftShader)
+
+After grade is approved, merge this to main:
+```bash
+git merge feature/part7-atmosphere
+# fix any conflicts (unlikely — different files)
+npm test && npm run build
+git push origin main
+```
+
+---
+
+## Done (live on main → Vercel)
+- **NPR render path:** `WebGPURenderer` + TSL with a WebGL2 fallback
+  ([`createRenderer.js`](../src/game/renderer/createRenderer.js)); cel+rim toon uber-material
+  ([`nprMaterial.js`](../src/game/renderer/materials/nprMaterial.js)); depth-discontinuity **ink
+  edges** + bloom + warm grade + film grain ([`postStacks.js`](../src/game/renderer/postStacks.js));
+  continuous day/night arc.
+- **Blender model set:** [`tools/blender/`](../tools/blender/) builders → `public/models/*.glb`,
+  loaded + NPR-reskinned + instanced by [`assetLoader.js`](../src/game/renderer/assetLoader.js)
+  (registry: [`assetManifest.js`](../src/game/renderer/assetManifest.js)). Full Frontier set
+  (buildings, wagon, mesas ring, watchtower, lamps, job board, props), attached lights, dressing
+  variation (`hashYaw`).
+- **Living World:** worldClock (sun arcs), animated water, weather, terrain relief + scatter (FBM
+  displacement, flat-masked corridor + marsh), 3rd-person rigged character, 5 interactive townsfolk.
+- **Visual overhaul (main @ `a5a75d6`):** hero capture camera, golden-hour dusk palette, terrain
+  relief, denser scatter, milk-killed fog/bloom. Composition reads — town/road/depth land.
+- **6A/6B/6C:** prop detail, hero rig (Run/Turn/Draw), interactive NPCs (Mabel/Cole/Rosa/Hank/Pearl).
+
+## After-grade pick-up order
+1. Atmosphere merge (motes + shimmer) from `feature/part7-atmosphere`
+2. Systems depth: sim.js → renderer wiring (`roadmap.md` P1)
+3. Mixamo-hybrid hero (needs user-supplied FBX)
+
 ## Pick up next (in order)
-1. **Systems depth** ([`roadmap.md`](roadmap.md)): the deeper 6C alternative not yet done — drive the
-   scene from the event-sourced [`sim.js`](../src/game/sim.js) (`stepSimulation`/`toRenderState`)
-   instead of the legacy snapshot (render-decoupling P1 deliverable). Then NPC schedules/quests
-   (port `patrolSystem`/`questDefinitions`/`decisionEngine`), combat (P2).
-2. **Mixamo-hybrid hero** (deferred from 6B — Adobe-login-gated, needs user-supplied FBX): retarget
-   a real humanoid + clip library onto the rig for higher-fidelity motion.
-3. **Texture atlas** if `public/models/` (~8MB of embedded albedos) needs trimming; world terrain
-   relief ([`ground.js`](../src/game/world/ground.js) TSL heightmap) per the art-craft roadmap.
-2. **NPC depth:** richer behaviour by porting Canvas `patrolSystem`/`npcBehaviors`/`npcMemory`;
-   make townsfolk interactive (proximity → greeting), schedules tied to `worldClock`.
-3. **Back to systems** ([`roadmap.md`](roadmap.md) P3+): wire the event-sourced sim
-   (`src/game/sim.js`) to the renderer, region streaming, combat.
+1. **Systems depth** ([`roadmap.md`](roadmap.md)): drive the scene from the event-sourced
+   [`sim.js`](../src/game/sim.js) (`stepSimulation`/`toRenderState`) instead of the legacy snapshot.
+2. **Mixamo-hybrid hero** (deferred — needs user-supplied FBX).
+3. **Texture atlas** if `public/models/` (~8MB of embedded albedos) needs trimming.
 
 ## How to run + verify
 ```bash
