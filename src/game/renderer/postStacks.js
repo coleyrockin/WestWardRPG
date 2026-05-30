@@ -14,7 +14,7 @@
 
 import * as THREE from "three";
 import { PostProcessing } from "three/webgpu";
-import { pass, uniform, mix, clamp, smoothstep, vec3 } from "three/tsl";
+import { pass, uniform, mix, clamp, smoothstep, vec3, vec2, uv } from "three/tsl";
 import { sobel } from "three/addons/tsl/display/SobelOperatorNode.js";
 import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { film } from "three/addons/tsl/display/FilmNode.js";
@@ -25,14 +25,14 @@ import { godrays } from "three/addons/tsl/display/GodraysNode.js";
 export const REGION_POST = {
   frontier: {
     inkColor: "#0a0408",
-    edgeStrength: 2.2,
+    edgeStrength: 3.4, // bold, confident comic linework
     // Sobel response below `edgeLo` is ignored (kills faint ground gradients) and
     // ramps to full ink by `edgeHi`.
-    edgeLo: 0.06,
-    edgeHi: 0.22,
-    bloomBase: 0.09, // multiplied by palette.bloom
-    bloomRadius: 0.5,
-    bloomThreshold: 0.93, // only the very brightest emissives bloom (no scene wash)
+    edgeLo: 0.045,
+    edgeHi: 0.28,
+    bloomBase: 0.11, // multiplied by palette.bloom
+    bloomRadius: 0.7, // wider painterly glow
+    bloomThreshold: 0.9, // only true highlights bloom — keeps the sky/haze from washing milky
     grainIntensity: 0.14,
   },
   // Scaffolded — shipped in Phase 6.
@@ -55,11 +55,14 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
     edgeStrength: uniform(opts.edgeStrength ?? region.edgeStrength),
     edgeLo: uniform(opts.edgeLo ?? region.edgeLo),
     edgeHi: uniform(opts.edgeHi ?? region.edgeHi),
-    gradeTint: uniform(new THREE.Color("#ff8a4a")),
+    gradeTint: uniform(new THREE.Color("#ff9a4a")),
     gradeAmount: uniform(0.12),
     // grain is time-animated (non-deterministic) — visual-capture passes 0.
     grainIntensity: uniform(opts.grainIntensity ?? region.grainIntensity),
-    godrayStrength: uniform(opts.godrayStrength ?? 0.45),
+    godrayStrength: uniform(opts.godrayStrength ?? 0.85),
+    // Vignette: darken toward the frame corners to draw the eye to the street.
+    // Deterministic (static) so it's safe under the ?visual capture.
+    vignetteStrength: uniform(opts.vignetteStrength ?? 0.4),
     // Final exposure multiplier — PostProcessing ignores renderer.toneMappingExposure,
     // so day/night exposure and weather darkening ride this uniform instead.
     exposure: uniform(1),
@@ -93,8 +96,13 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
     .mul(mix(vec3(1, 1, 1), vec3(uniforms.gradeTint).mul(1.6), uniforms.gradeAmount))
     .mul(uniforms.exposure);
 
+  // 3b. Vignette — radial darken from frame centre (UV distance), eases the eye
+  //     toward the street. factor = 1 - strength·t as distance goes 0.32 → 0.85.
+  const vigT = smoothstep(0.32, 0.85, uv().sub(vec2(0.5, 0.5)).length());
+  const vignetted = graded.mul(uniforms.vignetteStrength.mul(vigT).oneMinus());
+
   // 4. Film grain — paper-grain tooth over the whole frame.
-  const grained = film(graded, uniforms.grainIntensity);
+  const grained = film(vignetted, uniforms.grainIntensity);
 
   // debugEdges renders the raw ink mask (white-on-black) for tuning the Sobel.
   post.outputNode = opts.debugEdges ? vec3(edgeAmt) : grained;

@@ -126,11 +126,15 @@ export function createAtmosphere(scene, renderer, opts = {}) {
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 0.5;
-  sun.shadow.camera.far = 80;
-  sun.shadow.camera.left = -30;
-  sun.shadow.camera.right = 30;
-  sun.shadow.camera.top = 30;
-  sun.shadow.camera.bottom = -30;
+  sun.shadow.camera.far = 60;
+  // Tightened to the play wedge (still covers the ~30-unit world) for higher
+  // effective shadow resolution = crisper, more dramatic raking shadows.
+  sun.shadow.camera.left = -18;
+  sun.shadow.camera.right = 18;
+  sun.shadow.camera.top = 18;
+  sun.shadow.camera.bottom = -18;
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.02;
   sun.target.position.set(playCore.x, 0, playCore.y);
   scene.add(sun);
   scene.add(sun.target);

@@ -26,7 +26,7 @@ import { createAtmosphere } from "./atmosphere.js";
 import { sunArc } from "./timeOfDay.js";
 import { createWorldClock, tickClock, pinClock, cycleClock, dayTimeToKey } from "../game/world/worldClock.js";
 import { createWater } from "../game/world/water.js";
-import { createGroundMaterial } from "../game/world/ground.js";
+import { createGroundMaterial, groundHeight } from "../game/world/ground.js";
 import { createScatter } from "../game/world/scatter.js";
 import { createPlaceholderCharacter } from "../game/world/character.js";
 import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
@@ -439,9 +439,12 @@ function buildGround(scene, snapshot) {
   const spawn = snapshot?.player || PLAYER_SPAWN;
   // Big enough to comfortably hold the full ~30×20 explorable rectangle plus a
   // fog margin so the plane edge never shows. One plane — one draw call.
+  // Subdivided so the TSL relief (positionNode FBM in createGroundMaterial) has
+  // vertices to displace; center passed so the shader's height field lines up
+  // with the pure groundHeight() that seats props/scatter.
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(120, 110),
-    createGroundMaterial(),
+    new THREE.PlaneGeometry(120, 110, 96, 88),
+    createGroundMaterial({ center: { x: 14, z: 9 } }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(14, 0, 9);
@@ -561,7 +564,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   atmosphere.applyPalette(appliedPalette);
 
   buildGround(scene, snapshot);
-  createScatter(scene, { center: { x: 16, z: 10 }, area: 34, count: 90 });
+  createScatter(scene, { center: { x: 15, z: 8 }, area: 46, count: 320 });
 
   // Animated marsh water (replaces the flat plane that used to live in buildGround).
   const water = createWater({ width: 13, height: 5.5, skyTint: appliedPalette.sky.horizon });
@@ -580,7 +583,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       const effScale = (entry.scale ?? 1) * (p.size ?? 1);
       const yaw = (entry.yaw ?? 0) + (p.yaw ?? 0) + (entry.vary ? hashYaw(p.x, p.y) : 0);
       modelJobs.push(
-        instanceModel(entry.url, { x: p.x, z: p.y, yaw, scale: effScale })
+        instanceModel(entry.url, { x: p.x, z: p.y, y: groundHeight(p.x, p.y), yaw, scale: effScale })
           .then((node) => {
             props.add(node);
             // lamps/beacon/board carried their PointLight inside the old builder;
@@ -637,6 +640,21 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const openingTarget = snapshot.worldObjects.find((p) => p.kind === "jobBoard") || snapshot.player;
   camera.position.set(snapshot.player.x, 1.8, snapshot.player.y);
   camera.lookAt(openingTarget.x + 0.3, 1.0, openingTarget.y + 0.12);
+
+  // Cinematic hero pose for the golden-image capture (?visual). The eye-level
+  // "down a flat alley" gameplay framing reads as cardboard; this elevated SE→NW
+  // 3/4 angle (tighter FOV for mesa compression) reveals the ground relief, leads
+  // the eye down the street to the town + mesa ring, and looks toward the low sun
+  // so silhouettes rim-light and the god-ray shafts rake toward camera. Gameplay
+  // third-person follow is untouched — this only applies under capture.
+  function applyHeroCamera() {
+    camera.fov = 54;
+    camera.position.set(18.5, 5.6, 15.5);
+    camera.lookAt(7.5, 1.9, 4.8);
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld();
+  }
+  if (visualCapture) applyHeroCamera();
 
   function onResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -890,6 +908,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     const dt = Math.min((now - prevTs) / 1000, 0.05);
     prevTs = now;
     if (!boardModalController.isOpen()) player.update(dt, proxies);
+    if (visualCapture) applyHeroCamera(); // re-assert hero pose (player.update re-syncs the follow-cam)
     interaction.update(player.position);
     encounter.update(player.position, dt);
     character.update(visualCapture ? 0 : dt, player.moving && !visualCapture, player.running && !visualCapture);

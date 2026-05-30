@@ -32,7 +32,7 @@ const col = (hex) => new THREE.Color(hex);
 // bands (deep shadow → mid → lit). Built lazily so module import stays side-
 // effect-free for node tests.
 let gradientMap = null;
-export function celGradientMap(steps = [90, 175, 255]) {
+export function celGradientMap(steps = [55, 135, 255]) {
   if (gradientMap) return gradientMap;
   const data = Uint8Array.from(steps);
   const tex = new THREE.DataTexture(data, data.length, 1, THREE.RedFormat);
@@ -79,8 +79,8 @@ export function createNprMaterial(hex, opts = {}) {
     opacity = 1.0,
     flatShading = true,
     rimColor = "#9fb4ff",
-    rimPower = 3.0,
-    rimStrength = 0.5,
+    rimPower = 2.0,
+    rimStrength = 0.9,
     map = null,
   } = opts;
 

@@ -1,16 +1,55 @@
-// Terrain ground material — replaces the flat single-colour plane that made the
-// map read as a cardboard table. A cel (toon) material whose base colour is a
-// value-noise blend of dirt / sand / scrub tones over world XZ, so the ground has
-// large patches + fine grain instead of one dead beige. Unlit colour variation;
-// the toon ramp still bands it with the sun for the NPR look.
+// Terrain ground — relief + colour, the fix for the "cardboard table" read.
+//
+// Two jobs, both driven by one FBM value-noise field over world XZ so they agree:
+//   1. RELIEF — a TSL `positionNode` pushes the plane up/down (dunes, dry-creek
+//      undulation) so the ground is no longer dead flat. The SAME height field is
+//      exported as the pure `groundHeight(x,z)` so props + scatter seat onto the
+//      relief instead of floating (they must match the shader exactly).
+//   2. COLOUR — a cel (toon) material whose base colour blends dirt / sand / scrub
+//      patches, then darkens in the noise valleys (cheap baked-AO depth read).
+//
+// The relief is masked FLAT along the road/play corridor (|z-ROAD_Z| small) so the
+// player, hero cluster, and road dressing stay on level ground; relief ramps in on
+// the flanks (town, marsh, the mesa ring) where it reads as frontier terrain.
+//
+// TSL vertex displacement is already proven on the WebGPURenderer WebGL2 backend
+// (water.js does the same) — see memory: skinned/displaced regular meshes render;
+// instancing/lines/points do not.
 
 import * as THREE from "three";
 import { MeshToonNodeMaterial } from "three/webgpu";
-import { Fn, positionWorld, floor, fract, sin, dot, vec2, vec3, mix } from "three/tsl";
+import {
+  Fn,
+  positionWorld,
+  positionLocal,
+  floor,
+  fract,
+  sin,
+  dot,
+  abs,
+  clamp,
+  smoothstep,
+  float,
+  vec2,
+  vec3,
+  mix,
+} from "three/tsl";
 import { celGradientMap } from "../renderer/materials/nprMaterial.js";
 
 const col = (h) => new THREE.Color(h);
 const v3 = (c) => vec3(c.r, c.g, c.b);
+
+// Relief tuning — shared by the pure height fn and the TSL graph so props seat
+// exactly on the visible surface. Keep amplitude gentle: low slope across a
+// building footprint avoids edge gaps; the corridor mask keeps gameplay flat.
+const AMP = 0.4; // peak dune height (world units)
+const ROAD_Z = 8.9; // play/road corridor centreline (world z) kept flat
+const MASK_LO = 2.6; // |z-ROAD_Z| below this → fully flat
+const MASK_HI = 5.2; // above this → full relief
+// South marsh basin (water + apron live ~z15-16) stays flat so relief never
+// pokes up through the water surface. Relief ramps back out before the basin.
+const MARSH_LO = 11.0; // relief still full at/below this z
+const MARSH_HI = 12.5; // relief fully off (flat) at/above this z
 
 // Pure value noise (bilinear, smoothstepped) in [0,1] — mirrors the TSL graph for
 // node tests.
@@ -34,6 +73,31 @@ export function valueNoise2(x, y) {
   return top * (1 - v) + bot * v;
 }
 
+// Pure smoothstep in [0,1] (matches TSL smoothstep).
+function smooth01(a, b, x) {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+// Two-octave FBM in [0,1] over world XZ — the shared height/colour field.
+export function groundFbm(x, z) {
+  return valueNoise2(x * 0.045, z * 0.045) * 0.65 + valueNoise2(x * 0.13 + 19, z * 0.13 + 7) * 0.35;
+}
+
+// Relief mask in [0,1]: 0 in the road/play corridor AND in the south marsh basin,
+// ramping to 1 on the framing flanks.
+export function reliefMask(z) {
+  const corridor = smooth01(MASK_LO, MASK_HI, Math.abs(z - ROAD_Z));
+  const marsh = 1 - smooth01(MARSH_LO, MARSH_HI, z); // → 0 in the basin
+  return corridor * marsh;
+}
+
+// World-space terrain height at (x,z). Pure + deterministic so props/scatter seat
+// exactly on the rendered surface. Zero along the corridor; ±AMP on the flanks.
+export function groundHeight(x, z, amp = AMP) {
+  return (groundFbm(x, z) - 0.5) * 2 * amp * reliefMask(z);
+}
+
 const tslHash = (p) => fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453));
 const tslNoise = Fn(([p]) => {
   const i = floor(p);
@@ -46,17 +110,41 @@ const tslNoise = Fn(([p]) => {
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 });
 
+// TSL two-octave FBM — must match groundFbm() numerically.
+const tslFbm = Fn(([p]) =>
+  tslNoise(p.mul(0.045)).mul(0.65).add(tslNoise(p.mul(0.13).add(vec2(19, 7))).mul(0.35)),
+);
+
+// opts: { dirt, sand, scrub, center:{x,z}, amp }. `center` is the ground mesh's
+// world placement so the TSL height field lines up with the pure groundHeight().
 export function createGroundMaterial(opts = {}) {
   const dirt = col(opts.dirt ?? "#5a4128");
   const sand = col(opts.sand ?? "#856b44");
   const scrub = col(opts.scrub ?? "#515a30");
+  const center = opts.center ?? { x: 14, z: 9 };
+  const amp = opts.amp ?? AMP;
   const mat = new MeshToonNodeMaterial({ gradientMap: celGradientMap() });
 
-  const p = vec2(positionWorld.x, positionWorld.z);
-  const big = tslNoise(p.mul(0.045)); // broad dirt/sand patches
-  const fine = tslNoise(p.mul(0.32)); // fine grain
+  // Colour: dirt/sand patches + scrub pockets, then darkened in valleys (baked-AO).
+  const pc = vec2(positionWorld.x, positionWorld.z);
+  const big = tslNoise(pc.mul(0.045)); // broad dirt/sand patches
+  const fine = tslNoise(pc.mul(0.32)); // fine grain
   const base = mix(v3(dirt), v3(sand), big);
-  // scrub only in the wetter/greener pockets (where both noises peak)
-  mat.colorNode = mix(base, v3(scrub), big.mul(fine).mul(0.6));
+  const tinted = mix(base, v3(scrub), big.mul(fine).mul(0.6));
+  const fbmC = tslFbm(pc);
+  mat.colorNode = tinted.mul(mix(float(0.66), float(1.08), fbmC)); // valley shade → crest light
+
+  // Relief: displace local +z (plane is rotated flat → local +z is world up).
+  // Height input uses positionLocal mapped to world XZ to avoid positionWorld
+  // recursion inside positionNode: worldX = center.x + lx, worldZ = center.z - ly.
+  const wx = positionLocal.x.add(center.x);
+  const wz = float(center.z).sub(positionLocal.y);
+  const wp = vec2(wx, wz);
+  const corridorM = clamp(smoothstep(MASK_LO, MASK_HI, abs(wz.sub(ROAD_Z))), 0, 1);
+  const marshM = clamp(smoothstep(MARSH_LO, MARSH_HI, wz), 0, 1).oneMinus();
+  const reliefH = corridorM.mul(marshM);
+  const h = tslFbm(wp).sub(0.5).mul(2.0 * amp).mul(reliefH);
+  mat.positionNode = positionLocal.add(vec3(0, 0, h));
+
   return mat;
 }
