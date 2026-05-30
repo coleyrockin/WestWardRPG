@@ -129,9 +129,15 @@ describe("lerpPalette", () => {
     expect(lerpPalette(a, b, 0.5).label).toBe(b.label);
   });
 
-  it("steps rim.dir (no lerp) across the boundary", () => {
-    expect(lerpPalette(a, b, 0.25).rim.dir).toEqual(a.rim.dir);
-    expect(lerpPalette(a, b, 0.75).rim.dir).toEqual(b.rim.dir);
+  it("lerps rim.dir smoothly across the boundary (no hard-cut pop)", () => {
+    // rim.dir now interpolates (was a t<0.5 step that popped dusk→night when the
+    // two dirs are on opposite sides). Endpoints still land on the source dirs.
+    expect(lerpPalette(a, b, 0).rim.dir).toEqual(a.rim.dir);
+    expect(lerpPalette(a, b, 1).rim.dir).toEqual(b.rim.dir);
+    const mid = lerpPalette(a, b, 0.5).rim.dir;
+    expect(mid.x).toBeCloseTo((a.rim.dir.x + b.rim.dir.x) / 2, 6);
+    expect(mid.y).toBeCloseTo((a.rim.dir.y + b.rim.dir.y) / 2, 6);
+    expect(mid.z).toBeCloseTo((a.rim.dir.z + b.rim.dir.z) / 2, 6);
   });
 });
 

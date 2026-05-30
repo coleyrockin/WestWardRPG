@@ -135,6 +135,7 @@ export function createAtmosphere(scene, renderer, opts = {}) {
   sun.shadow.camera.bottom = -18;
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.02;
+  sun.shadow.radius = 3; // softer PCF penumbra — painterly raking shadows
   sun.target.position.set(playCore.x, 0, playCore.y);
   scene.add(sun);
   scene.add(sun.target);

@@ -14,7 +14,7 @@
 
 import * as THREE from "three";
 import { PostProcessing } from "three/webgpu";
-import { pass, uniform, mix, clamp, smoothstep, vec3, vec2, uv } from "three/tsl";
+import { pass, uniform, mix, clamp, smoothstep, vec3, vec2, uv, dot, float } from "three/tsl";
 import { sobel } from "three/addons/tsl/display/SobelOperatorNode.js";
 import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { film } from "three/addons/tsl/display/FilmNode.js";
@@ -57,9 +57,17 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
     edgeHi: uniform(opts.edgeHi ?? region.edgeHi),
     gradeTint: uniform(new THREE.Color("#ff9a4a")),
     gradeAmount: uniform(0.12),
+    // Cinematic grade (replaces the old flat tint-multiply which couldn't make
+    // contrast). contrast = S-curve strength around 0.5; saturation lifts the
+    // cream wash; split-tone pushes shadows cool + highlights warm so the whole
+    // frame gets drama, not just the lamp pool. All palette-driven (applyPalette).
+    contrast: uniform(1.55),
+    saturation: uniform(1.4),
+    shadowTint: uniform(new THREE.Color("#1a0a2e")), // cool purple in the darks
+    highlightTint: uniform(new THREE.Color("#ffb040")), // warm amber in the lights
     // grain is time-animated (non-deterministic) — visual-capture passes 0.
     grainIntensity: uniform(opts.grainIntensity ?? region.grainIntensity),
-    godrayStrength: uniform(opts.godrayStrength ?? 0.85),
+    godrayStrength: uniform(opts.godrayStrength ?? 1.3),
     // Vignette: darken toward the frame corners to draw the eye to the street.
     // Deterministic (static) so it's safe under the ?visual capture.
     vignetteStrength: uniform(opts.vignetteStrength ?? 0.4),
@@ -90,9 +98,26 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
   );
   const inked = mix(lit, vec3(uniforms.inkColor), edgeAmt);
 
-  // 3. Warm grade — brightness-preserving multiply toward the palette tint,
-  //    then the exposure multiplier (day/night + weather darkening).
-  const graded = inked
+  // 3. Cinematic grade — a real chain that CREATES contrast (the old flat
+  //    tint-multiply couldn't, which read as uniform cream):
+  //    (a) contrast S-curve around 0.5 → deep shadows + lifted highlights;
+  //    (b) saturation around luma → kills the desaturated cream wash;
+  //    (c) split-tone → cool shadows × warm highlights spread drama across the
+  //        whole frame; lerp weight by luma so darks/lights tint differently;
+  //    (d) the legacy warm tint-multiply, now a gentle finishing nudge;
+  //    (e) exposure (day/night + weather darkening).
+  const contrasted = inked.sub(0.5).mul(uniforms.contrast).add(0.5).clamp(0, 1);
+  const luma = dot(contrasted, vec3(0.2126, 0.7152, 0.0722));
+  const saturated = mix(vec3(luma), contrasted, uniforms.saturation).clamp(0, 1);
+  // split-tone: lerp each pixel between a shadow-tinted and highlight-tinted
+  // version by its own luma, then blend that over the saturated colour.
+  const splitColor = mix(
+    saturated.mul(vec3(uniforms.shadowTint).mul(2.0)),
+    saturated.mul(vec3(uniforms.highlightTint).mul(2.0)),
+    clamp(luma, 0, 1),
+  );
+  const splitToned = mix(saturated, splitColor, float(0.35));
+  const graded = splitToned
     .mul(mix(vec3(1, 1, 1), vec3(uniforms.gradeTint).mul(1.6), uniforms.gradeAmount))
     .mul(uniforms.exposure);
 
@@ -115,6 +140,12 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
     if (p.grade) {
       if (p.grade.tint) uniforms.gradeTint.value.set(p.grade.tint);
       if (typeof p.grade.amount === "number") uniforms.gradeAmount.value = p.grade.amount;
+      // Cinematic-grade knobs are optional palette fields; day/night can push
+      // contrast/saturation and re-tint the split-tone (e.g. cooler at night).
+      if (typeof p.grade.contrast === "number") uniforms.contrast.value = p.grade.contrast;
+      if (typeof p.grade.saturation === "number") uniforms.saturation.value = p.grade.saturation;
+      if (p.grade.shadowTint) uniforms.shadowTint.value.set(p.grade.shadowTint);
+      if (p.grade.highlightTint) uniforms.highlightTint.value.set(p.grade.highlightTint);
     }
   }
 
