@@ -39,3 +39,6 @@ pnpm-debug.log*
 # dev:py symlinks public/atmosphere.js to root so the python static fallback can
 # serve it. Vite already serves from public/, so the root copy is dev-only.
 /atmosphere.js
+
+# Claude Code scheduler artifacts
+.claude/scheduled_tasks.lock
