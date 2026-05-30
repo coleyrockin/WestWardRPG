@@ -127,10 +127,11 @@ export function createPlayerController(camera, opts = {}) {
     // movement heading. Falls back to first-person when thirdPerson is false.
     thirdPerson = false,
     character = null, // THREE.Object3D positioned at the player's feet
-    camDistance = 5.2,
-    camHeight = 2.9,
-    camLookHeight = 1.5,
-    camLookAhead = 2.2,
+    camDistance = 6.6,
+    camHeight = 3.6,
+    camLookHeight = 1.7,
+    camLookAhead = 3.0,
+    camShoulder = 1.15, // lateral over-the-shoulder offset so the hero isn't dead-centre blocking the view
   } = opts;
   let moving = false;
   let running = false; // moving AND sprint held — drives the Run animation blend
@@ -271,17 +272,21 @@ export function createPlayerController(camera, opts = {}) {
       // Follow-cam orbits behind the heading and looks slightly ahead of the
       // character. Drag yaw turns the whole rig; pitch tilts the cam vertically.
       const fwd = forwardVector(yaw);
+      const side = rightVector(yaw);
       const lift = Math.sin(pitch) * camDistance * 0.5;
+      // Behind + above the hero, pushed to one shoulder so the character sits
+      // off-centre and never fills/occludes the frame. Look slightly ahead and
+      // up the same shoulder so the road and horizon stay framed.
       camera.position.set(
-        position.x - fwd.x * camDistance,
+        position.x - fwd.x * camDistance + side.x * camShoulder,
         camHeight - lift,
-        position.z - fwd.z * camDistance,
+        position.z - fwd.z * camDistance + side.z * camShoulder,
       );
       if (camera.lookAt) {
         camera.lookAt(
-          position.x + fwd.x * camLookAhead,
+          position.x + fwd.x * camLookAhead + side.x * camShoulder * 0.5,
           camLookHeight + lift * 0.5,
-          position.z + fwd.z * camLookAhead,
+          position.z + fwd.z * camLookAhead + side.z * camShoulder * 0.5,
         );
       }
     } else if (camera) {
