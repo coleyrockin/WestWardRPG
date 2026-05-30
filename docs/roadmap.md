@@ -3,8 +3,8 @@
 Single source of truth. Do not create parallel `TODO.md`, `PLAN.md`, `ROADMAP-*.md`,
 or another roadmap file.
 
-Last updated: `2026-05-28`
-Branch: `refactor/decompose-main-and-csp`
+Last updated: `2026-05-30`
+Branch: `main` @ `f55f1b2` (Vercel Production ● Ready)
 
 ---
 
@@ -136,13 +136,47 @@ production.
 
 ---
 
+## 3.5 Current Status & Immediate Queue
+
+### ✅ Shipped to main (Vercel Production)
+- **NPR render path** — WebGPURenderer + TSL, cel+rim uber-material, depth-discontinuity ink edges, bloom, vignette, film grain, continuous day/night arc.
+- **Terrain relief** — FBM displacement on the ground plane (masked flat in the road corridor + marsh so props don't float), valley-AO albedo, 96×88 segments.
+- **Hero capture camera** — elevated SE→NW 3/4 angle, FOV 54, `?visual` only. Composition now reads: town, road, depth, warm lamp pool visible.
+- **Golden-hour lighting pass** — low amber sun (y 2.5, intensity 2.2), deep cel ramp `[55,135,255]`, strong cool rim (0.9/pow2), tightened shadow cam.
+- **Scatter × 3.5** — 320 motes, cracked-mud + dry-grass variety, road-density gradient; motes seated on terrain.
+- **Milk-kill** — fog 0.0075 + bloom threshold 0.9; pink haze gone.
+- **6A/6B/6C** — prop detail, hero rig (Run/Turn/Draw), interactive NPCs (Mabel/Cole/Rosa/Hank/Pearl).
+
+### 🔴 IMMEDIATE — Fix the grade (user reviewed live render, waiting)
+The scene now has composition but reads **flat, pale, uniform cream** because the current grade is a tint-multiply that cannot create contrast. Full spec in `docs/NEXT-AGENT.md`.
+
+**Changes:** `src/game/renderer/postStacks.js` — replace flat tint-multiply with:
+1. Contrast S-curve (contrast ≈ 1.6)
+2. Saturation (≈ 1.45)
+3. Split-tone — cool shadow tint `#1a0a2e` + warm highlight tint `#ffb040`
+
+**Lighting tightening:** `src/render3d/timeOfDay.js` dusk palette — rim `0.55→1.0`, sun `2.2→2.8`, hemi `0.34→0.18`, god-rays `0.85→1.3`.
+
+Deploy immediately after; user judges live on Vercel before anything else.
+
+### 🟡 Ready to merge — PART 7 atmosphere (`feature/part7-atmosphere`, local only)
+- `dustMotes.js` — sun-shaft ambient specks, hidden under `?visual`
+- `heatShimmer.js` + test — horizon-weighted horizontal resample wobble; amp=0 under capture
+- GTAO opt-in via `?ao` — de-risk PASSED on SwiftShader WebGL2 (not black, no errors, correct darkening). Left off-by-default pending golden re-baseline + user sign-off.
+
+Merge after grade is approved: `git merge feature/part7-atmosphere && git push origin main`.
+
+---
+
 ## 4. The 7 Phases
 
 > Per phase: **Goal · Deliverables · Exit criteria (testable) · Dependencies.**
 > Critical path: **P1 → P2 → P3 (slice gate) → P5 → P6 → P7.** P4's pure half (4a) runs
 > *parallel* to P2/P3.
 
-### Phase 1 — Foundation, Engine Spine & Hardcore Substrate
+### Phase 1 — Foundation, Engine Spine & Hardcore Substrate *(in progress)*
+**Current:** Renderer + visual pipeline ✅ shipped. ECS sim-wiring, save layer, input rework are next.
+
 **Goal:** Promote `src/render3d/` from spike to *the* engine — a fixed-timestep, save-backed,
 input-complete, perf-budgeted runtime with the asset pipeline and all hardcore *state contracts*
 in place, so no pillar is retrofitted later.
