@@ -344,6 +344,9 @@ function buildPorch(group, p) {
 }
 
 function buildPlacement(group, p) {
+  // Guard size once here: every per-kind builder multiplies p.size, so an entry
+  // missing it (undefined * k = NaN) would silently produce zero-scaled geometry.
+  if (typeof p.size !== "number" || !Number.isFinite(p.size)) p = { ...p, size: 1 };
   switch (p.kind) {
     case "town":
     case "ranch": return buildBuilding(group, p, p.depthLane === "background" ? 1.3 : 1.0);
@@ -636,7 +639,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
 
   // Start at the real road spawn and aim at Boone's board cluster. This keeps
   // first-load framing honest for both play and spike_compare screenshots.
-  const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
+  const _vw = (typeof window !== "undefined" && window.innerWidth) || 1280;
+  const _vh = (typeof window !== "undefined" && window.innerHeight) || 720;
+  const camera = new THREE.PerspectiveCamera(65, _vw / _vh, 0.1, 200);
   const openingTarget = snapshot.worldObjects.find((p) => p.kind === "jobBoard") || snapshot.player;
   camera.position.set(snapshot.player.x, 1.8, snapshot.player.y);
   camera.lookAt(openingTarget.x + 0.3, 1.0, openingTarget.y + 0.12);

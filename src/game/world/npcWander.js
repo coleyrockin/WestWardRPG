@@ -6,6 +6,18 @@
 
 export function createWander({ waypoints, speed = 1.3, pause = 1.6 }) {
   const wp = waypoints && waypoints.length ? waypoints : [{ x: 0, z: 0 }];
+  // Warn on duplicate adjacent waypoints: stepWander's `dist < 0.08` arrival guard
+  // would fire forever on a zero-length leg, stalling the NPC in a silent pause loop.
+  if (typeof console !== "undefined" && wp.length > 1) {
+    for (let i = 0; i < wp.length; i++) {
+      const a = wp[i];
+      const b = wp[(i + 1) % wp.length];
+      if (Math.hypot(b.x - a.x, b.z - a.z) < 0.08) {
+        console.warn(`[npcWander] duplicate adjacent waypoints at index ${i} — NPC may stall`);
+        break;
+      }
+    }
+  }
   return {
     waypoints: wp,
     idx: 0,
