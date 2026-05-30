@@ -133,6 +133,7 @@ export function createPlayerController(camera, opts = {}) {
     camLookAhead = 2.2,
   } = opts;
   let moving = false;
+  let running = false; // moving AND sprint held — drives the Run animation blend
 
   // Seed yaw + pitch from the camera's current heading so the spike's hero
   // pose is preserved on the first frame. We project the forward vector onto
@@ -244,6 +245,7 @@ export function createPlayerController(camera, opts = {}) {
     let nextPos = stepped.position;
 
     moving = !!(input.forward || input.back || input.left || input.right);
+    running = moving && !!input.shift; // sprint speed already applied in stepPlayer
 
     // Drain mouse deltas — they're per-frame, not held state.
     input.lookDx = 0;
@@ -331,5 +333,6 @@ export function createPlayerController(camera, opts = {}) {
     get yaw() { return yaw; },
     get pitch() { return pitch; },
     get moving() { return moving; },
+    get running() { return running; },
   };
 }

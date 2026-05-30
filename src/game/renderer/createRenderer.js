@@ -56,7 +56,25 @@ export async function createRenderer(canvas, opts = {}) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
 
-  await renderer.init();
+  // init() acquires the GPU device / selects the backend. If BOTH WebGPU and the
+  // WebGL2 fallback fail (no GL context, blacklisted driver, lost device), surface
+  // a readable message instead of a silent blank canvas, then rethrow so the
+  // caller's catch can log it.
+  try {
+    await renderer.init();
+  } catch (err) {
+    if (typeof document !== "undefined" && document.body) {
+      const msg = document.createElement("div");
+      msg.style.cssText =
+        "position:fixed;inset:0;display:flex;align-items:center;justify-content:center;" +
+        "padding:2rem;text-align:center;font:600 16px system-ui,sans-serif;color:#e8c8a0;" +
+        "background:#1a1226;z-index:9999";
+      msg.textContent =
+        "WestWard couldn't start the 3D renderer — your browser or GPU may not support WebGL2/WebGPU.";
+      document.body.appendChild(msg);
+    }
+    throw err;
+  }
 
   return { renderer, backend: resolveBackend(renderer) };
 }
