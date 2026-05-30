@@ -17,15 +17,15 @@ export const PALETTES = Object.freeze({
   dusk: {
     key: "dusk",
     label: "Dusk",
-    sky: { top: "#241845", mid: "#5a3570", horizon: "#e8894a" },
-    fog: { color: "#8a5a3a", density: 0.0075 },
+    sky: { top: "#2a2150", mid: "#6a4570", horizon: "#e89a5a" },
+    fog: { color: "#7a5a48", density: 0.0075 },
     sun: { color: "#ffb24a", intensity: 2.8, dir: { x: -10, y: 3.5, z: -5 }, disc: 0.028, glow: 0.2 },
     hemi: { sky: "#5a5488", ground: "#2a1e10", intensity: 0.3 },
     rim: { color: "#4a5fff", intensity: 1.0, dir: { x: 9, y: 5, z: 6 } },
     exposure: 1.15,
     stars: 0.1,
     bloom: 0.85,
-    grade: { tint: "#ff9a4a", amount: 0.22, contrast: 1.22, saturation: 1.35, shadowTint: "#3a4a7a", highlightTint: "#ffb050" },
+    grade: { tint: "#ff9a4a", amount: 0.05, contrast: 1.18, saturation: 1.12, shadowTint: "#3a4a7a", highlightTint: "#ffb050" },
     bodyBg: "#1a1226",
   },
   goldenHour: {
@@ -39,7 +39,7 @@ export const PALETTES = Object.freeze({
     exposure: 1.32,
     stars: 0,
     bloom: 0.55,
-    grade: { tint: "#ffb060", amount: 0.22, contrast: 1.2, saturation: 1.4, shadowTint: "#3a4a78", highlightTint: "#ffc468" },
+    grade: { tint: "#ffb060", amount: 0.05, contrast: 1.2, saturation: 1.35, shadowTint: "#3a4a78", highlightTint: "#ffc468" },
     bodyBg: "#2a1f2e",
   },
   night: {
@@ -53,7 +53,7 @@ export const PALETTES = Object.freeze({
     exposure: 0.85,
     stars: 1.0,
     bloom: 1.2,
-    grade: { tint: "#5a6bd0", amount: 0.2, contrast: 1.3, saturation: 1.25, shadowTint: "#2a3a6a", highlightTint: "#aac0ff" },
+    grade: { tint: "#5a6bd0", amount: 0.06, contrast: 1.3, saturation: 1.25, shadowTint: "#2a3a6a", highlightTint: "#aac0ff" },
     bodyBg: "#05060f",
   },
 });
