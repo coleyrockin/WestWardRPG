@@ -61,10 +61,12 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
     // contrast). contrast = S-curve strength around 0.5; saturation lifts the
     // cream wash; split-tone pushes shadows cool + highlights warm so the whole
     // frame gets drama, not just the lamp pool. All palette-driven (applyPalette).
-    contrast: uniform(1.55),
-    saturation: uniform(1.4),
-    shadowTint: uniform(new THREE.Color("#1a0a2e")), // cool purple in the darks
-    highlightTint: uniform(new THREE.Color("#ffb040")), // warm amber in the lights
+    contrast: uniform(1.22),
+    saturation: uniform(1.35),
+    // Split-tone hues (centred on grey ~0.5 — only the offset from 0.5 matters,
+    // so these shift colour, not brightness): cool-blue shadows, warm-amber lights.
+    shadowTint: uniform(new THREE.Color("#3a4a7a")),
+    highlightTint: uniform(new THREE.Color("#ffb050")),
     // grain is time-animated (non-deterministic) — visual-capture passes 0.
     grainIntensity: uniform(opts.grainIntensity ?? region.grainIntensity),
     godrayStrength: uniform(opts.godrayStrength ?? 1.3),
@@ -107,16 +109,17 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
   //    (d) the legacy warm tint-multiply, now a gentle finishing nudge;
   //    (e) exposure (day/night + weather darkening).
   const contrasted = inked.sub(0.5).mul(uniforms.contrast).add(0.5).clamp(0, 1);
-  const luma = dot(contrasted, vec3(0.2126, 0.7152, 0.0722));
+  const luma = clamp(dot(contrasted, vec3(0.2126, 0.7152, 0.0722)), 0, 1);
   const saturated = mix(vec3(luma), contrasted, uniforms.saturation).clamp(0, 1);
-  // split-tone: lerp each pixel between a shadow-tinted and highlight-tinted
-  // version by its own luma, then blend that over the saturated colour.
-  const splitColor = mix(
-    saturated.mul(vec3(uniforms.shadowTint).mul(2.0)),
-    saturated.mul(vec3(uniforms.highlightTint).mul(2.0)),
-    clamp(luma, 0, 1),
-  );
-  const splitToned = mix(saturated, splitColor, float(0.35));
+  // split-tone: ADD a hue shift biased by luma (cool into shadows, warm into
+  // highlights), centred on grey so it shifts colour WITHOUT crushing value —
+  // (tint-0.5) is signed, scaled by a gentle weight. Shadows get the shadowTint,
+  // highlights the highlightTint; midtones barely move. This spreads warm/cool
+  // drama across the whole frame instead of darkening it.
+  const shTint = vec3(uniforms.shadowTint).sub(0.5);
+  const hlTint = vec3(uniforms.highlightTint).sub(0.5);
+  const split = mix(shTint, hlTint, luma).mul(0.5);
+  const splitToned = saturated.add(split).clamp(0, 1);
   const graded = splitToned
     .mul(mix(vec3(1, 1, 1), vec3(uniforms.gradeTint).mul(1.6), uniforms.gradeAmount))
     .mul(uniforms.exposure);
