@@ -118,7 +118,7 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
   // drama across the whole frame instead of darkening it.
   const shTint = vec3(uniforms.shadowTint).sub(0.5);
   const hlTint = vec3(uniforms.highlightTint).sub(0.5);
-  const split = mix(shTint, hlTint, luma).mul(0.5);
+  const split = mix(shTint, hlTint, luma).mul(0.16); // gentle tint, not a heavy filter
   const splitToned = saturated.add(split).clamp(0, 1);
   const graded = splitToned
     .mul(mix(vec3(1, 1, 1), vec3(uniforms.gradeTint).mul(1.6), uniforms.gradeAmount))
