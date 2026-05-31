@@ -158,6 +158,55 @@ Merged scope:
 5. The first road is wider, less cluttered, and visually calmer under the dusk lighting stack.
 6. Screenshot comparison now validates the actual `Follow the Road` opening loop state.
 
+### 🔴 Next recovery plan — make the first five minutes actually good
+The current 3D slice is a proof, not a finished opening. The next work must prioritize playable
+truth over more decoration: readable world shape, verbs, pacing, and validation that matches what a
+player sees.
+
+#### P0 — Cut the visual mud
+- Replace the flat box-town foreground with a cleaner composition: one saloon facade, one board
+  corner, open road, marsh reveal, and distant mesa silhouettes.
+- Author a small Blender asset set for the opening: road planks/ruts, Boone board, two lamp posts,
+  one wagon, one saloon porch, one mesa kit, one slime-readable marsh prop cluster.
+- Set hard lighting budgets: no blown white lamps, no giant screen-wide shafts, no opaque foreground
+  blocker, no objective UI covering the walking lane.
+- Exit gate: first screenshot must show player, road, board, next landmark, and threat space within
+  two seconds with no explanation text.
+
+#### P1 — Turn it into five minutes of play
+- Expand the loop from "walk to four targets" into a paced route:
+  spawn orientation → board choice → road walk → cache clue → slime ambush → wagon salvage →
+  return to Boone → next-job teaser.
+- Add one real choice at the board: accept bounty, ask about road danger, or inspect old survey.
+  The choice should change one prompt, one reward line, and one follow-up objective.
+- Add three micro-beats on the road: a sign read, a short NPC bark, and a visible slime tell before
+  combat starts.
+- Exit gate: a fresh player can spend 4-6 minutes without repeating content or wondering where to go.
+
+#### P2 — Fix camera and input feel
+- Move from drag-look to click-to-focus / pointer-lock with an explicit escape path.
+- Add camera collision, wall avoidance, and a shoulder swap so buildings cannot swallow the hero.
+- Add sprint stamina feedback and a one-button camera reset behind the player.
+- Exit gate: WASD + mouse feels natural for 60 seconds in town, road, and marsh spaces.
+
+#### P3 — Replace placeholders with authored assets
+- Use Blender for low-poly western silhouettes with consistent scale, pivots, and material names.
+- Ship GLB assets through the existing `assetManifest.js`, not one-off procedural replacements.
+- Keep primitives only for debug helpers, collision proxies, and temporary blockers.
+- Exit gate: the opening screenshot looks intentionally art-directed, not like debug boxes with bloom.
+
+#### P4 — Proof-quality validation
+- Add a visual acceptance script that checks more than nonblank pixels: player silhouette, road width,
+  board visibility, HUD footprint, and lamp overexposure.
+- Record a deterministic 60-second route video or frame strip for GitHub review.
+- Keep `npm test`, typecheck, syntax, build, render3d smoke, and `spike_compare` as required gates.
+- Exit gate: a reviewer can compare before/after from artifacts without running the game.
+
+#### Do not do next
+- Do not add more fog, bloom, particles, or god rays until the road, camera, and first loop are good.
+- Do not expand the world boundary before the opening route is readable.
+- Do not write more roadmap language unless it changes what ships or what gets validated.
+
 ### 🟡 Ready to merge — PART 7 atmosphere (`feature/part7-atmosphere`, local only)
 - `dustMotes.js` — sun-shaft ambient specks, hidden under `?visual`
 - `heatShimmer.js` + test — horizon-weighted horizontal resample wobble; amp=0 under capture
