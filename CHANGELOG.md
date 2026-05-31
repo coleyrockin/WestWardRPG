@@ -7,6 +7,7 @@
 - Re-art-directed the opening frame around player/board, a wider road, cleaner town-edge silhouettes, distant mesa skyline, and a visible marsh-threat lane.
 - Upgraded the max-mode art pass with richer facade rooflines/porches, stepped mesa silhouettes, warmer dusty road material, route dust ribbons, and local light pools so the opening frame reads less like a prototype strip.
 - Added a route-progress rail, transient beat feedback, slime combat cue/splash, and stricter road/light-pool material tuning so the opening plays with clearer rewards and less chalky debug-road wash.
+- Added a compact 3D-route field map to the new Three.js slice so Boone's board, Smoke Cache, slime threat, wagon salvage, return path, and Old Road Survey upgrade read in the current art direction.
 - Warmed and reduced GLB prop rim lighting in the shared asset loader so authored models keep ink edges without turning fence, plank, and facade surfaces into pale slabs.
 - Added visual micro-payoffs for the first-road beats: Pearl's down-road cue, pulsing slime tell before aggro, Map Scrap reveal, and a changed Boone board state after return.
 - Extended the 3D debug API with composition, lighting, beat-visibility, and route-frame capture probes.

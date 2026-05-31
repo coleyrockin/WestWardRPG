@@ -190,6 +190,9 @@ Added in the max-mode polish pass:
   tuning so the first frame no longer reads as a washed-out debug runway.
 - Shared GLB material reskin now uses a warmer, lower rim so authored assets keep the graphic-novel
   outline without bleaching road planks, fences, or facade faces.
+- New-art-direction map pass: a compact Three.js-route field map in `spikes/render3d.html` now shows
+  the authored road, Boone board, Smoke Cache, marsh threat, wagon salvage, return path, and survey
+  upgrade state without falling back to the legacy Canvas presentation.
 - Debug probes and visual gates for composition blockers, controlled dusk lighting, beat visibility,
   and route-frame target readability.
 

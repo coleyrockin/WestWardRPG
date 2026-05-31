@@ -20,6 +20,7 @@ import { buildProxies } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
 import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine } from "./phaseState.js";
 import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
+import { buildFieldMapRouteModel, createFieldMapDomRefs, syncFieldMapDom } from "./fieldMapDom.js";
 import { createBoardModalController } from "./boardModal.js";
 import { createEncounterSystem } from "./encounterSystem.js";
 import { createAtmosphere } from "./atmosphere.js";
@@ -1206,7 +1207,9 @@ function createSpikeSnapshot() {
 export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const loopState = createLoopStateMachine();
   const objectiveRefs = createObjectiveDomRefs(document);
+  const fieldMapRefs = createFieldMapDomRefs(document);
   syncObjectiveDom(objectiveRefs, snapshot, loopState.state);
+  syncFieldMapDom(fieldMapRefs, loopState.state);
   const publishLoopDebug = (state) => {
     if (!import.meta.env.DEV || typeof window === "undefined") return;
     window.__westward3dLoop = state;
@@ -1506,6 +1509,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     const state = loopState.state;
     publishLoopDebug(state);
     syncObjectiveDom(objectiveRefs, snapshot, state);
+    syncFieldMapDom(fieldMapRefs, state);
     interaction.update(player.position);
   };
 
@@ -1513,6 +1517,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     const state = loopState.transition(event);
     publishLoopDebug(state);
     syncObjectiveDom(objectiveRefs, snapshot, state);
+    syncFieldMapDom(fieldMapRefs, state);
     interaction.update(player.position);
     return state;
   };
@@ -1577,6 +1582,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         ...loopState.state,
         objectiveText: "Old Road Survey is ready. This is tomorrow's next playable job.",
       });
+      syncFieldMapDom(fieldMapRefs, loopState.state);
       beatToast.show("Next Job Teased", "The old road is marked and waiting past the wagon wreck.");
     }
   };
@@ -1815,6 +1821,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       getLightingMetrics,
       getBeatVisibility,
       getBeatFeedback: () => beatToast.getState(),
+      getFieldMapState: () => buildFieldMapRouteModel(loopState.state),
       captureRouteFrame,
       getCameraPose: () => ({
         x: Number(camera.position.x.toFixed(2)),

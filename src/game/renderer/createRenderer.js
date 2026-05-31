@@ -15,10 +15,12 @@ import * as THREE from "three";
 import { WebGPURenderer } from "three/webgpu";
 
 // True when a real WebGPU adapter is reachable. SwiftShader headless and older
-// browsers leave `navigator.gpu` undefined, so we force the WebGL2 backend there
-// rather than paying for a failing async adapter probe.
+// browsers often leave `navigator.gpu` undefined; automated Chromium can expose
+// `navigator.gpu` but hang during adapter init. Playwright/CI therefore forces
+// the WebGL2 backend so render smoke and screenshot proof cannot stall on a
+// browser-process GPU probe.
 export function webgpuAvailable() {
-  return typeof navigator !== "undefined" && !!navigator.gpu;
+  return typeof navigator !== "undefined" && !!navigator.gpu && navigator.webdriver !== true;
 }
 
 // Create + initialise the renderer. Async because WebGPURenderer must `init()`

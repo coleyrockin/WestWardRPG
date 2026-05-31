@@ -25,6 +25,16 @@ function withTimeout(promise, label, ms = 20000) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+async function waitForPagePredicate(page, predicate, label, ms = 15000) {
+  const started = Date.now();
+  while (Date.now() - started < ms) {
+    const ok = await page.evaluate(predicate).catch(() => false);
+    if (ok) return true;
+    await sleep(200);
+  }
+  throw new Error(`${label} timed out after ${ms}ms`);
+}
+
 async function assertServerAvailable() {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
@@ -190,9 +200,10 @@ async function captureOld(context) {
   await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
   await page.waitForSelector("#game");
   // Wait for the smoke probe surface — proves the Canvas build booted.
-  await page.waitForFunction(
+  await waitForPagePredicate(page,
     () => typeof window.__westwardSmoke?.getGameplayState === "function",
-    { timeout: 15000 },
+    "old canvas smoke probe",
+    15000,
   );
   // Start the game by clicking the title start button (Enter is not bound).
   // force: true skips actionability checks — the title menu animates, so the
@@ -201,9 +212,10 @@ async function captureOld(context) {
   await page.evaluate(() => {
     try { document.querySelector("#start-btn")?.click(); } catch {}
   });
-  await page.waitForFunction(
+  await waitForPagePredicate(page,
     () => window.__westwardSmoke?.getGameplayState?.().mode === "playing",
-    { timeout: 5000 },
+    "old canvas playing mode",
+    5000,
   ).catch(() => null);
   // Force the frontier opening pose deterministically.
   await page.evaluate(() => {
@@ -243,8 +255,8 @@ async function captureNew(context) {
   console.log("[capture] new spike: loading spikes/render3d.html");
   await withTimeout(page.goto(`${BASE}/spikes/render3d.html`, { waitUntil: "load" }), "load spikes/render3d.html", 15000);
   await page.waitForSelector("#scene");
-  await page.waitForFunction(() => window.__spikeReady === true, { timeout: 15000 });
-  await page.waitForFunction(() => Boolean(
+  await waitForPagePredicate(page, () => window.__spikeReady === true, "new render3d ready signal", 45000);
+  await waitForPagePredicate(page, () => Boolean(
     window.__westward3dTest?.getHeroVisibility
       && window.__westward3dTest?.getPlayerVisibility
       && window.__westward3dTest?.getRouteMetrics
@@ -252,7 +264,7 @@ async function captureNew(context) {
       && window.__westward3dTest?.getLightingMetrics
       && window.__westward3dTest?.getBeatVisibility
       && window.__westward3dTest?.captureRouteFrame,
-  ), { timeout: 15000 });
+  ), "new render3d debug API", 15000);
   const snapshot = await page.evaluate(() => window.__westwardRenderSnapshot || null);
   const loopState = await page.evaluate(() => window.__westward3dLoop || null);
   if (!snapshot || snapshot.kind !== "westward-render-snapshot") {
@@ -309,8 +321,13 @@ async function captureNew(context) {
   if (!cameraPose || cameraPose.y < 2.5 || cameraPose.y > 4.8 || cameraPose.fov < 45 || cameraPose.fov > 55) {
     errors.push(`render3d first camera pose outside third-person opening bounds: ${JSON.stringify(cameraPose)}`);
   }
+  const fieldMapState = await page.evaluate(() => window.__westward3dTest.getFieldMapState?.() || null);
+  console.log(`[probe] new field map state: ${JSON.stringify(fieldMapState?.activeKind || null)} ${JSON.stringify(fieldMapState?.targetLabel || null)}`);
+  if (!fieldMapState || fieldMapState.activeKind !== "jobBoard" || !fieldMapState.path || !fieldMapState.points?.some((point) => point.kind === "smokeCache")) {
+    errors.push(`render3d field map missing first-road route state: ${JSON.stringify(fieldMapState)}`);
+  }
   const hudFootprint = await page.evaluate(() => {
-    const ids = ["objective", "prompt", "tag"];
+    const ids = ["objective", "prompt", "tag", "field-map"];
     const vw = window.innerWidth || 1;
     const vh = window.innerHeight || 1;
     let area = 0;

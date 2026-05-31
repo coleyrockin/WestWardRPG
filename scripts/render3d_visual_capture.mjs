@@ -33,6 +33,17 @@ const BASELINE = join(ROOT, "scripts", "baselines", "render3d", "frontier-dusk.p
 // absorbs the idle slime pulse + minor SwiftShader float nondeterminism; a real
 // regression (look/pipeline break) blows well past it.
 const THRESHOLD = 0.1;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function waitForPagePredicate(page, predicate, label, timeout = 30000) {
+  const started = Date.now();
+  while (Date.now() - started < timeout) {
+    const ok = await page.evaluate(predicate).catch(() => false);
+    if (ok) return true;
+    await sleep(200);
+  }
+  throw new Error(`${label} timed out after ${timeout}ms`);
+}
 
 async function capture() {
   const browser = await chromium.launch({
@@ -46,8 +57,7 @@ async function capture() {
     page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
     await page.goto(`${BASE}/spikes/render3d.html?visual=1`, { waitUntil: "load" });
-    const ready = await page
-      .waitForFunction(() => window.__spikeReady === true, { timeout: 30000 })
+    const ready = await waitForPagePredicate(page, () => window.__spikeReady === true, "render3d ready signal", 45000)
       .then(() => true)
       .catch(() => false);
     if (!ready) throw new Error("render3d never signalled __spikeReady");
@@ -59,7 +69,7 @@ async function capture() {
     // screenshot — page.screenshot skips the element-stability wait that an
     // always-animating canvas never satisfies under slow SwiftShader.
     await page.evaluate(() => {
-      for (const id of ["objective", "tag", "prompt", "board-modal"]) {
+      for (const id of ["objective", "tag", "prompt", "board-modal", "field-map"]) {
         const el = document.getElementById(id);
         if (el) el.style.display = "none";
       }

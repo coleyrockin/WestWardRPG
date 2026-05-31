@@ -22,6 +22,16 @@ async function getState(page) {
   return page.evaluate(() => window.__westward3dTest?.getLoopState?.() || null);
 }
 
+async function waitForPagePredicate(page, predicate, label, timeout = 15000) {
+  const started = Date.now();
+  while (Date.now() - started < timeout) {
+    const ok = await page.evaluate(predicate).catch(() => false);
+    if (ok) return true;
+    await sleep(200);
+  }
+  throw new Error(`${label} timed out after ${timeout}ms`);
+}
+
 async function expectPhase(page, phase) {
   const state = await getState(page);
   if (!state) throw new Error(`missing __westward3dTest state while expecting ${phase}`);
@@ -53,13 +63,13 @@ async function main() {
   try {
     await page.goto(`${BASE}/spikes/render3d.html`, { waitUntil: "load" });
     await page.waitForSelector("#scene");
-    await page.waitForFunction(() => window.__spikeReady === true, { timeout: 15000 });
-    await page.waitForFunction(() => Boolean(
+    await waitForPagePredicate(page, () => window.__spikeReady === true, "render3d ready signal", 45000);
+    await waitForPagePredicate(page, () => Boolean(
       window.__westward3dTest?.getPlayerPosition
         && window.__westward3dTest?.getLoopState
         && window.__westward3dTest?.interact
         && window.__westward3dTest?.movePlayerToKind,
-    ), { timeout: 10000 });
+    ), "render3d debug API", 15000);
     const openingBeats = await page.evaluate(() => window.__westward3dTest.getBeatVisibility?.());
     if (!openingBeats) throw new Error("beat visibility debug API missing");
     if (openingBeats.slimeTellVisible || openingBeats.roadSlimeVisible) {
