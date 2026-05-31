@@ -438,6 +438,161 @@ function getHeroVisibility(heroMeshes, camera) {
   );
 }
 
+function setNodeOpacity(node, opacity) {
+  if (!node || typeof node.traverse !== "function") return;
+  const apply = (mat) => {
+    if (!mat || !("opacity" in mat)) return;
+    if (!mat.userData) mat.userData = {};
+    if (!mat.userData.westwardBaseOpacity) mat.userData.westwardBaseOpacity = mat.opacity ?? 1;
+    const base = mat.userData.westwardBaseOpacity;
+    mat.opacity = Math.min(base, opacity);
+    mat.transparent = mat.opacity < 0.98 || mat.transparent === true;
+    mat.depthWrite = mat.opacity > 0.92;
+  };
+  node.traverse((o) => {
+    if (!o.material) return;
+    if (Array.isArray(o.material)) o.material.forEach(apply);
+    else apply(o.material);
+  });
+}
+
+function updateOcclusionFades(placementNodes, camera, playerPos) {
+  if (!placementNodes?.length || !camera || !playerPos) return;
+  const playerPoint = new THREE.Vector3(playerPos.x, 1.2, playerPos.z);
+  const cameraPoint = camera.position.clone();
+  const toPlayer = playerPoint.clone().sub(cameraPoint);
+  const distance = toPlayer.length();
+  if (distance < 0.01) return;
+  const ray = new THREE.Ray(cameraPoint, toPlayer.normalize());
+  const box = new THREE.Box3();
+  for (const record of placementNodes) {
+    if (!record?.node || ["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(record.kind)) {
+      continue;
+    }
+    box.setFromObject(record.node);
+    const hit = ray.intersectBox(box, new THREE.Vector3());
+    const blocksHero = Boolean(hit)
+      && hit.distanceTo(cameraPoint) < distance - 0.7
+      && box.max.y > 0.8;
+    setNodeOpacity(record.node, blocksHero ? 0.32 : 1);
+  }
+}
+
+function createPlayerReadabilityRig() {
+  const group = new THREE.Group();
+  group.name = "player-readability-rig";
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.58, 0.035, 8, 42),
+    standard("#ffd77b", {
+      emissive: "#ffb84a",
+      emissiveIntensity: 0.9,
+      transparent: true,
+      opacity: 0.76,
+      rimStrength: 0,
+    }),
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.045;
+  group.add(ring);
+
+  const marker = new THREE.Mesh(
+    new THREE.ConeGeometry(0.18, 0.32, 4),
+    standard("#fff1b8", {
+      emissive: "#ffd77b",
+      emissiveIntensity: 1.2,
+      transparent: true,
+      opacity: 0.92,
+      rimStrength: 0.15,
+    }),
+  );
+  marker.rotation.y = Math.PI / 4;
+  marker.position.y = 2.28;
+  group.add(marker);
+
+  return {
+    group,
+    update(t) {
+      const pulse = 0.92 + Math.sin(t * 4.2) * 0.08;
+      ring.scale.set(pulse, pulse, pulse);
+      marker.position.y = 2.26 + Math.sin(t * 3.4) * 0.055;
+      marker.rotation.y += 0.018;
+    },
+  };
+}
+
+function createObjectiveGuidance(snapshot) {
+  const group = new THREE.Group();
+  group.name = "objective-guidance";
+  const board = snapshot.worldObjects.find((p) => p.kind === "jobBoard");
+  const spawn = snapshot.player || PLAYER_SPAWN;
+  if (!board) return { group, update() {} };
+
+  const boardRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.92, 0.045, 8, 48),
+    standard("#ffd77b", {
+      emissive: "#ffb84a",
+      emissiveIntensity: 1.25,
+      transparent: true,
+      opacity: 0.82,
+      rimStrength: 0,
+    }),
+  );
+  boardRing.rotation.x = Math.PI / 2;
+  boardRing.position.copy(toVec(board.x, board.y, 1.72));
+  group.add(boardRing);
+
+  const boardPointer = new THREE.Mesh(
+    new THREE.ConeGeometry(0.2, 0.46, 4),
+    standard("#fff0b8", {
+      emissive: "#ffd77b",
+      emissiveIntensity: 1.8,
+      transparent: true,
+      opacity: 0.9,
+      rimStrength: 0.1,
+    }),
+  );
+  boardPointer.rotation.x = Math.PI;
+  boardPointer.rotation.y = Math.PI / 4;
+  boardPointer.position.copy(toVec(board.x, board.y, 2.72));
+  group.add(boardPointer);
+
+  const beads = [];
+  const dx = board.x - spawn.x;
+  const dz = board.y - spawn.y;
+  for (let i = 1; i <= 4; i++) {
+    const t = i / 5;
+    const bead = new THREE.Mesh(
+      new THREE.CircleGeometry(0.16 + i * 0.015, 18),
+      new THREE.MeshBasicMaterial({
+        color: col("#ffd77b"),
+        transparent: true,
+        opacity: 0.42,
+        depthWrite: false,
+      }),
+    );
+    bead.rotation.x = -Math.PI / 2;
+    bead.position.set(spawn.x + dx * t, 0.075, spawn.y + dz * t);
+    group.add(bead);
+    beads.push(bead);
+  }
+
+  return {
+    group,
+    update(t, phase) {
+      const active = phase === "spawn" || phase === "accept_bounty";
+      group.visible = active;
+      if (!active) return;
+      const pulse = 1 + Math.sin(t * 3.2) * 0.08;
+      boardRing.scale.set(pulse, pulse, pulse);
+      boardPointer.position.y = 2.72 + Math.sin(t * 3.6) * 0.08;
+      beads.forEach((bead, index) => {
+        bead.material.opacity = 0.3 + Math.max(0, Math.sin(t * 3 - index * 0.7)) * 0.28;
+      });
+    },
+  };
+}
+
 function buildGround(scene, snapshot) {
   const spawn = snapshot?.player || PLAYER_SPAWN;
   // Big enough to comfortably hold the full ~30×20 explorable rectangle plus a
@@ -466,28 +621,42 @@ function buildGround(scene, snapshot) {
 
   // (Marsh water is now an animated TSL surface created in startSpike — see createWater.)
 
-  // dusty road strip running east from spawn through the cluster toward the mesas
+  // Dusty road strip running east from spawn toward Boone's board + the mesas.
+  // The opening quest is "follow the road", so the road must read as the brightest,
+  // clearest path in the frame — wider, lighter packed-sand colour, and a gentle
+  // warm emissive lift so it stays legible even where buildings cast shadow.
   const ROAD_LEN = 30;
+  const ROAD_W = 2.6;
   const ROAD_CX = spawn.x + 11;
+  const ROAD_Z = spawn.y + 0.4;
   const road = new THREE.Mesh(
-    new THREE.PlaneGeometry(ROAD_LEN, 1.9),
-    standard("#9a7c4f", { roughness: 1 }),
+    new THREE.PlaneGeometry(ROAD_LEN, ROAD_W),
+    standard("#c2a06a", { roughness: 1, emissive: "#5a4424", emissiveIntensity: 0.35 }),
   );
   road.rotation.x = -Math.PI / 2;
-  road.position.set(ROAD_CX, 0.02, spawn.y + 0.4);
+  road.position.set(ROAD_CX, 0.02, ROAD_Z);
   road.receiveShadow = true;
   scene.add(road);
 
-  // bright dust edges for readability
-  for (const off of [-1.05, 1.05]) {
+  // Bright dust shoulders frame the road and lead the eye down it.
+  for (const off of [-(ROAD_W / 2 + 0.12), ROAD_W / 2 + 0.12]) {
     const edge = new THREE.Mesh(
-      new THREE.PlaneGeometry(ROAD_LEN, 0.2),
-      standard("#d8be8c", { roughness: 1, emissive: "#3a2c14", emissiveIntensity: 0.2 }),
+      new THREE.PlaneGeometry(ROAD_LEN, 0.28),
+      standard("#e8d29a", { roughness: 1, emissive: "#6a4e22", emissiveIntensity: 0.45 }),
     );
     edge.rotation.x = -Math.PI / 2;
-    edge.position.set(ROAD_CX, 0.03, spawn.y + 0.4 + off);
+    edge.position.set(ROAD_CX, 0.03, ROAD_Z + off);
     scene.add(edge);
   }
+
+  // Faint centre wear-line for direction and depth flow toward the objective.
+  const centerLine = new THREE.Mesh(
+    new THREE.PlaneGeometry(ROAD_LEN, 0.12),
+    standard("#a8895a", { roughness: 1 }),
+  );
+  centerLine.rotation.x = -Math.PI / 2;
+  centerLine.position.set(ROAD_CX, 0.028, ROAD_Z);
+  scene.add(centerLine);
 }
 
 function createSpikeSnapshot() {
@@ -577,6 +746,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
 
   const props = new THREE.Group();
   const heroMeshes = {};
+  const placementNodes = [];
   const modelJobs = [];
   for (const p of snapshot.worldObjects) {
     const entry = modelFor(p.kind);
@@ -589,6 +759,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         instanceModel(entry.url, { x: p.x, z: p.y, y: groundHeight(p.x, p.y), yaw, scale: effScale })
           .then((node) => {
             props.add(node);
+            placementNodes.push({ kind: p.kind, node });
             // lamps/beacon/board carried their PointLight inside the old builder;
             // re-add it here for the model path (height is in local model units).
             if (entry.light) attachLight(props, p, entry.light, effScale);
@@ -599,6 +770,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
           .catch((err) => {
             console.warn(`[render3d] model load failed for ${p.kind}, using fallback`, err);
             const mesh = buildPlacement(props, p);
+            if (mesh) placementNodes.push({ kind: p.kind, node: mesh });
             if (["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(p.kind) && mesh) {
               heroMeshes[p.kind] = mesh;
             }
@@ -607,12 +779,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       continue;
     }
     const mesh = buildPlacement(props, p);
+    if (mesh) placementNodes.push({ kind: p.kind, node: mesh });
     if (["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(p.kind) && mesh) {
       heroMeshes[p.kind] = mesh;
     }
   }
   await Promise.all(modelJobs);
   scene.add(props);
+  const objectiveGuidance = createObjectiveGuidance(snapshot);
+  scene.add(objectiveGuidance.group);
 
   // Ambient townsfolk — NPCs reusing the rig, wandering the town to bring the
   // street to life. Non-blocking fallback so a load failure never breaks the scene.
@@ -757,6 +932,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     console.warn("[render3d] animated character failed, using placeholder", err);
     character = createPlaceholderCharacter();
   }
+  const playerReadability = createPlayerReadabilityRig();
+  character.group.add(playerReadability.group);
   scene.add(character.group);
   // F → play the one-shot "draw" clip (no-op on the placeholder fallback)
   if (typeof window !== "undefined") {
@@ -768,7 +945,16 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // Milestone 3B step 1–3: walkable, collidable, promptable.
   // Player owns input + camera each frame; proxies block movement; interaction
   // surfaces the nearest prompt and dispatches handlers on E.
-  const player = createPlayerController(camera, { canvas, thirdPerson: true, character: character.group });
+  if (!visualCapture) {
+    camera.fov = 58;
+    camera.updateProjectionMatrix();
+  }
+  const player = createPlayerController(camera, {
+    canvas,
+    thirdPerson: true,
+    character: character.group,
+    cameraPreset: "exploration",
+  });
   const proxies = buildProxies(snapshot.worldObjects);
   const promptEl = document.getElementById("prompt");
   const setPromptText = (t) => {
@@ -901,6 +1087,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       isBoardModalOpen: () => boardModalController.isOpen(),
       getEncounterState: () => encounter.getState(),
       getHeroVisibility: () => getHeroVisibility(heroMeshes, camera),
+      getCameraPose: () => ({
+        x: Number(camera.position.x.toFixed(2)),
+        y: Number(camera.position.y.toFixed(2)),
+        z: Number(camera.position.z.toFixed(2)),
+        fov: Number(camera.fov.toFixed(1)),
+      }),
       cycleTimeOfDay,
       setTimeOfDay,
       getTimeOfDay: () => dayTimeToKey(clock.dayTime),
@@ -917,9 +1109,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     prevTs = now;
     if (!boardModalController.isOpen()) player.update(dt, proxies);
     if (visualCapture) applyHeroCamera(); // re-assert hero pose (player.update re-syncs the follow-cam)
+    updateOcclusionFades(placementNodes, camera, player.position);
     interaction.update(player.position);
     encounter.update(player.position, dt);
     character.update(visualCapture ? 0 : dt, player.moving && !visualCapture, player.running && !visualCapture);
+    playerReadability.update(now / 1000);
+    objectiveGuidance.update(now / 1000, loopState.phase);
     townsfolk.update(visualCapture ? 0 : dt, visualCapture, player.position);
     // NPC greeting prompt/speech overrides the kind prompt when near a townsperson
     if (npcSpeechT > 0) {

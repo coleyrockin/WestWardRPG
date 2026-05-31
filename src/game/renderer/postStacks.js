@@ -32,7 +32,7 @@ export const REGION_POST = {
     edgeHi: 0.28,
     bloomBase: 0.11, // multiplied by palette.bloom
     bloomRadius: 0.7, // wider painterly glow
-    bloomThreshold: 0.9, // only true highlights bloom — keeps the sky/haze from washing milky
+    bloomThreshold: 0.95, // only true emissives (lamps/beacon/sun disc) bloom — sky/walls stay crisp
     grainIntensity: 0.14,
   },
   // Scaffolded — shipped in Phase 6.

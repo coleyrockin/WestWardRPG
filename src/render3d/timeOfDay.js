@@ -17,16 +17,18 @@ export const PALETTES = Object.freeze({
   dusk: {
     key: "dusk",
     label: "Dusk",
-    sky: { top: "#2a2a50", mid: "#6a5570", horizon: "#d89a68" },
-    fog: { color: "#7a6858", density: 0.0072 },
-    sun: { color: "#ffc070", intensity: 2.4, dir: { x: -10, y: 3.5, z: -5 }, disc: 0.028, glow: 0.18 },
-    hemi: { sky: "#6a6890", ground: "#332618", intensity: 0.42 },
-    rim: { color: "#6a7adf", intensity: 0.7, dir: { x: 9, y: 5, z: 6 } },
-    exposure: 1.1,
-    stars: 0.1,
-    bloom: 0.7,
-    grade: { tint: "#ffb070", amount: 0.04, contrast: 1.08, saturation: 1.06, shadowTint: "#46527a", highlightTint: "#ffba70" },
-    bodyBg: "#1a1226",
+    // Sunset gradient with real depth: deep indigo zenith → violet mid → warm amber
+    // horizon. Tamed so lit walls/roofs hold detail instead of blowing to white.
+    sky: { top: "#1e2148", mid: "#5a4570", horizon: "#e0935a" },
+    fog: { color: "#6a5a4e", density: 0.0085 },
+    sun: { color: "#ffc878", intensity: 1.9, dir: { x: -10, y: 3.5, z: -5 }, disc: 0.026, glow: 0.16 },
+    hemi: { sky: "#5a5a82", ground: "#2e2114", intensity: 0.32 },
+    rim: { color: "#6a7adf", intensity: 0.75, dir: { x: 9, y: 5, z: 6 } },
+    exposure: 0.92,
+    stars: 0.12,
+    bloom: 0.55,
+    grade: { tint: "#ffb070", amount: 0.05, contrast: 1.12, saturation: 1.1, shadowTint: "#3e4a78", highlightTint: "#ffb868" },
+    bodyBg: "#161024",
   },
   goldenHour: {
     key: "goldenHour",
