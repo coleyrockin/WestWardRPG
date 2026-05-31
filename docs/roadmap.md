@@ -4,7 +4,7 @@ Single source of truth. Do not create parallel `TODO.md`, `PLAN.md`, `ROADMAP-*.
 or another roadmap file.
 
 Last updated: `2026-05-30`
-Branch: `main` @ `f55f1b2` (Vercel Production ● Ready)
+Branch: `codex-camera-feel-v1` (agent competition branch; do not merge automatically)
 
 ---
 
@@ -147,17 +147,20 @@ production.
 - **Milk-kill** — fog 0.0075 + bloom threshold 0.9; pink haze gone.
 - **6A/6B/6C** — prop detail, hero rig (Run/Turn/Draw), interactive NPCs (Mabel/Cole/Rosa/Hank/Pearl).
 
-### 🔴 IMMEDIATE — Fix the grade (user reviewed live render, waiting)
-The scene now has composition but reads **flat, pale, uniform cream** because the current grade is a tint-multiply that cannot create contrast. Full spec in `docs/NEXT-AGENT.md`.
+### 🟢 Active competition pass — `codex-camera-feel-v1`
+Goal: make the first 30 seconds read like a playable RPG instead of a static beauty shot.
 
-**Changes:** `src/game/renderer/postStacks.js` — replace flat tint-multiply with:
-1. Contrast S-curve (contrast ≈ 1.6)
-2. Saturation (≈ 1.45)
-3. Split-tone — cool shadow tint `#1a0a2e` + warm highlight tint `#ffb040`
+Current branch scope:
+1. Exploration camera is higher, pulled back, and smoothed through named presets in `src/render3d/playerController.js`.
+2. Player readability is reinforced with a subtle in-world ring and overhead marker attached to the character.
+3. Boone's job board gains an in-world objective ring, floating pointer, and road beads so the route is visible without relying only on the DOM objective strip.
+4. Foreground props between camera and player fade down instead of fully swallowing the character.
+5. Existing walk/run speeds remain pinned; movement math is unchanged while camera feel improves around it.
 
-**Lighting tightening:** `src/render3d/timeOfDay.js` dusk palette — rim `0.55→1.0`, sun `2.2→2.8`, hemi `0.34→0.18`, god-rays `0.85→1.3`.
-
-Deploy immediately after; user judges live on Vercel before anything else.
+Known follow-up for the branch comparison:
+- Take matching screenshots of `codex-camera-feel-v1` and `claude-world-polish-v1` from `spikes/render3d.html`.
+- Judge camera quality, player visibility, road guidance, Boone board clarity, console cleanliness, and frame stability.
+- Cherry-pick only the winning pieces into `main`; do not merge whole branches blindly.
 
 ### 🟡 Ready to merge — PART 7 atmosphere (`feature/part7-atmosphere`, local only)
 - `dustMotes.js` — sun-shaft ambient specks, hidden under `?visual`

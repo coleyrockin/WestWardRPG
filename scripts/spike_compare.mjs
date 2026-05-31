@@ -9,6 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
+import { PNG } from "pngjs";
 
 const BASE = process.env.WESTWARD_URL || "http://127.0.0.1:5180";
 const OUT = path.resolve("output/spike-compare");
@@ -64,16 +65,77 @@ function collectConsole(page, bucket) {
   page.on("pageerror", (e) => bucket.push(String(e)));
 }
 
+function assertImageHasVisiblePixels(outPath, label) {
+  const png = PNG.sync.read(fs.readFileSync(outPath));
+  let visible = 0;
+  const total = png.width * png.height;
+  for (let i = 0; i < png.data.length; i += 4) {
+    const r = png.data[i];
+    const g = png.data[i + 1];
+    const b = png.data[i + 2];
+    const a = png.data[i + 3];
+    if (a > 0 && r + g + b > 24) visible++;
+  }
+  const ratio = visible / Math.max(1, total);
+  if (ratio < 0.01) {
+    throw new Error(`${label} screenshot is visually blank (${(ratio * 100).toFixed(3)}% visible pixels)`);
+  }
+}
+
 // Capture the canvas element directly first. If Playwright cannot capture the
-// element, fall back to reading the canvas pixels in-page. Keeping both paths
-// avoids false negatives from either browser screenshot quirks or canvas
-// readback stalls.
+// element because the animated WebGL canvas never becomes "stable", take a
+// viewport screenshot clipped to the canvas bounds. Only then fall back to
+// canvas readback, which can stall on GPU-backed canvases.
 async function screenshotCanvas(page, selector, outPath) {
   try {
     await page.locator(selector).screenshot({ path: outPath, timeout: 10000 });
+    assertImageHasVisiblePixels(outPath, selector);
     return;
   } catch (screenshotError) {
-    console.warn(`[warn] element screenshot failed for ${selector}; trying canvas readback: ${screenshotError.message}`);
+    console.warn(`[warn] element screenshot failed for ${selector}; trying viewport clip: ${screenshotError.message}`);
+  }
+
+  try {
+    const box = await page.locator(selector).boundingBox({ timeout: 5000 });
+    if (box && box.width > 0 && box.height > 0) {
+      await page.screenshot({
+        path: outPath,
+        clip: {
+          x: Math.max(0, Math.floor(box.x)),
+          y: Math.max(0, Math.floor(box.y)),
+          width: Math.floor(box.width),
+          height: Math.floor(box.height),
+        },
+        timeout: 10000,
+      });
+      assertImageHasVisiblePixels(outPath, selector);
+      return;
+    }
+  } catch (clipError) {
+    console.warn(`[warn] viewport clip failed for ${selector}; trying CDP screenshot: ${clipError.message}`);
+  }
+
+  try {
+    const box = await page.locator(selector).boundingBox({ timeout: 5000 });
+    if (box && box.width > 0 && box.height > 0) {
+      const client = await page.context().newCDPSession(page);
+      const shot = await client.send("Page.captureScreenshot", {
+        format: "png",
+        fromSurface: true,
+        clip: {
+          x: Math.max(0, Math.floor(box.x)),
+          y: Math.max(0, Math.floor(box.y)),
+          width: Math.floor(box.width),
+          height: Math.floor(box.height),
+          scale: 1,
+        },
+      });
+      fs.writeFileSync(outPath, Buffer.from(shot.data, "base64"));
+      assertImageHasVisiblePixels(outPath, selector);
+      return;
+    }
+  } catch (cdpError) {
+    console.warn(`[warn] CDP screenshot failed for ${selector}; trying canvas readback: ${cdpError.message}`);
   }
 
   const dataUrl = await withTimeout(page.evaluate((sel) => {
@@ -90,6 +152,7 @@ async function screenshotCanvas(page, selector, outPath) {
   }
   const buf = Buffer.from(dataUrl.slice("data:image/png;base64,".length), "base64");
   fs.writeFileSync(outPath, buf);
+  assertImageHasVisiblePixels(outPath, selector);
 }
 
 async function captureOld(context) {
@@ -108,7 +171,13 @@ async function captureOld(context) {
   // force: true skips actionability checks — the title menu animates, so the
   // button is never "stable" without it.
   await page.locator("#start-btn").click({ timeout: 10000, force: true });
-  await sleep(400);
+  await page.evaluate(() => {
+    try { document.querySelector("#start-btn")?.click(); } catch {}
+  });
+  await page.waitForFunction(
+    () => window.__westwardSmoke?.getGameplayState?.().mode === "playing",
+    { timeout: 5000 },
+  ).catch(() => null);
   // Force the frontier opening pose deterministically.
   await page.evaluate(() => {
     try { window.__westwardSmoke?.setRegion?.("frontier"); } catch {}
@@ -158,6 +227,11 @@ async function captureNew(context) {
   const visibleKinds = Object.entries(heroVisibility).filter(([, view]) => view.inFrame).map(([kind]) => kind);
   if (!heroVisibility.jobBoard?.inFrame || visibleKinds.length < 2) {
     errors.push(`render3d first frame does not show the first-road hero cluster; visible=${visibleKinds.join(",") || "none"}`);
+  }
+  const cameraPose = await page.evaluate(() => window.__westward3dTest.getCameraPose?.() || null);
+  console.log(`[probe] new camera pose: ${JSON.stringify(cameraPose)}`);
+  if (!cameraPose || cameraPose.y < 2.5 || cameraPose.y > 4.8 || cameraPose.fov < 45 || cameraPose.fov > 55) {
+    errors.push(`render3d first camera pose outside third-person opening bounds: ${JSON.stringify(cameraPose)}`);
   }
   await sleep(300);
   await screenshotCanvas(page, "#scene", path.join(OUT, "new.png"));

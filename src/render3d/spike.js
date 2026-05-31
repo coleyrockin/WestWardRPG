@@ -946,7 +946,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // Player owns input + camera each frame; proxies block movement; interaction
   // surfaces the nearest prompt and dispatches handlers on E.
   if (!visualCapture) {
-    camera.fov = 58;
+    camera.fov = 54;
     camera.updateProjectionMatrix();
   }
   const player = createPlayerController(camera, {
@@ -957,7 +957,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   });
   const proxies = buildProxies(snapshot.worldObjects);
   const promptEl = document.getElementById("prompt");
+  let currentPromptText = "";
   const setPromptText = (t) => {
+    currentPromptText = t || "";
     if (!promptEl) return;
     if (promptEl.textContent !== t) promptEl.textContent = t;
     promptEl.hidden = !t;
@@ -1122,7 +1124,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       setPromptText(npcSpeechMsg);
     } else {
       const who = townsfolk.getInteractable();
-      if (who) setPromptText(`E — Talk to ${who.name}`);
+      if (who && loopState.phase !== "spawn" && !currentPromptText) setPromptText(`E — Talk to ${who.name}`);
     }
     stepWorld(dt);
     post.render();

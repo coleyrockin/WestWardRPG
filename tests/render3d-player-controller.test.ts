@@ -4,9 +4,13 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
+  CAMERA_PRESETS,
+  cameraSmoothingAlpha,
+  computeFollowCameraPose,
   createPlayerController,
   forwardVector,
   rightVector,
+  resolveCameraPreset,
   stepPlayer,
 } from "../src/render3d/playerController.js";
 
@@ -58,6 +62,40 @@ describe("playerController — basis vectors", () => {
     const r = rightVector(0);
     expect(approx(r.x, 1)).toBe(true);
     expect(approx(r.z, 0)).toBe(true);
+  });
+});
+
+describe("playerController — camera presets", () => {
+  it("keeps exploration higher and farther back than inspection", () => {
+    expect(CAMERA_PRESETS.exploration.distance).toBeGreaterThan(CAMERA_PRESETS.inspection.distance);
+    expect(CAMERA_PRESETS.exploration.height).toBeGreaterThan(CAMERA_PRESETS.inspection.height);
+  });
+
+  it("resolves unknown preset names to exploration while preserving overrides", () => {
+    const preset = resolveCameraPreset("missing", { distance: 12 });
+    expect(preset.distance).toBe(12);
+    expect(preset.lookAhead).toBe(CAMERA_PRESETS.exploration.lookAhead);
+  });
+
+  it("computes an exploration pose that looks ahead of the player down the road", () => {
+    const pose = computeFollowCameraPose({
+      position: { x: 9.5, z: 8.5 },
+      yaw: -Math.PI / 2,
+      pitch: 0,
+      preset: CAMERA_PRESETS.exploration,
+    });
+
+    expect(pose.camera.x).toBeLessThan(9.5);
+    expect(pose.camera.y).toBeGreaterThanOrEqual(4);
+    expect(pose.lookAt.x).toBeGreaterThan(9.5);
+    expect(pose.lookAt.z).toBeGreaterThan(8.5);
+  });
+
+  it("returns a bounded exponential smoothing alpha", () => {
+    expect(cameraSmoothingAlpha(0, 8)).toBe(0);
+    const alpha = cameraSmoothingAlpha(1 / 60, 8);
+    expect(alpha).toBeGreaterThan(0);
+    expect(alpha).toBeLessThan(1);
   });
 });
 
@@ -297,6 +335,39 @@ describe("playerController — DOM shell", () => {
     ctrl.update(1);
     // No movement after blur — forward was force-released.
     expect(camera.position.z).toBe(zAfterBlur);
+    ctrl.dispose();
+  });
+
+  it("third-person follow camera pulls above and behind while looking ahead", () => {
+    const doc = makeFakeDocument();
+    const camera = {
+      ...makeFakeCamera(),
+      position: {
+        x: 9.5,
+        y: 1.8,
+        z: 8.5,
+        set(x: number, y: number, z: number) {
+          this.x = x; this.y = y; this.z = z;
+        },
+      },
+      lookAt: vi.fn(),
+    };
+    const character = { position: { x: 0, z: 0 }, rotation: { y: 0 } };
+    const ctrl = createPlayerController(camera as any, {
+      document: doc as any,
+      thirdPerson: true,
+      character,
+      cameraPreset: "exploration",
+    });
+
+    ctrl.setPosition({ x: 9.5, z: 8.5 });
+    ctrl.update(1 / 60);
+
+    expect(camera.position.y).toBeGreaterThanOrEqual(4);
+    expect(camera.position.z).toBeGreaterThan(12);
+    expect(camera.lookAt).toHaveBeenCalled();
+    expect(character.position.x).toBe(9.5);
+    expect(character.position.z).toBe(8.5);
     ctrl.dispose();
   });
 });

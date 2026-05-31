@@ -56,7 +56,7 @@ The current build pushes the original Shattered Frontier into a compact Skyrim/O
 ## What Reviewers Should Notice
 
 - **Playable now**: the Canvas build has a full Dustward first-road loop with Boone's board, bounty flow, rewards, save recovery, and run memory.
-- **Engineering depth**: 96 Vitest files cover combat, saves, jobs, progression, visual profiles, accessibility settings, and the 3D spike seams.
+- **Engineering depth**: 107 Vitest files cover combat, saves, jobs, progression, visual profiles, accessibility settings, and the 3D spike seams.
 - **Browser QA discipline**: Playwright smoke scripts exercise golden-path, save-recovery, combat, weather, settings, and the Three.js first-road route.
 - **Clear migration path**: the Three.js renderer is isolated under `src/render3d/`, with the Canvas game kept stable until parity is proven.
 
@@ -101,7 +101,7 @@ The current build contains the Shattered Frontier v3 foundation plus several ope
 - **NPC memory foundation**: deterministic NPC memory for greetings, origin, region, house state, quest outcomes, faction stance, and gear milestones.
 - **Visual direction**: redesigned title screen, region visual identities, combat feedback, and an active Dustward Canvas art-kit pass with dusk sky, warmer road language, town silhouettes, lantern/wanted-board props, lower marsh barriers, and less placeholder-heavy opening composition.
 
-Latest local fast gate: `npm test` reports **1085 passing tests across 96 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
+Latest local fast gate: `npm test` reports **1174 passing tests across 107 files**. The core systems are present; the current roadmap is focused on turning them into a finished-product vertical slice. Run the verification commands below before committing gameplay changes.
 
 ## Current Direction
 
@@ -119,10 +119,12 @@ Current playable path:
 - `spikes/render3d.html` is an experimental Three.js first-road slice.
 - New 3D work should stay under `src/render3d/` until it reaches parity with the Canvas first-road loop.
 
+Active competition branch: `codex-camera-feel-v1` focuses on camera feel and gameplay readability. It raises and pulls back the exploration camera, keeps follow motion smooth, adds a player readability ring/marker, fades blocking foreground props, and gives Boone's board an in-world path/target guide.
+
 The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the single source of truth. The high-level active build order is:
 
 1. **3D foundation hardening** — keep Canvas stable while the Three.js spike becomes modular, testable, and smoke-gated.
-2. **First-road 3D loop** — finish the board, cache, slime, wagon, Map Scrap, and return-to-Boone sequence in `spikes/render3d.html`.
+2. **First-road 3D loop** — finish the board, cache, slime, wagon, Map Scrap, and return-to-Boone sequence in `spikes/render3d.html`, with the first 30 seconds clearly framing the player, road, and Boone's board.
 3. **Visual and accessibility proof** — add screenshot review, HUD readability, prompt semantics, and modal focus polish.
 4. **System parity planning** — design the safe bridge from 3D phase completions back to save-safe Canvas systems.
 5. **Release polish** — package the strongest playable path honestly, with known limits and current screenshots.

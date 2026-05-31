@@ -25,6 +25,41 @@ const DEFAULT_SENSITIVITY = 0.0035; // radians per pixel of mouse drag
 const DEFAULT_EYE_HEIGHT = 1.8;
 const MAX_PITCH = Math.PI / 3; // ±60° — generous; avoids gimbal flip near ±π/2
 
+export const CAMERA_PRESETS = Object.freeze({
+  exploration: Object.freeze({
+    distance: 7.6,
+    height: 4.0,
+    lookHeight: 1.45,
+    lookAhead: 4.8,
+    shoulder: 1.18,
+    smoothing: 9,
+  }),
+  town: Object.freeze({
+    distance: 7.6,
+    height: 5.0,
+    lookHeight: 1.55,
+    lookAhead: 4.4,
+    shoulder: 1.2,
+    smoothing: 9.5,
+  }),
+  inspection: Object.freeze({
+    distance: 4.8,
+    height: 3.5,
+    lookHeight: 1.65,
+    lookAhead: 2.2,
+    shoulder: 0.95,
+    smoothing: 12,
+  }),
+  objective: Object.freeze({
+    distance: 8.4,
+    height: 5.8,
+    lookHeight: 1.55,
+    lookAhead: 6.8,
+    shoulder: 1.25,
+    smoothing: 7.5,
+  }),
+});
+
 // Forward / right basis from yaw. Exported so tests and worldProxies can
 // reuse the same convention if needed.
 export function forwardVector(yaw) {
@@ -32,6 +67,42 @@ export function forwardVector(yaw) {
 }
 export function rightVector(yaw) {
   return { x: Math.cos(yaw), z: -Math.sin(yaw) };
+}
+
+export function resolveCameraPreset(name = "exploration", overrides = {}) {
+  const base = CAMERA_PRESETS[name] || CAMERA_PRESETS.exploration;
+  return { ...base, ...overrides };
+}
+
+export function cameraSmoothingAlpha(dt, smoothing = CAMERA_PRESETS.exploration.smoothing) {
+  const safeDt = Number.isFinite(dt) && dt > 0 ? dt : 0;
+  const safeSmoothing = Number.isFinite(smoothing) && smoothing > 0 ? smoothing : 1;
+  return 1 - Math.exp(-safeSmoothing * safeDt);
+}
+
+export function computeFollowCameraPose({
+  position,
+  yaw = 0,
+  pitch = 0,
+  preset = CAMERA_PRESETS.exploration,
+} = {}) {
+  const pos = position || { x: 0, z: 0 };
+  const cfg = resolveCameraPreset(null, preset);
+  const fwd = forwardVector(yaw);
+  const side = rightVector(yaw);
+  const lift = Math.sin(pitch) * cfg.distance * 0.38;
+  return {
+    camera: {
+      x: pos.x - fwd.x * cfg.distance + side.x * cfg.shoulder,
+      y: cfg.height - lift,
+      z: pos.z - fwd.z * cfg.distance + side.z * cfg.shoulder,
+    },
+    lookAt: {
+      x: pos.x + fwd.x * cfg.lookAhead + side.x * cfg.shoulder * 0.35,
+      y: cfg.lookHeight + lift * 0.45,
+      z: pos.z + fwd.z * cfg.lookAhead + side.z * cfg.shoulder * 0.35,
+    },
+  };
 }
 
 // Pure single-step update. Returns a *new* { position, yaw } — never mutates
@@ -127,14 +198,26 @@ export function createPlayerController(camera, opts = {}) {
     // movement heading. Falls back to first-person when thirdPerson is false.
     thirdPerson = false,
     character = null, // THREE.Object3D positioned at the player's feet
-    camDistance = 6.6,
-    camHeight = 3.6,
-    camLookHeight = 1.7,
-    camLookAhead = 3.0,
-    camShoulder = 1.15, // lateral over-the-shoulder offset so the hero isn't dead-centre blocking the view
+    cameraPreset = "exploration",
+    camDistance = null,
+    camHeight = null,
+    camLookHeight = null,
+    camLookAhead = null,
+    camShoulder = null, // lateral over-the-shoulder offset so the hero isn't dead-centre blocking the view
+    camSmoothing = null,
   } = opts;
+  const presetOverrides = {
+    ...(Number.isFinite(camDistance) ? { distance: camDistance } : {}),
+    ...(Number.isFinite(camHeight) ? { height: camHeight } : {}),
+    ...(Number.isFinite(camLookHeight) ? { lookHeight: camLookHeight } : {}),
+    ...(Number.isFinite(camLookAhead) ? { lookAhead: camLookAhead } : {}),
+    ...(Number.isFinite(camShoulder) ? { shoulder: camShoulder } : {}),
+    ...(Number.isFinite(camSmoothing) ? { smoothing: camSmoothing } : {}),
+  };
+  let activeCameraPreset = resolveCameraPreset(cameraPreset, presetOverrides);
   let moving = false;
   let running = false; // moving AND sprint held — drives the Run animation blend
+  let thirdPersonCameraSeeded = false;
 
   // Seed yaw + pitch from the camera's current heading so the spike's hero
   // pose is preserved on the first frame. We project the forward vector onto
@@ -271,23 +354,18 @@ export function createPlayerController(camera, opts = {}) {
     if (camera && thirdPerson) {
       // Follow-cam orbits behind the heading and looks slightly ahead of the
       // character. Drag yaw turns the whole rig; pitch tilts the cam vertically.
-      const fwd = forwardVector(yaw);
-      const side = rightVector(yaw);
-      const lift = Math.sin(pitch) * camDistance * 0.5;
-      // Behind + above the hero, pushed to one shoulder so the character sits
-      // off-centre and never fills/occludes the frame. Look slightly ahead and
-      // up the same shoulder so the road and horizon stay framed.
+      const pose = computeFollowCameraPose({ position, yaw, pitch, preset: activeCameraPreset });
+      const alpha = thirdPersonCameraSeeded
+        ? cameraSmoothingAlpha(dt, activeCameraPreset.smoothing)
+        : 1;
+      thirdPersonCameraSeeded = true;
       camera.position.set(
-        position.x - fwd.x * camDistance + side.x * camShoulder,
-        camHeight - lift,
-        position.z - fwd.z * camDistance + side.z * camShoulder,
+        camera.position.x + (pose.camera.x - camera.position.x) * alpha,
+        camera.position.y + (pose.camera.y - camera.position.y) * alpha,
+        camera.position.z + (pose.camera.z - camera.position.z) * alpha,
       );
       if (camera.lookAt) {
-        camera.lookAt(
-          position.x + fwd.x * camLookAhead + side.x * camShoulder * 0.5,
-          camLookHeight + lift * 0.5,
-          position.z + fwd.z * camLookAhead + side.z * camShoulder * 0.5,
-        );
+        camera.lookAt(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z);
       }
     } else if (camera) {
       camera.position.x = position.x;
@@ -313,6 +391,12 @@ export function createPlayerController(camera, opts = {}) {
       camera.position.x = incoming.x;
       camera.position.z = incoming.z;
     }
+    thirdPersonCameraSeeded = false;
+  }
+
+  function setCameraPreset(name, overrides = {}) {
+    activeCameraPreset = resolveCameraPreset(name, { ...presetOverrides, ...overrides });
+    thirdPersonCameraSeeded = false;
   }
 
   function dispose() {
@@ -333,6 +417,7 @@ export function createPlayerController(camera, opts = {}) {
   return {
     update,
     setPosition,
+    setCameraPreset,
     dispose,
     get position() { return { x: position.x, z: position.z }; },
     get yaw() { return yaw; },
