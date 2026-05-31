@@ -10,11 +10,14 @@ import {
 } from "../src/render3d/interactionSystem.js";
 
 const JOB_BOARD    = { kind: "jobBoard",    label: "Boone's Board",   x: 12.35, y: 8.55 };
+const ROAD_SIGN    = { kind: "roadSign",    label: "Road Sign",       x: 13.0,  y: 8.7 };
+const TOWN_BARK    = { kind: "townBark",    label: "Town Warning",    x: 13.2,  y: 8.9 };
 const SMOKE_CACHE  = { kind: "smokeCache",  label: "Smoke Cache",     x: 12.6,  y: 8.85 };
+const SLIME_TELL   = { kind: "slimeTell",   label: "Slime Trail",     x: 13.25, y: 9.0 };
 const BROKEN_WAGON = { kind: "brokenWagon", label: "Broken Wagon",    x: 13.5,  y: 10.5 };
 const ROAD_SLIME   = { kind: "roadSlime",   label: "Road Slime",      x: 14.4,  y: 9.4 };
 
-const WORLD = [JOB_BOARD, SMOKE_CACHE, BROKEN_WAGON, ROAD_SLIME];
+const WORLD = [JOB_BOARD, ROAD_SIGN, TOWN_BARK, SMOKE_CACHE, SLIME_TELL, BROKEN_WAGON, ROAD_SLIME];
 
 function makeFakeDocument() {
   const handlers: Record<string, Set<(e: any) => void>> = {};
@@ -34,7 +37,7 @@ function makeFakeDocument() {
 describe("interactionSystem — INTERACTABLE_KINDS", () => {
   it("includes first-road loop interactables", () => {
     expect(new Set(INTERACTABLE_KINDS)).toEqual(
-      new Set(["jobBoard", "smokeCache", "brokenWagon", "roadSlime"]),
+      new Set(["jobBoard", "roadSign", "townBark", "smokeCache", "slimeTell", "brokenWagon", "roadSlime"]),
     );
   });
 });
@@ -81,7 +84,10 @@ describe("interactionSystem — pickNearest", () => {
 describe("interactionSystem — promptFor", () => {
   it("emits the correct prompt for each interactable kind", () => {
     expect(promptFor(JOB_BOARD)).toBe("E — Open Boone's Board");
+    expect(promptFor(ROAD_SIGN)).toBe("E — Read Road Sign");
+    expect(promptFor(TOWN_BARK)).toBe("E — Hear Pearl's Warning");
     expect(promptFor(SMOKE_CACHE)).toBe("E — Open Smoke Cache");
+    expect(promptFor(SLIME_TELL)).toBe("E — Inspect Slime Trail");
     expect(promptFor(BROKEN_WAGON)).toBe("E — Inspect Wagon");
   });
 

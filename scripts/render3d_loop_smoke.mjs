@@ -81,7 +81,7 @@ async function main() {
 
     await expectPhase(page, "spawn");
     await interact(page, "jobBoard");
-    await expectPhase(page, "accept_bounty");
+    await expectPhase(page, "board_choice");
     const modalOpen = await page.evaluate(() => !document.getElementById("board-modal")?.hidden);
     if (!modalOpen) throw new Error("job board modal did not open");
     const beforeModalMove = await page.evaluate(() => window.__westward3dTest.getPlayerPosition());
@@ -93,26 +93,35 @@ async function main() {
       throw new Error("player moved while job board modal was open");
     }
 
-    await page.evaluate(() => window.__westward3dTest.acceptBoard());
-    await expectPhase(page, "road_walk");
+    await page.evaluate(() => window.__westward3dTest.chooseBoardOption("ask_danger"));
+    await expectPhase(page, "road_sign");
     const modalClosed = await page.evaluate(() => document.getElementById("board-modal")?.hidden === true);
     if (!modalClosed) throw new Error("job board modal did not close after accept");
+    const choice = await getState(page);
+    if (choice.boardChoice !== "ask_danger") throw new Error(`board choice not stored, got ${choice.boardChoice}`);
+
+    await interact(page, "roadSign");
+    await expectPhase(page, "road_walk");
+    await interact(page, "townBark");
+    await expectPhase(page, "cache_clue");
     await interact(page, "smokeCache");
-    const afterCache = await getState(page);
-    if (!["cache_open", "slime_fight"].includes(afterCache?.phase)) {
-      throw new Error(`expected cache_open or slime_fight after cache, got ${afterCache?.phase || "none"}`);
-    }
-    if (afterCache.phase === "cache_open") await waitForPhase(page, "slime_fight");
+    await expectPhase(page, "slime_tell");
+    await interact(page, "slimeTell");
+    await expectPhase(page, "slime_fight");
     await page.evaluate(() => window.__westward3dTest.movePlayerToKind?.("roadSlime"));
     await interact(page, "roadSlime");
-    await expectPhase(page, "wagon_inspect");
+    await expectPhase(page, "wagon_salvage");
     await interact(page, "brokenWagon");
-    await expectPhase(page, "scrap_earned");
+    await expectPhase(page, "return_to_boone");
     const reward = await getState(page);
     if (reward.inventoryPreview["Map Scrap"] !== 1) throw new Error("Map Scrap reward missing");
-    await waitForPhase(page, "return_to_boone");
     await interact(page, "jobBoard");
-    await expectPhase(page, "survey_offered");
+    await expectPhase(page, "survey_teaser");
+    const metrics = await page.evaluate(() => window.__westward3dTest.getRouteMetrics());
+    if (metrics.estimatedPlaySeconds < 240 || metrics.estimatedPlaySeconds > 360) {
+      throw new Error(`route pacing outside target: ${metrics.estimatedPlaySeconds}`);
+    }
+    if (!metrics.routeBeats.returnToBoone) throw new Error("return-to-Boone beat missing");
 
     if (errors.length) throw new Error(`console errors:\n${errors.join("\n")}`);
     console.log("[ok] render3d first-road loop smoke passed");

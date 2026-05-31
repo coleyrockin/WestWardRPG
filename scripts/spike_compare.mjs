@@ -82,6 +82,33 @@ function assertImageHasVisiblePixels(outPath, label) {
   }
 }
 
+function analyzeSpikeScreenshot(outPath) {
+  const png = PNG.sync.read(fs.readFileSync(outPath));
+  let roadLike = 0;
+  let overbright = 0;
+  const total = png.width * png.height;
+  for (let i = 0; i < png.data.length; i += 4) {
+    const r = png.data[i];
+    const g = png.data[i + 1];
+    const b = png.data[i + 2];
+    const a = png.data[i + 3];
+    if (a <= 0) continue;
+    if (r > 245 && g > 238 && b > 220) overbright++;
+    if (
+      r >= 72 && r <= 225 &&
+      g >= 48 && g <= 188 &&
+      b >= 24 && b <= 150 &&
+      r >= g * 0.9 &&
+      g >= b * 0.85 &&
+      r - b >= 22
+    ) roadLike++;
+  }
+  return {
+    roadLikeRatio: roadLike / Math.max(1, total),
+    overbrightRatio: overbright / Math.max(1, total),
+  };
+}
+
 // Capture the canvas element directly first. If Playwright cannot capture the
 // element because the animated WebGL canvas never becomes "stable", take a
 // viewport screenshot clipped to the canvas bounds. Only then fall back to
@@ -217,7 +244,11 @@ async function captureNew(context) {
   await withTimeout(page.goto(`${BASE}/spikes/render3d.html`, { waitUntil: "load" }), "load spikes/render3d.html", 15000);
   await page.waitForSelector("#scene");
   await page.waitForFunction(() => window.__spikeReady === true, { timeout: 15000 });
-  await page.waitForFunction(() => Boolean(window.__westward3dTest?.getHeroVisibility), { timeout: 15000 });
+  await page.waitForFunction(() => Boolean(
+    window.__westward3dTest?.getHeroVisibility
+      && window.__westward3dTest?.getPlayerVisibility
+      && window.__westward3dTest?.getRouteMetrics,
+  ), { timeout: 15000 });
   const snapshot = await page.evaluate(() => window.__westwardRenderSnapshot || null);
   const loopState = await page.evaluate(() => window.__westward3dLoop || null);
   if (!snapshot || snapshot.kind !== "westward-render-snapshot") {
@@ -232,16 +263,58 @@ async function captureNew(context) {
   const heroVisibility = await page.evaluate(() => window.__westward3dTest.getHeroVisibility());
   console.log(`[probe] new hero visibility: ${JSON.stringify(heroVisibility)}`);
   const visibleKinds = Object.entries(heroVisibility).filter(([, view]) => view.inFrame).map(([kind]) => kind);
-  if (!heroVisibility.jobBoard?.inFrame || visibleKinds.length < 2) {
-    errors.push(`render3d first frame does not show the first-road hero cluster; visible=${visibleKinds.join(",") || "none"}`);
+  if (!heroVisibility.jobBoard?.inFrame) {
+    errors.push(`render3d first frame does not show Boone's board; visible=${visibleKinds.join(",") || "none"}`);
+  }
+  const playerVisibility = await page.evaluate(() => window.__westward3dTest.getPlayerVisibility());
+  console.log(`[probe] new player visibility: ${JSON.stringify(playerVisibility)}`);
+  if (!playerVisibility?.inFrame) {
+    errors.push(`render3d first frame hides the player: ${JSON.stringify(playerVisibility)}`);
+  }
+  const routeMetrics = await page.evaluate(() => window.__westward3dTest.getRouteMetrics());
+  console.log(`[probe] new route metrics: ${JSON.stringify(routeMetrics)}`);
+  if (
+    !routeMetrics ||
+    routeMetrics.totalDistance < 95 ||
+    routeMetrics.estimatedPlaySeconds < 240 ||
+    routeMetrics.estimatedPlaySeconds > 360 ||
+    !routeMetrics.targetKinds?.includes("slimeTell")
+  ) {
+    errors.push(`render3d route metrics outside first-five-minute target: ${JSON.stringify(routeMetrics)}`);
   }
   const cameraPose = await page.evaluate(() => window.__westward3dTest.getCameraPose?.() || null);
   console.log(`[probe] new camera pose: ${JSON.stringify(cameraPose)}`);
   if (!cameraPose || cameraPose.y < 2.5 || cameraPose.y > 4.8 || cameraPose.fov < 45 || cameraPose.fov > 55) {
     errors.push(`render3d first camera pose outside third-person opening bounds: ${JSON.stringify(cameraPose)}`);
   }
+  const hudFootprint = await page.evaluate(() => {
+    const ids = ["objective", "prompt", "tag"];
+    const vw = window.innerWidth || 1;
+    const vh = window.innerHeight || 1;
+    let area = 0;
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (!el || el.hidden) continue;
+      const r = el.getBoundingClientRect();
+      area += Math.max(0, r.width) * Math.max(0, r.height);
+    }
+    return area / Math.max(1, vw * vh);
+  });
+  console.log(`[probe] new HUD footprint: ${hudFootprint.toFixed(4)}`);
+  if (hudFootprint > 0.13) {
+    errors.push(`render3d HUD footprint too large: ${(hudFootprint * 100).toFixed(2)}%`);
+  }
   await sleep(300);
-  await screenshotCanvas(page, "#scene", path.join(OUT, "new.png"));
+  const newPath = path.join(OUT, "new.png");
+  await screenshotCanvas(page, "#scene", newPath);
+  const pixels = analyzeSpikeScreenshot(newPath);
+  console.log(`[probe] new pixel gates: ${JSON.stringify(pixels)}`);
+  if (pixels.roadLikeRatio < 0.04) {
+    errors.push(`render3d road is not visually obvious enough: road-like ratio ${(pixels.roadLikeRatio * 100).toFixed(2)}%`);
+  }
+  if (pixels.overbrightRatio > 0.09) {
+    errors.push(`render3d lamp/sky highlights are overexposed: overbright ratio ${(pixels.overbrightRatio * 100).toFixed(2)}%`);
+  }
   console.log("[capture] new spike: wrote new.png");
   await page.close();
   return errors;

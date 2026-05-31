@@ -158,10 +158,23 @@ Merged scope:
 5. The first road is wider, less cluttered, and visually calmer under the dusk lighting stack.
 6. Screenshot comparison now validates the actual `Follow the Road` opening loop state.
 
-### 🔴 Next recovery plan — make the first five minutes actually good
+### 🟡 Active recovery branch — make the first five minutes actually good
 The current 3D slice is a proof, not a finished opening. The next work must prioritize playable
 truth over more decoration: readable world shape, verbs, pacing, and validation that matches what a
 player sees.
+
+Active branch: `codex/first-five-minutes-v2`
+
+Implemented in this recovery pass:
+- Longer S-shaped first-road route with explicit phases from spawn through Old Road Survey teaser.
+- Board choice with `accept_bounty`, `ask_danger`, and `inspect_survey` follow-up copy.
+- Required road micro-beats: marshal sign, Pearl's warning, slime tell before combat.
+- Blender mini-kit registered through `assetManifest.js` for board, planks, lamps, saloon facade,
+  wagon salvage, mesa silhouettes, and slime tell.
+- Click-focus pointer-lock, Escape release, camera reset, and camera avoidance for major world
+  proxies.
+- Route metrics and visual gates for first-frame player/board visibility, 4-6 minute pacing, HUD
+  footprint, road readability, and overbright highlights.
 
 #### P0 — Cut the visual mud
 - Replace the flat box-town foreground with a cleaner composition: one saloon facade, one board

@@ -5,6 +5,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   CAMERA_PRESETS,
+  avoidCameraObstacles,
   cameraSmoothingAlpha,
   computeFollowCameraPose,
   createPlayerController,
@@ -96,6 +97,33 @@ describe("playerController — camera presets", () => {
     const alpha = cameraSmoothingAlpha(1 / 60, 8);
     expect(alpha).toBeGreaterThan(0);
     expect(alpha).toBeLessThan(1);
+  });
+});
+
+describe("playerController — camera obstacle avoidance", () => {
+  it("pulls the follow camera in front of large blocking geometry", () => {
+    const desired = { x: -8, y: 4, z: 0 };
+    const adjusted = avoidCameraObstacles({
+      from: { x: 0, y: 1.45, z: 0 },
+      desired,
+      proxies: [{ minX: -4.5, maxX: -3.5, minZ: -1, maxZ: 1, source: { kind: "saloonFacade" } }],
+      radius: 0.1,
+    });
+
+    expect(adjusted.x).toBeGreaterThan(-4.5);
+    expect(adjusted.x).toBeLessThan(0);
+    expect(adjusted.y).toBeGreaterThan(1.45);
+  });
+
+  it("ignores small prop proxies for camera collision", () => {
+    const desired = { x: -8, y: 4, z: 0 };
+    const adjusted = avoidCameraObstacles({
+      from: { x: 0, y: 1.45, z: 0 },
+      desired,
+      proxies: [{ minX: -4.5, maxX: -3.5, minZ: -1, maxZ: 1, source: { kind: "lampLow" } }],
+    });
+
+    expect(adjusted).toBe(desired);
   });
 });
 
@@ -309,6 +337,63 @@ describe("playerController — DOM shell", () => {
     // Subsequent update with no new drag must NOT rotate again (deltas drained).
     ctrl.update(0);
     expect(approx(ctrl.yaw, -1, 1e-9)).toBe(true);
+    ctrl.dispose();
+  });
+
+  it("click-focus pointer lock uses movement deltas and Escape releases focus", () => {
+    const doc: any = makeFakeDocument();
+    doc.pointerLockElement = null;
+    doc.exitPointerLock = vi.fn(() => {
+      doc.pointerLockElement = null;
+      doc.dispatch("pointerlockchange", {});
+    });
+    const canvas: any = {
+      _h: {} as Record<string, (e: any) => void>,
+      requestPointerLock: vi.fn(() => {
+        doc.pointerLockElement = canvas;
+        doc.dispatch("pointerlockchange", {});
+      }),
+      addEventListener(t: string, fn: any) { this._h[t] = fn; },
+      removeEventListener(t: string) { delete this._h[t]; },
+    };
+    const camera = makeFakeCamera();
+    const ctrl = createPlayerController(camera, {
+      document: doc as any, canvas, sensitivity: 0.01,
+    });
+
+    canvas._h.mousedown({ button: 0, clientX: 100, clientY: 100, preventDefault: vi.fn() });
+    doc.dispatch("mousemove", { movementX: 50, movementY: 0 });
+    ctrl.update(0);
+    expect(canvas.requestPointerLock).toHaveBeenCalled();
+    expect(approx(ctrl.yaw, -0.5, 1e-9)).toBe(true);
+
+    doc.dispatch("keydown", { code: "Escape" });
+    expect(doc.exitPointerLock).toHaveBeenCalled();
+    ctrl.dispose();
+  });
+
+  it("reset key clears camera pitch and can snap yaw behind the route", () => {
+    const doc = makeFakeDocument();
+    const camera = makeFakeCamera();
+    const ctrl = createPlayerController(camera, {
+      document: doc as any,
+      resetYaw: -Math.PI / 2,
+      sensitivity: 0.01,
+    });
+    const before = stepPlayer({
+      position: { x: 0, z: 0 },
+      yaw: 0,
+      input: { lookDx: 80, lookDy: 80 },
+      dt: 0,
+      sensitivity: 0.01,
+    });
+
+    ctrl.resetCameraBehind(before.yaw);
+    expect(approx(ctrl.yaw, before.yaw, 1e-9)).toBe(true);
+
+    doc.dispatch("keydown", { code: "KeyR" });
+    expect(approx(ctrl.yaw, -Math.PI / 2, 1e-9)).toBe(true);
+    expect(approx(ctrl.pitch, 0, 1e-9)).toBe(true);
     ctrl.dispose();
   });
 

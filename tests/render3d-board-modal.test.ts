@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { createBoardModalController } from "../src/render3d/boardModal.js";
 
-function makeButton() {
+function makeButton(optionId?: string) {
   const handlers: Record<string, Set<() => void>> = {};
   return {
     focused: false,
+    dataset: optionId ? { option: optionId } : {},
     addEventListener(type: string, fn: () => void) {
       (handlers[type] ||= new Set()).add(fn);
     },
@@ -66,6 +67,27 @@ describe("render3d board modal controller", () => {
     expect(onAccept).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(controller.isOpen()).toBe(false);
+  });
+
+  it("chooses a specific board option and closes the modal", () => {
+    const modal = { hidden: true };
+    const optionButton = makeButton("ask_danger");
+    const onChoose = vi.fn();
+    const onClose = vi.fn();
+    const controller = createBoardModalController({
+      modal,
+      optionButtons: [optionButton],
+      onChoose,
+      onClose,
+    });
+
+    controller.open();
+    optionButton.click();
+
+    expect(onChoose).toHaveBeenCalledWith("ask_danger");
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(controller.isOpen()).toBe(false);
+    expect(modal.hidden).toBe(true);
   });
 
   it("disposes event listeners", () => {

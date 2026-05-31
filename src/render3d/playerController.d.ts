@@ -50,6 +50,14 @@ export function computeFollowCameraPose(args?: {
   pitch?: number;
   preset?: Partial<CameraPreset>;
 }): CameraPose;
+export function isCameraBlockingProxy(proxy: any): boolean;
+export function avoidCameraObstacles(args?: {
+  from?: { x: number; y?: number; z: number };
+  desired?: { x: number; y?: number; z: number };
+  proxies?: any[];
+  radius?: number;
+  padding?: number;
+}): { x: number; y?: number; z: number };
 export function stepPlayer(args: StepPlayerArgs): StepPlayerResult;
 
 export interface CreatePlayerControllerOptions {
@@ -68,12 +76,18 @@ export interface CreatePlayerControllerOptions {
   camLookAhead?: number | null;
   camShoulder?: number | null;
   camSmoothing?: number | null;
+  pointerLock?: boolean;
+  dragLookFallback?: boolean;
+  resetKey?: string;
+  resetYaw?: number | null;
 }
 
 export interface PlayerController {
   update(dt: number, proxies?: any[] | null): void;
   setPosition(position: Vec2): void;
   setCameraPreset(name: string, overrides?: Partial<CameraPreset>): void;
+  resetCameraBehind(yaw?: number | null): void;
+  releasePointerFocus(): void;
   dispose(): void;
   readonly position: Vec2;
   readonly yaw: number;

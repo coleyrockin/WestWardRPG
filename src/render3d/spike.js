@@ -14,7 +14,7 @@ import { createPostProcessing } from "../game/renderer/postStacks.js";
 import { instanceModel, hashYaw } from "../game/renderer/assetLoader.js";
 import { modelFor } from "../game/renderer/assetManifest.js";
 import { createRenderSnapshot } from "../bridge/stateSnapshot.js";
-import { buildFrontierPlacements, PLAYER_SPAWN } from "./frontierLayout.js";
+import { buildFrontierPlacements, FIRST_FIVE_ROUTE, getRouteMetrics, PLAYER_SPAWN } from "./frontierLayout.js";
 import { createPlayerController } from "./playerController.js";
 import { buildProxies } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
@@ -37,6 +37,7 @@ import { createWeatherSystem } from "../game/world/weatherView.js";
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
 const col = (hex) => new THREE.Color(hex);
+const HERO_KINDS = Object.freeze(["jobBoard", "roadSign", "townBark", "smokeCache", "slimeTell", "roadSlime", "brokenWagon"]);
 
 // Sky dome, sun/rim/hemi lights, fog, and clouds now live in atmosphere.js,
 // driven by the time-of-day palettes in timeOfDay.js.
@@ -124,6 +125,13 @@ function buildLamp(group, p) {
   group.add(light);
 }
 
+function buildRoadPlank(group, p) {
+  const plank = addBox(group, 1.25 * p.size, 0.08, 0.28 * p.size, standard(p.color || "#87633c"), toVec(p.x, p.y));
+  plank.rotation.y = p.yaw || 0;
+  addContactShadow(group, p.x, p.y, 0.55 * p.size, 0.16 * p.size);
+  return plank;
+}
+
 function buildFence(group, p) {
   const len = 1.6 * p.size + 0.6;
   const mat = standard(p.color);
@@ -148,6 +156,48 @@ function buildSign(group, p) {
   panel.position.copy(toVec(p.x, p.y, 1.05));
   panel.castShadow = true;
   group.add(panel);
+}
+
+function buildTownBarkMarker(group, p) {
+  const base = addBox(group, 0.42, 0.14, 0.42, standard("#4a3218"), toVec(p.x, p.y));
+  const pole = addBox(group, 0.08, 1.35, 0.08, standard("#3a2a1c"), toVec(p.x, p.y));
+  const marker = new THREE.Mesh(
+    new THREE.ConeGeometry(0.24, 0.34, 4),
+    standard("#fff0b8", { emissive: "#ffd77b", emissiveIntensity: 0.7 }),
+  );
+  marker.rotation.y = Math.PI / 4;
+  marker.position.copy(toVec(p.x, p.y, 1.62));
+  group.add(marker);
+  addContactShadow(group, p.x, p.y, 0.45, 0.45);
+  return pole || base;
+}
+
+function buildSlimeTell(group, p) {
+  const tell = new THREE.Group();
+  tell.name = "slime-tell";
+  const smearMat = standard("#75d06b", {
+    emissive: "#2a6820",
+    emissiveIntensity: 0.8,
+    transparent: true,
+    opacity: 0.72,
+    rimStrength: 0,
+  });
+  for (let i = 0; i < 4; i++) {
+    const smear = new THREE.Mesh(new THREE.CircleGeometry(0.34 - i * 0.035, 18), smearMat);
+    smear.rotation.x = -Math.PI / 2;
+    smear.scale.set(1.65, 1, 0.48);
+    smear.position.set(p.x + i * 0.48, 0.07, p.y + Math.sin(i) * 0.22);
+    tell.add(smear);
+  }
+  const reeds = standard("#5f7a4a", { roughness: 1 });
+  for (const [dx, dz] of [[-0.35, 0.28], [0.1, -0.32], [0.5, 0.18]]) {
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.72, 0.06), reeds);
+    blade.position.copy(toVec(p.x + dx, p.y + dz, 0.36));
+    blade.rotation.z = dx;
+    tell.add(blade);
+  }
+  group.add(tell);
+  return tell;
 }
 
 function buildJobBoard(group, p) {
@@ -353,23 +403,32 @@ function buildPlacement(group, p) {
     case "gate": return buildBuilding(group, p, 0.8);
     case "watchtower":
     case "landmark": return buildWatchtower(group, p);
-    case "lamp": return buildLamp(group, p);
+    case "lamp":
+    case "lampTall":
+    case "lampLow": return buildLamp(group, p);
     case "fence": return buildFence(group, p);
     case "sign":
+    case "roadSign":
     case "road": return buildSign(group, p);
+    case "townBark": return buildTownBarkMarker(group, p);
     case "jobBoard": return buildJobBoard(group, p);
     case "smokeCache": return buildSmokeCache(group, p);
-    case "brokenWagon": return buildWagon(group, p);
+    case "slimeTell": return buildSlimeTell(group, p);
+    case "brokenWagon":
+    case "wagonSalvage": return buildWagon(group, p);
     case "roadSlime": return buildSlime(group, p);
-    case "saloon": return buildBuilding(group, p, 1.15);
+    case "saloon":
+    case "saloonFacade": return buildBuilding(group, p, 1.15);
     case "storefront": return buildBuilding(group, p, 0.95);
     case "porch": return buildPorch(group, p);
     case "mesa":
+    case "mesaSilhouette":
     case "cliff": return buildMesa(group, p);
     case "rock":
     case "boulder": return buildRock(group, p);
     case "cactus": return buildCactus(group, p);
     case "deadTree": return buildDeadTree(group, p);
+    case "roadPlank": return buildRoadPlank(group, p);
     case "brush": return buildBrush(group, p);
     case "reeds": return buildReeds(group, p);
     case "cart":
@@ -497,7 +556,7 @@ function updateOcclusionFades(placementNodes, camera, playerPos) {
   const box = new THREE.Box3();
   const hitPt = new THREE.Vector3();
   for (const record of placementNodes) {
-    if (!record?.node || ["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(record.kind)) {
+    if (!record?.node || HERO_KINDS.includes(record.kind)) {
       continue;
     }
     box.setFromObject(record.node);
@@ -563,70 +622,87 @@ function createPlayerReadabilityRig() {
 function createObjectiveGuidance(snapshot) {
   const group = new THREE.Group();
   group.name = "objective-guidance";
-  const board = snapshot.worldObjects.find((p) => p.kind === "jobBoard");
-  const spawn = snapshot.player || PLAYER_SPAWN;
-  if (!board) return { group, update() {} };
-
-  const boardRing = new THREE.Mesh(
-    new THREE.TorusGeometry(0.92, 0.045, 8, 48),
-    standard("#ffd77b", {
-      emissive: "#ffb84a",
-      emissiveIntensity: 1.25,
-      transparent: true,
-      opacity: 0.82,
-      rimStrength: 0,
-    }),
-  );
-  boardRing.rotation.x = Math.PI / 2;
-  boardRing.position.copy(toVec(board.x, board.y, 1.72));
-  group.add(boardRing);
-
-  const boardPointer = new THREE.Mesh(
-    new THREE.ConeGeometry(0.2, 0.46, 4),
-    standard("#fff0b8", {
-      emissive: "#ffd77b",
-      emissiveIntensity: 1.8,
-      transparent: true,
-      opacity: 0.9,
-      rimStrength: 0.1,
-    }),
-  );
-  boardPointer.rotation.x = Math.PI;
-  boardPointer.rotation.y = Math.PI / 4;
-  boardPointer.position.copy(toVec(board.x, board.y, 2.72));
-  group.add(boardPointer);
-
-  const beads = [];
-  const dx = board.x - spawn.x;
-  const dz = board.y - spawn.y;
-  for (let i = 1; i <= 4; i++) {
-    const t = i / 5;
-    const bead = new THREE.Mesh(
-      new THREE.CircleGeometry(0.16 + i * 0.015, 18),
-      new THREE.MeshBasicMaterial({
-        color: col("#ffd77b"),
+  const byKind = new Map(snapshot.worldObjects.map((p) => [p.kind, p]));
+  const targetRings = new Map();
+  const targetPointers = new Map();
+  for (const kind of HERO_KINDS) {
+    const target = byKind.get(kind);
+    if (!target) continue;
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(kind === "jobBoard" ? 0.92 : 0.72, 0.04, 8, 44),
+      standard("#ffd77b", {
+        emissive: "#ffb84a",
+        emissiveIntensity: 1.15,
         transparent: true,
-        opacity: 0.42,
-        depthWrite: false,
+        opacity: 0.8,
+        rimStrength: 0,
       }),
     );
-    bead.rotation.x = -Math.PI / 2;
-    bead.position.set(spawn.x + dx * t, 0.075, spawn.y + dz * t);
-    group.add(bead);
-    beads.push(bead);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.copy(toVec(target.x, target.y, 1.58));
+    group.add(ring);
+    targetRings.set(kind, ring);
+
+    const pointer = new THREE.Mesh(
+      new THREE.ConeGeometry(0.18, 0.42, 4),
+      standard("#fff0b8", {
+        emissive: "#ffd77b",
+        emissiveIntensity: 1.45,
+        transparent: true,
+        opacity: 0.88,
+        rimStrength: 0.1,
+      }),
+    );
+    pointer.rotation.x = Math.PI;
+    pointer.rotation.y = Math.PI / 4;
+    pointer.position.copy(toVec(target.x, target.y, 2.52));
+    group.add(pointer);
+    targetPointers.set(kind, pointer);
+  }
+
+  const beads = [];
+  const route = FIRST_FIVE_ROUTE.filter((point) => point.kind !== "returnJobBoard");
+  for (let seg = 1; seg < route.length; seg++) {
+    const from = route[seg - 1];
+    const to = route[seg];
+    for (let i = 1; i <= 3; i++) {
+      const t = i / 4;
+      const bead = new THREE.Mesh(
+        new THREE.CircleGeometry(0.12 + i * 0.012, 18),
+        new THREE.MeshBasicMaterial({
+          color: col("#ffd77b"),
+          transparent: true,
+          opacity: 0.26,
+          depthWrite: false,
+        }),
+      );
+      bead.rotation.x = -Math.PI / 2;
+      bead.position.set(from.x + (to.x - from.x) * t, 0.075, from.y + (to.y - from.y) * t);
+      group.add(bead);
+      beads.push(bead);
+    }
   }
 
   return {
     group,
-    update(t, phase) {
-      const active = phase === "spawn" || phase === "accept_bounty";
+    update(t, state) {
+      const targetKind = state?.activeTargetKind || (typeof state === "string" ? null : "jobBoard");
+      const active = Boolean(targetKind && targetRings.has(targetKind));
       group.visible = active;
+      targetRings.forEach((ring, kind) => {
+        ring.visible = kind === targetKind;
+      });
+      targetPointers.forEach((pointer, kind) => {
+        pointer.visible = kind === targetKind;
+      });
       if (!active) return;
       const pulse = 1 + Math.sin(t * 3.2) * 0.08;
-      boardRing.scale.set(pulse, pulse, pulse);
-      boardPointer.position.y = 2.72 + Math.sin(t * 3.6) * 0.08;
+      const ring = targetRings.get(targetKind);
+      const pointer = targetPointers.get(targetKind);
+      ring?.scale.set(pulse, pulse, pulse);
+      if (pointer) pointer.position.y = 2.52 + Math.sin(t * 3.6) * 0.08;
       beads.forEach((bead, index) => {
-        bead.material.opacity = 0.3 + Math.max(0, Math.sin(t * 3 - index * 0.7)) * 0.28;
+        bead.material.opacity = 0.18 + Math.max(0, Math.sin(t * 3 - index * 0.5)) * 0.22;
       });
     },
   };
@@ -641,75 +717,79 @@ function buildGround(scene, snapshot) {
   // with the pure groundHeight() that seats props/scatter.
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(120, 110, 96, 88),
-    createGroundMaterial({ center: { x: 14, z: 9 } }),
+    createGroundMaterial({ center: { x: 35, z: 13 } }),
   );
   ground.rotation.x = -Math.PI / 2;
-  ground.position.set(14, 0, 9);
+  ground.position.set(35, 0, 13);
   ground.receiveShadow = true;
   scene.add(ground);
 
   // Greenish marsh apron over the southern lowland (thin tinted plane).
   const marsh = new THREE.Mesh(
-    new THREE.PlaneGeometry(20, 9),
+    new THREE.PlaneGeometry(31, 10),
     standard("#3c4a2e", { roughness: 1 }),
   );
   marsh.rotation.x = -Math.PI / 2;
-  marsh.position.set(16, 0.005, 15.5);
+  marsh.position.set(47, 0.005, 18);
   marsh.receiveShadow = true;
   scene.add(marsh);
 
   // (Marsh water is now an animated TSL surface created in startSpike — see createWater.)
 
-  // Dusty road strip running east from spawn toward Boone's board + the mesas.
-  // The opening quest is "follow the road", so the road must read as the brightest,
-  // clearest path in the frame — wider, lighter packed-sand colour, and a gentle
-  // warm emissive lift so it stays legible even where buildings cast shadow.
-  // Anchored to START a touch behind the player's feet so the path reads as
-  // "begins here, leads east" rather than the player standing in its middle.
-  const ROAD_LEN = 30;
-  const ROAD_W = 6.6;
-  const ROAD_CX = spawn.x + ROAD_LEN / 2 - 3; // strip starts ~3u west of spawn
-  const ROAD_Z = spawn.y + 0.4;
-  const road = new THREE.Mesh(
-    new THREE.PlaneGeometry(ROAD_LEN, ROAD_W),
-    standard("#b99461", { roughness: 1, emissive: "#3b2c17", emissiveIntensity: 0.18 }),
-  );
-  road.rotation.x = -Math.PI / 2;
-  road.position.set(ROAD_CX, 0.02, ROAD_Z);
-  road.receiveShadow = true;
-  scene.add(road);
+  // Dusty S-road ribbon running through the entire first-five-minute route.
+  // Segmenting it by route points makes the path visibly turn toward the marsh
+  // instead of reading as a short flat alley.
+  const ROAD_W = 8.2;
+  const roadMat = standard("#906a42", { roughness: 1, emissive: "#2f2112", emissiveIntensity: 0.08 });
+  const edgeMat = standard("#b08657", { roughness: 1, emissive: "#362414", emissiveIntensity: 0.08 });
+  const rutMat = standard("#6c4f31", { roughness: 1 });
+  const centerMat = standard("#7b5b37", { roughness: 1 });
+  const route = FIRST_FIVE_ROUTE.filter((point) => point.kind !== "returnJobBoard");
 
-  // Bright dust shoulders frame the road and lead the eye down it.
-  for (const off of [-(ROAD_W / 2 + 0.18), ROAD_W / 2 + 0.18]) {
-    const edge = new THREE.Mesh(
-      new THREE.PlaneGeometry(ROAD_LEN, 0.42),
-      standard("#d6bf8f", { roughness: 1, emissive: "#4c371c", emissiveIntensity: 0.18 }),
-    );
-    edge.rotation.x = -Math.PI / 2;
-    edge.position.set(ROAD_CX, 0.03, ROAD_Z + off);
-    scene.add(edge);
+  function addRoadPlane(from, to, width, y, mat) {
+    const dx = to.x - from.x;
+    const dz = to.y - from.y;
+    const len = Math.hypot(dx, dz);
+    if (len <= 0.01) return null;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(len, width), mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.rotation.z = Math.atan2(dz, dx);
+    mesh.position.set((from.x + to.x) / 2, y, (from.y + to.y) / 2);
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    return mesh;
   }
 
-  // Two darker wheel ruts — parallel worn tracks that sell "a road travelled" and
-  // give the eye a strong directional line toward the objective.
-  for (const off of [-1.65, 1.65]) {
-    const rut = new THREE.Mesh(
-      new THREE.PlaneGeometry(ROAD_LEN, 0.28),
-      standard("#8d7045", { roughness: 1 }),
-    );
-    rut.rotation.x = -Math.PI / 2;
-    rut.position.set(ROAD_CX, 0.027, ROAD_Z + off);
-    scene.add(rut);
-  }
+  for (let i = 1; i < route.length; i++) {
+    const from = route[i - 1];
+    const to = route[i];
+    const dx = to.x - from.x;
+    const dz = to.y - from.y;
+    const len = Math.hypot(dx, dz);
+    const nx = len > 0 ? -dz / len : 0;
+    const nz = len > 0 ? dx / len : 1;
 
-  // Faint centre wear-line for direction and depth flow toward the objective.
-  const centerLine = new THREE.Mesh(
-    new THREE.PlaneGeometry(ROAD_LEN, 0.16),
-    standard("#a58455", { roughness: 1 }),
-  );
-  centerLine.rotation.x = -Math.PI / 2;
-  centerLine.position.set(ROAD_CX, 0.028, ROAD_Z);
-  scene.add(centerLine);
+    addRoadPlane(from, to, ROAD_W, 0.02, roadMat);
+    for (const off of [-(ROAD_W / 2 + 0.18), ROAD_W / 2 + 0.18]) {
+      addRoadPlane(
+        { x: from.x + nx * off, y: from.y + nz * off },
+        { x: to.x + nx * off, y: to.y + nz * off },
+        0.42,
+        0.03,
+        edgeMat,
+      );
+    }
+    for (const off of [-1.65, 1.65]) {
+      addRoadPlane(
+        { x: from.x + nx * off, y: from.y + nz * off },
+        { x: to.x + nx * off, y: to.y + nz * off },
+        0.28,
+        0.027,
+        rutMat,
+      );
+    }
+    addRoadPlane(from, to, 0.16, 0.028, centerMat);
+  }
 }
 
 function createSpikeSnapshot() {
@@ -789,12 +869,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   atmosphere.applyPalette(appliedPalette);
 
   buildGround(scene, snapshot);
-  createScatter(scene, { center: { x: 15, z: 8 }, area: 46, count: 320 });
+  createScatter(scene, { center: { x: 35, z: 13 }, area: 78, count: 520 });
 
   // Animated marsh water (replaces the flat plane that used to live in buildGround).
-  const water = createWater({ width: 13, height: 5.5, skyTint: appliedPalette.sky.horizon });
+  const water = createWater({ width: 29, height: 6.2, skyTint: appliedPalette.sky.horizon });
   water.mesh.rotation.x = -Math.PI / 2;
-  water.mesh.position.set(17, 0.05, 16);
+  water.mesh.position.set(48, 0.05, 19);
   scene.add(water.mesh);
 
   const props = new THREE.Group();
@@ -817,7 +897,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
             // re-add it here for the model path (height is in local model units).
             if (entry.light) attachLight(props, p, entry.light, effScale);
             if (entry.windowLight) attachBuildingWarmth(props, p, entry.windowLight);
-            if (["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(p.kind)) {
+            if (HERO_KINDS.includes(p.kind)) {
               heroMeshes[p.kind] = node;
             }
           })
@@ -825,7 +905,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
             console.warn(`[render3d] model load failed for ${p.kind}, using fallback`, err);
             const mesh = buildPlacement(props, p);
             if (mesh) placementNodes.push({ kind: p.kind, node: mesh });
-            if (["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(p.kind) && mesh) {
+            if (HERO_KINDS.includes(p.kind) && mesh) {
               heroMeshes[p.kind] = mesh;
             }
           }),
@@ -834,7 +914,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     }
     const mesh = buildPlacement(props, p);
     if (mesh) placementNodes.push({ kind: p.kind, node: mesh });
-    if (["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(p.kind) && mesh) {
+    if (HERO_KINDS.includes(p.kind) && mesh) {
       heroMeshes[p.kind] = mesh;
     }
   }
@@ -1008,6 +1088,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     thirdPerson: true,
     character: character.group,
     cameraPreset: "exploration",
+    resetYaw: -Math.PI / 2,
   });
   const proxies = buildProxies(snapshot.worldObjects);
   const promptEl = document.getElementById("prompt");
@@ -1026,6 +1107,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   });
   const boardModal = document.getElementById("board-modal");
   const boardAccept = document.getElementById("board-accept");
+  const boardOptionButtons = Array.from(document.querySelectorAll("[data-option]:not(#board-accept)"));
   const boardClose = document.getElementById("board-close");
 
   const refreshLoopDom = () => {
@@ -1046,10 +1128,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const boardModalController = createBoardModalController({
     modal: boardModal,
     acceptButton: boardAccept,
+    optionButtons: boardOptionButtons,
     closeButton: boardClose,
     setPromptText,
     onAccept: () => {
-      advance("accept_bounty");
+      advance({ type: "choose_board", optionId: "accept_bounty" });
+      markJobBoardAccepted(heroMeshes.jobBoard);
+    },
+    onChoose: (optionId) => {
+      advance({ type: "choose_board", optionId });
       markJobBoardAccepted(heroMeshes.jobBoard);
     },
     onClose: refreshLoopDom,
@@ -1059,7 +1146,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     slimeMesh: heroMeshes.roadSlime,
     getPhase: () => loopState.phase,
     onSlimeEngage: () => {
-      if (loopState.phase !== "cache_open") return false;
+      if (loopState.phase !== "slime_tell") return false;
       advance("slime_appeared");
       return true;
     },
@@ -1074,7 +1161,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       boardModalController.open();
       return;
     }
-    if (loopState.phase === "accept_bounty") {
+    if (loopState.phase === "board_choice") {
       boardModalController.open();
       return;
     }
@@ -1082,34 +1169,59 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       advance("report_to_boone");
       return;
     }
-    if (loopState.phase === "survey_offered") {
+    if (loopState.phase === "survey_teaser") {
       syncObjectiveDom(objectiveRefs, snapshot, {
         ...loopState.state,
         objectiveText: "Old Road Survey is ready. This is tomorrow's next playable job.",
       });
     }
   };
-  const handleSmokeCache = () => {
+  const handleRoadSign = () => {
+    if (loopState.phase !== "road_sign") return;
+    advance("read_sign");
+  };
+  const handleTownBark = () => {
     if (loopState.phase !== "road_walk") return;
+    advance("hear_bark");
+    npcSpeechMsg = "Pearl: \"Road's quiet when it wants you close. Watch the marsh grass.\"";
+    npcSpeechT = 3.5;
+    setPromptText(npcSpeechMsg);
+  };
+  const handleSmokeCache = () => {
+    if (loopState.phase !== "cache_clue") return;
     advance("open_cache");
+  };
+  const handleSlimeTell = () => {
+    if (loopState.phase !== "slime_tell") return;
     encounter.engage();
+    if (loopState.phase === "slime_tell") advance("spot_slime_tell");
   };
   const handleRoadSlime = () => {
     if (loopState.phase !== "slime_fight") return;
     encounter.strike(player.position);
   };
   const handleBrokenWagon = () => {
-    if (loopState.phase !== "wagon_inspect") return;
+    if (loopState.phase !== "wagon_salvage") return;
     advance("inspect_wagon");
-    window.setTimeout(() => {
-      if (loopState.phase === "scrap_earned") advance("acknowledge_scrap");
-    }, 900);
   };
 
   interaction.registerHandler("jobBoard", handleJobBoard);
+  interaction.registerHandler("roadSign", handleRoadSign);
+  interaction.registerHandler("townBark", handleTownBark);
   interaction.registerHandler("smokeCache", handleSmokeCache);
+  interaction.registerHandler("slimeTell", handleSlimeTell);
   interaction.registerHandler("roadSlime", handleRoadSlime);
   interaction.registerHandler("brokenWagon", handleBrokenWagon);
+
+  const updateBeatVisibility = () => {
+    if (heroMeshes.slimeTell) {
+      heroMeshes.slimeTell.visible = ["slime_tell", "slime_fight", "wagon_salvage", "return_to_boone", "survey_teaser"].includes(loopState.phase);
+    }
+    if (heroMeshes.roadSlime) {
+      heroMeshes.roadSlime.visible = ["slime_fight"].includes(loopState.phase);
+    }
+  };
+  updateBeatVisibility();
 
   if (import.meta.env.DEV && typeof window !== "undefined") {
     window.__westward3dTest = {
@@ -1128,7 +1240,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       interact(kind) {
         const handlers = {
           jobBoard: handleJobBoard,
+          roadSign: handleRoadSign,
+          townBark: handleTownBark,
           smokeCache: handleSmokeCache,
+          slimeTell: handleSlimeTell,
           roadSlime: handleRoadSlime,
           brokenWagon: handleBrokenWagon,
         };
@@ -1139,10 +1254,21 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         boardModalController.accept();
         return loopState.state;
       },
+      chooseBoardOption(optionId) {
+        boardModalController.choose(optionId);
+        return loopState.state;
+      },
       closeBoard: boardModalController.close,
       isBoardModalOpen: () => boardModalController.isOpen(),
       getEncounterState: () => encounter.getState(),
+      getRouteMetrics: () => ({
+        ...getRouteMetrics(snapshot.worldObjects),
+        phase: loopState.phase,
+        routeBeats: loopState.state.routeBeats,
+        boardChoice: loopState.state.boardChoice,
+      }),
       getHeroVisibility: () => getHeroVisibility(heroMeshes, camera),
+      getPlayerVisibility: () => getHeroVisibility({ player: character.group }, camera).player,
       getCameraPose: () => ({
         x: Number(camera.position.x.toFixed(2)),
         y: Number(camera.position.y.toFixed(2)),
@@ -1168,9 +1294,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     updateOcclusionFades(placementNodes, camera, player.position);
     interaction.update(player.position);
     encounter.update(player.position, dt);
+    updateBeatVisibility();
     character.update(visualCapture ? 0 : dt, player.moving && !visualCapture, player.running && !visualCapture);
     playerReadability.update(now / 1000);
-    objectiveGuidance.update(now / 1000, loopState.phase);
+    objectiveGuidance.update(now / 1000, loopState.state);
     townsfolk.update(visualCapture ? 0 : dt, visualCapture, player.position);
     // NPC greeting prompt/speech overrides the kind prompt when near a townsperson
     if (npcSpeechT > 0) {

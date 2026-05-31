@@ -12,7 +12,10 @@ const ACTION_KEY = "KeyE";
 
 const PROMPTS = {
   jobBoard:    { radius: 2.5, text: "E — Open Boone's Board" },
+  roadSign:    { radius: 2.2, text: "E — Read Road Sign" },
+  townBark:    { radius: 2.4, text: "E — Hear Pearl's Warning" },
   smokeCache:  { radius: 2.0, text: "E — Open Smoke Cache" },
+  slimeTell:   { radius: 2.2, text: "E — Inspect Slime Trail" },
   brokenWagon: { radius: 2.5, text: "E — Inspect Wagon" },
   roadSlime:   { radius: 2.2, text: "E — Strike Road Slime" },
 };

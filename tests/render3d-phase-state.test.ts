@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  BOARD_OPTIONS,
   LOOP_PHASES,
   createInitialLoopState,
   createLoopStateMachine,
@@ -19,15 +20,16 @@ describe("render3d phase state", () => {
     expect(view.objectiveMeta).toEqual(["Target: Boone's job board", "Action: Open board"]);
   });
 
-  it("walks the full first-road phase sequence", () => {
+  it("walks the full paced first-road phase sequence", () => {
     const events = [
       "board_reached",
-      "accept_bounty",
+      { type: "choose_board", optionId: "ask_danger" },
+      "read_sign",
+      "hear_bark",
       "open_cache",
-      "slime_appeared",
+      "spot_slime_tell",
       "defeat_slime",
       "inspect_wagon",
-      "acknowledge_scrap",
       "report_to_boone",
     ];
     const phases = ["spawn"];
@@ -40,41 +42,49 @@ describe("render3d phase state", () => {
 
     expect(phases).toEqual([
       "spawn",
-      "accept_bounty",
+      "board_choice",
+      "road_sign",
       "road_walk",
-      "cache_open",
+      "cache_clue",
+      "slime_tell",
       "slime_fight",
-      "wagon_inspect",
-      "scrap_earned",
+      "wagon_salvage",
       "return_to_boone",
-      "survey_offered",
+      "survey_teaser",
     ]);
   });
 
-  it("records local-only reward and completion preview state", () => {
+  it("records board choice, route beats, reward, and completion preview state", () => {
     let state = createInitialLoopState();
     for (const event of [
       "board_reached",
-      "accept_bounty",
+      { type: "choose_board", optionId: "inspect_survey" },
+      "read_sign",
+      "hear_bark",
       "open_cache",
-      "slime_appeared",
+      "spot_slime_tell",
       "defeat_slime",
       "inspect_wagon",
     ]) {
       state = transitionLoopPhase(state, event);
     }
 
-    expect(state.phase).toBe("scrap_earned");
+    expect(state.phase).toBe("return_to_boone");
+    expect(state.boardChoice).toBe("inspect_survey");
     expect(state.inventoryPreview["Map Scrap"]).toBe(1);
     expect(state.completedInteractions).toContain("road_slime_defeated");
-    expect(state.completedInteractions).toContain("frontier_broken_wagon_inspected");
+    expect(state.completedInteractions).toContain("frontier_broken_wagon_salvaged");
     expect(state.encounterState.slime).toBe("dead");
+    expect(Object.values(state.routeBeats).filter(Boolean).length).toBeGreaterThanOrEqual(7);
   });
 
   it("keeps prompt and objective target aligned by phase", () => {
     const machine = createLoopStateMachine();
     const jobBoard = { kind: "jobBoard" };
+    const roadSign = { kind: "roadSign" };
+    const bark = { kind: "townBark" };
     const cache = { kind: "smokeCache" };
+    const tell = { kind: "slimeTell" };
     const slime = { kind: "roadSlime" };
 
     expect(machine.isTargetEnabled(jobBoard)).toBe(true);
@@ -82,16 +92,31 @@ describe("render3d phase state", () => {
     expect(machine.isTargetEnabled(cache)).toBe(false);
 
     machine.transition("board_reached");
-    machine.transition("accept_bounty");
-    expect(machine.phase).toBe("road_walk");
+    machine.chooseBoardOption("accept_bounty");
+    expect(machine.phase).toBe("road_sign");
+    expect(machine.isTargetEnabled(roadSign)).toBe(true);
+
+    machine.transition("read_sign");
+    expect(machine.isTargetEnabled(bark)).toBe(true);
+
+    machine.transition("hear_bark");
     expect(machine.isTargetEnabled(cache)).toBe(true);
-    expect(machine.getPromptForTarget(cache)).toContain("Smoke Cache");
 
     machine.transition("open_cache");
-    machine.transition("slime_appeared");
-    expect(machine.phase).toBe("slime_fight");
+    expect(machine.isTargetEnabled(tell)).toBe(true);
+
+    machine.transition("spot_slime_tell");
     expect(machine.isTargetEnabled(slime)).toBe(true);
     expect(machine.getPromptForTarget(slime)).toContain("Strike");
+  });
+
+  it("reflects board option in follow-up objective copy", () => {
+    const state = createInitialLoopState({ phase: "cache_clue", boardChoice: "ask_danger" });
+    const view = getPhaseView("cache_clue", state);
+
+    expect(BOARD_OPTIONS.map((option) => option.id)).toContain("ask_danger");
+    expect(view.objectiveText).toContain("marsh grass");
+    expect(view.objectiveMeta[1]).toContain("Ask about road danger");
   });
 
   it("gives every first-road phase objective metadata", () => {

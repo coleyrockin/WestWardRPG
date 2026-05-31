@@ -396,6 +396,144 @@ def build_crate(name="crate"):
     return export_glb(obj, name, bake=True)
 
 
+def build_road_plank(name="road_plank"):
+    clear_scene()
+    dust = make_mat("dustroad", "#b99461")
+    rut = make_mat("rut", "#7a5f38")
+    edge = make_mat("edge", "#d6bf8f")
+    parts = [
+        add_box((3.2, 0.92, 0.055), (0, 0, 0.027), dust, "packed_dust"),
+        add_box((3.15, 0.08, 0.07), (0, -0.31, 0.06), rut, "rut_l"),
+        add_box((3.15, 0.08, 0.07), (0, 0.31, 0.06), rut, "rut_r"),
+        add_box((3.2, 0.04, 0.08), (0, -0.48, 0.07), edge, "edge_l"),
+        add_box((3.2, 0.04, 0.08), (0, 0.48, 0.07), edge, "edge_r"),
+    ]
+    for x in (-1.1, 0.0, 1.1):
+        parts.append(add_box((0.035, 0.82, 0.075), (x, 0, 0.078), rut, "cross_wear"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name, bake=True)
+
+
+def build_jobboard_v2(name="jobBoard_v2"):
+    clear_scene()
+    wood = make_mat("jbwood", PALETTE["wood"])
+    dark = make_mat("jbdark", PALETTE["wood_dark"])
+    roof = make_mat("jbroof", PALETTE["roof"])
+    paper = make_mat("jbpaper", "#e8dcc0")
+    board = make_mat("jbboard", PALETTE["board"], emissive=PALETTE["board"], emissive_strength=0.9)
+    glow = make_mat("jblamp", PALETTE["lamp_glow"], emissive=PALETTE["lamp_glow"], emissive_strength=1.35)
+    parts = [
+        add_box((0.16, 0.16, 1.75), (-0.72, 0, 0.875), wood, "post_l"),
+        add_box((0.16, 0.16, 1.75), (0.72, 0, 0.875), wood, "post_r"),
+        add_box((1.72, 0.12, 1.08), (0, 0, 1.16), board, "board"),
+        add_box((1.92, 0.14, 0.16), (0, 0.02, 1.78), roof, "top_beam"),
+        add_box((1.85, 0.44, 0.08), (0, 0.06, 1.92), roof, "sloped_roof"),
+        add_box((0.36, 0.025, 0.28), (-0.42, 0.08, 1.31), paper, "bounty_note"),
+        add_box((0.3, 0.025, 0.24), (0.28, 0.08, 1.08), paper, "survey_note"),
+        add_box((0.22, 0.22, 0.24), (0, 0.13, 1.78), glow, "lamp"),
+        add_box((1.5, 0.06, 0.08), (0, 0.08, 0.62), dark, "lower_rail"),
+    ]
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_lamp_variant(name="lamp_tall", height=2.05, arm=0.52):
+    clear_scene()
+    dark = make_mat("lamppost", PALETTE["wood_dark"])
+    cap = make_mat("lampcap", PALETTE["post"])
+    glow = make_mat("lampglow", PALETTE["lamp_glow"], emissive=PALETTE["lamp_glow"], emissive_strength=1.0)
+    cx = arm
+    parts = [
+        add_box((0.1, 0.1, height), (0, 0, height / 2), dark, "post"),
+        add_box((arm + 0.1, 0.07, 0.07), (arm / 2, 0, height - 0.14), dark, "arm"),
+        add_box((0.05, 0.05, 0.14), (cx, 0, height - 0.08), dark, "hook"),
+        add_box((0.25, 0.25, 0.24), (cx, 0, height - 0.28), glow, "pane"),
+        add_box((0.32, 0.32, 0.05), (cx, 0, height - 0.12), cap, "cap_top"),
+        add_box((0.32, 0.32, 0.05), (cx, 0, height - 0.43), cap, "cap_bottom"),
+    ]
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_saloon_facade(name="saloon_facade"):
+    clear_scene()
+    wall = make_mat("saloonwall", PALETTE["saloon"])
+    roof = make_mat("roof", PALETTE["roof"])
+    trim = make_mat("trim", PALETTE["wood_dark"])
+    sign = make_mat("sign", PALETTE["board"], emissive=PALETTE["board"], emissive_strength=0.45)
+    parts = [
+        add_box((2.2, 0.18, 2.6), (0, 0, 1.3), wall, "false_front"),
+        add_box((2.4, 0.28, 0.16), (0, 0.02, 2.54), trim, "cornice"),
+        add_box((2.35, 0.72, 0.08), (0, 0.34, 1.88), roof, "porch_roof"),
+        add_box((1.45, 0.08, 0.32), (0, 0.48, 1.82), sign, "saloon_sign"),
+    ]
+    for dx in (-0.82, 0.82):
+        parts.append(add_box((0.1, 0.1, 1.8), (dx, 0.62, 0.9), trim, "porch_post"))
+    for dx in (-0.45, 0.45):
+        parts.append(add_box((0.34, 0.06, 0.44), (dx, 0.11, 1.16), trim, "dark_window"))
+    parts.append(add_box((0.5, 0.07, 1.0), (0, 0.12, 0.5), trim, "door"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name, bake=True)
+
+
+def build_wagon_salvage(name="wagon_salvage"):
+    clear_scene()
+    wood = make_mat("salvagewood", PALETTE["wagon"])
+    paper = make_mat("survey", "#e8dcc0")
+    dark = make_mat("dark", PALETTE["wheel"])
+    parts = [
+        add_box((0.82, 0.16, 0.12), (-0.24, 0, 0.08), wood, "loose_plank"),
+        add_box((0.72, 0.12, 0.12), (0.18, 0.18, 0.1), wood, "loose_plank_2"),
+        add_box((0.42, 0.03, 0.3), (0.02, 0.02, 0.22), paper, "map_scrap"),
+    ]
+    _cyl(10, 0.26, 0.06, (0.5, -0.22, 0.12), dark, rot=(math.radians(90), 0, 0))
+    parts.append(bpy.context.active_object)
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name, bake=True)
+
+
+def build_mesa_silhouette(name="mesa_silhouette"):
+    return build_mesa(name, w=4.8, h=4.4)
+
+
+def build_slime_tell_asset(name="slime_tell"):
+    clear_scene()
+    slime = make_mat("slime", "#75d06b", emissive="#2a6820", emissive_strength=0.9)
+    reed = make_mat("reed", PALETTE["cactus_dark"])
+    parts = []
+    for i, x in enumerate((-0.65, -0.2, 0.25, 0.7)):
+        parts.append(add_box((0.56 - i * 0.05, 0.16, 0.035), (x, math.sin(i) * 0.12, 0.025), slime, "glow_slick"))
+    for x, y, h in ((-0.45, 0.22, 0.6), (0.08, -0.22, 0.7), (0.55, 0.18, 0.5)):
+        parts.append(add_box((0.045, 0.045, h), (x, y, h / 2), reed, "reed"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_recovery_kit():
+    out = {}
+    out["road_plank"] = build_road_plank()
+    out["jobBoard_v2"] = build_jobboard_v2()
+    out["lamp_tall"] = build_lamp_variant("lamp_tall", height=2.05, arm=0.52)
+    out["lamp_low"] = build_lamp_variant("lamp_low", height=1.35, arm=0.34)
+    out["saloon_facade"] = build_saloon_facade()
+    out["wagon_salvage"] = build_wagon_salvage()
+    out["mesa_silhouette"] = build_mesa_silhouette()
+    out["slime_tell"] = build_slime_tell_asset()
+    return out
+
+
 def build_batch_b():
     out = {}
     out["mesa"] = build_mesa()

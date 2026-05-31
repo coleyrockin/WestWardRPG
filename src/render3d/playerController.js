@@ -1,9 +1,8 @@
-// WASD + mouse-drag player controller for the Three.js spike.
+// WASD + click-focus player controller for the Three.js spike.
 //
 // Milestone 3B step 1 (docs/roadmap.md). Wraps a THREE.PerspectiveCamera with
-// first-person input: WASD walks, shift sprints, left-mouse drag on the canvas
-// rotates yaw. Pitch is locked (camera stays level) — this is intentional for
-// the spike's hero pose; pitch can land later.
+// third-person input: WASD walks, shift sprints, click-focus/pointer-lock rotates
+// yaw/pitch, and R re-centers the follow camera behind the route.
 //
 // Conventions
 //   World y axis is up. World (x, z) is the ground plane.
@@ -24,6 +23,21 @@ const DEFAULT_SPEEDS = { walk: 4, run: 8 };
 const DEFAULT_SENSITIVITY = 0.0035; // radians per pixel of mouse drag
 const DEFAULT_EYE_HEIGHT = 1.8;
 const MAX_PITCH = Math.PI / 3; // ±60° — generous; avoids gimbal flip near ±π/2
+const CAMERA_COLLISION_RADIUS = 0.42;
+
+const CAMERA_BLOCKING_KINDS = new Set([
+  "town",
+  "ranch",
+  "gate",
+  "watchtower",
+  "landmark",
+  "saloon",
+  "saloonFacade",
+  "storefront",
+  "mesa",
+  "mesaSilhouette",
+  "cliff",
+]);
 
 export const CAMERA_PRESETS = Object.freeze({
   exploration: Object.freeze({
@@ -102,6 +116,68 @@ export function computeFollowCameraPose({
       y: cfg.lookHeight + lift * 0.45,
       z: pos.z + fwd.z * cfg.lookAhead + side.z * cfg.shoulder * 0.35,
     },
+  };
+}
+
+export function isCameraBlockingProxy(proxy) {
+  const kind = proxy?.source?.kind;
+  return !kind || CAMERA_BLOCKING_KINDS.has(kind);
+}
+
+function segmentEnterAabb2D(from, to, box) {
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  let tMin = 0;
+  let tMax = 1;
+  const slabs = [
+    [from.x, dx, box.minX, box.maxX],
+    [from.z, dz, box.minZ, box.maxZ],
+  ];
+
+  for (const [origin, delta, min, max] of slabs) {
+    if (Math.abs(delta) < 1e-8) {
+      if (origin < min || origin > max) return null;
+      continue;
+    }
+    let t1 = (min - origin) / delta;
+    let t2 = (max - origin) / delta;
+    if (t1 > t2) [t1, t2] = [t2, t1];
+    tMin = Math.max(tMin, t1);
+    tMax = Math.min(tMax, t2);
+    if (tMin > tMax) return null;
+  }
+  if (tMax < 0 || tMin > 1) return null;
+  return Math.max(0, tMin);
+}
+
+export function avoidCameraObstacles({
+  from,
+  desired,
+  proxies = [],
+  radius = CAMERA_COLLISION_RADIUS,
+  padding = 0.06,
+} = {}) {
+  if (!from || !desired || !Array.isArray(proxies) || proxies.length === 0) return desired;
+
+  let bestT = 1;
+  for (const proxy of proxies) {
+    if (!isCameraBlockingProxy(proxy)) continue;
+    const box = {
+      minX: proxy.minX - radius,
+      maxX: proxy.maxX + radius,
+      minZ: proxy.minZ - radius,
+      maxZ: proxy.maxZ + radius,
+    };
+    const t = segmentEnterAabb2D(from, desired, box);
+    if (t == null) continue;
+    bestT = Math.min(bestT, Math.max(0.18, t - padding));
+  }
+
+  if (bestT >= 0.999) return desired;
+  return {
+    x: from.x + (desired.x - from.x) * bestT,
+    y: from.y + ((desired.y ?? from.y) - from.y) * bestT,
+    z: from.z + (desired.z - from.z) * bestT,
   };
 }
 
@@ -205,6 +281,10 @@ export function createPlayerController(camera, opts = {}) {
     camLookAhead = null,
     camShoulder = null, // lateral over-the-shoulder offset so the hero isn't dead-centre blocking the view
     camSmoothing = null,
+    pointerLock = true,
+    dragLookFallback = true,
+    resetKey = "KeyR",
+    resetYaw = null,
   } = opts;
   const presetOverrides = {
     ...(Number.isFinite(camDistance) ? { distance: camDistance } : {}),
@@ -269,12 +349,48 @@ export function createPlayerController(camera, opts = {}) {
 
   const input = makeInputState();
 
-  // Drag state — only consume mouse motion while a button is held on the canvas.
+  // Click-focus state. Pointer lock is the primary look model; the older
+  // drag-look path remains as a fallback for browsers/tests without pointer lock.
+  let pointerFocused = false;
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
 
+  const hasPointerLock = () => Boolean(canvas && doc?.pointerLockElement === canvas);
+  const releasePointerFocus = () => {
+    pointerFocused = false;
+    dragging = false;
+    input.lookDx = 0;
+    input.lookDy = 0;
+    if (hasPointerLock() && doc?.exitPointerLock) {
+      try { doc.exitPointerLock(); } catch {}
+    }
+  };
+  const requestPointerFocus = () => {
+    if (pointerLock && canvas?.requestPointerLock) {
+      try {
+        const request = canvas.requestPointerLock();
+        if (request && typeof request.catch === "function") request.catch(() => {});
+        pointerFocused = true;
+        return;
+      } catch {}
+    }
+    pointerFocused = true;
+  };
+  const resetCameraBehind = (nextYaw = resetYaw) => {
+    if (Number.isFinite(nextYaw)) yaw = nextYaw;
+    pitch = 0;
+    thirdPersonCameraSeeded = false;
+  };
   const onKeyDown = (e) => {
+    if (e.code === "Escape") {
+      releasePointerFocus();
+      return;
+    }
+    if (resetKey && e.code === resetKey) {
+      resetCameraBehind();
+      return;
+    }
     const key = KEY_MAP[e.code];
     if (key) { input[key] = true; }
     if (e.code === "ShiftLeft" || e.code === "ShiftRight") input.shift = true;
@@ -286,23 +402,34 @@ export function createPlayerController(camera, opts = {}) {
   };
   const onMouseDown = (e) => {
     if (e.button !== 0) return;
-    dragging = true;
+    requestPointerFocus();
+    dragging = dragLookFallback && !hasPointerLock();
     lastX = e.clientX;
     lastY = e.clientY;
+    if (e.preventDefault) e.preventDefault();
   };
   const onMouseMove = (e) => {
+    if (hasPointerLock() || (pointerFocused && Number.isFinite(e.movementX))) {
+      input.lookDx += e.movementX || 0;
+      input.lookDy += e.movementY || 0;
+      return;
+    }
     if (!dragging) return;
     input.lookDx += e.clientX - lastX;
     input.lookDy += e.clientY - lastY;
     lastX = e.clientX;
     lastY = e.clientY;
   };
-  const onMouseUp = () => { dragging = false; };
+  const onMouseUp = () => { if (!hasPointerLock()) dragging = false; };
+  const onPointerLockChange = () => {
+    pointerFocused = hasPointerLock();
+    if (!pointerFocused) dragging = false;
+  };
   const onBlur = () => {
     // Avoid stuck keys when the window loses focus mid-press.
     input.forward = input.back = input.left = input.right = false;
     input.shift = false;
-    dragging = false;
+    releasePointerFocus();
   };
 
   if (doc?.addEventListener) {
@@ -317,6 +444,7 @@ export function createPlayerController(camera, opts = {}) {
     // the canvas before release.
     doc.addEventListener("mousemove", onMouseMove);
     doc.addEventListener("mouseup", onMouseUp);
+    doc.addEventListener("pointerlockchange", onPointerLockChange);
   }
   if (win?.addEventListener) {
     win.addEventListener("blur", onBlur);
@@ -355,14 +483,21 @@ export function createPlayerController(camera, opts = {}) {
       // Follow-cam orbits behind the heading and looks slightly ahead of the
       // character. Drag yaw turns the whole rig; pitch tilts the cam vertically.
       const pose = computeFollowCameraPose({ position, yaw, pitch, preset: activeCameraPreset });
+      const cameraPoint = proxies && proxies.length
+        ? avoidCameraObstacles({
+            from: { x: position.x, y: activeCameraPreset.lookHeight, z: position.z },
+            desired: pose.camera,
+            proxies,
+          })
+        : pose.camera;
       const alpha = thirdPersonCameraSeeded
         ? cameraSmoothingAlpha(dt, activeCameraPreset.smoothing)
         : 1;
       thirdPersonCameraSeeded = true;
       camera.position.set(
-        camera.position.x + (pose.camera.x - camera.position.x) * alpha,
-        camera.position.y + (pose.camera.y - camera.position.y) * alpha,
-        camera.position.z + (pose.camera.z - camera.position.z) * alpha,
+        camera.position.x + (cameraPoint.x - camera.position.x) * alpha,
+        camera.position.y + (cameraPoint.y - camera.position.y) * alpha,
+        camera.position.z + (cameraPoint.z - camera.position.z) * alpha,
       );
       if (camera.lookAt) {
         camera.lookAt(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z);
@@ -405,6 +540,7 @@ export function createPlayerController(camera, opts = {}) {
       doc.removeEventListener("keyup", onKeyUp);
       doc.removeEventListener("mousemove", onMouseMove);
       doc.removeEventListener("mouseup", onMouseUp);
+      doc.removeEventListener("pointerlockchange", onPointerLockChange);
     }
     if (canvas?.removeEventListener) {
       canvas.removeEventListener("mousedown", onMouseDown);
@@ -418,6 +554,8 @@ export function createPlayerController(camera, opts = {}) {
     update,
     setPosition,
     setCameraPreset,
+    resetCameraBehind,
+    releasePointerFocus,
     dispose,
     get position() { return { x: position.x, z: position.z }; },
     get yaw() { return yaw; },

@@ -135,6 +135,7 @@
       }
       #board-actions {
         display: flex;
+        flex-wrap: wrap;
         gap: 10px;
         justify-content: flex-end;
         margin-top: 18px;
@@ -168,13 +169,15 @@
     </div>
     <div id="board-modal" hidden>
       <div id="board-card" role="dialog" aria-modal="true" aria-labelledby="board-title">
-        <h2 id="board-title">Marsh Slime Bounty</h2>
-        <p>Smoke Cache is spitting green light again. Boone wants the road cleared before more cargo goes missing.</p>
-        <p>Next step: follow the lantern road toward Smoke Cache.</p>
+        <h2 id="board-title">Boone's First Road Job</h2>
+        <p>Smoke Cache is spitting green light again. Boone wants the road checked before more cargo goes missing.</p>
+        <p>Pick how you want to take the job, then follow the marshal road east.</p>
         <p class="reward">Reward: +38g, +18 XP, Old Road Survey lead</p>
         <div id="board-actions">
           <button id="board-close" class="secondary" type="button">Not yet</button>
-          <button id="board-accept" type="button">Accept bounty</button>
+          <button id="board-accept" data-option="accept_bounty" type="button">Accept bounty</button>
+          <button data-option="ask_danger" type="button">Ask danger</button>
+          <button data-option="inspect_survey" type="button">Inspect survey</button>
         </div>
       </div>
     </div>

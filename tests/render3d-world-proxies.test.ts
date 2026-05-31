@@ -7,14 +7,14 @@ import { buildFrontierPlacements, PLAYER_SPAWN } from "../src/render3d/frontierL
 
 const KINDS_THAT_BLOCK = new Set([
   "town", "ranch", "gate", "watchtower", "landmark",
-  "fence", "sign", "lamp",
-  "jobBoard", "smokeCache", "brokenWagon",
+  "fence", "sign", "lamp", "lampTall", "lampLow",
+  "jobBoard", "roadSign", "smokeCache", "brokenWagon", "wagonSalvage",
   "cart", "crate",
   // bigger-world expansion
-  "mesa", "cliff", "rock", "boulder", "cactus", "deadTree",
-  "saloon", "storefront", "porch",
+  "mesa", "mesaSilhouette", "cliff", "rock", "boulder", "cactus", "deadTree",
+  "saloon", "saloonFacade", "storefront", "porch",
 ]);
-const KINDS_THAT_PASS = new Set(["road", "roadSlime", "brush", "reeds"]);
+const KINDS_THAT_PASS = new Set(["road", "roadPlank", "townBark", "slimeTell", "roadSlime", "brush", "reeds"]);
 
 describe("worldProxies — buildProxies", () => {
   const placements = buildFrontierPlacements();
