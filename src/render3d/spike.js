@@ -890,6 +890,93 @@ function createCompositionMetrics({ heroMeshes, placementNodes, character, camer
   };
 }
 
+function createOpeningLightPools(snapshot) {
+  const group = new THREE.Group();
+  group.name = "opening-light-pools";
+  const pools = [];
+  const specs = [
+    { kind: "jobBoard", rx: 3.3, rz: 2.05, color: "#ffbd70", opacity: 0.18 },
+    { kind: "roadSign", rx: 2.3, rz: 1.35, color: "#ffc982", opacity: 0.1 },
+    { kind: "smokeCache", rx: 2.1, rz: 1.3, color: "#d99a60", opacity: 0.08 },
+    { kind: "brokenWagon", rx: 2.6, rz: 1.55, color: "#e0985e", opacity: 0.1 },
+  ];
+
+  for (const spec of specs) {
+    const p = placementByKind(snapshot, spec.kind);
+    if (!p) continue;
+    const mat = new THREE.MeshBasicMaterial({
+      color: col(spec.color),
+      transparent: true,
+      opacity: spec.opacity,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(1, 44), mat);
+    pool.rotation.x = -Math.PI / 2;
+    pool.scale.set(spec.rx, spec.rz, 1);
+    pool.position.set(p.x, 0.035, p.y);
+    pool.renderOrder = -1;
+    group.add(pool);
+    pools.push({ mesh: pool, baseOpacity: spec.opacity, phase: spec.kind.length * 0.37 });
+  }
+
+  return {
+    group,
+    update(t) {
+      for (const pool of pools) {
+        pool.mesh.material.opacity = pool.baseOpacity * (0.88 + Math.sin(t * 1.8 + pool.phase) * 0.08);
+      }
+    },
+  };
+}
+
+function createRoadDust(snapshot) {
+  const group = new THREE.Group();
+  group.name = "road-dust-ribbons";
+  const route = FIRST_FIVE_ROUTE.filter((point) => point.kind !== "returnJobBoard");
+  const ribbons = [];
+  for (let seg = 1; seg < route.length; seg++) {
+    const from = route[seg - 1];
+    const to = route[seg];
+    const dx = to.x - from.x;
+    const dz = to.y - from.y;
+    const len = Math.hypot(dx, dz);
+    if (len < 0.1) continue;
+    const nx = -dz / len;
+    const nz = dx / len;
+    const count = Math.max(1, Math.floor(len / 7));
+    for (let i = 1; i <= count; i++) {
+      const t = i / (count + 1);
+      const side = ((i + seg) % 2 === 0 ? -1 : 1) * (1.2 + (i % 2) * 0.8);
+      const mat = new THREE.MeshBasicMaterial({
+        color: col(i % 2 ? "#d6a263" : "#b98250"),
+        transparent: true,
+        opacity: 0.06,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const dust = new THREE.Mesh(new THREE.CircleGeometry(1, 20), mat);
+      dust.rotation.x = -Math.PI / 2;
+      dust.scale.set(1.45 + (i % 3) * 0.32, 0.45 + (seg % 2) * 0.14, 1);
+      dust.position.set(from.x + dx * t + nx * side, 0.065, from.y + dz * t + nz * side);
+      dust.rotation.z = Math.atan2(dz, dx) + (i % 2 ? 0.12 : -0.08);
+      dust.renderOrder = -1;
+      group.add(dust);
+      ribbons.push({ mesh: dust, baseOpacity: mat.opacity, phase: seg * 0.7 + i * 0.31 });
+    }
+  }
+
+  return {
+    group,
+    update(t) {
+      for (const ribbon of ribbons) {
+        ribbon.mesh.material.opacity = ribbon.baseOpacity * (0.74 + Math.sin(t * 1.35 + ribbon.phase) * 0.18);
+        ribbon.mesh.position.y = 0.065 + Math.sin(t * 1.1 + ribbon.phase) * 0.006;
+      }
+    },
+  };
+}
+
 function buildGround(scene, snapshot) {
   const spawn = snapshot?.player || PLAYER_SPAWN;
   // Big enough to comfortably hold the full ~30×20 explorable rectangle plus a
@@ -921,11 +1008,11 @@ function buildGround(scene, snapshot) {
   // Dusty S-road ribbon running through the entire first-five-minute route.
   // Segmenting it by route points makes the path visibly turn toward the marsh
   // instead of reading as a short flat alley.
-  const ROAD_W = 8.2;
-  const roadMat = standard("#906a42", { roughness: 1, emissive: "#2f2112", emissiveIntensity: 0.08 });
-  const edgeMat = standard("#b08657", { roughness: 1, emissive: "#362414", emissiveIntensity: 0.08 });
-  const rutMat = standard("#6c4f31", { roughness: 1 });
-  const centerMat = standard("#7b5b37", { roughness: 1 });
+  const ROAD_W = 8.0;
+  const roadMat = standard("#ba8651", { roughness: 1, emissive: "#5d3b20", emissiveIntensity: 0.16 });
+  const edgeMat = standard("#c99763", { roughness: 1, emissive: "#5c3d22", emissiveIntensity: 0.1 });
+  const rutMat = standard("#7f5b3a", { roughness: 1 });
+  const centerMat = standard("#986c42", { roughness: 1 });
   const route = FIRST_FIVE_ROUTE.filter((point) => point.kind !== "returnJobBoard");
 
   function addRoadPlane(from, to, width, y, mat) {
@@ -951,8 +1038,12 @@ function buildGround(scene, snapshot) {
     const nx = len > 0 ? -dz / len : 0;
     const nz = len > 0 ? dx / len : 1;
 
-    addRoadPlane(from, to, ROAD_W, 0.02, roadMat);
-    for (const off of [-(ROAD_W / 2 + 0.18), ROAD_W / 2 + 0.18]) {
+    // The near spawn segment fills the foreground fast in third-person view; a
+    // slightly tapered width keeps it from reading like a red carpet while later
+    // segments stay broad enough to guide the eye down-road.
+    const segmentWidth = i === 1 ? 6.6 : ROAD_W;
+    addRoadPlane(from, to, segmentWidth, 0.02, roadMat);
+    for (const off of [-(segmentWidth / 2 + 0.18), segmentWidth / 2 + 0.18]) {
       addRoadPlane(
         { x: from.x + nx * off, y: from.y + nz * off },
         { x: to.x + nx * off, y: to.y + nz * off },
@@ -1039,7 +1130,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     anchor: { x: snapshot.player.x, y: snapshot.player.y },
     playCore: { x: snapshot.player.x + 6, y: snapshot.player.y },
   });
-  scene.add(new THREE.AmbientLight(col("#5b321f"), 0.16));
+  scene.add(new THREE.AmbientLight(col("#745038"), 0.34));
   // Continuous day/night: a slow world clock advances dayTime; sunArc(dayTime)
   // is the live palette so the sun arcs and colours drift. Starts at dusk. The
   // golden-image gate loads ?visual to freeze everything time-animated (sun,
@@ -1052,6 +1143,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   atmosphere.applyPalette(appliedPalette);
 
   buildGround(scene, snapshot);
+  const openingLightPools = createOpeningLightPools(snapshot);
+  const roadDust = createRoadDust(snapshot);
+  scene.add(openingLightPools.group);
+  scene.add(roadDust.group);
   createScatter(scene, { center: { x: 35, z: 13 }, area: 78, count: 520 });
 
   // Animated marsh water (replaces the flat plane that used to live in buildGround).
@@ -1625,6 +1720,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     updateBeatVisibility();
     character.update(visualCapture ? 0 : dt, player.moving && !visualCapture, player.running && !visualCapture);
     playerReadability.update(now / 1000);
+    openingLightPools.update(now / 1000);
+    roadDust.update(now / 1000);
     objectiveGuidance.update(now / 1000, loopState.state);
     animateBeatPayoffs(now / 1000);
     townsfolk.update(visualCapture ? 0 : dt, visualCapture, player.position);

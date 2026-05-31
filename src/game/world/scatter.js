@@ -12,10 +12,10 @@ import * as THREE from "three";
 import { createNprMaterial } from "../renderer/materials/nprMaterial.js";
 import { groundHeight } from "./ground.js";
 
-const PEBBLE = ["#6a5f55", "#5a5048", "#766a5e"];
-const TUFT = ["#4f6a32", "#5c7a3a", "#445c2c"];
-const MUD = ["#5a4632", "#6b513a", "#4e3d2c"]; // cracked-mud disks
-const DRY = ["#8a7a4a", "#9a8a55", "#7a6a3e"]; // dry dead-grass spikes
+const PEBBLE = ["#76675a", "#6a5848", "#806d5d"];
+const TUFT = ["#58713a", "#657f3f", "#4f6332"];
+const MUD = ["#6a4d35", "#7a593d", "#5c432f"]; // cracked-mud disks
+const DRY = ["#a08a54", "#ad965d", "#8d7948"]; // dry dead-grass spikes
 
 export function createScatter(scene, opts = {}) {
   const { center = { x: 16, z: 9 }, area = 34, count = 90, seed = 7 } = opts;

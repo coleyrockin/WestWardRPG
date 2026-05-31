@@ -183,6 +183,8 @@ Added in the max-mode polish pass:
   and marsh-threat lane, with slab-like foreground masses moved out of the playable frame.
 - Beat-specific visual payoffs: Pearl's down-road cue, pulsing slime tell before aggro, Map Scrap
   reveal, and a changed Boone board state after return.
+- Second-pass art lift for the branch: more detailed facade silhouettes, stepped mesa skyline assets,
+  road dust ribbons, local light pools, warmer road/terrain colors, and less red foreground wash.
 - Debug probes and visual gates for composition blockers, controlled dusk lighting, beat visibility,
   and route-frame target readability.
 

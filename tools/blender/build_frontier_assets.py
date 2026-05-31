@@ -543,6 +543,15 @@ def build_jobboard_max(name="jobBoard_max"):
         add_box((0.07, 0.035, 0.07), (-0.18, 0.12, 1.25), red, "wax_seal"),
         add_box((0.26, 0.26, 0.28), (0, 0.18, 1.86), glow, "lamp"),
     ]
+    # Readable paper marks and frame trim: small enough to stay low-poly, strong
+    # enough for the ink pass to sell a real board instead of one glowing slab.
+    for y in (1.44, 1.34, 1.24):
+        parts.append(add_box((0.42, 0.035, 0.018), (-0.44, 0.128, y), dark, "bounty_line"))
+    for y in (1.12, 1.02):
+        parts.append(add_box((0.26, 0.035, 0.016), (0.38, 0.128, y), dark, "survey_line"))
+    for x in (-0.82, 0.82):
+        parts.append(add_box((0.08, 0.08, 1.24), (x, 0.12, 1.18), dark, "side_trim"))
+    parts.append(add_box((1.98, 0.08, 0.08), (0, 0.12, 1.78), dark, "top_trim"))
     for x in (-0.68, -0.34, 0.34, 0.68):
         parts.append(add_box((0.04, 0.04, 0.24), (x, 0.1, 2.0), dark, "awning_bracket"))
     obj = join_as(parts, name)
@@ -638,18 +647,35 @@ def build_town_facade_variant(name="town_facade_warm", wall_key="wall", width=1.
     glass = make_mat("glass", "#20252b")
     sign = make_mat("sign", PALETTE["board"], emissive=PALETTE["board"], emissive_strength=0.22)
     parts = [
+        add_box((width * 0.86, 0.78, height * 0.72), (0, -0.36, height * 0.36), wall, "body_depth"),
         add_box((width, 0.22, height), (0, 0, height / 2), wall, "false_front"),
-        add_box((width * 1.08, 0.28, 0.16), (0, 0.04, height - 0.08), trim, "cornice"),
-        add_box((width * 1.05, 0.62, 0.08), (0, 0.34, height * 0.68), roof, "awning"),
+        add_box((width * 1.12, 0.3, 0.16), (0, 0.04, height - 0.08), trim, "cornice"),
+        add_box((width * 0.62, 0.26, 0.2), (0, 0.06, height + 0.05), trim, "raised_parapet"),
+        add_box((width * 0.92, 0.86, 0.1), (0, -0.28, height * 0.72), roof, "rear_roof"),
+        add_box((width * 1.08, 0.7, 0.08), (0, 0.36, height * 0.68), roof, "awning"),
         add_box((0.5, 0.08, 1.0), (0, 0.13, 0.5), trim, "door"),
     ]
+    parts[-2].rotation_euler = (math.radians(5), 0, 0)
+    for i in range(5):
+        x = (-0.5 + i / 4) * width * 0.9
+        parts.append(add_box((0.035, 0.045, height * 0.78), (x, 0.14, height * 0.44), trim, "front_batten"))
     for dx in (-width * 0.28, width * 0.28):
         parts.append(add_box((0.34, 0.07, 0.42), (dx, 0.13, height * 0.48), glass, "window"))
         parts.append(add_box((0.42, 0.04, 0.5), (dx, 0.11, height * 0.48), trim, "window_frame"))
+        parts.append(add_box((0.035, 0.075, 0.42), (dx, 0.155, height * 0.48), trim, "window_mull_v"))
+        parts.append(add_box((0.34, 0.075, 0.035), (dx, 0.155, height * 0.48), trim, "window_mull_h"))
     if sign_text:
         parts.append(add_box((width * 0.66, 0.08, 0.28), (0, 0.52, height * 0.63), sign, "hanging_sign"))
+        for x in (-width * 0.2, 0, width * 0.2):
+            parts.append(add_box((0.1, 0.09, 0.035), (x, 0.575, height * 0.63), trim, "sign_tick"))
+    parts.append(add_box((width * 1.08, 0.52, 0.08), (0, 0.56, 0.08), trim, "porch_deck"))
+    for x in (-width * 0.48, width * 0.48):
+        parts.append(add_box((0.08, 0.08, height * 0.56), (x, 0.58, height * 0.28), trim, "porch_post"))
+        parts.append(add_box((0.08, 0.08, 0.5), (x * 0.82, -0.78, height * 0.25), trim, "rear_post"))
     for dx in (-width * 0.45, width * 0.45):
-        parts.append(add_box((0.08, 0.08, height * 0.62), (dx, 0.58, height * 0.31), trim, "porch_post"))
+        rail = add_box((0.46, 0.07, 0.07), (dx * 0.72, 0.59, height * 0.35), trim, "porch_rail")
+        rail.rotation_euler = (0, 0, math.radians(4 if dx > 0 else -4))
+        parts.append(rail)
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
@@ -660,12 +686,24 @@ def build_mesa_skyline(name="mesa_skyline"):
     clear_scene()
     rock = make_mat("mesa", "#5b4432")
     warm = make_mat("mesa_warm", "#6a5038")
-    parts = [
-        add_box((2.1, 0.8, 2.6), (-1.6, 0, 1.3), rock, "spire_a"),
-        add_box((2.7, 0.9, 3.2), (0.3, 0.08, 1.6), warm, "spire_b"),
-        add_box((1.9, 0.75, 2.2), (2.0, -0.04, 1.1), rock, "spire_c"),
-        add_box((5.2, 0.65, 0.42), (0.25, 0, 0.21), rock, "base_shelf"),
+    shadow = make_mat("mesa_shadow", "#3d3028")
+    parts = [add_box((6.2, 0.62, 0.38), (0, 0, 0.19), shadow, "long_shadow_base")]
+    shelves = [
+        (-2.35, 1.35, 1.95, rock),
+        (-1.25, 1.95, 2.65, warm),
+        (0.1, 2.35, 3.15, rock),
+        (1.45, 1.65, 2.28, warm),
+        (2.55, 1.1, 1.72, rock),
     ]
+    for i, (x, w, h, mat) in enumerate(shelves):
+        parts.append(add_box((w, 0.74, h), (x, 0.02 * i, h / 2), mat, f"butte_{i}"))
+        parts.append(add_box((w * 0.68, 0.84, h * 0.18), (x + w * 0.08, -0.03, h + h * 0.09), mat, f"cap_{i}"))
+        if i % 2 == 0:
+            parts.append(add_box((0.07, 0.78, h * 0.54), (x - w * 0.18, 0.08, h * 0.37), shadow, f"crack_{i}"))
+    for x in (-2.9, -1.8, -0.25, 0.85, 2.2):
+        ledge = add_box((0.82, 0.08, 0.09), (x, 0.42, 0.76 + (x % 0.7)), warm, "horizon_ledge")
+        ledge.rotation_euler = (0, 0, math.radians(2.5))
+        parts.append(ledge)
     obj = join_as(parts, name)
     shade_flat(obj)
     origin_to_base(obj)
