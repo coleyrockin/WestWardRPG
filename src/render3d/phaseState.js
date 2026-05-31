@@ -12,7 +12,7 @@ export const LOOP_PHASES = Object.freeze([
 
 const PHASE_COPY = {
   spawn: {
-    label: "Follow the road",
+    label: "Follow the Road",
     text: "Find Boone's lit job board by the road.",
     meta: ["Target: Boone's job board", "Action: Open board"],
     targetKind: "jobBoard",

@@ -54,7 +54,12 @@ async function main() {
     await page.goto(`${BASE}/spikes/render3d.html`, { waitUntil: "load" });
     await page.waitForSelector("#scene");
     await page.waitForFunction(() => window.__spikeReady === true, { timeout: 15000 });
-    await page.waitForFunction(() => Boolean(window.__westward3dTest), { timeout: 5000 });
+    await page.waitForFunction(() => Boolean(
+      window.__westward3dTest?.getPlayerPosition
+        && window.__westward3dTest?.getLoopState
+        && window.__westward3dTest?.interact
+        && window.__westward3dTest?.movePlayerToKind,
+    ), { timeout: 10000 });
 
     // force: skip actionability waits — the canvas renders continuously and, under
     // the headless SwiftShader WebGL2 backend, the main thread is busy enough that

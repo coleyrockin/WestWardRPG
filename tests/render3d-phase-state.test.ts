@@ -15,7 +15,7 @@ describe("render3d phase state", () => {
     expect(state.phase).toBe("spawn");
     expect(view.activeTargetKind).toBe("jobBoard");
     expect(view.objectiveText).toContain("Boone");
-    expect(view.label).toBe("Follow the road");
+    expect(view.label).toBe("Follow the Road");
     expect(view.objectiveMeta).toEqual(["Target: Boone's job board", "Action: Open board"]);
   });
 

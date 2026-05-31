@@ -4,7 +4,7 @@ Single source of truth. Do not create parallel `TODO.md`, `PLAN.md`, `ROADMAP-*.
 or another roadmap file.
 
 Last updated: `2026-05-30`
-Branch: `codex-camera-feel-v1` (agent competition branch; do not merge automatically)
+Branch: `first-five-minutes-polish-v1` (agent competition branch; do not merge automatically)
 
 ---
 
@@ -147,18 +147,18 @@ production.
 - **Milk-kill** — fog 0.0075 + bloom threshold 0.9; pink haze gone.
 - **6A/6B/6C** — prop detail, hero rig (Run/Turn/Draw), interactive NPCs (Mabel/Cole/Rosa/Hank/Pearl).
 
-### 🟢 Active competition pass — `codex-camera-feel-v1`
-Goal: make the first 30 seconds read like a playable RPG instead of a static beauty shot.
+### 🟢 Active competition pass — `first-five-minutes-polish-v1`
+Goal: make the first five minutes read like a playable RPG instead of a static beauty shot.
 
 Current branch scope:
-1. Exploration camera is higher, pulled back, and smoothed through named presets in `src/render3d/playerController.js`.
+1. Exploration camera is tuned to the requested third-person RPG range and smoothed through named presets in `src/render3d/playerController.js`.
 2. Player readability is reinforced with a subtle in-world ring and overhead marker attached to the character.
 3. Boone's job board gains an in-world objective ring, floating pointer, and road beads so the route is visible without relying only on the DOM objective strip.
 4. Foreground props between camera and player fade down instead of fully swallowing the character.
 5. Existing walk/run speeds remain pinned; movement math is unchanged while camera feel improves around it.
 
 Known follow-up for the branch comparison:
-- Take matching screenshots of `codex-camera-feel-v1` and `claude-world-polish-v1` from `spikes/render3d.html`.
+- Take matching screenshots of `first-five-minutes-polish-v1` and `claude-world-polish-v1` from `spikes/render3d.html`.
 - Judge camera quality, player visibility, road guidance, Boone board clarity, console cleanliness, and frame stability.
 - Cherry-pick only the winning pieces into `main`; do not merge whole branches blindly.
 

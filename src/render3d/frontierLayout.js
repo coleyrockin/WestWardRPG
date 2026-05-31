@@ -42,6 +42,19 @@ const PROPS = [
   { kind: "crate", label: "Barricade Crates",   dx: 2.6,  dy: 1.2,  color: "#b9824d", size: 0.62, depthLane: "foreground" },
 ];
 
+// Corridor framing — props in the spawn→board wedge (absolute coords) that turn
+// the road's first stretch into a readable street: a pair of lanterns flanking the
+// path right out of spawn, a directional signpost, and a hitching rail edge. These
+// lead the eye east toward Boone's board without crowding the walking lane.
+const ROAD_CORRIDOR = [
+  { kind: "lamp",  label: "Spawn Lantern Left",  x: 10.4, y: 7.4, color: "#ffe6a8", size: 0.62 },
+  { kind: "lamp",  label: "Spawn Lantern Right", x: 10.4, y: 9.9, color: "#ffe6a8", size: 0.62 },
+  { kind: "sign",  label: "Road Sign — Board",   x: 10.8, y: 7.7, color: "#ffd77b", size: 0.8 },
+  { kind: "fence", label: "Corridor Rail North",  x: 11.4, y: 7.2, color: "#a47b4c", size: 0.62 },
+  { kind: "fence", label: "Corridor Rail South",  x: 11.6, y: 10.1, color: "#a47b4c", size: 0.6 },
+  { kind: "crate", label: "Roadside Crates",      x: 13.8, y: 7.4, color: "#b9824d", size: 0.6 },
+];
+
 // Tall hero landmark — should read as the tallest first-view shape.
 const LANDMARK = { kind: "landmark", label: "North Watchtower Beacon", dx: 5.16, dy: -1.66, color: "#ffd77b", size: 1.84, depthLane: "background" };
 
@@ -146,7 +159,7 @@ function world(anchor, dx, dy, depthLane) {
 
 // Anchor-relative dressing entries carry dx/dy; absolute zone entries already
 // carry x/y. Project the former, pass the latter through untouched.
-const ABSOLUTE_ZONES = [...TOWN_EDGE, ...ROAD_FLORA, ...MARSH, ...BOUNDARY_RING];
+const ABSOLUTE_ZONES = [...TOWN_EDGE, ...ROAD_CORRIDOR, ...ROAD_FLORA, ...MARSH, ...BOUNDARY_RING];
 
 // Returns all scene placements in absolute world coordinates.
 export function buildFrontierPlacements() {

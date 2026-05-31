@@ -1,9 +1,9 @@
 # Changelog
 
-## Unreleased — `codex-camera-feel-v1`
+## Unreleased — `first-five-minutes-polish-v1`
 
 - Added named 3D camera presets for exploration, town, inspection, and objective focus.
-- Raised and pulled back the default exploration camera so the road, player, and Boone's board fit in the same playable frame.
+- Tuned the default exploration camera to a third-person RPG range so the road, player, and Boone's board fit in the same playable frame.
 - Smoothed third-person follow motion with deterministic camera-pose helpers covered by Vitest.
 - Added a subtle player ring and overhead marker to keep the character readable against town geometry.
 - Added in-world Boone board guidance: target ring, floating pointer, and road beads from spawn to the objective.

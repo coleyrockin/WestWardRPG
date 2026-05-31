@@ -625,13 +625,15 @@ function buildGround(scene, snapshot) {
   // The opening quest is "follow the road", so the road must read as the brightest,
   // clearest path in the frame — wider, lighter packed-sand colour, and a gentle
   // warm emissive lift so it stays legible even where buildings cast shadow.
+  // Anchored to START a touch behind the player's feet so the path reads as
+  // "begins here, leads east" rather than the player standing in its middle.
   const ROAD_LEN = 30;
-  const ROAD_W = 2.6;
-  const ROAD_CX = spawn.x + 11;
+  const ROAD_W = 3.0;
+  const ROAD_CX = spawn.x + ROAD_LEN / 2 - 3; // strip starts ~3u west of spawn
   const ROAD_Z = spawn.y + 0.4;
   const road = new THREE.Mesh(
     new THREE.PlaneGeometry(ROAD_LEN, ROAD_W),
-    standard("#c2a06a", { roughness: 1, emissive: "#5a4424", emissiveIntensity: 0.35 }),
+    standard("#caa770", { roughness: 1, emissive: "#5a4424", emissiveIntensity: 0.4 }),
   );
   road.rotation.x = -Math.PI / 2;
   road.position.set(ROAD_CX, 0.02, ROAD_Z);
@@ -639,20 +641,32 @@ function buildGround(scene, snapshot) {
   scene.add(road);
 
   // Bright dust shoulders frame the road and lead the eye down it.
-  for (const off of [-(ROAD_W / 2 + 0.12), ROAD_W / 2 + 0.12]) {
+  for (const off of [-(ROAD_W / 2 + 0.14), ROAD_W / 2 + 0.14]) {
     const edge = new THREE.Mesh(
-      new THREE.PlaneGeometry(ROAD_LEN, 0.28),
-      standard("#e8d29a", { roughness: 1, emissive: "#6a4e22", emissiveIntensity: 0.45 }),
+      new THREE.PlaneGeometry(ROAD_LEN, 0.32),
+      standard("#ecd6a0", { roughness: 1, emissive: "#6a4e22", emissiveIntensity: 0.5 }),
     );
     edge.rotation.x = -Math.PI / 2;
     edge.position.set(ROAD_CX, 0.03, ROAD_Z + off);
     scene.add(edge);
   }
 
+  // Two darker wheel ruts — parallel worn tracks that sell "a road travelled" and
+  // give the eye a strong directional line toward the objective.
+  for (const off of [-0.62, 0.62]) {
+    const rut = new THREE.Mesh(
+      new THREE.PlaneGeometry(ROAD_LEN, 0.2),
+      standard("#9a7c4c", { roughness: 1 }),
+    );
+    rut.rotation.x = -Math.PI / 2;
+    rut.position.set(ROAD_CX, 0.027, ROAD_Z + off);
+    scene.add(rut);
+  }
+
   // Faint centre wear-line for direction and depth flow toward the objective.
   const centerLine = new THREE.Mesh(
     new THREE.PlaneGeometry(ROAD_LEN, 0.12),
-    standard("#a8895a", { roughness: 1 }),
+    standard("#b08f5e", { roughness: 1 }),
   );
   centerLine.rotation.x = -Math.PI / 2;
   centerLine.position.set(ROAD_CX, 0.028, ROAD_Z);
