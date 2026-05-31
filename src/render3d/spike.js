@@ -391,6 +391,28 @@ function attachLight(group, p, light, effScale) {
   group.add(l);
 }
 
+// Warm a building so it reads as occupied at dusk: a couple of emissive window
+// panes + a soft interior PointLight, placed on the side facing the road/player so
+// the glow is visible from the street. `face` is the +z (south) road-facing offset.
+function attachBuildingWarmth(group, p, wl) {
+  const faceZ = p.y + 1.05; // toward the road (south, +z in world→3D)
+  const winMat = standard(wl.color, { emissive: wl.color, emissiveIntensity: 1.6, rimStrength: 0 });
+  for (const [dx, wy] of [[-0.42, 1.55], [0.42, 1.55], [0, 0.62]]) {
+    // two upper windows + a low door-glow slit, all on the road face
+    const isDoor = wy < 1.0;
+    const pane = new THREE.Mesh(
+      new THREE.PlaneGeometry(isDoor ? 0.5 : 0.42, isDoor ? 1.05 : 0.5),
+      winMat,
+    );
+    pane.position.set(p.x + dx, wy, faceZ);
+    pane.renderOrder = 1;
+    group.add(pane);
+  }
+  const l = new THREE.PointLight(col(wl.color), wl.intensity, wl.distance ?? 8, 2);
+  l.position.set(p.x, wl.height ?? 1.5, p.y + 0.4);
+  group.add(l);
+}
+
 function recolorAccepted(mat) {
   if (!mat) return;
   if (mat.color?.set) mat.color.set("#e1a34c");
@@ -777,6 +799,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
             // lamps/beacon/board carried their PointLight inside the old builder;
             // re-add it here for the model path (height is in local model units).
             if (entry.light) attachLight(props, p, entry.light, effScale);
+            if (entry.windowLight) attachBuildingWarmth(props, p, entry.windowLight);
             if (["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(p.kind)) {
               heroMeshes[p.kind] = node;
             }
