@@ -20,14 +20,16 @@ export const PALETTES = Object.freeze({
     // Sunset gradient with real depth: deep indigo zenith → violet mid → warm amber
     // horizon. Tamed so lit walls/roofs hold detail instead of blowing to white.
     sky: { top: "#1e2148", mid: "#5a4570", horizon: "#e0935a" },
-    fog: { color: "#6a5a4e", density: 0.0085 },
-    sun: { color: "#ffc878", intensity: 1.9, dir: { x: -10, y: 3.5, z: -5 }, disc: 0.026, glow: 0.16 },
-    hemi: { sky: "#5a5a82", ground: "#2e2114", intensity: 0.32 },
+    fog: { color: "#7e6450", density: 0.0095 },
+    sun: { color: "#ffc878", intensity: 1.95, dir: { x: -10, y: 3.5, z: -5 }, disc: 0.026, glow: 0.16 },
+    // Warmer, brighter ground bounce lifts shadowed faces so the foreground reads
+    // instead of crushing to dead black — shadows stay rich but not empty.
+    hemi: { sky: "#6a6a92", ground: "#4a3520", intensity: 0.5 },
     rim: { color: "#6a7adf", intensity: 0.75, dir: { x: 9, y: 5, z: 6 } },
-    exposure: 0.92,
+    exposure: 0.96,
     stars: 0.12,
     bloom: 0.55,
-    grade: { tint: "#ffb070", amount: 0.05, contrast: 1.12, saturation: 1.1, shadowTint: "#3e4a78", highlightTint: "#ffb868" },
+    grade: { tint: "#ffb070", amount: 0.05, contrast: 1.1, saturation: 1.1, shadowTint: "#42507e", highlightTint: "#ffb868" },
     bodyBg: "#161024",
   },
   goldenHour: {
