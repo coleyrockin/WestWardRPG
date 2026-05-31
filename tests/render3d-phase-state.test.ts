@@ -119,6 +119,14 @@ describe("render3d phase state", () => {
     expect(view.objectiveMeta[1]).toContain("Ask about road danger");
   });
 
+  it("reflects board option in the return-to-Boone payoff copy", () => {
+    const state = createInitialLoopState({ phase: "return_to_boone", boardChoice: "inspect_survey" });
+    const view = getPhaseView("return_to_boone", state);
+
+    expect(view.objectiveText).toContain("Old Road Survey");
+    expect(view.objectiveMeta[1]).toContain("Inspect old survey");
+  });
+
   it("gives every first-road phase objective metadata", () => {
     for (const phase of LOOP_PHASES) {
       const view = getPhaseView(phase);

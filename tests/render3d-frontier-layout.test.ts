@@ -20,13 +20,27 @@ describe("render3d frontier layout", () => {
     const kinds = new Set(placements.map((placement) => placement.kind));
     const planks = placements.filter((placement) => placement.kind === "roadPlank");
 
-    expect(kinds.has("saloonFacade")).toBe(true);
+    expect(kinds.has("townFacadeWarm")).toBe(true);
+    expect(kinds.has("townFacadeStore")).toBe(true);
+    expect(kinds.has("townFacadeDark")).toBe(true);
     expect(kinds.has("lampTall")).toBe(true);
     expect(kinds.has("lampLow")).toBe(true);
     expect(kinds.has("wagonSalvage")).toBe(true);
-    expect(kinds.has("mesaSilhouette")).toBe(true);
+    expect(kinds.has("mesa")).toBe(true);
     expect(planks.length).toBeGreaterThanOrEqual(12);
     expect(planks.every((placement) => Number.isFinite(placement.yaw))).toBe(true);
+  });
+
+  it("registers the max-mode Blender kit with readable route composition props", () => {
+    const placements = buildFrontierPlacements();
+    const kinds = new Set(placements.map((placement) => placement.kind));
+    const ruts = placements.filter((placement) => placement.kind === "roadRut");
+
+    expect(kinds.has("brokenFence")).toBe(true);
+    expect(kinds.has("marshCluster")).toBe(true);
+    expect(kinds.has("mesaSkyline")).toBe(true);
+    expect(ruts.length).toBeGreaterThanOrEqual(10);
+    expect(ruts.every((placement) => Number.isFinite(placement.yaw))).toBe(true);
   });
 
   it("emits finite coordinates and sizes for every placement", () => {

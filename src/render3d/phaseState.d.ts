@@ -14,6 +14,7 @@ export interface BoardOption {
   id: string;
   label: string;
   followUp: string;
+  returnLine: string;
 }
 
 export const LOOP_PHASES: ReadonlyArray<LoopPhase>;

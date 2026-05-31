@@ -18,7 +18,7 @@ import { buildFrontierPlacements, FIRST_FIVE_ROUTE, getRouteMetrics, PLAYER_SPAW
 import { createPlayerController } from "./playerController.js";
 import { buildProxies } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
-import { createLoopStateMachine } from "./phaseState.js";
+import { LOOP_PHASES, createLoopStateMachine } from "./phaseState.js";
 import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
 import { createBoardModalController } from "./boardModal.js";
 import { createEncounterSystem } from "./encounterSystem.js";
@@ -400,20 +400,25 @@ function buildPlacement(group, p) {
   switch (p.kind) {
     case "town":
     case "ranch": return buildBuilding(group, p, p.depthLane === "background" ? 1.3 : 1.0);
+    case "townFacadeWarm": return buildBuilding(group, p, 0.95);
+    case "townFacadeStore": return buildBuilding(group, p, 0.86);
+    case "townFacadeDark": return buildBuilding(group, p, 0.8);
     case "gate": return buildBuilding(group, p, 0.8);
     case "watchtower":
     case "landmark": return buildWatchtower(group, p);
     case "lamp":
     case "lampTall":
     case "lampLow": return buildLamp(group, p);
-    case "fence": return buildFence(group, p);
+    case "fence":
+    case "brokenFence": return buildFence(group, p);
     case "sign":
     case "roadSign":
     case "road": return buildSign(group, p);
     case "townBark": return buildTownBarkMarker(group, p);
     case "jobBoard": return buildJobBoard(group, p);
     case "smokeCache": return buildSmokeCache(group, p);
-    case "slimeTell": return buildSlimeTell(group, p);
+    case "slimeTell":
+    case "marshCluster": return buildSlimeTell(group, p);
     case "brokenWagon":
     case "wagonSalvage": return buildWagon(group, p);
     case "roadSlime": return buildSlime(group, p);
@@ -423,12 +428,14 @@ function buildPlacement(group, p) {
     case "porch": return buildPorch(group, p);
     case "mesa":
     case "mesaSilhouette":
+    case "mesaSkyline":
     case "cliff": return buildMesa(group, p);
     case "rock":
     case "boulder": return buildRock(group, p);
     case "cactus": return buildCactus(group, p);
     case "deadTree": return buildDeadTree(group, p);
-    case "roadPlank": return buildRoadPlank(group, p);
+    case "roadPlank":
+    case "roadRut": return buildRoadPlank(group, { ...p, size: p.kind === "roadRut" ? 2.0 * p.size : p.size });
     case "brush": return buildBrush(group, p);
     case "reeds": return buildReeds(group, p);
     case "cart":
@@ -708,6 +715,181 @@ function createObjectiveGuidance(snapshot) {
   };
 }
 
+function placementByKind(snapshot, kind) {
+  return snapshot.worldObjects.find((p) => p.kind === kind);
+}
+
+function createPearlRoadCue(snapshot) {
+  const target = placementByKind(snapshot, "townBark");
+  const group = new THREE.Group();
+  group.name = "pearl-road-cue";
+  if (!target) return { group, update() {} };
+
+  const shaftMat = standard("#ffd77b", { emissive: "#ffb84a", emissiveIntensity: 0.82, transparent: true, opacity: 0.86, rimStrength: 0 });
+  const shadowMat = standard("#3a2818", { transparent: true, opacity: 0.62 });
+  const base = addBox(group, 0.18, 0.18, 1.1, shadowMat, toVec(target.x + 0.45, target.y - 0.15, 0.03));
+  base.rotation.y = -0.74;
+  const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.52, 4), shaftMat);
+  arrow.rotation.z = Math.PI / 2;
+  arrow.rotation.y = -0.74;
+  arrow.position.copy(toVec(target.x + 1.02, target.y - 0.52, 1.22));
+  group.add(arrow);
+  group.visible = false;
+
+  return {
+    group,
+    update(t, visible) {
+      group.visible = visible;
+      if (!visible) return;
+      arrow.position.y = 1.22 + Math.sin(t * 4.0) * 0.08;
+      arrow.rotation.y = -0.74 + Math.sin(t * 2.2) * 0.06;
+    },
+  };
+}
+
+function createMapScrapReward(snapshot) {
+  const wagon = placementByKind(snapshot, "brokenWagon");
+  const group = new THREE.Group();
+  group.name = "map-scrap-reward";
+  if (!wagon) return { group, update() {} };
+
+  const paper = standard("#f1dfb8", { emissive: "#d6a34f", emissiveIntensity: 0.44, roughness: 1, rimStrength: 0.05 });
+  const ink = standard("#5b3a1d", { emissive: "#5b3a1d", emissiveIntensity: 0.12 });
+  const scrap = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.035, 0.42), paper);
+  scrap.position.copy(toVec(wagon.x - 0.22, wagon.y + 0.28, 1.25));
+  scrap.rotation.set(0.2, -0.42, 0.08);
+  scrap.castShadow = true;
+  group.add(scrap);
+  const line = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.035), ink);
+  line.position.copy(toVec(wagon.x - 0.22, wagon.y + 0.29, 1.29));
+  line.rotation.copy(scrap.rotation);
+  group.add(line);
+  const light = new THREE.PointLight(col("#ffcc80"), 1.1, 2.8, 2.2);
+  light.position.copy(toVec(wagon.x - 0.22, wagon.y + 0.28, 1.55));
+  group.add(light);
+  group.visible = false;
+
+  return {
+    group,
+    update(t, visible) {
+      group.visible = visible;
+      if (!visible) return;
+      scrap.position.y = 1.25 + Math.sin(t * 3.3) * 0.045;
+      line.position.y = scrap.position.y + 0.04;
+      light.intensity = 0.9 + Math.sin(t * 4.2) * 0.18;
+    },
+  };
+}
+
+function createBoardReturnNotice(snapshot) {
+  const board = placementByKind(snapshot, "jobBoard");
+  const group = new THREE.Group();
+  group.name = "board-return-notice";
+  if (!board) return { group, update() {} };
+
+  const paper = standard("#f0dfbb", { emissive: "#d9a857", emissiveIntensity: 0.36, rimStrength: 0 });
+  const pin = standard("#b84932", { emissive: "#b84932", emissiveIntensity: 0.28, rimStrength: 0 });
+  const notice = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.045, 0.32), paper);
+  notice.position.copy(toVec(board.x + 0.34, board.y - 0.05, 1.52));
+  notice.rotation.y = Math.PI / 2;
+  group.add(notice);
+  const tack = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), pin);
+  tack.position.copy(toVec(board.x + 0.34, board.y - 0.08, 1.68));
+  group.add(tack);
+  group.visible = false;
+
+  return {
+    group,
+    update(t, visible) {
+      group.visible = visible;
+      if (!visible) return;
+      const pulse = 1 + Math.sin(t * 3.1) * 0.035;
+      notice.scale.set(pulse, pulse, pulse);
+      tack.scale.setScalar(1 + Math.sin(t * 4.7) * 0.08);
+    },
+  };
+}
+
+function nodeScreenStats(node, camera) {
+  if (!node || node.visible === false) return null;
+  camera.updateMatrixWorld();
+  camera.updateProjectionMatrix();
+  const box = new THREE.Box3().setFromObject(node);
+  if (box.isEmpty()) return null;
+  const min = box.min;
+  const max = box.max;
+  const corners = [
+    [min.x, min.y, min.z], [min.x, min.y, max.z], [min.x, max.y, min.z], [min.x, max.y, max.z],
+    [max.x, min.y, min.z], [max.x, min.y, max.z], [max.x, max.y, min.z], [max.x, max.y, max.z],
+  ];
+  let minX = 1;
+  let maxX = -1;
+  let minY = 1;
+  let maxY = -1;
+  let inDepth = false;
+  for (const corner of corners) {
+    const p = new THREE.Vector3(corner[0], corner[1], corner[2]).project(camera);
+    if (p.z >= -1 && p.z <= 1) inDepth = true;
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  }
+  const clipMinX = Math.max(-1, minX);
+  const clipMaxX = Math.min(1, maxX);
+  const clipMinY = Math.max(-1, minY);
+  const clipMaxY = Math.min(1, maxY);
+  const area = Math.max(0, clipMaxX - clipMinX) * Math.max(0, clipMaxY - clipMinY) / 4;
+  const center = box.getCenter(new THREE.Vector3());
+  return {
+    inFrame: inDepth && area > 0,
+    area: Number(area.toFixed(4)),
+    center,
+    height: Number((box.max.y - box.min.y).toFixed(2)),
+    ndc: {
+      minX: Number(clipMinX.toFixed(3)),
+      maxX: Number(clipMaxX.toFixed(3)),
+      minY: Number(clipMinY.toFixed(3)),
+      maxY: Number(clipMaxY.toFixed(3)),
+    },
+  };
+}
+
+function createCompositionMetrics({ heroMeshes, placementNodes, character, camera, player, extras = {} }) {
+  const heroVisibility = getHeroVisibility(heroMeshes, camera);
+  const playerVisibility = getHeroVisibility({ player: character.group }, camera).player;
+  let visibleBeatCount = 0;
+  for (const kind of ["jobBoard", "roadSign", "townBark", "smokeCache", "slimeTell", "roadSlime", "brokenWagon"]) {
+    if (heroVisibility[kind]?.inFrame) visibleBeatCount++;
+  }
+  for (const node of Object.values(extras)) {
+    if (nodeScreenStats(node, camera)?.inFrame) visibleBeatCount++;
+  }
+
+  let maxForegroundBlocker = { kind: null, screenArea: 0, distanceToPlayer: 0 };
+  for (const record of placementNodes) {
+    if (!record?.node || HERO_KINDS.includes(record.kind)) continue;
+    const stats = nodeScreenStats(record.node, camera);
+    if (!stats?.inFrame || stats.height < 1.05) continue;
+    const distanceToPlayer = Math.hypot(stats.center.x - player.position.x, stats.center.z - player.position.z);
+    if (distanceToPlayer > 14) continue;
+    if (stats.area > maxForegroundBlocker.screenArea) {
+      maxForegroundBlocker = {
+        kind: record.kind,
+        screenArea: stats.area,
+        distanceToPlayer: Number(distanceToPlayer.toFixed(2)),
+      };
+    }
+  }
+
+  return {
+    playerVisible: Boolean(playerVisibility?.inFrame),
+    boardVisible: Boolean(heroVisibility.jobBoard?.inFrame),
+    visibleBeatCount,
+    maxForegroundBlocker,
+  };
+}
+
 function buildGround(scene, snapshot) {
   const spawn = snapshot?.player || PLAYER_SPAWN;
   // Big enough to comfortably hold the full ~30×20 explorable rectangle plus a
@@ -857,6 +1039,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     anchor: { x: snapshot.player.x, y: snapshot.player.y },
     playCore: { x: snapshot.player.x + 6, y: snapshot.player.y },
   });
+  scene.add(new THREE.AmbientLight(col("#5b321f"), 0.16));
   // Continuous day/night: a slow world clock advances dayTime; sunArc(dayTime)
   // is the live palette so the sun arcs and colours drift. Starts at dusk. The
   // golden-image gate loads ?visual to freeze everything time-animated (sun,
@@ -922,6 +1105,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   scene.add(props);
   const objectiveGuidance = createObjectiveGuidance(snapshot);
   scene.add(objectiveGuidance.group);
+  const pearlRoadCue = createPearlRoadCue(snapshot);
+  const mapScrapReward = createMapScrapReward(snapshot);
+  const boardReturnNotice = createBoardReturnNotice(snapshot);
+  scene.add(pearlRoadCue.group);
+  scene.add(mapScrapReward.group);
+  scene.add(boardReturnNotice.group);
 
   // Ambient townsfolk — NPCs reusing the rig, wandering the town to bring the
   // street to life. Non-blocking fallback so a load failure never breaks the scene.
@@ -1155,7 +1344,14 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     },
   });
 
+  let beatFocusTimer = 0;
+  const focusBeat = (preset = "inspection", seconds = 0.9) => {
+    beatFocusTimer = Math.max(beatFocusTimer, seconds);
+    player.setCameraPreset(preset);
+  };
+
   const handleJobBoard = () => {
+    focusBeat(loopState.phase === "return_to_boone" ? "objective" : "inspection", 1.0);
     if (loopState.phase === "spawn") {
       advance("board_reached");
       boardModalController.open();
@@ -1167,6 +1363,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     }
     if (loopState.phase === "return_to_boone") {
       advance("report_to_boone");
+      markJobBoardAccepted(heroMeshes.jobBoard);
       return;
     }
     if (loopState.phase === "survey_teaser") {
@@ -1178,10 +1375,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   };
   const handleRoadSign = () => {
     if (loopState.phase !== "road_sign") return;
+    focusBeat("inspection", 0.75);
     advance("read_sign");
   };
   const handleTownBark = () => {
     if (loopState.phase !== "road_walk") return;
+    focusBeat("objective", 0.9);
     advance("hear_bark");
     npcSpeechMsg = "Pearl: \"Road's quiet when it wants you close. Watch the marsh grass.\"";
     npcSpeechT = 3.5;
@@ -1189,10 +1388,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   };
   const handleSmokeCache = () => {
     if (loopState.phase !== "cache_clue") return;
+    focusBeat("inspection", 0.9);
     advance("open_cache");
   };
   const handleSlimeTell = () => {
     if (loopState.phase !== "slime_tell") return;
+    focusBeat("objective", 0.8);
     encounter.engage();
     if (loopState.phase === "slime_tell") advance("spot_slime_tell");
   };
@@ -1202,6 +1403,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   };
   const handleBrokenWagon = () => {
     if (loopState.phase !== "wagon_salvage") return;
+    focusBeat("inspection", 0.95);
     advance("inspect_wagon");
   };
 
@@ -1221,22 +1423,140 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       heroMeshes.roadSlime.visible = ["slime_fight"].includes(loopState.phase);
     }
   };
+  const animateBeatPayoffs = (t) => {
+    const state = loopState.state;
+    const showMapScrap = ["return_to_boone", "survey_teaser"].includes(state.phase) || state.routeBeats.wagonSalvage;
+    const showBoardNotice = state.phase === "survey_teaser" || state.routeBeats.returnToBoone;
+    const showPearlCue = state.phase === "road_walk" || state.phase === "cache_clue";
+    pearlRoadCue.update(t, showPearlCue);
+    mapScrapReward.update(t, showMapScrap);
+    boardReturnNotice.update(t, showBoardNotice);
+    if (heroMeshes.slimeTell?.visible) {
+      const pulse = 1 + Math.sin(t * 4.6) * 0.045;
+      heroMeshes.slimeTell.scale.setScalar(pulse);
+      heroMeshes.slimeTell.traverse?.((obj) => {
+        if (obj.material && "emissiveIntensity" in obj.material) {
+          obj.material.emissiveIntensity = 0.55 + Math.max(0, Math.sin(t * 5.2)) * 0.5;
+        }
+      });
+    }
+  };
   updateBeatVisibility();
 
   if (import.meta.env.DEV && typeof window !== "undefined") {
+    const phaseAdvanceEvents = {
+      spawn: "board_reached",
+      board_choice: { type: "choose_board", optionId: "accept_bounty" },
+      road_sign: "read_sign",
+      road_walk: "hear_bark",
+      cache_clue: "open_cache",
+      slime_tell: "spot_slime_tell",
+      slime_fight: "defeat_slime",
+      wagon_salvage: "inspect_wagon",
+      return_to_boone: "report_to_boone",
+    };
+    const movePlayerToKind = (kind) => {
+      const target = snapshot.worldObjects.find((obj) => obj.kind === kind);
+      if (!target || !player.setPosition) return null;
+      const x = target.x - 1.35;
+      const z = target.y;
+      player.setPosition({ x, z });
+      refreshLoopDom();
+      interaction.update(player.position);
+      return player.position;
+    };
+    const driveToPhase = (phase) => {
+      const targetIndex = LOOP_PHASES.indexOf(phase);
+      if (targetIndex < 0) return loopState.state;
+      let guard = LOOP_PHASES.length;
+      while (LOOP_PHASES.indexOf(loopState.phase) < targetIndex && guard > 0) {
+        const event = phaseAdvanceEvents[loopState.phase];
+        if (!event) break;
+        advance(event);
+        guard--;
+      }
+      return loopState.state;
+    };
+    const getCompositionMetrics = () => createCompositionMetrics({
+      heroMeshes,
+      placementNodes,
+      character,
+      camera,
+      player,
+      extras: {
+        mapScrap: mapScrapReward.group,
+        pearlCue: pearlRoadCue.group,
+        boardNotice: boardReturnNotice.group,
+      },
+    });
+    const getLightingMetrics = () => {
+      const metrics = {
+        pointLights: 0,
+        directionalLights: 0,
+        hemisphereLights: 0,
+        maxPointIntensity: 0,
+        maxLightIntensity: 0,
+        exposure: Number((postUniforms.exposure.value ?? 1).toFixed(3)),
+        palette: appliedPalette?.key || "unknown",
+        bloom: Number((appliedPalette?.bloom ?? 0).toFixed(3)),
+      };
+      scene.traverse((obj) => {
+        if (!obj?.isLight) return;
+        metrics.maxLightIntensity = Math.max(metrics.maxLightIntensity, obj.intensity || 0);
+        if (obj.isPointLight) {
+          metrics.pointLights++;
+          metrics.maxPointIntensity = Math.max(metrics.maxPointIntensity, obj.intensity || 0);
+        }
+        if (obj.isDirectionalLight) metrics.directionalLights++;
+        if (obj.isHemisphereLight) metrics.hemisphereLights++;
+      });
+      metrics.maxPointIntensity = Number(metrics.maxPointIntensity.toFixed(2));
+      metrics.maxLightIntensity = Number(metrics.maxLightIntensity.toFixed(2));
+      return metrics;
+    };
+    const getBeatVisibility = () => {
+      updateBeatVisibility();
+      animateBeatPayoffs(performance.now() / 1000);
+      return {
+        slimeTellVisible: Boolean(heroMeshes.slimeTell?.visible),
+        roadSlimeVisible: Boolean(heroMeshes.roadSlime?.visible),
+        mapScrapVisible: Boolean(mapScrapReward.group.visible),
+        pearlCueVisible: Boolean(pearlRoadCue.group.visible),
+        boardNoticeVisible: Boolean(boardReturnNotice.group.visible),
+        heroVisibility: getHeroVisibility(heroMeshes, camera),
+      };
+    };
+    const captureRouteFrame = (phase) => {
+      const state = driveToPhase(phase);
+      updateBeatVisibility();
+      animateBeatPayoffs(performance.now() / 1000);
+      movePlayerToKind(state.activeTargetKind);
+      player.resetCameraBehind?.(-Math.PI / 2);
+      player.setCameraPreset(phase === "slime_fight" ? "objective" : "inspection");
+      for (let i = 0; i < 18; i++) player.update(0.016, proxies);
+      const target = placementByKind(snapshot, state.activeTargetKind);
+      if (target) {
+        camera.position.set(player.position.x - 4.8, 4.15, player.position.z + 5.35);
+        camera.lookAt(target.x, 1.35, target.y);
+      }
+      camera.updateMatrixWorld();
+      return {
+        phase: loopState.phase,
+        targetKind: loopState.state.activeTargetKind,
+        composition: getCompositionMetrics(),
+        beatVisibility: getBeatVisibility(),
+        cameraPose: {
+          x: Number(camera.position.x.toFixed(2)),
+          y: Number(camera.position.y.toFixed(2)),
+          z: Number(camera.position.z.toFixed(2)),
+          fov: Number(camera.fov.toFixed(1)),
+        },
+      };
+    };
     window.__westward3dTest = {
       getLoopState: () => loopState.state,
       getPlayerPosition: () => player.position,
-      movePlayerToKind: (kind) => {
-        const target = snapshot.worldObjects.find((obj) => obj.kind === kind);
-        if (!target || !player.setPosition) return null;
-        const x = target.x - 1.35;
-        const z = target.y;
-        player.setPosition({ x, z });
-        refreshLoopDom();
-        interaction.update(player.position);
-        return player.position;
-      },
+      movePlayerToKind,
       interact(kind) {
         const handlers = {
           jobBoard: handleJobBoard,
@@ -1269,6 +1589,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       }),
       getHeroVisibility: () => getHeroVisibility(heroMeshes, camera),
       getPlayerVisibility: () => getHeroVisibility({ player: character.group }, camera).player,
+      getCompositionMetrics,
+      getLightingMetrics,
+      getBeatVisibility,
+      captureRouteFrame,
       getCameraPose: () => ({
         x: Number(camera.position.x.toFixed(2)),
         y: Number(camera.position.y.toFixed(2)),
@@ -1290,6 +1614,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     const dt = Math.min((now - prevTs) / 1000, 0.05);
     prevTs = now;
     if (!boardModalController.isOpen()) player.update(dt, proxies);
+    if (beatFocusTimer > 0) {
+      beatFocusTimer = Math.max(0, beatFocusTimer - dt);
+      if (beatFocusTimer === 0) player.setCameraPreset("exploration");
+    }
     if (visualCapture) applyHeroCamera(); // re-assert hero pose (player.update re-syncs the follow-cam)
     updateOcclusionFades(placementNodes, camera, player.position);
     interaction.update(player.position);
@@ -1298,6 +1626,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     character.update(visualCapture ? 0 : dt, player.moving && !visualCapture, player.running && !visualCapture);
     playerReadability.update(now / 1000);
     objectiveGuidance.update(now / 1000, loopState.state);
+    animateBeatPayoffs(now / 1000);
     townsfolk.update(visualCapture ? 0 : dt, visualCapture, player.position);
     // NPC greeting prompt/speech overrides the kind prompt when near a townsperson
     if (npcSpeechT > 0) {

@@ -247,7 +247,11 @@ async function captureNew(context) {
   await page.waitForFunction(() => Boolean(
     window.__westward3dTest?.getHeroVisibility
       && window.__westward3dTest?.getPlayerVisibility
-      && window.__westward3dTest?.getRouteMetrics,
+      && window.__westward3dTest?.getRouteMetrics
+      && window.__westward3dTest?.getCompositionMetrics
+      && window.__westward3dTest?.getLightingMetrics
+      && window.__westward3dTest?.getBeatVisibility
+      && window.__westward3dTest?.captureRouteFrame,
   ), { timeout: 15000 });
   const snapshot = await page.evaluate(() => window.__westwardRenderSnapshot || null);
   const loopState = await page.evaluate(() => window.__westward3dLoop || null);
@@ -270,6 +274,24 @@ async function captureNew(context) {
   console.log(`[probe] new player visibility: ${JSON.stringify(playerVisibility)}`);
   if (!playerVisibility?.inFrame) {
     errors.push(`render3d first frame hides the player: ${JSON.stringify(playerVisibility)}`);
+  }
+  const compositionMetrics = await page.evaluate(() => window.__westward3dTest.getCompositionMetrics());
+  console.log(`[probe] new composition metrics: ${JSON.stringify(compositionMetrics)}`);
+  if (!compositionMetrics?.playerVisible || !compositionMetrics?.boardVisible) {
+    errors.push(`render3d composition lost player/board readability: ${JSON.stringify(compositionMetrics)}`);
+  }
+  if (compositionMetrics?.maxForegroundBlocker?.screenArea > 0.24) {
+    errors.push(`render3d has a giant foreground blocker: ${JSON.stringify(compositionMetrics.maxForegroundBlocker)}`);
+  }
+  const lightingMetrics = await page.evaluate(() => window.__westward3dTest.getLightingMetrics());
+  console.log(`[probe] new lighting metrics: ${JSON.stringify(lightingMetrics)}`);
+  if (lightingMetrics?.maxPointIntensity > 10.2 || lightingMetrics?.exposure > 1.05 || lightingMetrics?.bloom > 0.2) {
+    errors.push(`render3d lighting is outside controlled dusk bounds: ${JSON.stringify(lightingMetrics)}`);
+  }
+  const openingBeatVisibility = await page.evaluate(() => window.__westward3dTest.getBeatVisibility());
+  console.log(`[probe] new opening beat visibility: ${JSON.stringify(openingBeatVisibility)}`);
+  if (openingBeatVisibility?.slimeTellVisible || openingBeatVisibility?.roadSlimeVisible) {
+    errors.push(`render3d encounter staging is visible too early: ${JSON.stringify(openingBeatVisibility)}`);
   }
   const routeMetrics = await page.evaluate(() => window.__westward3dTest.getRouteMetrics());
   console.log(`[probe] new route metrics: ${JSON.stringify(routeMetrics)}`);
@@ -314,6 +336,28 @@ async function captureNew(context) {
   }
   if (pixels.overbrightRatio > 0.09) {
     errors.push(`render3d lamp/sky highlights are overexposed: overbright ratio ${(pixels.overbrightRatio * 100).toFixed(2)}%`);
+  }
+  const routeFrames = [];
+  for (const phase of ["road_sign", "cache_clue", "slime_tell", "wagon_salvage", "return_to_boone", "survey_teaser"]) {
+    const frame = await page.evaluate((targetPhase) => window.__westward3dTest.captureRouteFrame(targetPhase), phase);
+    routeFrames.push(frame);
+  }
+  console.log(`[probe] new route frame captures: ${JSON.stringify(routeFrames)}`);
+  const missingRouteFrame = routeFrames.find((frame) =>
+    !frame?.composition?.playerVisible ||
+    !frame?.targetKind ||
+    !frame?.beatVisibility?.heroVisibility?.[frame.targetKind]?.inFrame,
+  );
+  if (missingRouteFrame) {
+    errors.push(`render3d route frame lost target visibility: ${JSON.stringify(missingRouteFrame)}`);
+  }
+  const slimeTellFrame = routeFrames.find((frame) => frame.phase === "slime_tell");
+  if (!slimeTellFrame?.beatVisibility?.slimeTellVisible || slimeTellFrame?.beatVisibility?.roadSlimeVisible) {
+    errors.push(`render3d slime tell staging failed: ${JSON.stringify(slimeTellFrame)}`);
+  }
+  const returnFrame = routeFrames.find((frame) => frame.phase === "survey_teaser");
+  if (!returnFrame?.beatVisibility?.boardNoticeVisible || !returnFrame?.beatVisibility?.mapScrapVisible) {
+    errors.push(`render3d return reward visuals missing: ${JSON.stringify(returnFrame)}`);
   }
   console.log("[capture] new spike: wrote new.png");
   await page.close();

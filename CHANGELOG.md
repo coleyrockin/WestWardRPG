@@ -2,6 +2,12 @@
 
 ## Unreleased — first five-minute 3D opening polish
 
+- Started the max-mode polish branch from `6826ce2` on `codex/first-five-minutes-v2` as `codex/first-five-minutes-max-mode`.
+- Generated and registered a second focused Blender mini-kit: awning Boone board, road rut strips, broken fence scrap, marsh slime trail cluster, hero wagon wreck, town facade variants, and mesa skyline pieces.
+- Re-art-directed the opening frame around player/board, a wider road, cleaner town-edge silhouettes, distant mesa skyline, and a visible marsh-threat lane.
+- Added visual micro-payoffs for the first-road beats: Pearl's down-road cue, pulsing slime tell before aggro, Map Scrap reveal, and a changed Boone board state after return.
+- Extended the 3D debug API with composition, lighting, beat-visibility, and route-frame capture probes.
+- Hardened `spike_compare` against giant foreground blockers, overcooked dusk lighting, premature encounter visibility, and missing staged beat frames.
 - Expanded the Three.js first-road slice into a paced Dustward route: spawn, Boone board choice, marshal road sign, town-edge bark, Smoke Cache clue, slime tell, slime fight, wagon salvage, return to Boone, and Old Road Survey teaser.
 - Added a local board-choice model with three options and follow-up objective copy.
 - Generated and registered a Blender recovery kit: upgraded Boone board, road planks, lamp variants, saloon facade, wagon salvage, mesa silhouettes, and slime-tell props.

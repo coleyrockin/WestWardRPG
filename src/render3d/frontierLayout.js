@@ -69,13 +69,40 @@ function routePlanks() {
   return planks;
 }
 
+function routeRuts() {
+  const ruts = [];
+  for (let seg = 1; seg < OUTBOUND_ROUTE.length; seg++) {
+    const from = OUTBOUND_ROUTE[seg - 1];
+    const to = OUTBOUND_ROUTE[seg];
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.1) continue;
+    const yaw = Math.atan2(dx, dy);
+    const count = Math.max(1, Math.floor(len / 4.0));
+    for (let i = 1; i <= count; i++) {
+      const t = i / (count + 1);
+      ruts.push({
+        kind: "roadRut",
+        label: `Road Rut ${seg}-${i}`,
+        x: from.x + dx * t,
+        y: from.y + dy * t,
+        yaw,
+        color: "#8f6338",
+        size: 1.0,
+      });
+    }
+  }
+  return ruts;
+}
+
 // Dressing offsets relative to FRONTIER_ANCHOR, lifted verbatim from
 // REGION_PRESENTATION.frontier. depthLane drives subtle scale/elevation cues.
 const VISTAS = [
-  { kind: "town",       label: "Town Roofline",    dx: 0.9,  dy: -1.4,  color: "#caa66c", size: 1.22, depthLane: "background" },
-  { kind: "watchtower", label: "Watchtower Frame",  dx: 4.8,  dy: -2.2,  color: "#ffd77b", size: 1.28, depthLane: "background" },
-  { kind: "gate",       label: "Town Gate Posts",   dx: 2.4,  dy: -1.2,  color: "#b9824d", size: 0.96, depthLane: "midground" },
-  { kind: "fence",      label: "Ranch Rail",        dx: -0.9, dy: 4.2,   color: "#8d6540", size: 0.55, depthLane: "foreground" },
+  { kind: "townFacadeWarm", label: "Boone Back Office", dx: -3.7, dy: -3.0, color: "#caa66c", size: 0.46, depthLane: "background" },
+  { kind: "watchtower", label: "Watchtower Frame",  dx: 5.2,  dy: -2.7,  color: "#ffd77b", size: 1.1, depthLane: "background" },
+  { kind: "townFacadeStore", label: "Far Storefront", dx: -2.05, dy: -2.78, color: "#8a6a3e", size: 0.42, depthLane: "background" },
+  { kind: "brokenFence", label: "Ranch Rail",        dx: -0.9, dy: 4.2,   color: "#8d6540", size: 0.55, depthLane: "foreground" },
 ];
 
 const ROADS = [
@@ -105,8 +132,8 @@ const ROAD_CORRIDOR = [
   { kind: "lampLow",  label: "Spawn Lantern Left",  x: 10.4, y: 4.7,  color: "#ffe6a8", size: 0.62 },
   { kind: "lampLow",  label: "Spawn Lantern Right", x: 10.4, y: 13.2, color: "#ffe6a8", size: 0.62 },
   { kind: "sign",  label: "Road Sign — Board",   x: 11.2, y: 5.35, color: "#ffd77b", size: 0.8 },
-  { kind: "fence", label: "Corridor Rail North",  x: 11.6, y: 4.9, color: "#a47b4c", size: 0.62 },
-  { kind: "fence", label: "Corridor Rail South",  x: 11.8, y: 13.1, color: "#a47b4c", size: 0.6 },
+  { kind: "brokenFence", label: "Corridor Rail North",  x: 11.6, y: 4.9, color: "#a47b4c", size: 0.62, yaw: 0.12 },
+  { kind: "brokenFence", label: "Corridor Rail South",  x: 11.8, y: 13.1, color: "#a47b4c", size: 0.6, yaw: -0.16 },
   { kind: "crate", label: "Roadside Crates",      x: 14.2, y: 5.2,  color: "#b9824d", size: 0.6 },
 ];
 
@@ -146,14 +173,15 @@ const HERO_OBJECTS = [
 // buildings don't overlap (each saloon/store is ~2.8 units wide at scale 1.0-1.35,
 // so min 3.5 units clear between centres; larger buildings need 4+).
 const TOWN_EDGE = [
-  { kind: "saloonFacade", label: "Dustward Saloon",  x: -1.8, y: 1.0,  color: "#7a5a36", size: 0.95 },
-  { kind: "storefront",   label: "Dry Goods Store",  x: 4.4,  y: 1.1,  color: "#8a6a3e", size: 0.82 },
-  { kind: "porch",        label: "Saloon Porch",     x: -1.8, y: 2.4,  color: "#5a4327", size: 0.85 },
-  { kind: "porch",        label: "Store Porch",      x: 4.4,  y: 2.45, color: "#5a4327", size: 0.78 },
-  { kind: "lamp",         label: "Saloon Lamp",      x: 1.2,  y: 2.75, color: "#ffe0a0", size: 0.5, depthLane: "foreground" },
-  { kind: "sign",         label: "Saloon Shingle",   x: -1.8, y: 0.25, color: "#ffd77b", size: 0.72 },
-  { kind: "fence",        label: "Town Hitching Rail", x: 8.2, y: 3.25, color: "#a47b4c", size: 0.7, depthLane: "foreground" },
-  { kind: "cactus",       label: "Town Cactus",      x: -0.6, y: 6.7,  color: "#5c7a3a", size: 0.74 },
+  { kind: "townFacadeWarm", label: "Dustward Saloon",  x: -5.2, y: 0.55, color: "#7a5a36", size: 0.72 },
+  { kind: "townFacadeStore", label: "Dry Goods Store",  x: 0.8,  y: 0.45, color: "#8a6a3e", size: 0.62 },
+  { kind: "townFacadeDark", label: "Assay Office", x: 5.8, y: 0.35, color: "#6a4a30", size: 0.54 },
+  { kind: "porch",        label: "Saloon Porch",     x: -5.2, y: 1.75, color: "#5a4327", size: 0.62 },
+  { kind: "porch",        label: "Store Porch",      x: 0.8,  y: 1.75, color: "#5a4327", size: 0.58 },
+  { kind: "lamp",         label: "Saloon Lamp",      x: -1.9, y: 2.25, color: "#ffe0a0", size: 0.44, depthLane: "foreground" },
+  { kind: "sign",         label: "Saloon Shingle",   x: -5.2, y: 0.05, color: "#ffd77b", size: 0.56 },
+  { kind: "fence",        label: "Town Hitching Rail", x: 6.8, y: 2.65, color: "#a47b4c", size: 0.55, depthLane: "foreground" },
+  { kind: "cactus",       label: "Town Cactus",      x: -1.3, y: 6.9,  color: "#5c7a3a", size: 0.64 },
 ];
 
 // Western flora flanking the road corridor — shoulders only (out of the wedge).
@@ -168,9 +196,11 @@ const ROAD_FLORA = [
   { kind: "cactus", label: "Twin Cactus", x: 34.0, y: 10.8, color: "#5c7a3a", size: 0.85 },
   { kind: "brush", label: "Tumbleweed", x: 38.6, y: 9.3, color: "#8a7a4a", size: 0.5 },
   { kind: "deadTree", label: "Junction Snag", x: 45.5, y: 12.4, color: "#3e3224", size: 1.1 },
+  { kind: "marshCluster", label: "Marsh Slime Sign", x: 46.5, y: 16.1, color: "#75d06b", size: 0.75, yaw: -0.5 },
   { kind: "cactus", label: "Long Road Cactus", x: 50.4, y: 12.0, color: "#577538", size: 0.9 },
   { kind: "rock", label: "Wagon Road Rock", x: 56.0, y: 17.0, color: "#6a5f55", size: 0.8 },
   { kind: "wagonSalvage", label: "Scattered Wagon Salvage", x: 58.7, y: 10.4, color: "#a87542", size: 0.58, yaw: -0.45 },
+  { kind: "brokenFence", label: "Wagon Splinter Rail", x: 61.8, y: 10.7, color: "#8d6540", size: 0.72, yaw: 0.45 },
 ];
 
 // Marsh / water lowland to the south — the Road Slime's home turf.
@@ -190,20 +220,18 @@ const MARSH = [
 // footprints are square (3.2*size); spacing 5 with size ~1.8 (half-width 2.88)
 // overlaps by ~0.76, so there is no gap wide enough to slip through.
 const BOUNDARY_RING = [
-  // north wall (behind town), y ≈ -1.2
-  { kind: "mesaSilhouette", label: "North Mesa", x: 1.0, y: -1.2, color: "#5a4636", size: 1.8 },
-  { kind: "mesa", label: "North Mesa", x: 6.0, y: -1.2, color: "#63503c", size: 1.9 },
-  { kind: "mesa", label: "North Mesa", x: 11.0, y: -1.4, color: "#5a4636", size: 1.8 },
-  { kind: "cliff", label: "North Cliff", x: 16.0, y: -1.2, color: "#544234", size: 2.0 },
-  { kind: "mesa", label: "North Mesa", x: 21.0, y: -1.2, color: "#63503c", size: 1.9 },
-  { kind: "mesa", label: "North Mesa", x: 30.0, y: -1.2, color: "#5a4636", size: 2.0 },
-  { kind: "mesa", label: "North Mesa", x: 39.0, y: -1.0, color: "#63503c", size: 1.9 },
-  { kind: "cliff", label: "North Cliff", x: 48.0, y: -1.3, color: "#544234", size: 2.0 },
-  { kind: "mesaSilhouette", label: "Northeast Mesa", x: 62.0, y: -1.2, color: "#5a4636", size: 2.0 },
+  // north wall (behind town), pushed back so it reads as horizon, not a first-frame slab
+  { kind: "mesaSkyline", label: "North Mesa", x: 1.0, y: -5.4, color: "#5a4636", size: 1.0 },
+  { kind: "mesaSkyline", label: "North Mesa", x: 8.0, y: -5.8, color: "#63503c", size: 1.05 },
+  { kind: "mesaSkyline", label: "North Mesa", x: 15.0, y: -5.6, color: "#5a4636", size: 0.98 },
+  { kind: "mesaSkyline", label: "North Cliff", x: 23.0, y: -5.5, color: "#544234", size: 1.08 },
+  { kind: "mesaSkyline", label: "North Mesa", x: 32.0, y: -5.6, color: "#63503c", size: 1.04 },
+  { kind: "mesaSkyline", label: "North Mesa", x: 42.0, y: -5.4, color: "#5a4636", size: 1.08 },
+  { kind: "mesaSkyline", label: "Northeast Mesa", x: 62.0, y: -5.3, color: "#5a4636", size: 1.12 },
   // east wall (the eastern horizon backdrop), x ≈ 70
   { kind: "mesa", label: "East Mesa", x: 70.0, y: 4.0, color: "#5e4a38", size: 2.0 },
   { kind: "cliff", label: "East Cliff", x: 70.0, y: 10.5, color: "#564434", size: 2.1 },
-  { kind: "mesaSilhouette", label: "East Mesa", x: 70.0, y: 17.5, color: "#5e4a38", size: 2.0 },
+  { kind: "mesaSkyline", label: "East Mesa", x: 70.0, y: 17.5, color: "#5e4a38", size: 1.45 },
   { kind: "mesa", label: "Southeast Mesa", x: 68.0, y: 26.5, color: "#5a4636", size: 1.9 },
   // south wall, y ≈ 27
   { kind: "mesa", label: "South Mesa", x: 58.0, y: 27.0, color: "#544234", size: 1.9 },
@@ -235,6 +263,7 @@ const ABSOLUTE_ZONES = [
   ...TOWN_EDGE,
   ...ROAD_CORRIDOR,
   ...ROUTE_LIGHTS,
+  ...routeRuts(),
   ...routePlanks(),
   ...ROAD_FLORA,
   ...MARSH,

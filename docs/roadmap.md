@@ -158,12 +158,12 @@ Merged scope:
 5. The first road is wider, less cluttered, and visually calmer under the dusk lighting stack.
 6. Screenshot comparison now validates the actual `Follow the Road` opening loop state.
 
-### 🟡 Active recovery branch — make the first five minutes actually good
+### 🟡 Active max-mode branch — make the first five minutes actually good
 The current 3D slice is a proof, not a finished opening. The next work must prioritize playable
 truth over more decoration: readable world shape, verbs, pacing, and validation that matches what a
 player sees.
 
-Active branch: `codex/first-five-minutes-v2`
+Active branch: `codex/first-five-minutes-max-mode`
 
 Implemented in this recovery pass:
 - Longer S-shaped first-road route with explicit phases from spawn through Old Road Survey teaser.
@@ -175,6 +175,16 @@ Implemented in this recovery pass:
   proxies.
 - Route metrics and visual gates for first-frame player/board visibility, 4-6 minute pacing, HUD
   footprint, road readability, and overbright highlights.
+
+Added in the max-mode polish pass:
+- Second Blender mini-kit for Boone board awning detail, road rut strips, broken fence/scrap
+  silhouettes, marsh slime trail cluster, hero wagon wreck, town facades, and mesa skyline pieces.
+- Cleaner first-frame composition: player + board pool of light, open road, town edge, distant mesa
+  and marsh-threat lane, with slab-like foreground masses moved out of the playable frame.
+- Beat-specific visual payoffs: Pearl's down-road cue, pulsing slime tell before aggro, Map Scrap
+  reveal, and a changed Boone board state after return.
+- Debug probes and visual gates for composition blockers, controlled dusk lighting, beat visibility,
+  and route-frame target readability.
 
 #### P0 — Cut the visual mud
 - Replace the flat box-town foreground with a cleaner composition: one saloon facade, one board

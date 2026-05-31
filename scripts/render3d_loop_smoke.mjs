@@ -60,6 +60,11 @@ async function main() {
         && window.__westward3dTest?.interact
         && window.__westward3dTest?.movePlayerToKind,
     ), { timeout: 10000 });
+    const openingBeats = await page.evaluate(() => window.__westward3dTest.getBeatVisibility?.());
+    if (!openingBeats) throw new Error("beat visibility debug API missing");
+    if (openingBeats.slimeTellVisible || openingBeats.roadSlimeVisible) {
+      throw new Error(`encounter beats visible before staging: ${JSON.stringify(openingBeats)}`);
+    }
 
     // force: skip actionability waits — the canvas renders continuously and, under
     // the headless SwiftShader WebGL2 backend, the main thread is busy enough that
@@ -106,8 +111,13 @@ async function main() {
     await expectPhase(page, "cache_clue");
     await interact(page, "smokeCache");
     await expectPhase(page, "slime_tell");
+    const tellVisible = await page.evaluate(() => window.__westward3dTest.getBeatVisibility());
+    if (!tellVisible.slimeTellVisible) throw new Error("slime tell did not become visible before the fight");
+    if (tellVisible.roadSlimeVisible) throw new Error("road slime appeared before slime tell interaction");
     await interact(page, "slimeTell");
     await expectPhase(page, "slime_fight");
+    const slimeVisible = await page.evaluate(() => window.__westward3dTest.getBeatVisibility());
+    if (!slimeVisible.roadSlimeVisible) throw new Error("road slime did not appear after slime tell");
     await page.evaluate(() => window.__westward3dTest.movePlayerToKind?.("roadSlime"));
     await interact(page, "roadSlime");
     await expectPhase(page, "wagon_salvage");
@@ -115,8 +125,12 @@ async function main() {
     await expectPhase(page, "return_to_boone");
     const reward = await getState(page);
     if (reward.inventoryPreview["Map Scrap"] !== 1) throw new Error("Map Scrap reward missing");
+    const salvageVisible = await page.evaluate(() => window.__westward3dTest.getBeatVisibility());
+    if (!salvageVisible.mapScrapVisible) throw new Error("Map Scrap visual reward did not unlock after wagon salvage");
     await interact(page, "jobBoard");
     await expectPhase(page, "survey_teaser");
+    const returnVisible = await page.evaluate(() => window.__westward3dTest.getBeatVisibility());
+    if (!returnVisible.boardNoticeVisible) throw new Error("return-to-Boone board state did not visibly change");
     const metrics = await page.evaluate(() => window.__westward3dTest.getRouteMetrics());
     if (metrics.estimatedPlaySeconds < 240 || metrics.estimatedPlaySeconds > 360) {
       throw new Error(`route pacing outside target: ${metrics.estimatedPlaySeconds}`);

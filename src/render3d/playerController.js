@@ -23,7 +23,7 @@ const DEFAULT_SPEEDS = { walk: 4, run: 8 };
 const DEFAULT_SENSITIVITY = 0.0035; // radians per pixel of mouse drag
 const DEFAULT_EYE_HEIGHT = 1.8;
 const MAX_PITCH = Math.PI / 3; // ±60° — generous; avoids gimbal flip near ±π/2
-const CAMERA_COLLISION_RADIUS = 0.42;
+const CAMERA_COLLISION_RADIUS = 0.58;
 
 const CAMERA_BLOCKING_KINDS = new Set([
   "town",
@@ -33,10 +33,17 @@ const CAMERA_BLOCKING_KINDS = new Set([
   "landmark",
   "saloon",
   "saloonFacade",
+  "townFacadeWarm",
+  "townFacadeStore",
+  "townFacadeDark",
   "storefront",
   "mesa",
   "mesaSilhouette",
+  "mesaSkyline",
   "cliff",
+  "brokenFence",
+  "brokenWagon",
+  "wagonSalvage",
 ]);
 
 export const CAMERA_PRESETS = Object.freeze({
@@ -46,7 +53,7 @@ export const CAMERA_PRESETS = Object.freeze({
     lookHeight: 1.45,
     lookAhead: 4.8,
     shoulder: 1.18,
-    smoothing: 9,
+    smoothing: 10.5,
   }),
   town: Object.freeze({
     distance: 7.6,
@@ -155,7 +162,7 @@ export function avoidCameraObstacles({
   desired,
   proxies = [],
   radius = CAMERA_COLLISION_RADIUS,
-  padding = 0.06,
+  padding = 0.09,
 } = {}) {
   if (!from || !desired || !Array.isArray(proxies) || proxies.length === 0) return desired;
 

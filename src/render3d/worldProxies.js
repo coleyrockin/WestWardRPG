@@ -38,6 +38,7 @@ const FOOTPRINTS = {
   sign:        (p) => box(p, 0.3, 0.3),
   road:        null,                            // road markers are visual only
   roadPlank:   null,
+  roadRut:     null,
   lamp:        (p) => box(p, 0.2, 0.2),
   lampTall:    (p) => box(p, 0.24, 0.24),
   lampLow:     (p) => box(p, 0.2, 0.2),
@@ -46,14 +47,17 @@ const FOOTPRINTS = {
   townBark:    null,
   smokeCache:  (p) => box(p, 0.72, 0.54),
   slimeTell:   null,
+  marshCluster:null,
   brokenWagon: (p) => box(p, 1.6, 1.0),
   wagonSalvage:(p) => box(p, 1.1 * p.size, 0.8 * p.size),
+  brokenFence: (p) => box(p, 1.4 * p.size, 0.28 * p.size),
   roadSlime:   null,                            // soft collision lives in encounterSystem
   cart:        (p) => box(p, 0.6 * p.size, 0.6 * p.size),
   crate:       (p) => box(p, 0.6 * p.size, 0.6 * p.size),
   // --- bigger-world expansion (zone props) ---
   mesa:        (p) => box(p, 3.2 * p.size, 3.2 * p.size),
   mesaSilhouette: (p) => box(p, 3.2 * p.size, 3.2 * p.size),
+  mesaSkyline: (p) => box(p, 4.8 * p.size, 1.0 * p.size),
   cliff:       (p) => box(p, 2.4 * p.size, 1.4 * p.size),
   rock:        (p) => box(p, 0.9 * p.size, 0.9 * p.size),
   boulder:     (p) => box(p, 1.4 * p.size, 1.4 * p.size),
@@ -61,6 +65,9 @@ const FOOTPRINTS = {
   deadTree:    (p) => box(p, 0.6 * p.size, 0.6 * p.size),
   saloon:      (p) => box(p, 1.6 * p.size, 1.6 * p.size),
   saloonFacade:(p) => box(p, 2.6 * p.size, 1.2 * p.size),
+  townFacadeWarm:  (p) => box(p, 1.8 * p.size, 0.9 * p.size),
+  townFacadeStore: (p) => box(p, 1.6 * p.size, 0.9 * p.size),
+  townFacadeDark:  (p) => box(p, 1.4 * p.size, 0.8 * p.size),
   storefront:  (p) => box(p, 1.3 * p.size, 1.3 * p.size),
   porch:       (p) => box(p, 1.4 * p.size, 0.5 * p.size),
   brush:       null,                            // low scrub — visual only

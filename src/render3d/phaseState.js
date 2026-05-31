@@ -16,16 +16,19 @@ export const BOARD_OPTIONS = Object.freeze([
     id: "accept_bounty",
     label: "Accept bounty",
     followUp: "Boone marks the cache road in lamp chalk.",
+    returnLine: "Boone counts the bounty and pins your Map Scrap beside the old survey.",
   },
   {
     id: "ask_danger",
     label: "Ask about road danger",
     followUp: "Boone warns you to watch the marsh grass before the cache.",
+    returnLine: "Boone marks the marsh warning in red and circles the safe road home.",
   },
   {
     id: "inspect_survey",
     label: "Inspect old survey",
     followUp: "A torn survey note points past the wagon toward the old road.",
+    returnLine: "Boone matches your scrap to the Old Road Survey and opens the next job.",
   },
 ]);
 
@@ -181,6 +184,7 @@ function copyFor(phase, state = null) {
 
   return {
     ...base,
+    text: option.returnLine,
     meta: [base.meta[0], `Choice remembered: ${option.label}`],
   };
 }
