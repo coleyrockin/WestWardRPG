@@ -653,9 +653,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // so silhouettes rim-light and the god-ray shafts rake toward camera. Gameplay
   // third-person follow is untouched — this only applies under capture.
   function applyHeroCamera() {
-    camera.fov = 54;
-    camera.position.set(18.5, 5.6, 15.5);
-    camera.lookAt(7.5, 1.9, 4.8);
+    camera.fov = 50;
+    // Elevated establishing 3/4: high + back enough to clear the ~3-tall
+    // rooflines and look DOWN onto the town + road junction, so the ground,
+    // street, and mesa ring all read instead of staring into a canyon of boxes.
+    camera.position.set(19, 11.5, 18);
+    camera.lookAt(9, 0.5, 6);
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
   }

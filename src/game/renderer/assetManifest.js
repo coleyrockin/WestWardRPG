@@ -10,11 +10,13 @@
 // Authored in tools/blender/, exported to public/models/.
 export const MODELS = {
   // buildings (western false-front variants)
-  saloon: { url: "/models/building_saloon.glb", scale: 0.8 },
-  storefront: { url: "/models/building_store.glb", scale: 0.85 },
-  town: { url: "/models/building_house.glb", scale: 0.8 },
-  ranch: { url: "/models/building_house.glb", scale: 0.9 },
-  gate: { url: "/models/building_gate.glb", scale: 0.9 },
+  // Buildings tower ~2.5× over the ~1.8-tall character — frontier false-fronts,
+  // big enough to read as real buildings without crowding the street.
+  saloon: { url: "/models/building_saloon.glb", scale: 2.1 },
+  storefront: { url: "/models/building_store.glb", scale: 2.0 },
+  town: { url: "/models/building_house.glb", scale: 1.95 },
+  ranch: { url: "/models/building_house.glb", scale: 2.05 },
+  gate: { url: "/models/building_gate.glb", scale: 2.05 },
   // hero + dressing (Batch A)
   brokenWagon: { url: "/models/wagon.glb", scale: 0.85 },
   cactus: { url: "/models/cactus.glb", scale: 1.0, vary: true },

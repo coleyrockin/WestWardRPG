@@ -17,10 +17,10 @@ export const PLAYER_SPAWN = { x: 9.5, y: 8.5 };
 // Dressing offsets relative to FRONTIER_ANCHOR, lifted verbatim from
 // REGION_PRESENTATION.frontier. depthLane drives subtle scale/elevation cues.
 const VISTAS = [
-  { kind: "town", label: "Town Roofline", dx: 1.12, dy: -1.08, color: "#caa66c", size: 1.22, depthLane: "background" },
-  { kind: "watchtower", label: "Watchtower Frame", dx: 4.25, dy: -1.92, color: "#ffd77b", size: 1.28, depthLane: "background" },
-  { kind: "gate", label: "Town Gate Posts", dx: 2.45, dy: -1.02, color: "#b9824d", size: 0.96, depthLane: "midground" },
-  { kind: "ranch", label: "Ranch Roof", dx: 0.52, dy: 1.24, color: "#9f7a4e", size: 0.78, depthLane: "foreground" },
+  { kind: "town",       label: "Town Roofline",    dx: 0.9,  dy: -1.4,  color: "#caa66c", size: 1.22, depthLane: "background" },
+  { kind: "watchtower", label: "Watchtower Frame",  dx: 4.8,  dy: -2.2,  color: "#ffd77b", size: 1.28, depthLane: "background" },
+  { kind: "gate",       label: "Town Gate Posts",   dx: 2.4,  dy: -1.2,  color: "#b9824d", size: 0.96, depthLane: "midground" },
+  { kind: "ranch",      label: "Ranch Roof",        dx: 0.4,  dy: 1.6,   color: "#9f7a4e", size: 0.78, depthLane: "foreground" },
 ];
 
 const ROADS = [
@@ -32,14 +32,14 @@ const ROADS = [
 ];
 
 const PROPS = [
-  { kind: "sign", label: "Boone Road Sign", dx: 1.62, dy: 0.74, color: "#ffd77b", size: 0.82, depthLane: "foreground" },
-  { kind: "fence", label: "Left Split Fence", dx: 2.34, dy: 1.44, color: "#a47b4c", size: 0.6, depthLane: "foreground" },
-  { kind: "fence", label: "Right Split Fence", dx: 3.12, dy: -0.96, color: "#a47b4c", size: 0.54, depthLane: "midground" },
-  { kind: "cart", label: "Supply Cart", dx: 3.58, dy: -0.62, color: "#b9824d", size: 0.7, depthLane: "midground" },
-  { kind: "lamp", label: "Road Lantern", dx: 4.25, dy: 0.42, color: "#ffd77b", size: 0.68, depthLane: "midground" },
-  { kind: "lamp", label: "Board Lantern", dx: 1.18, dy: -0.44, color: "#ffe6a8", size: 0.58, depthLane: "midground" },
-  { kind: "lamp", label: "Town Gate Lantern", dx: 2.58, dy: -0.58, color: "#ffe6a8", size: 0.56, depthLane: "background" },
-  { kind: "crate", label: "Barricade Crates", dx: 2.84, dy: 0.92, color: "#b9824d", size: 0.62, depthLane: "foreground" },
+  { kind: "sign",  label: "Boone Road Sign",    dx: 1.5,  dy: 0.9,  color: "#ffd77b", size: 0.82, depthLane: "foreground" },
+  { kind: "fence", label: "Left Split Fence",   dx: 2.1,  dy: 1.8,  color: "#a47b4c", size: 0.6,  depthLane: "foreground" },
+  { kind: "fence", label: "Right Split Fence",  dx: 3.4,  dy: -1.1, color: "#a47b4c", size: 0.54, depthLane: "midground" },
+  { kind: "cart",  label: "Supply Cart",        dx: 4.2,  dy: -0.7, color: "#b9824d", size: 0.7,  depthLane: "midground" },
+  { kind: "lamp",  label: "Road Lantern",       dx: 5.0,  dy: 0.5,  color: "#ffd77b", size: 0.68, depthLane: "midground" },
+  { kind: "lamp",  label: "Board Lantern",      dx: 1.0,  dy: -0.5, color: "#ffe6a8", size: 0.58, depthLane: "midground" },
+  { kind: "lamp",  label: "Town Gate Lantern",  dx: 3.0,  dy: -0.7, color: "#ffe6a8", size: 0.56, depthLane: "background" },
+  { kind: "crate", label: "Barricade Crates",   dx: 2.6,  dy: 1.2,  color: "#b9824d", size: 0.62, depthLane: "foreground" },
 ];
 
 // Tall hero landmark — should read as the tallest first-view shape.
@@ -47,10 +47,10 @@ const LANDMARK = { kind: "landmark", label: "North Watchtower Beacon", dx: 5.16,
 
 // Hero objects at their real gameplay world positions (not anchor-relative).
 const HERO_OBJECTS = [
-  { kind: "jobBoard", label: "Boone's Job Board", x: 12.35, y: 8.55, color: "#d8a84f", size: 1.0 },
-  { kind: "smokeCache", label: "Smoke Cache", x: 12.6, y: 8.85, color: "#caa15a", size: 0.9 },
-  { kind: "brokenWagon", label: "Broken Wagon", x: 13.5, y: 10.5, color: "#b9824d", size: 1.2 },
-  { kind: "roadSlime", label: "Road Slime", x: 14.4, y: 9.4, color: "#7fd06a", size: 0.9 },
+  { kind: "jobBoard",    label: "Boone's Job Board", x: 12.5,  y: 8.3,  color: "#d8a84f", size: 1.0 },
+  { kind: "smokeCache",  label: "Smoke Cache",       x: 11.2,  y: 9.4,  color: "#caa15a", size: 0.9 },
+  { kind: "brokenWagon", label: "Broken Wagon",      x: 15.5,  y: 11.0, color: "#b9824d", size: 1.2 },
+  { kind: "roadSlime",   label: "Road Slime",        x: 14.8,  y: 9.0,  color: "#7fd06a", size: 0.9 },
 ];
 
 // --- Bigger-world expansion -------------------------------------------------
@@ -63,18 +63,20 @@ const HERO_OBJECTS = [
 //   3. The mesa/cliff ring overlaps with no gap > player diameter (~0.6) so the
 //      player can roam but never walk off the ground plane.
 
-// Walkable town edge to the NW of spawn — north of the opening wedge.
+// Walkable town edge to the NW of spawn — spread along a proper main street so
+// buildings don't overlap (each saloon/store is ~2.8 units wide at scale 1.0-1.35,
+// so min 3.5 units clear between centres; larger buildings need 4+).
 const TOWN_EDGE = [
-  { kind: "saloon", label: "Dustward Saloon", x: 4.2, y: 2.0, color: "#7a5a36", size: 1.35 },
-  { kind: "storefront", label: "Dry Goods Store", x: 7.6, y: 2.2, color: "#8a6a3e", size: 1.0 },
-  { kind: "storefront", label: "Assay Office", x: 2.6, y: 4.2, color: "#6f5230", size: 0.95 },
-  { kind: "saloon", label: "Boarding House", x: 6.6, y: 4.8, color: "#74552f", size: 1.1 },
-  { kind: "porch", label: "Saloon Porch", x: 4.2, y: 3.15, color: "#5a4327", size: 1.2 },
-  { kind: "porch", label: "Store Porch", x: 7.6, y: 3.3, color: "#5a4327", size: 1.0 },
-  { kind: "lamp", label: "Saloon Lamp", x: 5.4, y: 3.0, color: "#ffe6a8", size: 0.6, depthLane: "foreground" },
-  { kind: "sign", label: "Saloon Shingle", x: 4.2, y: 0.9, color: "#ffd77b", size: 0.82 },
-  { kind: "fence", label: "Town Hitching Rail", x: 9.0, y: 3.8, color: "#a47b4c", size: 0.8, depthLane: "foreground" },
-  { kind: "cactus", label: "Town Cactus", x: 2.0, y: 6.8, color: "#5c7a3a", size: 0.85 },
+  { kind: "saloon",     label: "Dustward Saloon",    x: 3.0,  y: 1.8,  color: "#7a5a36", size: 1.35 },
+  { kind: "storefront", label: "Dry Goods Store",    x: 7.2,  y: 1.6,  color: "#8a6a3e", size: 1.0 },
+  { kind: "storefront", label: "Assay Office",       x: 1.0,  y: 5.0,  color: "#6f5230", size: 0.95 },
+  { kind: "saloon",     label: "Boarding House",     x: 6.0,  y: 5.5,  color: "#74552f", size: 1.1 },
+  { kind: "porch",      label: "Saloon Porch",       x: 3.0,  y: 3.1,  color: "#5a4327", size: 1.2 },
+  { kind: "porch",      label: "Store Porch",        x: 7.2,  y: 2.8,  color: "#5a4327", size: 1.0 },
+  { kind: "lamp",       label: "Saloon Lamp",        x: 5.0,  y: 2.8,  color: "#ffe6a8", size: 0.6, depthLane: "foreground" },
+  { kind: "sign",       label: "Saloon Shingle",     x: 3.0,  y: 0.6,  color: "#ffd77b", size: 0.82 },
+  { kind: "fence",      label: "Town Hitching Rail", x: 9.5,  y: 3.5,  color: "#a47b4c", size: 0.8, depthLane: "foreground" },
+  { kind: "cactus",     label: "Town Cactus",        x: 0.5,  y: 7.2,  color: "#5c7a3a", size: 0.85 },
 ];
 
 // Western flora flanking the road corridor — shoulders only (out of the wedge).
