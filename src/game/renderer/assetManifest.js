@@ -12,10 +12,12 @@ export const MODELS = {
   // buildings (western false-front variants)
   // Buildings tower ~2.5× over the ~1.8-tall character — frontier false-fronts,
   // big enough to read as real buildings without crowding the street.
-  saloon: { url: "/models/building_saloon.glb", scale: 2.1 },
-  storefront: { url: "/models/building_store.glb", scale: 2.0 },
-  town: { url: "/models/building_house.glb", scale: 1.95 },
-  ranch: { url: "/models/building_house.glb", scale: 2.05 },
+  // `windowLight` adds warm emissive window panes + a soft interior PointLight on
+  // the road-facing side so buildings read as occupied at dusk instead of dark boxes.
+  saloon: { url: "/models/building_saloon.glb", scale: 2.1, windowLight: { color: "#ffb867", intensity: 4.0, distance: 9, height: 1.7 } },
+  storefront: { url: "/models/building_store.glb", scale: 2.0, windowLight: { color: "#ffc070", intensity: 3.4, distance: 8, height: 1.6 } },
+  town: { url: "/models/building_house.glb", scale: 1.95, windowLight: { color: "#ffbf72", intensity: 3.0, distance: 8, height: 1.5 } },
+  ranch: { url: "/models/building_house.glb", scale: 2.05, windowLight: { color: "#ffbf72", intensity: 3.0, distance: 8, height: 1.5 } },
   gate: { url: "/models/building_gate.glb", scale: 2.05 },
   // hero + dressing (Batch A)
   brokenWagon: { url: "/models/wagon.glb", scale: 0.85 },
