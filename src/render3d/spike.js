@@ -396,7 +396,7 @@ function attachLight(group, p, light, effScale) {
 // the glow is visible from the street. `face` is the +z (south) road-facing offset.
 function attachBuildingWarmth(group, p, wl) {
   const faceZ = p.y + 1.05; // toward the road (south, +z in world→3D)
-  const winMat = standard(wl.color, { emissive: wl.color, emissiveIntensity: 1.6, rimStrength: 0 });
+  const winMat = standard(wl.color, { emissive: wl.color, emissiveIntensity: 0.9, rimStrength: 0 });
   for (const [dx, wy] of [[-0.42, 1.55], [0.42, 1.55], [0, 0.62]]) {
     // two upper windows + a low door-glow slit, all on the road face
     const isDoor = wy < 1.0;
@@ -480,23 +480,40 @@ function setNodeOpacity(node, opacity) {
 
 function updateOcclusionFades(placementNodes, camera, playerPos) {
   if (!placementNodes?.length || !camera || !playerPos) return;
-  const playerPoint = new THREE.Vector3(playerPos.x, 1.2, playerPos.z);
   const cameraPoint = camera.position.clone();
-  const toPlayer = playerPoint.clone().sub(cameraPoint);
-  const distance = toPlayer.length();
-  if (distance < 0.01) return;
-  const ray = new THREE.Ray(cameraPoint, toPlayer.normalize());
+  // Sample a small cone of rays toward the player — centre mass plus head and
+  // shoulder offsets — so a roof overhang or wall that crowds the frame edge in
+  // front of the hero fades too, not only geometry on the exact centre ray.
+  const targets = [
+    new THREE.Vector3(playerPos.x, 1.2, playerPos.z),       // chest
+    new THREE.Vector3(playerPos.x, 2.0, playerPos.z),       // head
+    new THREE.Vector3(playerPos.x + 0.9, 1.4, playerPos.z), // right shoulder
+    new THREE.Vector3(playerPos.x - 0.9, 1.4, playerPos.z), // left shoulder
+  ];
+  const rays = targets.map((t) => {
+    const dir = t.clone().sub(cameraPoint);
+    return { ray: new THREE.Ray(cameraPoint, dir.clone().normalize()), dist: dir.length() };
+  });
   const box = new THREE.Box3();
+  const hitPt = new THREE.Vector3();
   for (const record of placementNodes) {
     if (!record?.node || ["jobBoard", "smokeCache", "brokenWagon", "roadSlime"].includes(record.kind)) {
       continue;
     }
     box.setFromObject(record.node);
-    const hit = ray.intersectBox(box, new THREE.Vector3());
-    const blocksHero = Boolean(hit)
-      && hit.distanceTo(cameraPoint) < distance - 0.7
-      && box.max.y > 0.8;
-    setNodeOpacity(record.node, blocksHero ? 0.32 : 1);
+    if (box.max.y <= 0.8) {
+      setNodeOpacity(record.node, 1);
+      continue;
+    }
+    let blocks = false;
+    for (const { ray, dist } of rays) {
+      const hit = ray.intersectBox(box, hitPt);
+      if (hit && hit.distanceTo(cameraPoint) < dist - 0.7) {
+        blocks = true;
+        break;
+      }
+    }
+    setNodeOpacity(record.node, blocks ? 0.18 : 1);
   }
 }
 
@@ -650,12 +667,12 @@ function buildGround(scene, snapshot) {
   // Anchored to START a touch behind the player's feet so the path reads as
   // "begins here, leads east" rather than the player standing in its middle.
   const ROAD_LEN = 30;
-  const ROAD_W = 3.0;
+  const ROAD_W = 6.6;
   const ROAD_CX = spawn.x + ROAD_LEN / 2 - 3; // strip starts ~3u west of spawn
   const ROAD_Z = spawn.y + 0.4;
   const road = new THREE.Mesh(
     new THREE.PlaneGeometry(ROAD_LEN, ROAD_W),
-    standard("#caa770", { roughness: 1, emissive: "#5a4424", emissiveIntensity: 0.4 }),
+    standard("#b99461", { roughness: 1, emissive: "#3b2c17", emissiveIntensity: 0.18 }),
   );
   road.rotation.x = -Math.PI / 2;
   road.position.set(ROAD_CX, 0.02, ROAD_Z);
@@ -663,10 +680,10 @@ function buildGround(scene, snapshot) {
   scene.add(road);
 
   // Bright dust shoulders frame the road and lead the eye down it.
-  for (const off of [-(ROAD_W / 2 + 0.14), ROAD_W / 2 + 0.14]) {
+  for (const off of [-(ROAD_W / 2 + 0.18), ROAD_W / 2 + 0.18]) {
     const edge = new THREE.Mesh(
-      new THREE.PlaneGeometry(ROAD_LEN, 0.32),
-      standard("#ecd6a0", { roughness: 1, emissive: "#6a4e22", emissiveIntensity: 0.5 }),
+      new THREE.PlaneGeometry(ROAD_LEN, 0.42),
+      standard("#d6bf8f", { roughness: 1, emissive: "#4c371c", emissiveIntensity: 0.18 }),
     );
     edge.rotation.x = -Math.PI / 2;
     edge.position.set(ROAD_CX, 0.03, ROAD_Z + off);
@@ -675,10 +692,10 @@ function buildGround(scene, snapshot) {
 
   // Two darker wheel ruts — parallel worn tracks that sell "a road travelled" and
   // give the eye a strong directional line toward the objective.
-  for (const off of [-0.62, 0.62]) {
+  for (const off of [-1.65, 1.65]) {
     const rut = new THREE.Mesh(
-      new THREE.PlaneGeometry(ROAD_LEN, 0.2),
-      standard("#9a7c4c", { roughness: 1 }),
+      new THREE.PlaneGeometry(ROAD_LEN, 0.28),
+      standard("#8d7045", { roughness: 1 }),
     );
     rut.rotation.x = -Math.PI / 2;
     rut.position.set(ROAD_CX, 0.027, ROAD_Z + off);
@@ -687,8 +704,8 @@ function buildGround(scene, snapshot) {
 
   // Faint centre wear-line for direction and depth flow toward the objective.
   const centerLine = new THREE.Mesh(
-    new THREE.PlaneGeometry(ROAD_LEN, 0.12),
-    standard("#b08f5e", { roughness: 1 }),
+    new THREE.PlaneGeometry(ROAD_LEN, 0.16),
+    standard("#a58455", { roughness: 1 }),
   );
   centerLine.rotation.x = -Math.PI / 2;
   centerLine.position.set(ROAD_CX, 0.028, ROAD_Z);

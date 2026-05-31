@@ -61,18 +61,18 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
     // contrast). contrast = S-curve strength around 0.5; saturation lifts the
     // cream wash; split-tone pushes shadows cool + highlights warm so the whole
     // frame gets drama, not just the lamp pool. All palette-driven (applyPalette).
-    contrast: uniform(1.22),
-    saturation: uniform(1.35),
+    contrast: uniform(1.08),
+    saturation: uniform(1.08),
     // Split-tone hues (centred on grey ~0.5 — only the offset from 0.5 matters,
     // so these shift colour, not brightness): cool-blue shadows, warm-amber lights.
     shadowTint: uniform(new THREE.Color("#3a4a7a")),
     highlightTint: uniform(new THREE.Color("#ffb050")),
     // grain is time-animated (non-deterministic) — visual-capture passes 0.
     grainIntensity: uniform(opts.grainIntensity ?? region.grainIntensity),
-    godrayStrength: uniform(opts.godrayStrength ?? 1.3),
+    godrayStrength: uniform(opts.godrayStrength ?? 0.18),
     // Vignette: darken toward the frame corners to draw the eye to the street.
     // Deterministic (static) so it's safe under the ?visual capture.
-    vignetteStrength: uniform(opts.vignetteStrength ?? 0.4),
+    vignetteStrength: uniform(opts.vignetteStrength ?? 0.1),
     // Final exposure multiplier — PostProcessing ignores renderer.toneMappingExposure,
     // so day/night exposure and weather darkening ride this uniform instead.
     exposure: uniform(1),
@@ -118,7 +118,7 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
   // drama across the whole frame instead of darkening it.
   const shTint = vec3(uniforms.shadowTint).sub(0.5);
   const hlTint = vec3(uniforms.highlightTint).sub(0.5);
-  const split = mix(shTint, hlTint, luma).mul(0.16); // gentle tint, not a heavy filter
+  const split = mix(shTint, hlTint, luma).mul(0.06); // gentle tint, not a heavy filter
   const splitToned = saturated.add(split).clamp(0, 1);
   const graded = splitToned
     .mul(mix(vec3(1, 1, 1), vec3(uniforms.gradeTint).mul(1.6), uniforms.gradeAmount))

@@ -20,7 +20,7 @@ const VISTAS = [
   { kind: "town",       label: "Town Roofline",    dx: 0.9,  dy: -1.4,  color: "#caa66c", size: 1.22, depthLane: "background" },
   { kind: "watchtower", label: "Watchtower Frame",  dx: 4.8,  dy: -2.2,  color: "#ffd77b", size: 1.28, depthLane: "background" },
   { kind: "gate",       label: "Town Gate Posts",   dx: 2.4,  dy: -1.2,  color: "#b9824d", size: 0.96, depthLane: "midground" },
-  { kind: "ranch",      label: "Ranch Roof",        dx: 0.4,  dy: 1.6,   color: "#9f7a4e", size: 0.78, depthLane: "foreground" },
+  { kind: "ranch",      label: "Ranch Roof",        dx: -0.9, dy: 4.2,   color: "#9f7a4e", size: 0.72, depthLane: "foreground" },
 ];
 
 const ROADS = [
@@ -47,12 +47,12 @@ const PROPS = [
 // path right out of spawn, a directional signpost, and a hitching rail edge. These
 // lead the eye east toward Boone's board without crowding the walking lane.
 const ROAD_CORRIDOR = [
-  { kind: "lamp",  label: "Spawn Lantern Left",  x: 10.4, y: 7.4, color: "#ffe6a8", size: 0.62 },
-  { kind: "lamp",  label: "Spawn Lantern Right", x: 10.4, y: 9.9, color: "#ffe6a8", size: 0.62 },
-  { kind: "sign",  label: "Road Sign — Board",   x: 10.8, y: 7.7, color: "#ffd77b", size: 0.8 },
-  { kind: "fence", label: "Corridor Rail North",  x: 11.4, y: 7.2, color: "#a47b4c", size: 0.62 },
-  { kind: "fence", label: "Corridor Rail South",  x: 11.6, y: 10.1, color: "#a47b4c", size: 0.6 },
-  { kind: "crate", label: "Roadside Crates",      x: 13.8, y: 7.4, color: "#b9824d", size: 0.6 },
+  { kind: "lamp",  label: "Spawn Lantern Left",  x: 10.4, y: 5.0,  color: "#ffe6a8", size: 0.62 },
+  { kind: "lamp",  label: "Spawn Lantern Right", x: 10.4, y: 12.8, color: "#ffe6a8", size: 0.62 },
+  { kind: "sign",  label: "Road Sign — Board",   x: 11.2, y: 5.35, color: "#ffd77b", size: 0.8 },
+  { kind: "fence", label: "Corridor Rail North",  x: 11.6, y: 5.15, color: "#a47b4c", size: 0.62 },
+  { kind: "fence", label: "Corridor Rail South",  x: 11.8, y: 12.9, color: "#a47b4c", size: 0.6 },
+  { kind: "crate", label: "Roadside Crates",      x: 14.2, y: 5.2,  color: "#b9824d", size: 0.6 },
 ];
 
 // Tall hero landmark — should read as the tallest first-view shape.
@@ -60,10 +60,10 @@ const LANDMARK = { kind: "landmark", label: "North Watchtower Beacon", dx: 5.16,
 
 // Hero objects at their real gameplay world positions (not anchor-relative).
 const HERO_OBJECTS = [
-  { kind: "jobBoard",    label: "Boone's Job Board", x: 12.5,  y: 8.3,  color: "#d8a84f", size: 1.0 },
-  { kind: "smokeCache",  label: "Smoke Cache",       x: 11.2,  y: 9.4,  color: "#caa15a", size: 0.9 },
-  { kind: "brokenWagon", label: "Broken Wagon",      x: 15.5,  y: 11.0, color: "#b9824d", size: 1.2 },
-  { kind: "roadSlime",   label: "Road Slime",        x: 14.8,  y: 9.0,  color: "#7fd06a", size: 0.9 },
+  { kind: "jobBoard",    label: "Boone's Job Board", x: 13.0,  y: 5.65, color: "#d8a84f", size: 1.0 },
+  { kind: "smokeCache",  label: "Smoke Cache",       x: 17.2,  y: 11.9, color: "#caa15a", size: 0.9 },
+  { kind: "brokenWagon", label: "Broken Wagon",      x: 20.2,  y: 12.4, color: "#b9824d", size: 1.2 },
+  { kind: "roadSlime",   label: "Road Slime",        x: 18.7,  y: 10.6, color: "#7fd06a", size: 0.9 },
 ];
 
 // --- Bigger-world expansion -------------------------------------------------

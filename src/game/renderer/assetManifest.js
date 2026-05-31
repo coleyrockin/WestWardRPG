@@ -14,10 +14,10 @@ export const MODELS = {
   // big enough to read as real buildings without crowding the street.
   // `windowLight` adds warm emissive window panes + a soft interior PointLight on
   // the road-facing side so buildings read as occupied at dusk instead of dark boxes.
-  saloon: { url: "/models/building_saloon.glb", scale: 2.1, windowLight: { color: "#ffb867", intensity: 4.0, distance: 9, height: 1.7 } },
-  storefront: { url: "/models/building_store.glb", scale: 2.0, windowLight: { color: "#ffc070", intensity: 3.4, distance: 8, height: 1.6 } },
-  town: { url: "/models/building_house.glb", scale: 1.95, windowLight: { color: "#ffbf72", intensity: 3.0, distance: 8, height: 1.5 } },
-  ranch: { url: "/models/building_house.glb", scale: 2.05, windowLight: { color: "#ffbf72", intensity: 3.0, distance: 8, height: 1.5 } },
+  saloon: { url: "/models/building_saloon.glb", scale: 2.1, windowLight: { color: "#ffb867", intensity: 2.0, distance: 6.5, height: 1.7 } },
+  storefront: { url: "/models/building_store.glb", scale: 2.0, windowLight: { color: "#ffc070", intensity: 1.8, distance: 6, height: 1.6 } },
+  town: { url: "/models/building_house.glb", scale: 1.95, windowLight: { color: "#ffbf72", intensity: 1.6, distance: 6, height: 1.5 } },
+  ranch: { url: "/models/building_house.glb", scale: 2.05, windowLight: { color: "#ffbf72", intensity: 1.6, distance: 6, height: 1.5 } },
   gate: { url: "/models/building_gate.glb", scale: 2.05 },
   // hero + dressing (Batch A)
   brokenWagon: { url: "/models/wagon.glb", scale: 0.85 },
@@ -29,10 +29,10 @@ export const MODELS = {
   mesa: { url: "/models/mesa.glb", scale: 1.0, vary: true },
   cliff: { url: "/models/cliff.glb", scale: 1.0, vary: true },
   // structures + lights (Batch B)
-  watchtower: { url: "/models/watchtower.glb", scale: 0.55, light: { color: "#ffcc80", intensity: 18, distance: 22, decay: 1.8, height: 4.75 } },
-  landmark: { url: "/models/watchtower.glb", scale: 0.55, light: { color: "#ffcc80", intensity: 18, distance: 22, decay: 1.8, height: 4.75 } },
-  lamp: { url: "/models/lamp.glb", scale: 1.6, light: { color: "#ffcaa0", intensity: 5.5, distance: 7, decay: 2, height: 1.55 } },
-  jobBoard: { url: "/models/jobBoard.glb", scale: 1.0, yaw: Math.PI / 2, light: { color: "#ffd090", intensity: 6, distance: 7, decay: 1.8, height: 2.3 } },
+  watchtower: { url: "/models/watchtower.glb", scale: 0.55, light: { color: "#ffcc80", intensity: 10, distance: 16, decay: 1.8, height: 4.75 } },
+  landmark: { url: "/models/watchtower.glb", scale: 0.55, light: { color: "#ffcc80", intensity: 10, distance: 16, decay: 1.8, height: 4.75 } },
+  lamp: { url: "/models/lamp.glb", scale: 1.6, light: { color: "#ffcaa0", intensity: 3.2, distance: 5.5, decay: 2, height: 1.55 } },
+  jobBoard: { url: "/models/jobBoard.glb", scale: 1.0, yaw: Math.PI / 2, light: { color: "#ffd090", intensity: 5.2, distance: 6, decay: 1.8, height: 2.3 } },
   fence: { url: "/models/fence.glb", scale: 1.5 },
   sign: { url: "/models/sign.glb", scale: 1.2 },
   road: { url: "/models/road.glb", scale: 1.6 },

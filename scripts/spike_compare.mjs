@@ -219,8 +219,15 @@ async function captureNew(context) {
   await page.waitForFunction(() => window.__spikeReady === true, { timeout: 15000 });
   await page.waitForFunction(() => Boolean(window.__westward3dTest?.getHeroVisibility), { timeout: 15000 });
   const snapshot = await page.evaluate(() => window.__westwardRenderSnapshot || null);
-  if (!snapshot || snapshot.kind !== "westward-render-snapshot" || snapshot.objective?.phase !== "accept_bounty") {
-    errors.push(`render3d snapshot missing or wrong phase: ${snapshot?.objective?.phase || "none"}`);
+  const loopState = await page.evaluate(() => window.__westward3dLoop || null);
+  if (!snapshot || snapshot.kind !== "westward-render-snapshot") {
+    errors.push("render3d snapshot missing");
+  }
+  if (loopState?.phase !== "spawn" || loopState?.objectiveLabel !== "Follow the Road") {
+    errors.push(`render3d opening objective changed: ${JSON.stringify({
+      phase: loopState?.phase || snapshot?.objective?.phase || "none",
+      label: loopState?.objectiveLabel || snapshot?.objective?.title || "none",
+    })}`);
   }
   const heroVisibility = await page.evaluate(() => window.__westward3dTest.getHeroVisibility());
   console.log(`[probe] new hero visibility: ${JSON.stringify(heroVisibility)}`);
