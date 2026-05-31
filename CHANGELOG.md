@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — `first-five-minutes-polish-v1`
+## Unreleased — first five-minute 3D opening polish
 
 - Added named 3D camera presets for exploration, town, inspection, and objective focus.
 - Tuned the default exploration camera to a third-person RPG range so the road, player, and Boone's board fit in the same playable frame.
@@ -10,7 +10,7 @@
 - Added conservative foreground fading for props that sit between the camera and player.
 - Preserved existing walk/run speeds and input math to avoid widening the gameplay blast radius.
 
-Validation target before merge:
+Validation target:
 
 ```bash
 npm test

@@ -119,7 +119,7 @@ Current playable path:
 - `spikes/render3d.html` is an experimental Three.js first-road slice.
 - New 3D work should stay under `src/render3d/` until it reaches parity with the Canvas first-road loop.
 
-Active competition branch: `first-five-minutes-polish-v1` focuses on camera feel and gameplay readability. It keeps the exploration camera in a third-person RPG range, preserves smooth follow motion, adds a player readability ring/marker, fades blocking foreground props, and gives Boone's board an in-world path/target guide.
+The current `main` branch includes the first five-minute 3D opening polish: third-person RPG camera framing, smooth follow motion, a player readability ring/marker, foreground prop fading, a wider first road, calmer dusk lighting, and in-world guidance toward Boone's board.
 
 The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the single source of truth. The high-level active build order is:
 
