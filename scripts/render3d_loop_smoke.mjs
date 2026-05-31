@@ -107,6 +107,10 @@ async function main() {
 
     await interact(page, "roadSign");
     await expectPhase(page, "road_walk");
+    const roadFeedback = await page.evaluate(() => window.__westward3dTest.getBeatFeedback?.());
+    if (roadFeedback?.current?.title !== "Marshal Road") {
+      throw new Error(`road-sign feedback missing: ${JSON.stringify(roadFeedback)}`);
+    }
     await interact(page, "townBark");
     await expectPhase(page, "cache_clue");
     await interact(page, "smokeCache");
@@ -118,9 +122,12 @@ async function main() {
     await expectPhase(page, "slime_fight");
     const slimeVisible = await page.evaluate(() => window.__westward3dTest.getBeatVisibility());
     if (!slimeVisible.roadSlimeVisible) throw new Error("road slime did not appear after slime tell");
+    if (!slimeVisible.slimeCombatCueVisible) throw new Error("slime combat cue did not appear during the fight");
     await page.evaluate(() => window.__westward3dTest.movePlayerToKind?.("roadSlime"));
     await interact(page, "roadSlime");
     await expectPhase(page, "wagon_salvage");
+    const slimeDefeat = await page.evaluate(() => window.__westward3dTest.getBeatVisibility());
+    if (!slimeDefeat.slimeCombatCueVisible) throw new Error("slime defeat splash did not replace the combat cue");
     await interact(page, "brokenWagon");
     await expectPhase(page, "return_to_boone");
     const reward = await getState(page);

@@ -2,6 +2,9 @@ export type ObjectiveDomRefs = {
   label: any | null;
   text: any | null;
   meta: any | null;
+  progress: any | null;
+  progressLabel: any | null;
+  progressFill: any | null;
   tag: any | null;
   createElement: ((tagName: string) => any) | null;
 };

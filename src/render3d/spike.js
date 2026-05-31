@@ -18,7 +18,7 @@ import { buildFrontierPlacements, FIRST_FIVE_ROUTE, getRouteMetrics, PLAYER_SPAW
 import { createPlayerController } from "./playerController.js";
 import { buildProxies } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
-import { LOOP_PHASES, createLoopStateMachine } from "./phaseState.js";
+import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine } from "./phaseState.js";
 import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
 import { createBoardModalController } from "./boardModal.js";
 import { createEncounterSystem } from "./encounterSystem.js";
@@ -810,6 +810,109 @@ function createBoardReturnNotice(snapshot) {
   };
 }
 
+function createSlimeCombatCue(snapshot) {
+  const slime = placementByKind(snapshot, "roadSlime");
+  const group = new THREE.Group();
+  group.name = "slime-combat-cue";
+  if (!slime) return { group, update() {} };
+
+  const warningMat = new THREE.MeshBasicMaterial({
+    color: col("#ff8f45"),
+    transparent: true,
+    opacity: 0.58,
+    depthWrite: false,
+  });
+  const dangerMat = new THREE.MeshBasicMaterial({
+    color: col("#ffd77b"),
+    transparent: true,
+    opacity: 0.74,
+    depthWrite: false,
+  });
+  const splashMat = new THREE.MeshBasicMaterial({
+    color: col("#70d86a"),
+    transparent: true,
+    opacity: 0.0,
+    depthWrite: false,
+  });
+
+  const warningRing = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.035, 8, 52), warningMat);
+  warningRing.rotation.x = Math.PI / 2;
+  warningRing.position.set(slime.x, 0.12, slime.y);
+  group.add(warningRing);
+
+  const strikePointer = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.46, 4), dangerMat);
+  strikePointer.rotation.x = Math.PI;
+  strikePointer.rotation.y = Math.PI / 4;
+  strikePointer.position.set(slime.x, 1.65, slime.y);
+  group.add(strikePointer);
+
+  const defeatSplash = new THREE.Mesh(new THREE.CircleGeometry(1, 28), splashMat);
+  defeatSplash.rotation.x = -Math.PI / 2;
+  defeatSplash.position.set(slime.x, 0.095, slime.y);
+  group.add(defeatSplash);
+  group.visible = false;
+
+  return {
+    group,
+    update(t, mode = "hidden") {
+      const combatVisible = mode === "combat";
+      const defeatedVisible = mode === "defeated";
+      group.visible = combatVisible || defeatedVisible;
+      warningRing.visible = combatVisible;
+      strikePointer.visible = combatVisible;
+      defeatSplash.visible = defeatedVisible;
+      if (combatVisible) {
+        const pulse = 1 + Math.sin(t * 6.0) * 0.12;
+        warningRing.scale.set(pulse, pulse, pulse);
+        warningMat.opacity = 0.42 + Math.max(0, Math.sin(t * 5.2)) * 0.22;
+        strikePointer.position.y = 1.65 + Math.sin(t * 4.4) * 0.1;
+        strikePointer.rotation.y += 0.025;
+      }
+      if (defeatedVisible) {
+        const pulse = 1 + Math.sin(t * 2.4) * 0.04;
+        defeatSplash.scale.set(1.12 * pulse, 0.72 * pulse, 1);
+        splashMat.opacity = 0.32 + Math.max(0, Math.sin(t * 3.4)) * 0.08;
+      }
+    },
+  };
+}
+
+function createBeatToast(rootDocument = globalThis.document) {
+  const el = rootDocument?.getElementById?.("beat-toast") || null;
+  const titleEl = el?.querySelector?.(".toast-title") || null;
+  const lineEl = el?.querySelector?.(".toast-line") || null;
+  let ttl = 0;
+  let current = null;
+
+  function show(title, line, seconds = 2.8) {
+    current = { title, line };
+    ttl = Math.max(ttl, seconds);
+    if (!el) return current;
+    if (titleEl) titleEl.textContent = title;
+    if (lineEl) lineEl.textContent = line;
+    el.hidden = false;
+    return current;
+  }
+
+  function update(dt) {
+    if (!el || ttl <= 0) return;
+    ttl = Math.max(0, ttl - Math.max(0, dt || 0));
+    if (ttl <= 0) el.hidden = true;
+  }
+
+  return {
+    show,
+    update,
+    getState() {
+      return {
+        visible: Boolean(el && !el.hidden && ttl > 0),
+        ttl: Number(ttl.toFixed(2)),
+        current,
+      };
+    },
+  };
+}
+
 function nodeScreenStats(node, camera) {
   if (!node || node.visible === false) return null;
   camera.updateMatrixWorld();
@@ -895,10 +998,10 @@ function createOpeningLightPools(snapshot) {
   group.name = "opening-light-pools";
   const pools = [];
   const specs = [
-    { kind: "jobBoard", rx: 3.3, rz: 2.05, color: "#ffbd70", opacity: 0.18 },
-    { kind: "roadSign", rx: 2.3, rz: 1.35, color: "#ffc982", opacity: 0.1 },
-    { kind: "smokeCache", rx: 2.1, rz: 1.3, color: "#d99a60", opacity: 0.08 },
-    { kind: "brokenWagon", rx: 2.6, rz: 1.55, color: "#e0985e", opacity: 0.1 },
+    { kind: "jobBoard", rx: 2.7, rz: 1.65, color: "#d78949", opacity: 0.12 },
+    { kind: "roadSign", rx: 1.85, rz: 1.08, color: "#d89455", opacity: 0.06 },
+    { kind: "smokeCache", rx: 1.75, rz: 1.02, color: "#b77945", opacity: 0.05 },
+    { kind: "brokenWagon", rx: 2.15, rz: 1.24, color: "#c27b48", opacity: 0.06 },
   ];
 
   for (const spec of specs) {
@@ -909,7 +1012,7 @@ function createOpeningLightPools(snapshot) {
       transparent: true,
       opacity: spec.opacity,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
     });
     const pool = new THREE.Mesh(new THREE.CircleGeometry(1, 44), mat);
     pool.rotation.x = -Math.PI / 2;
@@ -949,11 +1052,11 @@ function createRoadDust(snapshot) {
       const t = i / (count + 1);
       const side = ((i + seg) % 2 === 0 ? -1 : 1) * (1.2 + (i % 2) * 0.8);
       const mat = new THREE.MeshBasicMaterial({
-        color: col(i % 2 ? "#d6a263" : "#b98250"),
+        color: col(i % 2 ? "#b77d46" : "#8f633c"),
         transparent: true,
-        opacity: 0.06,
+        opacity: 0.04,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
+        blending: THREE.NormalBlending,
       });
       const dust = new THREE.Mesh(new THREE.CircleGeometry(1, 20), mat);
       dust.rotation.x = -Math.PI / 2;
@@ -996,7 +1099,7 @@ function buildGround(scene, snapshot) {
   // Greenish marsh apron over the southern lowland (thin tinted plane).
   const marsh = new THREE.Mesh(
     new THREE.PlaneGeometry(31, 10),
-    standard("#3c4a2e", { roughness: 1 }),
+    standard("#3c4a2e", { roughness: 1, rimStrength: 0.08 }),
   );
   marsh.rotation.x = -Math.PI / 2;
   marsh.position.set(47, 0.005, 18);
@@ -1008,11 +1111,11 @@ function buildGround(scene, snapshot) {
   // Dusty S-road ribbon running through the entire first-five-minute route.
   // Segmenting it by route points makes the path visibly turn toward the marsh
   // instead of reading as a short flat alley.
-  const ROAD_W = 8.0;
-  const roadMat = standard("#ba8651", { roughness: 1, emissive: "#5d3b20", emissiveIntensity: 0.16 });
-  const edgeMat = standard("#c99763", { roughness: 1, emissive: "#5c3d22", emissiveIntensity: 0.1 });
-  const rutMat = standard("#7f5b3a", { roughness: 1 });
-  const centerMat = standard("#986c42", { roughness: 1 });
+  const ROAD_W = 7.4;
+  const roadMat = standard("#9f6c41", { roughness: 1, emissive: "#3d2718", emissiveIntensity: 0.045, rimStrength: 0.04 });
+  const edgeMat = standard("#b9804d", { roughness: 1, emissive: "#3c2819", emissiveIntensity: 0.025, rimStrength: 0.04 });
+  const rutMat = standard("#5f4228", { roughness: 1, rimStrength: 0.02 });
+  const centerMat = standard("#755132", { roughness: 1, rimStrength: 0.02 });
   const route = FIRST_FIVE_ROUTE.filter((point) => point.kind !== "returnJobBoard");
 
   function addRoadPlane(from, to, width, y, mat) {
@@ -1041,7 +1144,7 @@ function buildGround(scene, snapshot) {
     // The near spawn segment fills the foreground fast in third-person view; a
     // slightly tapered width keeps it from reading like a red carpet while later
     // segments stay broad enough to guide the eye down-road.
-    const segmentWidth = i === 1 ? 6.6 : ROAD_W;
+    const segmentWidth = i === 1 ? 6.0 : ROAD_W;
     addRoadPlane(from, to, segmentWidth, 0.02, roadMat);
     for (const off of [-(segmentWidth / 2 + 0.18), segmentWidth / 2 + 0.18]) {
       addRoadPlane(
@@ -1203,9 +1306,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const pearlRoadCue = createPearlRoadCue(snapshot);
   const mapScrapReward = createMapScrapReward(snapshot);
   const boardReturnNotice = createBoardReturnNotice(snapshot);
+  const slimeCombatCue = createSlimeCombatCue(snapshot);
   scene.add(pearlRoadCue.group);
   scene.add(mapScrapReward.group);
   scene.add(boardReturnNotice.group);
+  scene.add(slimeCombatCue.group);
 
   // Ambient townsfolk — NPCs reusing the rig, wandering the town to bring the
   // street to life. Non-blocking fallback so a load failure never breaks the scene.
@@ -1376,6 +1481,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   });
   const proxies = buildProxies(snapshot.worldObjects);
   const promptEl = document.getElementById("prompt");
+  const beatToast = createBeatToast(document);
   let currentPromptText = "";
   const setPromptText = (t) => {
     currentPromptText = t || "";
@@ -1393,6 +1499,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const boardAccept = document.getElementById("board-accept");
   const boardOptionButtons = Array.from(document.querySelectorAll("[data-option]:not(#board-accept)"));
   const boardClose = document.getElementById("board-close");
+  const labelForBoardOption = (optionId) =>
+    BOARD_OPTIONS.find((option) => option.id === optionId)?.label || "Accept bounty";
 
   const refreshLoopDom = () => {
     const state = loopState.state;
@@ -1418,10 +1526,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     onAccept: () => {
       advance({ type: "choose_board", optionId: "accept_bounty" });
       markJobBoardAccepted(heroMeshes.jobBoard);
+      beatToast.show("Road Job Marked", "Boone chalks the cache road and points you east.");
     },
     onChoose: (optionId) => {
       advance({ type: "choose_board", optionId });
       markJobBoardAccepted(heroMeshes.jobBoard);
+      beatToast.show("Road Job Marked", `${labelForBoardOption(optionId)} changes Boone's cache note.`);
     },
     onClose: refreshLoopDom,
   });
@@ -1459,6 +1569,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (loopState.phase === "return_to_boone") {
       advance("report_to_boone");
       markJobBoardAccepted(heroMeshes.jobBoard);
+      beatToast.show("Old Road Survey", "Boone pins your Map Scrap beside the next job.");
       return;
     }
     if (loopState.phase === "survey_teaser") {
@@ -1466,12 +1577,14 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         ...loopState.state,
         objectiveText: "Old Road Survey is ready. This is tomorrow's next playable job.",
       });
+      beatToast.show("Next Job Teased", "The old road is marked and waiting past the wagon wreck.");
     }
   };
   const handleRoadSign = () => {
     if (loopState.phase !== "road_sign") return;
     focusBeat("inspection", 0.75);
     advance("read_sign");
+    beatToast.show("Marshal Road", "The sign bends the route toward Smoke Cache.");
   };
   const handleTownBark = () => {
     if (loopState.phase !== "road_walk") return;
@@ -1480,26 +1593,33 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     npcSpeechMsg = "Pearl: \"Road's quiet when it wants you close. Watch the marsh grass.\"";
     npcSpeechT = 3.5;
     setPromptText(npcSpeechMsg);
+    beatToast.show("Pearl's Warning", "Pearl points you down-road toward the cache smoke.");
   };
   const handleSmokeCache = () => {
     if (loopState.phase !== "cache_clue") return;
     focusBeat("inspection", 0.9);
+    const clueLine = loopState.state.objectiveText;
     advance("open_cache");
+    beatToast.show("Cache Clue", clueLine);
   };
   const handleSlimeTell = () => {
     if (loopState.phase !== "slime_tell") return;
     focusBeat("objective", 0.8);
     encounter.engage();
     if (loopState.phase === "slime_tell") advance("spot_slime_tell");
+    beatToast.show("Ambush", "The marsh trail shivers. Strike the Road Slime.");
   };
   const handleRoadSlime = () => {
     if (loopState.phase !== "slime_fight") return;
-    encounter.strike(player.position);
+    if (encounter.strike(player.position)) {
+      beatToast.show("Road Slime Down", "The wagon wreck is clear enough to salvage.");
+    }
   };
   const handleBrokenWagon = () => {
     if (loopState.phase !== "wagon_salvage") return;
     focusBeat("inspection", 0.95);
     advance("inspect_wagon");
+    beatToast.show("Map Scrap Found", "+ Map Scrap. Return it to Boone's board.");
   };
 
   interaction.registerHandler("jobBoard", handleJobBoard);
@@ -1523,9 +1643,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     const showMapScrap = ["return_to_boone", "survey_teaser"].includes(state.phase) || state.routeBeats.wagonSalvage;
     const showBoardNotice = state.phase === "survey_teaser" || state.routeBeats.returnToBoone;
     const showPearlCue = state.phase === "road_walk" || state.phase === "cache_clue";
+    const slimeCueMode = state.phase === "slime_fight"
+      ? "combat"
+      : state.routeBeats.slimeDefeated
+        ? "defeated"
+        : "hidden";
     pearlRoadCue.update(t, showPearlCue);
     mapScrapReward.update(t, showMapScrap);
     boardReturnNotice.update(t, showBoardNotice);
+    slimeCombatCue.update(t, slimeCueMode);
     if (heroMeshes.slimeTell?.visible) {
       const pulse = 1 + Math.sin(t * 4.6) * 0.045;
       heroMeshes.slimeTell.scale.setScalar(pulse);
@@ -1618,6 +1744,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         mapScrapVisible: Boolean(mapScrapReward.group.visible),
         pearlCueVisible: Boolean(pearlRoadCue.group.visible),
         boardNoticeVisible: Boolean(boardReturnNotice.group.visible),
+        slimeCombatCueVisible: Boolean(slimeCombatCue.group.visible),
         heroVisibility: getHeroVisibility(heroMeshes, camera),
       };
     };
@@ -1687,6 +1814,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       getCompositionMetrics,
       getLightingMetrics,
       getBeatVisibility,
+      getBeatFeedback: () => beatToast.getState(),
       captureRouteFrame,
       getCameraPose: () => ({
         x: Number(camera.position.x.toFixed(2)),
@@ -1724,6 +1852,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     roadDust.update(now / 1000);
     objectiveGuidance.update(now / 1000, loopState.state);
     animateBeatPayoffs(now / 1000);
+    beatToast.update(dt);
     townsfolk.update(visualCapture ? 0 : dt, visualCapture, player.position);
     // NPC greeting prompt/speech overrides the kind prompt when near a townsperson
     if (npcSpeechT > 0) {

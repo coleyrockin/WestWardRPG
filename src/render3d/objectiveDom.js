@@ -1,6 +1,8 @@
 // DOM objective strip helpers for the Three.js spike.
 // Keeps phase-driven UI updates out of spike.js and avoids string HTML writes.
 
+import { getPhaseProgress } from "./phaseState.js";
+
 export function createObjectiveDomRefs(rootDocument = globalThis.document) {
   const doc = rootDocument && typeof rootDocument.querySelector === "function"
     ? rootDocument
@@ -9,6 +11,9 @@ export function createObjectiveDomRefs(rootDocument = globalThis.document) {
     label: doc?.querySelector("#objective .label") || null,
     text: doc?.querySelector("#objective .text") || null,
     meta: doc?.querySelector("#objective .meta") || null,
+    progress: doc?.querySelector("#route-progress") || null,
+    progressLabel: doc?.querySelector("#route-progress .progress-label") || null,
+    progressFill: doc?.querySelector("#route-progress .progress-fill") || null,
     tag: doc?.querySelector("#tag") || null,
     createElement: typeof doc?.createElement === "function"
       ? doc.createElement.bind(doc)
@@ -60,6 +65,12 @@ export function syncObjectiveDom(refs, snapshot, loopState = null) {
 
   const items = Array.isArray(view.objectiveMeta) ? view.objectiveMeta.slice(0, 2) : [];
   setMetaChildren(refs, items);
+
+  if (refs?.progress) {
+    const progress = getPhaseProgress(view.phase || "spawn");
+    if (refs.progressLabel) refs.progressLabel.textContent = `Road beat ${progress.label}`;
+    if (refs.progressFill?.style) refs.progressFill.style.width = `${Math.round(progress.ratio * 100)}%`;
+  }
 
   if (refs?.tag) {
     const region = snapshot?.region?.label || "Dustward Frontier";

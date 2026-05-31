@@ -5,6 +5,7 @@ import {
   createInitialLoopState,
   createLoopStateMachine,
   getPhaseView,
+  getPhaseProgress,
   transitionLoopPhase,
 } from "../src/render3d/phaseState.js";
 
@@ -133,5 +134,16 @@ describe("render3d phase state", () => {
       expect(view.objectiveMeta.length).toBeGreaterThan(0);
       expect(view.objectiveMeta.every((line: string) => line.trim().length > 0)).toBe(true);
     }
+  });
+
+  it("reports phase progress for the route HUD", () => {
+    const start = getPhaseProgress("spawn");
+    const fight = getPhaseProgress("slime_fight");
+    const end = getPhaseProgress("survey_teaser");
+
+    expect(start).toMatchObject({ step: 1, total: LOOP_PHASES.length, ratio: 0, label: `1/${LOOP_PHASES.length}` });
+    expect(fight.step).toBeGreaterThan(start.step);
+    expect(fight.ratio).toBeGreaterThan(0.5);
+    expect(end.ratio).toBe(1);
   });
 });

@@ -26,7 +26,12 @@ function applyNpr(root) {
     const src = Array.isArray(o.material) ? o.material[0] : o.material;
     const hex = src && src.color ? `#${src.color.getHexString()}` : "#9a8f80";
     const hasEmissive = src && src.emissive && src.emissive.getHexString() !== "000000";
-    const opts = { map: src && src.map ? src.map : null }; // carry the painted albedo if any
+    const opts = {
+      map: src && src.map ? src.map : null, // carry the painted albedo if any
+      rimColor: "#d8ad76",
+      rimPower: 4.2,
+      rimStrength: hasEmissive ? 0.28 : 0.18,
+    };
     if (hasEmissive) {
       opts.emissive = `#${src.emissive.getHexString()}`;
       opts.emissiveIntensity = src.emissiveIntensity ?? 1;

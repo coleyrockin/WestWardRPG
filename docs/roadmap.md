@@ -185,6 +185,11 @@ Added in the max-mode polish pass:
   reveal, and a changed Boone board state after return.
 - Second-pass art lift for the branch: more detailed facade silhouettes, stepped mesa skyline assets,
   road dust ribbons, local light pools, warmer road/terrain colors, and less red foreground wash.
+- Third-pass feel/readability lift: compact route-progress HUD, transient beat feedback for each
+  interaction payoff, a visible slime combat cue/defeat splash, and darker road/light-pool material
+  tuning so the first frame no longer reads as a washed-out debug runway.
+- Shared GLB material reskin now uses a warmer, lower rim so authored assets keep the graphic-novel
+  outline without bleaching road planks, fences, or facade faces.
 - Debug probes and visual gates for composition blockers, controlled dusk lighting, beat visibility,
   and route-frame target readability.
 

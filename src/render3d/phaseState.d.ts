@@ -19,6 +19,14 @@ export interface BoardOption {
 
 export const LOOP_PHASES: ReadonlyArray<LoopPhase>;
 export const BOARD_OPTIONS: ReadonlyArray<BoardOption>;
+export function getPhaseProgress(phase: LoopPhase | string): {
+  phase: LoopPhase;
+  index: number;
+  step: number;
+  total: number;
+  ratio: number;
+  label: string;
+};
 
 export interface RouteBeats {
   boardChoice: boolean;

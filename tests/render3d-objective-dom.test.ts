@@ -5,6 +5,7 @@ function makeElement() {
   return {
     textContent: "",
     children: [] as any[],
+    style: {} as Record<string, string>,
     replaceChildren(...nodes: any[]) {
       this.children = nodes;
     },
@@ -16,6 +17,9 @@ function makeDocument() {
     "#objective .label": makeElement(),
     "#objective .text": makeElement(),
     "#objective .meta": makeElement(),
+    "#route-progress": makeElement(),
+    "#route-progress .progress-label": makeElement(),
+    "#route-progress .progress-fill": makeElement(),
     "#tag": makeElement(),
   };
   return {
@@ -37,6 +41,9 @@ describe("render3d objective DOM helpers", () => {
     expect(refs.label).toBe(doc.nodes["#objective .label"]);
     expect(refs.text).toBe(doc.nodes["#objective .text"]);
     expect(refs.meta).toBe(doc.nodes["#objective .meta"]);
+    expect(refs.progress).toBe(doc.nodes["#route-progress"]);
+    expect(refs.progressLabel).toBe(doc.nodes["#route-progress .progress-label"]);
+    expect(refs.progressFill).toBe(doc.nodes["#route-progress .progress-fill"]);
     expect(refs.tag).toBe(doc.nodes["#tag"]);
   });
 
@@ -61,6 +68,8 @@ describe("render3d objective DOM helpers", () => {
       "Target: Smoke Cache",
       "Threat: Unknown in marsh",
     ]);
+    expect(refs.progressLabel?.textContent).toBe("Road beat 4/10");
+    expect(refs.progressFill?.style.width).toBe("33%");
     expect(refs.tag?.textContent).toBe("WestWard · Dustward Frontier · road_walk");
   });
 

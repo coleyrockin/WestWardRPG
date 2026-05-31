@@ -11,6 +11,20 @@ export const LOOP_PHASES = Object.freeze([
   "survey_teaser",
 ]);
 
+export function getPhaseProgress(phase) {
+  const safePhase = LOOP_PHASES.includes(phase) ? phase : "spawn";
+  const index = LOOP_PHASES.indexOf(safePhase);
+  const total = LOOP_PHASES.length;
+  return {
+    phase: safePhase,
+    index,
+    step: index + 1,
+    total,
+    ratio: total <= 1 ? 1 : index / (total - 1),
+    label: `${index + 1}/${total}`,
+  };
+}
+
 export const BOARD_OPTIONS = Object.freeze([
   {
     id: "accept_bounty",
