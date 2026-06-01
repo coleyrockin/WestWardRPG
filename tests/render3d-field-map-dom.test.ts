@@ -24,6 +24,8 @@ describe("render3d field map DOM helpers", () => {
     const model = buildFieldMapRouteModel({ phase: "cache_clue" });
     const byKind = new Map(model.points.map((point: any) => [point.kind, point]));
 
+    expect(model.activeIndex).toBe(4);
+    expect(model.warningKinds).toEqual(expect.arrayContaining(["slimeTell", "roadSlime"]));
     expect(byKind.get("jobBoard")).toMatchObject({ shape: "square" });
     expect(byKind.get("smokeCache")).toMatchObject({ shape: "diamond", active: true });
     expect(byKind.get("slimeTell")).toMatchObject({ shape: "triangle", warning: true });
@@ -41,6 +43,7 @@ describe("render3d field map DOM helpers", () => {
     expect(model.upgraded).toBe(true);
     expect(model.statusLabel).toBe("Old Road Survey marked");
     expect(model.activeKind).toBe("returnJobBoard");
+    expect(model.completedKinds).toEqual(expect.arrayContaining(["jobBoard", "brokenWagon"]));
     expect(board?.completed).toBe(true);
     expect(wagon?.completed).toBe(true);
   });

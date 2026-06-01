@@ -368,6 +368,20 @@ async function captureNew(context) {
   if (missingRouteFrame) {
     errors.push(`render3d route frame lost target visibility: ${JSON.stringify(missingRouteFrame)}`);
   }
+  const missingMapFrame = routeFrames.find((frame) => {
+    if (!frame?.fieldMap || frame.fieldMap.phase !== frame.phase) return true;
+    if (["return_to_boone", "survey_teaser"].includes(frame.phase)) {
+      return frame.fieldMap.activeKind !== "returnJobBoard";
+    }
+    return frame.fieldMap.activeKind !== frame.targetKind;
+  });
+  if (missingMapFrame) {
+    errors.push(`render3d field map lost phase alignment: ${JSON.stringify(missingMapFrame)}`);
+  }
+  const cacheFrame = routeFrames.find((frame) => frame.phase === "cache_clue");
+  if (!cacheFrame?.fieldMap?.warningKinds?.includes("slimeTell")) {
+    errors.push(`render3d field map did not warn about the marsh threat near cache: ${JSON.stringify(cacheFrame)}`);
+  }
   const slimeTellFrame = routeFrames.find((frame) => frame.phase === "slime_tell");
   if (!slimeTellFrame?.beatVisibility?.slimeTellVisible || slimeTellFrame?.beatVisibility?.roadSlimeVisible) {
     errors.push(`render3d slime tell staging failed: ${JSON.stringify(slimeTellFrame)}`);
@@ -375,6 +389,9 @@ async function captureNew(context) {
   const returnFrame = routeFrames.find((frame) => frame.phase === "survey_teaser");
   if (!returnFrame?.beatVisibility?.boardNoticeVisible || !returnFrame?.beatVisibility?.mapScrapVisible) {
     errors.push(`render3d return reward visuals missing: ${JSON.stringify(returnFrame)}`);
+  }
+  if (!returnFrame?.fieldMap?.upgraded || !returnFrame?.fieldMap?.completedKinds?.includes("brokenWagon")) {
+    errors.push(`render3d field map did not upgrade after survey return: ${JSON.stringify(returnFrame)}`);
   }
   console.log("[capture] new spike: wrote new.png");
   await page.close();

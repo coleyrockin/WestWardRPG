@@ -113,11 +113,14 @@ export function buildFieldMapRouteModel(loopState = {}, options = {}) {
 
   return {
     phase: progress.phase,
+    activeIndex,
     activeKind: targetPoint.kind,
     targetLabel: targetPoint.label,
     progressLabel: `Road beat ${progress.label}`,
     statusLabel: upgraded ? "Old Road Survey marked" : `Road beat ${progress.label}`,
     upgraded,
+    completedKinds: points.filter((point) => point.completed).map((point) => point.kind),
+    warningKinds: points.filter((point) => point.warning).map((point) => point.kind),
     path: pathD(route.slice(0, 8)),
     activePath: pathD(activePath),
     returnPath: pathD(returnPath),

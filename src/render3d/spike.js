@@ -1771,6 +1771,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       return {
         phase: loopState.phase,
         targetKind: loopState.state.activeTargetKind,
+        fieldMap: buildFieldMapRouteModel(loopState.state),
         composition: getCompositionMetrics(),
         beatVisibility: getBeatVisibility(),
         cameraPose: {
