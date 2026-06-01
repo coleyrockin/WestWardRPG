@@ -76,6 +76,9 @@ describe("render3d phase state", () => {
     expect(state.completedInteractions).toContain("road_slime_defeated");
     expect(state.completedInteractions).toContain("frontier_broken_wagon_salvaged");
     expect(state.encounterState.slime).toBe("dead");
+    expect(state.encounterState.slimeHp).toBe(0);
+    expect(state.encounterState.slimeHits).toBe(3);
+    expect(state.encounterState.slimeDefeated).toBe(true);
     expect(Object.values(state.routeBeats).filter(Boolean).length).toBeGreaterThanOrEqual(7);
   });
 

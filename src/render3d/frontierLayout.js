@@ -49,20 +49,20 @@ function routePlanks() {
     const len = Math.hypot(dx, dy);
     if (len < 0.1) continue;
     const yaw = Math.atan2(dx, dy);
-    const count = Math.max(1, Math.floor(len / 3.2));
+    const count = Math.max(1, Math.floor(len / 3.5));
     const nx = -dy / len;
     const ny = dx / len;
     for (let i = 1; i <= count; i++) {
       const t = i / (count + 1);
-      const side = ((i + seg) % 2 === 0 ? -1 : 1) * (2.6 + (i % 3) * 0.25);
+      const side = ((i + seg) % 2 === 0 ? -1 : 1) * (3.25 + (i % 3) * 0.22);
       planks.push({
         kind: "roadPlank",
         label: `Road Plank ${seg}-${i}`,
         x: from.x + dx * t + nx * side,
         y: from.y + dy * t + ny * side,
         yaw,
-        color: "#87633c",
-        size: 0.72,
+        color: "#735332",
+        size: 0.48,
       });
     }
   }
@@ -88,8 +88,8 @@ function routeRuts() {
         x: from.x + dx * t,
         y: from.y + dy * t,
         yaw,
-        color: "#8f6338",
-        size: 1.0,
+        color: "#6f4f31",
+        size: 0.72,
       });
     }
   }
@@ -99,10 +99,10 @@ function routeRuts() {
 // Dressing offsets relative to FRONTIER_ANCHOR, lifted verbatim from
 // REGION_PRESENTATION.frontier. depthLane drives subtle scale/elevation cues.
 const VISTAS = [
-  { kind: "townFacadeWarm", label: "Boone Back Office", dx: -3.7, dy: -3.0, color: "#caa66c", size: 0.46, depthLane: "background" },
-  { kind: "watchtower", label: "Watchtower Frame",  dx: 5.2,  dy: -2.7,  color: "#ffd77b", size: 1.1, depthLane: "background" },
-  { kind: "townFacadeStore", label: "Far Storefront", dx: -2.05, dy: -2.78, color: "#8a6a3e", size: 0.42, depthLane: "background" },
-  { kind: "brokenFence", label: "Ranch Rail",        dx: -0.9, dy: 4.2,   color: "#8d6540", size: 0.55, depthLane: "foreground" },
+  { kind: "townFacadeWarm", label: "Boone Back Office", dx: -3.7, dy: -4.25, color: "#b99462", size: 0.34, depthLane: "background" },
+  { kind: "watchtower", label: "Watchtower Frame",  dx: 5.3,  dy: -3.25,  color: "#ffd77b", size: 0.96, depthLane: "background" },
+  { kind: "townFacadeStore", label: "Far Storefront", dx: -1.65, dy: -4.45, color: "#856342", size: 0.3, depthLane: "background" },
+  { kind: "brokenFence", label: "Ranch Rail",        dx: -1.15, dy: 4.6,   color: "#8d6540", size: 0.42, depthLane: "foreground" },
 ];
 
 const ROADS = [
@@ -186,15 +186,15 @@ const TOWN_EDGE = [
 
 // Western flora flanking the road corridor — shoulders only (out of the wedge).
 const ROAD_FLORA = [
-  { kind: "cactus", label: "Roadside Cactus", x: 11.2, y: 6.0, color: "#5c7a3a", size: 0.9 },
-  { kind: "brush", label: "Dry Brush", x: 13.0, y: 6.1, color: "#7a6a3a", size: 0.7 },
-  { kind: "brush", label: "Dry Brush", x: 12.2, y: 11.6, color: "#6f5f33", size: 0.6 },
+  { kind: "sagePatch", label: "Roadside Sage", x: 10.9, y: 6.1, color: "#687a42", size: 1.1 },
+  { kind: "sagePatch", label: "Board Sage", x: 13.2, y: 6.3, color: "#74864a", size: 0.95 },
+  { kind: "sagePatch", label: "South Road Sage", x: 12.2, y: 11.6, color: "#63753f", size: 0.9 },
   { kind: "cactus", label: "Tall Cactus", x: 16.6, y: 7.9, color: "#577538", size: 1.0 },
   { kind: "deadTree", label: "Lone Dead Tree", x: 18.2, y: 6.9, color: "#4a3a28", size: 1.1 },
-  { kind: "brush", label: "Scrub", x: 23.4, y: 9.6, color: "#6f5f33", size: 0.7 },
+  { kind: "sagePatch", label: "Road Scrub", x: 23.4, y: 9.6, color: "#657744", size: 0.85 },
   { kind: "rock", label: "Road Rock", x: 27.8, y: 5.3, color: "#6a5f55", size: 0.9 },
   { kind: "cactus", label: "Twin Cactus", x: 34.0, y: 10.8, color: "#5c7a3a", size: 0.85 },
-  { kind: "brush", label: "Tumbleweed", x: 38.6, y: 9.3, color: "#8a7a4a", size: 0.5 },
+  { kind: "sagePatch", label: "Cache Scrub", x: 38.6, y: 9.3, color: "#8a7a4a", size: 0.72 },
   { kind: "deadTree", label: "Junction Snag", x: 45.5, y: 12.4, color: "#3e3224", size: 1.1 },
   { kind: "marshCluster", label: "Marsh Slime Sign", x: 46.5, y: 16.1, color: "#75d06b", size: 0.75, yaw: -0.5 },
   { kind: "cactus", label: "Long Road Cactus", x: 50.4, y: 12.0, color: "#577538", size: 0.9 },
@@ -213,7 +213,7 @@ const MARSH = [
   { kind: "deadTree", label: "Marsh Snag", x: 58.2, y: 19.2, color: "#3e3224", size: 1.0 },
   { kind: "rock", label: "Marsh Stone", x: 37.0, y: 18.0, color: "#5a5048", size: 0.8 },
   { kind: "boulder", label: "Sunken Boulder", x: 50.0, y: 20.6, color: "#544c44", size: 1.0 },
-  { kind: "brush", label: "Marsh Grass", x: 47.0, y: 14.8, color: "#6a7a3a", size: 0.7 },
+  { kind: "sagePatch", label: "Marsh Grass", x: 47.0, y: 14.8, color: "#6a7a3a", size: 0.9 },
 ];
 
 // Soft world boundary — mesas/cliffs/boulders ring the playable rectangle. Mesa

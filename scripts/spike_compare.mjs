@@ -323,7 +323,14 @@ async function captureNew(context) {
   }
   const fieldMapState = await page.evaluate(() => window.__westward3dTest.getFieldMapState?.() || null);
   console.log(`[probe] new field map state: ${JSON.stringify(fieldMapState?.activeKind || null)} ${JSON.stringify(fieldMapState?.targetLabel || null)}`);
-  if (!fieldMapState || fieldMapState.activeKind !== "jobBoard" || !fieldMapState.path || !fieldMapState.points?.some((point) => point.kind === "smokeCache")) {
+  if (
+    !fieldMapState ||
+    fieldMapState.activeKind !== "jobBoard" ||
+    !fieldMapState.path ||
+    !fieldMapState.points?.some((point) => point.kind === "smokeCache") ||
+    !Number.isFinite(fieldMapState.distanceToTarget) ||
+    !Number.isFinite(fieldMapState.playerPoint?.x)
+  ) {
     errors.push(`render3d field map missing first-road route state: ${JSON.stringify(fieldMapState)}`);
   }
   const hudFootprint = await page.evaluate(() => {
@@ -392,6 +399,10 @@ async function captureNew(context) {
   }
   if (!returnFrame?.fieldMap?.upgraded || !returnFrame?.fieldMap?.completedKinds?.includes("brokenWagon")) {
     errors.push(`render3d field map did not upgrade after survey return: ${JSON.stringify(returnFrame)}`);
+  }
+  const wagonFrame = routeFrames.find((frame) => frame.phase === "wagon_salvage");
+  if (!wagonFrame?.encounter?.defeated || wagonFrame?.encounter?.hitCount !== 3 || wagonFrame?.encounter?.hp !== 0) {
+    errors.push(`render3d slime encounter did not require a full three-hit defeat before wagon salvage: ${JSON.stringify(wagonFrame)}`);
   }
   console.log("[capture] new spike: wrote new.png");
   await page.close();

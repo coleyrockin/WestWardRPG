@@ -90,19 +90,29 @@ describe("render3d encounter system — controller shell", () => {
     expect(onSlimeEngage).toHaveBeenCalledTimes(1);
   });
 
-  it("strikes the slime, fires death once, and prevents re-aggro", () => {
+  it("requires three valid strikes, fires death once, and prevents re-aggro", () => {
     const onSlimeDeath = vi.fn();
+    const onSlimeHit = vi.fn();
     const mesh = fakeSlimeMesh();
-    const encounter = createEncounterSystem(null, SNAPSHOT, { onSlimeDeath, slimeMesh: mesh });
+    const encounter = createEncounterSystem(null, SNAPSHOT, { onSlimeDeath, onSlimeHit, slimeMesh: mesh });
 
     encounter.update({ x: 7, z: 5 }, 0.1);
     expect(encounter.strike({ x: 7, z: 5 })).toBe(true);
+    expect(encounter.getState()).toMatchObject({ slime: "attack", hp: 2, hitCount: 1, defeated: false });
+    expect(onSlimeDeath).not.toHaveBeenCalled();
+
+    expect(encounter.strike({ x: 7, z: 5 })).toBe(true);
+    expect(encounter.getState()).toMatchObject({ hp: 1, hitCount: 2, defeated: false });
+
+    expect(encounter.strike({ x: 7, z: 5 })).toBe(true);
     expect(encounter.getState().slime).toBe("dead");
+    expect(encounter.getState()).toMatchObject({ hp: 0, hitCount: 3, maxHp: 3, defeated: true });
     expect(mesh.scale.y).toBeCloseTo(0.02);
 
     encounter.update({ x: 10, z: 5 }, 0.1);
     expect(encounter.getState().slime).toBe("dead");
     expect(encounter.strike({ x: 10, z: 5 })).toBe(false);
+    expect(onSlimeHit).toHaveBeenCalledTimes(3);
     expect(onSlimeDeath).toHaveBeenCalledTimes(1);
   });
 

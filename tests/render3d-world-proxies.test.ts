@@ -15,7 +15,7 @@ const KINDS_THAT_BLOCK = new Set([
   "saloon", "saloonFacade", "townFacadeWarm", "townFacadeStore", "townFacadeDark", "storefront", "porch",
   "brokenFence", "mesaSkyline",
 ]);
-const KINDS_THAT_PASS = new Set(["road", "roadPlank", "roadRut", "townBark", "slimeTell", "marshCluster", "roadSlime", "brush", "reeds"]);
+const KINDS_THAT_PASS = new Set(["road", "roadPlank", "roadRut", "townBark", "slimeTell", "marshCluster", "roadSlime", "brush", "sagePatch", "reeds"]);
 
 describe("worldProxies — buildProxies", () => {
   const placements = buildFrontierPlacements();

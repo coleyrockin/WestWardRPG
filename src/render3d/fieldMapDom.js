@@ -36,6 +36,10 @@ function finiteNumber(value, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
 function styleFor(kind, upgraded = false) {
   const base = KIND_STYLES[kind] || { shape: "circle", color: "#f0d6a4", size: 4 };
   if (upgraded && (kind === "jobBoard" || kind === "returnJobBoard" || kind === "brokenWagon")) {
@@ -55,7 +59,7 @@ function calculateBounds(route) {
   };
 }
 
-function projectRoute(route, size = DEFAULT_SIZE) {
+function createProjector(route, size = DEFAULT_SIZE) {
   const bounds = calculateBounds(route);
   const width = finiteNumber(size.width, DEFAULT_SIZE.width);
   const height = finiteNumber(size.height, DEFAULT_SIZE.height);
@@ -68,11 +72,43 @@ function projectRoute(route, size = DEFAULT_SIZE) {
   const offsetX = (width - routeW) / 2;
   const offsetY = (height - routeH) / 2;
 
-  return route.map((point) => ({
-    ...point,
-    mapX: offsetX + (finiteNumber(point.x, bounds.minX) - bounds.minX) * scale,
-    mapY: offsetY + (finiteNumber(point.y, bounds.minY) - bounds.minY) * scale,
-  }));
+  const project = (point) => ({
+    mapX: clamp(offsetX + (finiteNumber(point.x, bounds.minX) - bounds.minX) * scale, padding * 0.55, width - padding * 0.55),
+    mapY: clamp(offsetY + (finiteNumber(point.y, bounds.minY) - bounds.minY) * scale, padding * 0.55, height - padding * 0.55),
+  });
+
+  return { project, width, height, padding, bounds };
+}
+
+function worldPointFromPosition(position, fallback = FIRST_FIVE_ROUTE[0]) {
+  if (!position) return fallback;
+  const x = finiteNumber(position.x, fallback.x);
+  const y = finiteNumber(position.z, finiteNumber(position.y, fallback.y));
+  return { x, y };
+}
+
+function worldDistance(a, b) {
+  if (!a || !b) return Infinity;
+  return Math.hypot(finiteNumber(a.x, 0) - finiteNumber(b.x, 0), finiteNumber(a.y, 0) - finiteNumber(b.y, 0));
+}
+
+function formatDistance(distance) {
+  if (!Number.isFinite(distance)) return "distance unknown";
+  const paces = Math.max(0, Math.round(distance * 5));
+  return `${paces} paces`;
+}
+
+function choiceCueFor(optionId) {
+  if (optionId === "ask_danger") {
+    return { optionId, kind: "slimeTell", label: "Marsh warning marked" };
+  }
+  if (optionId === "inspect_survey") {
+    return { optionId, kind: "brokenWagon", label: "Survey scrap lead marked" };
+  }
+  if (optionId === "accept_bounty") {
+    return { optionId, kind: "smokeCache", label: "Bounty cache road marked" };
+  }
+  return null;
 }
 
 function pathD(points) {
@@ -86,28 +122,39 @@ export function buildFieldMapRouteModel(loopState = {}, options = {}) {
   const phase = loopState?.phase || "spawn";
   const activeIndex = PHASE_ROUTE_INDEX[phase] ?? PHASE_ROUTE_INDEX.spawn;
   const progress = getPhaseProgress(phase);
-  const route = projectRoute(FIRST_FIVE_ROUTE, options.size);
+  const projector = createProjector(FIRST_FIVE_ROUTE, options.size);
+  const route = FIRST_FIVE_ROUTE.map((point) => ({
+    ...point,
+    ...projector.project(point),
+  }));
   const beats = loopState?.routeBeats || {};
   const upgraded = phase === "survey_teaser" || Boolean(beats.returnToBoone);
   const targetPoint = route[activeIndex] || route[1] || route[0];
   const activePath = route.slice(0, activeIndex + 1);
-  const returnPath = route.slice(7, 9);
+  const returnUnlocked = Boolean(beats.wagonSalvage) || phase === "return_to_boone" || phase === "survey_teaser";
+  const returnPath = returnUnlocked ? route.slice(7, 9) : [];
+  const playerWorld = worldPointFromPosition(options.playerPosition || loopState?.playerPosition || loopState?.player, FIRST_FIVE_ROUTE[0]);
+  const playerMap = projector.project(playerWorld);
+  const distanceToTarget = worldDistance(playerWorld, targetPoint);
+  const choiceCue = choiceCueFor(loopState?.boardChoice);
 
   const points = route.map((point, index) => {
     const style = styleFor(point.kind, upgraded);
     const isThreat = point.kind === "slimeTell" || point.kind === "roadSlime";
+    const isChoiceCue = Boolean(choiceCue && point.kind === choiceCue.kind);
     return {
       kind: point.kind,
-      label: point.label,
+      label: isChoiceCue ? `${point.label} — ${choiceCue.label}` : point.label,
       x: Number(point.mapX.toFixed(2)),
       y: Number(point.mapY.toFixed(2)),
       shape: style.shape,
-      color: style.color,
-      size: style.size,
+      color: isChoiceCue ? "#ffecad" : style.color,
+      size: isChoiceCue ? style.size + 0.35 : style.size,
       active: index === activeIndex,
       completed: index < activeIndex || (upgraded && point.kind === "jobBoard"),
       warning: isThreat && activeIndex >= 4,
       muted: isThreat && activeIndex < 4,
+      choice: isChoiceCue,
     };
   });
 
@@ -117,8 +164,22 @@ export function buildFieldMapRouteModel(loopState = {}, options = {}) {
     activeKind: targetPoint.kind,
     targetLabel: targetPoint.label,
     progressLabel: `Road beat ${progress.label}`,
-    statusLabel: upgraded ? "Old Road Survey marked" : `Road beat ${progress.label}`,
+    statusLabel: upgraded
+      ? "Old Road Survey marked"
+      : choiceCue
+        ? choiceCue.label
+        : `Road beat ${progress.label}`,
     upgraded,
+    choiceCue,
+    playerPoint: {
+      x: Number(playerMap.mapX.toFixed(2)),
+      y: Number(playerMap.mapY.toFixed(2)),
+      worldX: Number(playerWorld.x.toFixed(2)),
+      worldY: Number(playerWorld.y.toFixed(2)),
+      label: "You",
+    },
+    distanceToTarget: Number(distanceToTarget.toFixed(2)),
+    distanceLabel: formatDistance(distanceToTarget),
     completedKinds: points.filter((point) => point.completed).map((point) => point.kind),
     warningKinds: points.filter((point) => point.warning).map((point) => point.kind),
     path: pathD(route.slice(0, 8)),
@@ -169,6 +230,7 @@ function appendMarker(refs, parent, point) {
     point.completed ? "is-complete" : "",
     point.warning ? "is-warning" : "",
     point.muted ? "is-muted" : "",
+    point.choice ? "is-choice" : "",
   ].filter(Boolean).join(" ");
   let node = null;
   const s = point.size;
@@ -204,14 +266,47 @@ function appendMarker(refs, parent, point) {
   if (node) parent?.appendChild?.(node);
 }
 
-export function syncFieldMapDom(refs, loopState = {}) {
-  const model = buildFieldMapRouteModel(loopState);
+function appendPlayerMarker(refs, parent, point) {
+  if (!point) return;
+  const group = setAttrs(svgNode(refs, "g"), {
+    class: "map-player",
+    transform: `translate(${point.x.toFixed(2)} ${point.y.toFixed(2)})`,
+  });
+  const cone = setAttrs(svgNode(refs, "path"), {
+    class: "map-player-cone",
+    d: "M 0 -8 L 4.4 4.8 L 0 2.4 L -4.4 4.8 Z",
+  });
+  const ring = setAttrs(svgNode(refs, "circle"), {
+    class: "map-player-ring",
+    cx: 0,
+    cy: 0,
+    r: 5.3,
+  });
+  const dot = setAttrs(svgNode(refs, "circle"), {
+    class: "map-player-dot",
+    cx: 0,
+    cy: 0,
+    r: 2.6,
+  });
+  const title = svgNode(refs, "title");
+  if (title) title.textContent = point.label || "You";
+  group?.appendChild?.(cone);
+  group?.appendChild?.(ring);
+  group?.appendChild?.(dot);
+  if (title) group?.appendChild?.(title);
+  if (group) parent?.appendChild?.(group);
+}
+
+export function syncFieldMapDom(refs, loopState = {}, options = {}) {
+  const model = buildFieldMapRouteModel(loopState, options);
   if (refs?.phaseLabel) refs.phaseLabel.textContent = model.statusLabel;
   if (refs?.targetLabel) refs.targetLabel.textContent = model.targetLabel;
+  if (refs?.targetLabel && model.distanceLabel) refs.targetLabel.textContent = `${model.targetLabel} · ${model.distanceLabel}`;
   if (refs?.root?.dataset) {
     refs.root.dataset.phase = model.phase;
     refs.root.dataset.activeKind = model.activeKind;
     refs.root.dataset.upgraded = model.upgraded ? "true" : "false";
+    refs.root.dataset.boardChoice = model.choiceCue?.optionId || "";
   }
   if (!refs?.svg || !refs.createElementNS) return model;
 
@@ -242,5 +337,6 @@ export function syncFieldMapDom(refs, loopState = {}) {
   appendPath(refs, layer, "map-return-route", model.returnPath);
   appendPath(refs, layer, "map-active-route", model.activePath);
   for (const point of model.points) appendMarker(refs, layer, point);
+  appendPlayerMarker(refs, layer, model.playerPoint);
   return model;
 }

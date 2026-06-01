@@ -71,6 +71,7 @@ const FOOTPRINTS = {
   storefront:  (p) => box(p, 1.3 * p.size, 1.3 * p.size),
   porch:       (p) => box(p, 1.4 * p.size, 0.5 * p.size),
   brush:       null,                            // low scrub — visual only
+  sagePatch:   null,                            // low scrub — visual only
   reeds:       null,                            // marsh blades — visual only
 };
 

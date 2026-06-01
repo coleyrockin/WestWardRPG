@@ -19,17 +19,17 @@ export const PALETTES = Object.freeze({
     label: "Dusk",
     // Sunset gradient with real depth: deep indigo zenith → violet mid → warm amber
     // horizon. Tamed so lit walls/roofs hold detail instead of blowing to white.
-    sky: { top: "#31425d", mid: "#836b54", horizon: "#e29a58" },
-    fog: { color: "#866047", density: 0.0062 },
-    sun: { color: "#ffc176", intensity: 1.18, dir: { x: -10, y: 5.2, z: -5 }, disc: 0.026, glow: 0.06 },
+    sky: { top: "#324760", mid: "#a38357", horizon: "#efb262" },
+    fog: { color: "#a87a53", density: 0.0072 },
+    sun: { color: "#ffc47e", intensity: 1.12, dir: { x: -10, y: 5.2, z: -5 }, disc: 0.026, glow: 0.055 },
     // Warmer, brighter ground bounce lifts shadowed faces so the foreground reads
     // instead of crushing to dead black — shadows stay rich but not empty.
-    hemi: { sky: "#858a9a", ground: "#7f552a", intensity: 0.95 },
-    rim: { color: "#8490cc", intensity: 0.5, dir: { x: 9, y: 5, z: 6 } },
-    exposure: 1.02,
+    hemi: { sky: "#9da3a0", ground: "#9a7b45", intensity: 1.28 },
+    rim: { color: "#7f92bd", intensity: 0.46, dir: { x: 9, y: 5, z: 6 } },
+    exposure: 1.0,
     stars: 0.12,
     bloom: 0.13,
-    grade: { tint: "#e6a060", amount: 0.01, contrast: 1.0, saturation: 1.03, shadowTint: "#63584d", highlightTint: "#ecab68" },
+    grade: { tint: "#e6ad6a", amount: 0.006, contrast: 0.9, saturation: 1.08, shadowTint: "#737458", highlightTint: "#efb66f" },
     bodyBg: "#17131d",
   },
   goldenHour: {

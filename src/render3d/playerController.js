@@ -50,9 +50,9 @@ export const CAMERA_PRESETS = Object.freeze({
   exploration: Object.freeze({
     distance: 7.6,
     height: 4.0,
-    lookHeight: 1.45,
-    lookAhead: 4.8,
-    shoulder: 1.18,
+    lookHeight: 1.22,
+    lookAhead: 6.6,
+    shoulder: 0.68,
     smoothing: 10.5,
   }),
   town: Object.freeze({

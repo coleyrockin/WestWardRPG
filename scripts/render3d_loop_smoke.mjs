@@ -135,7 +135,23 @@ async function main() {
     if (!slimeVisible.slimeCombatCueVisible) throw new Error("slime combat cue did not appear during the fight");
     await page.evaluate(() => window.__westward3dTest.movePlayerToKind?.("roadSlime"));
     await interact(page, "roadSlime");
+    await expectPhase(page, "slime_fight");
+    let encounter = await page.evaluate(() => window.__westward3dTest.getEncounterState());
+    if (encounter.hitCount !== 1 || encounter.hp !== 2 || encounter.defeated) {
+      throw new Error(`first slime strike did not wound cleanly: ${JSON.stringify(encounter)}`);
+    }
+    await interact(page, "roadSlime");
+    await expectPhase(page, "slime_fight");
+    encounter = await page.evaluate(() => window.__westward3dTest.getEncounterState());
+    if (encounter.hitCount !== 2 || encounter.hp !== 1 || encounter.defeated) {
+      throw new Error(`second slime strike did not wound cleanly: ${JSON.stringify(encounter)}`);
+    }
+    await interact(page, "roadSlime");
     await expectPhase(page, "wagon_salvage");
+    encounter = await page.evaluate(() => window.__westward3dTest.getEncounterState());
+    if (encounter.hitCount !== 3 || encounter.hp !== 0 || !encounter.defeated) {
+      throw new Error(`final slime strike did not defeat cleanly: ${JSON.stringify(encounter)}`);
+    }
     const slimeDefeat = await page.evaluate(() => window.__westward3dTest.getBeatVisibility());
     if (!slimeDefeat.slimeCombatCueVisible) throw new Error("slime defeat splash did not replace the combat cue");
     await interact(page, "brokenWagon");

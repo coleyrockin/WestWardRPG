@@ -236,12 +236,18 @@ function applySideEffects(next, event) {
   if (type === "spot_slime_tell" || type === "slime_appeared") {
     next.routeBeats.slimeTell = true;
     next.encounterState.slime = "aggro";
+    next.encounterState.slimeHp = 3;
+    next.encounterState.slimeHits = 0;
+    next.encounterState.slimeDefeated = false;
     next.completedInteractions.push("slime_trail_spotted");
   }
   if (type === "defeat_slime") {
     next.routeBeats.slimeDefeated = true;
     next.completedInteractions.push("road_slime_defeated");
     next.encounterState.slime = "dead";
+    next.encounterState.slimeHp = 0;
+    next.encounterState.slimeHits = 3;
+    next.encounterState.slimeDefeated = true;
   }
   if (type === "inspect_wagon") {
     next.routeBeats.wagonSalvage = true;
@@ -286,6 +292,9 @@ export function createInitialLoopState(overrides = {}) {
     completedInteractions: [...(overrides.completedInteractions || [])],
     encounterState: {
       slime: "idle",
+      slimeHp: 3,
+      slimeHits: 0,
+      slimeDefeated: false,
       playerHp: 40,
       ...(overrides.encounterState || {}),
     },

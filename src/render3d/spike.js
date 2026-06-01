@@ -117,16 +117,23 @@ function buildLamp(group, p) {
   addBox(group, 0.14, 1.6, 0.14, standard("#2c2118"), toVec(p.x, p.y));
   const glow = new THREE.Mesh(
     new THREE.SphereGeometry(0.15, 14, 10),
-    standard("#ffb866", { emissive: "#ffa64d", emissiveIntensity: 1.4 }),
+    standard("#f2b56d", { emissive: "#d9863f", emissiveIntensity: 1.05 }),
   );
   glow.position.copy(toVec(p.x, p.y, 1.7));
   group.add(glow);
-  const light = new THREE.PointLight(col("#ffcaa0"), 9, 7, 2);
+  const light = new THREE.PointLight(col("#ffc08a"), 6.4, 7, 2);
   light.position.copy(toVec(p.x, p.y, 1.7));
   group.add(light);
 }
 
 function buildRoadPlank(group, p) {
+  if (p.kind === "roadRut") {
+    const rut = addBox(group, 1.65 * p.size, 0.026, 0.11 * p.size, standard(p.color || "#6f4f31", { roughness: 1, rimStrength: 0 }), toVec(p.x, p.y));
+    rut.rotation.y = p.yaw || 0;
+    rut.castShadow = false;
+    rut.receiveShadow = true;
+    return rut;
+  }
   const plank = addBox(group, 1.25 * p.size, 0.08, 0.28 * p.size, standard(p.color || "#87633c"), toVec(p.x, p.y));
   plank.rotation.y = p.yaw || 0;
   addContactShadow(group, p.x, p.y, 0.55 * p.size, 0.16 * p.size);
@@ -213,7 +220,7 @@ function buildJobBoard(group, p) {
   board.castShadow = true;
   group.add(board);
   // warm reading lantern over the board
-  const light = new THREE.PointLight(col("#ffd090"), 9, 7, 1.8);
+  const light = new THREE.PointLight(col("#ffc887"), 6.8, 7, 1.8);
   light.position.copy(toVec(p.x, p.y, 2.3));
   group.add(light);
   addContactShadow(group, p.x, p.y, 0.8, 0.8);
@@ -368,6 +375,27 @@ function buildBrush(group, p) {
   return null;
 }
 
+function buildSagePatch(group, p) {
+  const mat = standard(p.color || "#687a42", { roughness: 1, rimStrength: 0.02 });
+  const dryMat = standard("#a88d55", { roughness: 1, rimStrength: 0 });
+  const bladeGeo = new THREE.ConeGeometry(0.08, 0.58, 5);
+  const clumpGeo = new THREE.ConeGeometry(0.22, 0.38, 6);
+  const count = Math.max(5, Math.round(8 * p.size));
+  for (let i = 0; i < count; i++) {
+    const a = (i * 2.399963 + p.x * 0.13) % (Math.PI * 2);
+    const r = (0.16 + ((i * 37) % 100) / 100 * 0.56) * p.size;
+    const h = 0.38 + ((i * 19) % 100) / 100 * 0.34;
+    const mesh = new THREE.Mesh(i % 4 === 0 ? clumpGeo : bladeGeo, i % 5 === 0 ? dryMat : mat);
+    mesh.scale.set(0.72 + (i % 3) * 0.18, h, 0.72 + ((i + 1) % 3) * 0.14);
+    mesh.position.copy(toVec(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, h * 0.28));
+    mesh.rotation.y = a;
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
+  return null;
+}
+
 // Marsh reeds — thin emissive blades over the water, passthrough, no outline.
 function buildReeds(group, p) {
   const mat = standard(p.color, { roughness: 1, emissive: p.color, emissiveIntensity: 0.12 });
@@ -436,8 +464,9 @@ function buildPlacement(group, p) {
     case "cactus": return buildCactus(group, p);
     case "deadTree": return buildDeadTree(group, p);
     case "roadPlank":
-    case "roadRut": return buildRoadPlank(group, { ...p, size: p.kind === "roadRut" ? 2.0 * p.size : p.size });
+    case "roadRut": return buildRoadPlank(group, { ...p, size: p.kind === "roadRut" ? 1.35 * p.size : p.size });
     case "brush": return buildBrush(group, p);
+    case "sagePatch": return buildSagePatch(group, p);
     case "reeds": return buildReeds(group, p);
     case "cart":
     case "crate": return buildGeneric(group, p, 0.7);
@@ -1081,6 +1110,57 @@ function createRoadDust(snapshot) {
   };
 }
 
+function createRouteSageField(snapshot) {
+  const group = new THREE.Group();
+  group.name = "route-sage-field";
+  const route = FIRST_FIVE_ROUTE.filter((point) => point.kind !== "returnJobBoard");
+  const colors = ["#768a50", "#83925a", "#687d45", "#b19a62"];
+  const bladeGeo = new THREE.ConeGeometry(0.065, 0.62, 5);
+  const seedValue = (x) => {
+    const s = Math.sin(x * 91.7 + 17.13) * 43758.5453;
+    return s - Math.floor(s);
+  };
+  let n = 0;
+
+  for (let seg = 1; seg < route.length; seg++) {
+    const from = route[seg - 1];
+    const to = route[seg];
+    const dx = to.x - from.x;
+    const dz = to.y - from.y;
+    const len = Math.hypot(dx, dz);
+    if (len < 0.1) continue;
+    const nx = -dz / len;
+    const nz = dx / len;
+    const count = Math.max(16, Math.floor(len * 3.8));
+    for (let i = 0; i < count; i++) {
+      const t = (i + 0.35 + seedValue(seg * 19 + i) * 0.4) / count;
+      const side = seedValue(seg * 41 + i * 3) > 0.5 ? 1 : -1;
+      const shoulder = side * (3.8 + seedValue(seg * 13 + i * 5) * 3.4);
+      const alongJitter = (seedValue(seg * 29 + i * 7) - 0.5) * 0.8;
+      const x = from.x + dx * t + nx * shoulder + (dx / len) * alongJitter;
+      const z = from.y + dz * t + nz * shoulder + (dz / len) * alongJitter;
+      const blades = 2 + Math.floor(seedValue(seg * 53 + i * 11) * 3);
+      for (let b = 0; b < blades; b++) {
+        const a = seedValue(n * 7 + b) * Math.PI * 2;
+        const r = seedValue(n * 13 + b) * 0.32;
+        const h = 0.54 + seedValue(n * 17 + b) * 0.58;
+        const mat = standard(colors[(n + b) % colors.length], { roughness: 1, rimStrength: 0 });
+        const blade = new THREE.Mesh(bladeGeo, mat);
+        const sc = 0.82 + seedValue(n * 23 + b) * 0.72;
+        blade.scale.set(sc, h, sc);
+        blade.position.set(x + Math.cos(a) * r, groundHeight(x, z) + h * 0.24, z + Math.sin(a) * r);
+        blade.rotation.set(0.08 * Math.sin(a), a, 0.08 * Math.cos(a));
+        blade.castShadow = false;
+        blade.receiveShadow = true;
+        group.add(blade);
+      }
+      n++;
+    }
+  }
+
+  return group;
+}
+
 function buildGround(scene, snapshot) {
   const spawn = snapshot?.player || PLAYER_SPAWN;
   // Big enough to comfortably hold the full ~30×20 explorable rectangle plus a
@@ -1112,11 +1192,17 @@ function buildGround(scene, snapshot) {
   // Dusty S-road ribbon running through the entire first-five-minute route.
   // Segmenting it by route points makes the path visibly turn toward the marsh
   // instead of reading as a short flat alley.
-  const ROAD_W = 7.4;
-  const roadMat = standard("#9f6c41", { roughness: 1, emissive: "#3d2718", emissiveIntensity: 0.045, rimStrength: 0.04 });
-  const edgeMat = standard("#b9804d", { roughness: 1, emissive: "#3c2819", emissiveIntensity: 0.025, rimStrength: 0.04 });
-  const rutMat = standard("#5f4228", { roughness: 1, rimStrength: 0.02 });
-  const centerMat = standard("#755132", { roughness: 1, rimStrength: 0.02 });
+  const ROAD_W = 6.45;
+  const roadMat = standard("#9c794f", { roughness: 1, emissive: "#46341f", emissiveIntensity: 0.025, rimStrength: 0.035 });
+  const edgeMat = standard("#b99561", { roughness: 1, emissive: "#4a3a24", emissiveIntensity: 0.015, rimStrength: 0.035 });
+  const rutMat = standard("#675036", { roughness: 1, rimStrength: 0.02 });
+  const centerMat = standard("#806242", { roughness: 1, rimStrength: 0.02 });
+  const sageShoulderMat = new THREE.MeshBasicMaterial({
+    color: col("#6f7f46"),
+    transparent: true,
+    opacity: 0.18,
+    depthWrite: false,
+  });
   const route = FIRST_FIVE_ROUTE.filter((point) => point.kind !== "returnJobBoard");
 
   function addRoadPlane(from, to, width, y, mat) {
@@ -1145,7 +1231,17 @@ function buildGround(scene, snapshot) {
     // The near spawn segment fills the foreground fast in third-person view; a
     // slightly tapered width keeps it from reading like a red carpet while later
     // segments stay broad enough to guide the eye down-road.
-    const segmentWidth = i === 1 ? 6.0 : ROAD_W;
+    const segmentWidth = i === 1 ? 5.15 : ROAD_W;
+    for (const off of [-(segmentWidth / 2 + 1.65), segmentWidth / 2 + 1.65]) {
+      const shoulder = addRoadPlane(
+        { x: from.x + nx * off, y: from.y + nz * off },
+        { x: to.x + nx * off, y: to.y + nz * off },
+        2.45,
+        0.018,
+        sageShoulderMat,
+      );
+      if (shoulder) shoulder.renderOrder = -2;
+    }
     addRoadPlane(from, to, segmentWidth, 0.02, roadMat);
     for (const off of [-(segmentWidth / 2 + 0.18), segmentWidth / 2 + 0.18]) {
       addRoadPlane(
@@ -1236,7 +1332,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     anchor: { x: snapshot.player.x, y: snapshot.player.y },
     playCore: { x: snapshot.player.x + 6, y: snapshot.player.y },
   });
-  scene.add(new THREE.AmbientLight(col("#745038"), 0.34));
+  scene.add(new THREE.AmbientLight(col("#b28a5d"), 0.62));
   // Continuous day/night: a slow world clock advances dayTime; sunArc(dayTime)
   // is the live palette so the sun arcs and colours drift. Starts at dusk. The
   // golden-image gate loads ?visual to freeze everything time-animated (sun,
@@ -1251,9 +1347,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   buildGround(scene, snapshot);
   const openingLightPools = createOpeningLightPools(snapshot);
   const roadDust = createRoadDust(snapshot);
+  const routeSageField = createRouteSageField(snapshot);
   scene.add(openingLightPools.group);
   scene.add(roadDust.group);
-  createScatter(scene, { center: { x: 35, z: 13 }, area: 78, count: 520 });
+  scene.add(routeSageField);
+  createScatter(scene, { center: { x: 35, z: 13 }, area: 78, count: 620 });
 
   // Animated marsh water (replaces the flat plane that used to live in buildGround).
   const water = createWater({ width: 29, height: 6.2, skyTint: appliedPalette.sky.horizon });
@@ -1492,11 +1590,17 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (promptEl.textContent !== t) promptEl.textContent = t;
     promptEl.hidden = !t;
   };
+  let encounter = null;
   const interaction = createInteractionSystem({
     worldObjects: snapshot.worldObjects,
     setPromptText,
     isTargetEnabled: (target) => loopState.isTargetEnabled(target),
-    getPromptText: (target) => loopState.getPromptForTarget(target),
+    getPromptText: (target) => {
+      const prompt = loopState.getPromptForTarget(target);
+      if (target?.kind !== "roadSlime" || loopState.phase !== "slime_fight" || !encounter) return prompt;
+      const state = encounter.getState(player.position);
+      return `${prompt} · ${state.hitCount}/${state.maxHp} hits`;
+    },
   });
   const boardModal = document.getElementById("board-modal");
   const boardAccept = document.getElementById("board-accept");
@@ -1504,12 +1608,14 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const boardClose = document.getElementById("board-close");
   const labelForBoardOption = (optionId) =>
     BOARD_OPTIONS.find((option) => option.id === optionId)?.label || "Accept bounty";
+  const syncLiveFieldMap = () => syncFieldMapDom(fieldMapRefs, loopState.state, { playerPosition: player.position });
+  syncLiveFieldMap();
 
   const refreshLoopDom = () => {
     const state = loopState.state;
     publishLoopDebug(state);
     syncObjectiveDom(objectiveRefs, snapshot, state);
-    syncFieldMapDom(fieldMapRefs, state);
+    syncLiveFieldMap();
     interaction.update(player.position);
   };
 
@@ -1517,7 +1623,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     const state = loopState.transition(event);
     publishLoopDebug(state);
     syncObjectiveDom(objectiveRefs, snapshot, state);
-    syncFieldMapDom(fieldMapRefs, state);
+    syncLiveFieldMap();
     interaction.update(player.position);
     return state;
   };
@@ -1541,13 +1647,18 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     onClose: refreshLoopDom,
   });
 
-  const encounter = createEncounterSystem(scene, snapshot, {
+  encounter = createEncounterSystem(scene, snapshot, {
     slimeMesh: heroMeshes.roadSlime,
+    maxHits: 3,
     getPhase: () => loopState.phase,
     onSlimeEngage: () => {
       if (loopState.phase !== "slime_tell") return false;
       advance("slime_appeared");
       return true;
+    },
+    onSlimeHit: ({ hp, maxHits, defeated }) => {
+      if (defeated || loopState.phase !== "slime_fight") return;
+      setPromptText(`E — Strike Road Slime · ${maxHits - hp}/${maxHits} hits`);
     },
     onSlimeDeath: () => {
       if (loopState.phase === "slime_fight") advance("defeat_slime");
@@ -1582,7 +1693,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         ...loopState.state,
         objectiveText: "Old Road Survey is ready. This is tomorrow's next playable job.",
       });
-      syncFieldMapDom(fieldMapRefs, loopState.state);
+      syncLiveFieldMap();
       beatToast.show("Next Job Teased", "The old road is marked and waiting past the wagon wreck.");
     }
   };
@@ -1618,7 +1729,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const handleRoadSlime = () => {
     if (loopState.phase !== "slime_fight") return;
     if (encounter.strike(player.position)) {
-      beatToast.show("Road Slime Down", "The wagon wreck is clear enough to salvage.");
+      const state = encounter.getState(player.position);
+      focusBeat(state.defeated ? "objective" : "inspection", state.defeated ? 0.8 : 0.45);
+      if (state.defeated) {
+        beatToast.show("Road Slime Down", "The wagon wreck is clear enough to salvage.");
+      } else {
+        beatToast.show("Road Slime Hit", `${state.hitCount}/${state.maxHp} strikes landed. Keep it pinned.`);
+      }
+      syncLiveFieldMap();
+      interaction.update(player.position);
     }
   };
   const handleBrokenWagon = () => {
@@ -1697,6 +1816,16 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       if (targetIndex < 0) return loopState.state;
       let guard = LOOP_PHASES.length;
       while (LOOP_PHASES.indexOf(loopState.phase) < targetIndex && guard > 0) {
+        if (loopState.phase === "slime_fight") {
+          movePlayerToKind("roadSlime");
+          let strikeGuard = 5;
+          while (!encounter.getState(player.position).defeated && strikeGuard > 0) {
+            encounter.strike(player.position);
+            strikeGuard--;
+          }
+          guard--;
+          continue;
+        }
         const event = phaseAdvanceEvents[loopState.phase];
         if (!event) break;
         advance(event);
@@ -1771,7 +1900,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       return {
         phase: loopState.phase,
         targetKind: loopState.state.activeTargetKind,
-        fieldMap: buildFieldMapRouteModel(loopState.state),
+        fieldMap: buildFieldMapRouteModel(loopState.state, { playerPosition: player.position }),
+        encounter: encounter.getState(player.position),
         composition: getCompositionMetrics(),
         beatVisibility: getBeatVisibility(),
         cameraPose: {
@@ -1809,7 +1939,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       },
       closeBoard: boardModalController.close,
       isBoardModalOpen: () => boardModalController.isOpen(),
-      getEncounterState: () => encounter.getState(),
+      getEncounterState: () => encounter.getState(player.position),
       getRouteMetrics: () => ({
         ...getRouteMetrics(snapshot.worldObjects),
         phase: loopState.phase,
@@ -1822,7 +1952,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       getLightingMetrics,
       getBeatVisibility,
       getBeatFeedback: () => beatToast.getState(),
-      getFieldMapState: () => buildFieldMapRouteModel(loopState.state),
+      getFieldMapState: () => buildFieldMapRouteModel(loopState.state, { playerPosition: player.position }),
       captureRouteFrame,
       getCameraPose: () => ({
         x: Number(camera.position.x.toFixed(2)),
@@ -1840,6 +1970,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
 
   let frames = 0;
   let prevTs = performance.now();
+  let fieldMapLiveSyncT = 0;
   function loop(now = performance.now()) {
     // dt in seconds, clamped to keep big tab-resume jumps from teleporting.
     const dt = Math.min((now - prevTs) / 1000, 0.05);
@@ -1852,6 +1983,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (visualCapture) applyHeroCamera(); // re-assert hero pose (player.update re-syncs the follow-cam)
     updateOcclusionFades(placementNodes, camera, player.position);
     interaction.update(player.position);
+    fieldMapLiveSyncT -= dt;
+    if (fieldMapLiveSyncT <= 0) {
+      syncLiveFieldMap();
+      fieldMapLiveSyncT = 0.18;
+    }
     encounter.update(player.position, dt);
     updateBeatVisibility();
     character.update(visualCapture ? 0 : dt, player.moving && !visualCapture, player.running && !visualCapture);

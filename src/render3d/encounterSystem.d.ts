@@ -24,19 +24,31 @@ export function createEncounterSystem(scene?: any, snapshot?: any, options?: {
   aggroRadius?: number;
   attackRadius?: number;
   strikeRadius?: number;
+  maxHits?: number;
   getPhase?: () => string | null;
   onSlimeEngage?: (event: any) => void | boolean;
   onSlimeAttack?: (event: any) => void | boolean;
+  onSlimeHit?: (event: any) => void;
   onSlimeDeath?: (event: any) => void;
 }): {
   update(playerPos: { x: number; z: number }, dt?: number): {
     slime: SlimeState;
+    hp: number;
+    maxHp: number;
+    hitCount: number;
+    hits: number;
+    defeated: boolean;
     distance: number;
     engaged: boolean;
     disposed: boolean;
   };
   engage(): {
     slime: SlimeState;
+    hp: number;
+    maxHp: number;
+    hitCount: number;
+    hits: number;
+    defeated: boolean;
     distance: number;
     engaged: boolean;
     disposed: boolean;
@@ -45,6 +57,11 @@ export function createEncounterSystem(scene?: any, snapshot?: any, options?: {
   dispose(): void;
   getState(playerPos?: { x: number; z: number } | null): {
     slime: SlimeState;
+    hp: number;
+    maxHp: number;
+    hitCount: number;
+    hits: number;
+    defeated: boolean;
     distance: number;
     engaged: boolean;
     disposed: boolean;

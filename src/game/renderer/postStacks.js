@@ -25,7 +25,7 @@ import { godrays } from "three/addons/tsl/display/GodraysNode.js";
 export const REGION_POST = {
   frontier: {
     inkColor: "#0a0408",
-    edgeStrength: 3.4, // bold, confident comic linework
+    edgeStrength: 2.65, // readable comic linework without heavy prototype outlines
     // Sobel response below `edgeLo` is ignored (kills faint ground gradients) and
     // ramps to full ink by `edgeHi`.
     edgeLo: 0.045,
@@ -33,7 +33,7 @@ export const REGION_POST = {
     bloomBase: 0.11, // multiplied by palette.bloom
     bloomRadius: 0.7, // wider painterly glow
     bloomThreshold: 0.95, // only true emissives (lamps/beacon/sun disc) bloom — sky/walls stay crisp
-    grainIntensity: 0.14,
+    grainIntensity: 0.08,
   },
   // Scaffolded — shipped in Phase 6.
   ashfall: { inkColor: "#1a0d06", edgeStrength: 2.0, edgeLo: 0.06, edgeHi: 0.24, bloomBase: 0.3, bloomRadius: 0.6, bloomThreshold: 0.82, grainIntensity: 0.14 },
@@ -69,10 +69,10 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
     highlightTint: uniform(new THREE.Color("#ffb050")),
     // grain is time-animated (non-deterministic) — visual-capture passes 0.
     grainIntensity: uniform(opts.grainIntensity ?? region.grainIntensity),
-    godrayStrength: uniform(opts.godrayStrength ?? 0.18),
+    godrayStrength: uniform(opts.godrayStrength ?? 0.08),
     // Vignette: darken toward the frame corners to draw the eye to the street.
     // Deterministic (static) so it's safe under the ?visual capture.
-    vignetteStrength: uniform(opts.vignetteStrength ?? 0.1),
+    vignetteStrength: uniform(opts.vignetteStrength ?? 0.045),
     // Final exposure multiplier — PostProcessing ignores renderer.toneMappingExposure,
     // so day/night exposure and weather darkening ride this uniform instead.
     exposure: uniform(1),
