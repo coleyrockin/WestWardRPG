@@ -17,6 +17,21 @@ export function canStrikeSlime(options?: {
   strikeRadius?: number;
 }): boolean;
 
+export interface EncounterState {
+  slime: SlimeState;
+  hp: number;
+  maxHp: number;
+  hitCount: number;
+  hits: number;
+  defeated: boolean;
+  distance: number;
+  engaged: boolean;
+  playerHp: number;
+  playerMaxHp: number;
+  playerDefeated: boolean;
+  disposed: boolean;
+}
+
 export function createEncounterSystem(scene?: any, snapshot?: any, options?: {
   worldObjects?: any[];
   slimePlacement?: any;
@@ -25,45 +40,19 @@ export function createEncounterSystem(scene?: any, snapshot?: any, options?: {
   attackRadius?: number;
   strikeRadius?: number;
   maxHits?: number;
+  initialPlayerHp?: number;
+  playerDamagePerSecond?: number;
+  canDamagePlayer?: () => boolean;
   getPhase?: () => string | null;
   onSlimeEngage?: (event: any) => void | boolean;
   onSlimeAttack?: (event: any) => void | boolean;
   onSlimeHit?: (event: any) => void;
   onSlimeDeath?: (event: any) => void;
+  onPlayerDeath?: (event: any) => void;
 }): {
-  update(playerPos: { x: number; z: number }, dt?: number): {
-    slime: SlimeState;
-    hp: number;
-    maxHp: number;
-    hitCount: number;
-    hits: number;
-    defeated: boolean;
-    distance: number;
-    engaged: boolean;
-    disposed: boolean;
-  };
-  engage(): {
-    slime: SlimeState;
-    hp: number;
-    maxHp: number;
-    hitCount: number;
-    hits: number;
-    defeated: boolean;
-    distance: number;
-    engaged: boolean;
-    disposed: boolean;
-  };
+  update(playerPos: { x: number; z: number }, dt?: number): EncounterState;
+  engage(): EncounterState;
   strike(playerPos: { x: number; z: number }): boolean;
   dispose(): void;
-  getState(playerPos?: { x: number; z: number } | null): {
-    slime: SlimeState;
-    hp: number;
-    maxHp: number;
-    hitCount: number;
-    hits: number;
-    defeated: boolean;
-    distance: number;
-    engaged: boolean;
-    disposed: boolean;
-  };
+  getState(playerPos?: { x: number; z: number } | null): EncounterState;
 };

@@ -42,6 +42,8 @@ import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
 import { createTownsfolk } from "../game/world/townsfolk.js";
 import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
+import { createSaveStateManager } from "../saveStateManager.js";
+import { buildRunPayload, loadRun, writeRun, sealRun } from "./runSave.js";
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
@@ -1612,7 +1614,15 @@ function createSpikeSnapshot() {
 }
 
 export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
-  const loopState = createLoopStateMachine();
+  // Determinism: the golden-image capture (?visual) must always render a fresh
+  // fixed scene — never read or write a persisted run.
+  const visualCapture =
+    typeof location !== "undefined" && new URLSearchParams(location.search).has("visual");
+  // Ironman load-on-start: a "playing" run resumes in place; a "sealed" run shows
+  // its summary over a fresh scene; no/corrupt save → fresh run.
+  const loadedRun = visualCapture ? null : await loadRun();
+  const resumeRun = loadedRun && loadedRun.mode === "playing" ? loadedRun : null;
+  const loopState = createLoopStateMachine(resumeRun ? resumeRun.loopState : {});
   const objectiveRefs = createObjectiveDomRefs(document);
   const fieldMapRefs = createFieldMapDomRefs(document);
   const productionHudRefs = createProductionHudRefs(document);
@@ -1650,12 +1660,18 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // is the live palette so the sun arcs and colours drift. Starts at dusk. The
   // golden-image gate loads ?visual to freeze everything time-animated (sun,
   // clouds, water, weather, film grain) for a stable pixelmatch baseline.
-  const visualCapture =
-    typeof location !== "undefined" && new URLSearchParams(location.search).has("visual");
   const debugPlayerMarker =
     typeof location !== "undefined" && new URLSearchParams(location.search).has("debugPlayerMarker");
   const clock = createWorldClock(); // defaults to dusk (dayTime 1/3)
   if (visualCapture) pinClock(clock, "dusk");
+  else if (resumeRun && Number.isFinite(resumeRun.world?.dayTime)) clock.dayTime = resumeRun.world.dayTime;
+
+  // --- Ironman run persistence (frontier-ironman slot) ---
+  const saveMgr = createSaveStateManager({ interval: 90 });
+  let runMode = loadedRun && loadedRun.mode === "sealed" ? "sealed" : "playing";
+  const runSeed = resumeRun && Number.isFinite(resumeRun.seed) ? resumeRun.seed : Date.now();
+  let runElapsed = resumeRun && Number.isFinite(resumeRun.time) ? resumeRun.time : 0;
+  const runStartedAt = resumeRun?.runStats?.startedAt ?? Date.now();
   let appliedPalette = sunArc(clock.dayTime);
   atmosphere.applyPalette(appliedPalette);
 
@@ -1919,6 +1935,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     resetYaw: -0.9,
   });
   player.resetCameraBehind(-0.9);
+  // Ironman resume: restore saved player position + heading (best-effort).
+  if (resumeRun && Number.isFinite(resumeRun.player?.x) && Number.isFinite(resumeRun.player?.z)) {
+    player.setPosition({ x: resumeRun.player.x, z: resumeRun.player.z });
+    if (Number.isFinite(resumeRun.player?.yaw)) player.resetCameraBehind(resumeRun.player.yaw);
+  }
   const proxies = buildProxies(snapshot.worldObjects);
   const promptEl = document.getElementById("prompt");
   const beatToast = createBeatToast(document);
@@ -1966,6 +1987,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     syncLiveFieldMap();
     syncProductionHud(productionHudRefs, state, encounter?.getState?.(player.position) || null);
     interaction.update(player.position);
+    onRunMutated(); // on-event ironman save (milestone transitions are rare)
     return state;
   };
 
@@ -1991,6 +2013,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   encounter = createEncounterSystem(scene, snapshot, {
     slimeMesh: heroMeshes.roadSlime,
     maxHits: 3,
+    initialPlayerHp: resumeRun?.loopState?.encounterState?.playerHp ?? 40,
+    canDamagePlayer: () => loopState.phase === "slime_fight",
+    onPlayerDeath: () => sealCurrentRun("slain by the roadside slime"),
     getPhase: () => loopState.phase,
     onSlimeEngage: () => {
       if (loopState.phase !== "slime_tell") return false;
@@ -2343,6 +2368,111 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     };
   }
 
+  // --- Ironman run helpers (hoisted; read player/encounter/clock at runtime) ---
+  function currentRunPayload(overrides = {}) {
+    const snap = loopState.state;
+    const livePlayerHp = encounter?.getState?.()?.playerHp;
+    const encounterState = Number.isFinite(livePlayerHp)
+      ? { ...snap.encounterState, playerHp: livePlayerHp }
+      : { ...snap.encounterState };
+    const pos = player?.position || { x: 0, z: 0 };
+    return buildRunPayload({
+      mode: runMode,
+      seed: runSeed,
+      time: runElapsed,
+      player: { x: pos.x, z: pos.z, yaw: Number.isFinite(player?.yaw) ? player.yaw : 0 },
+      loopState: { ...snap, encounterState },
+      world: { dayTime: clock.dayTime, weatherKind: snapshot.weather?.kind || "clear" },
+      runStats: { startedAt: runStartedAt, phaseReached: snap.phase },
+      ...overrides,
+    });
+  }
+  function persistRun() {
+    if (visualCapture || runMode !== "playing") return;
+    writeRun(currentRunPayload())
+      .then(() => saveMgr.onSaveSuccess())
+      .catch((err) => { if (import.meta.env?.DEV) console.warn("[render3d] run save failed", err); });
+  }
+  function onRunMutated() {
+    if (visualCapture || runMode !== "playing") return;
+    saveMgr.markDirty();
+    persistRun();
+  }
+  function sealCurrentRun(cause) {
+    if (visualCapture || runMode !== "playing") return;
+    runMode = "sealed";
+    sealRun(currentRunPayload({ mode: "sealed" }), cause)
+      .catch((err) => { if (import.meta.env?.DEV) console.warn("[render3d] seal failed", err); });
+    showRunSummary({ cause, phaseReached: loopState.phase, time: runElapsed });
+  }
+  function prettyPhase(phase) {
+    return String(phase || "spawn").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  function formatRunDuration(seconds) {
+    const s = Math.max(0, Math.floor(seconds || 0));
+    return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+  }
+  function showRunSummary(info) {
+    const el = document.getElementById("run-summary");
+    if (!el) return;
+    const causeEl = el.querySelector(".run-summary-cause");
+    if (causeEl) {
+      const c = info.cause || "Your run has ended.";
+      causeEl.textContent = c.charAt(0).toUpperCase() + c.slice(1);
+    }
+    const statsEl = el.querySelector(".run-summary-stats");
+    if (statsEl) {
+      while (statsEl.firstChild) statsEl.removeChild(statsEl.firstChild);
+      const lines = [
+        `Reached: ${prettyPhase(info.phaseReached)}`,
+        `Survived: ${formatRunDuration(info.time)}`,
+        "Ironman — this run is sealed.",
+      ];
+      for (const line of lines) {
+        const li = document.createElement("li");
+        li.textContent = line;
+        statsEl.appendChild(li);
+      }
+    }
+    const btn = el.querySelector(".run-summary-newrun");
+    if (btn && !btn.dataset.wired) {
+      btn.dataset.wired = "1";
+      btn.addEventListener("click", () => startNewRun());
+    }
+    el.hidden = false;
+  }
+  function startNewRun() {
+    const el = document.getElementById("run-summary");
+    if (el) el.hidden = true;
+    const fresh = buildRunPayload({
+      mode: "playing",
+      seed: Date.now(),
+      time: 0,
+      player: { x: snapshot.player.x, z: snapshot.player.y, yaw: 0 },
+      loopState: createLoopStateMachine().state,
+      world: { dayTime: 1 / 3, weatherKind: snapshot.weather?.kind || "clear" },
+      runStats: { startedAt: Date.now() },
+    });
+    writeRun(fresh).finally(() => { if (typeof location !== "undefined") location.reload(); });
+  }
+  // On-quit best-effort flush (no beforeunload precedent; mirror main.js
+  // fire-and-forget). pagehide + visibilitychange cover tab close/switch.
+  if (!visualCapture && typeof window !== "undefined") {
+    const flush = () => { if (runMode === "playing") persistRun(); };
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("visibilitychange", () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") flush();
+    });
+  }
+  // A loaded sealed run shows its summary over the fresh scene.
+  if (!visualCapture && loadedRun && loadedRun.mode === "sealed") {
+    showRunSummary({
+      cause: loadedRun.runStats?.cause || "Your run has ended.",
+      phaseReached: loadedRun.runStats?.phaseReached || loadedRun.loopState?.phase || "spawn",
+      time: loadedRun.time || 0,
+    });
+  }
+
   let frames = 0;
   let prevTs = performance.now();
   let fieldMapLiveSyncT = 0;
@@ -2374,6 +2504,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     objectiveGuidance.update(now / 1000, loopState.state);
     animateBeatPayoffs(now / 1000);
     beatToast.update(dt);
+    if (!visualCapture) {
+      runElapsed += dt;
+      if (player.moving) saveMgr.markDirty(); // periodic autosave captures position drift
+      saveMgr.tick(dt, runMode, { onAutoSave: persistRun });
+    }
     townsfolk.update(visualCapture ? 0 : dt, visualCapture, player.position);
     // NPC greeting prompt/speech overrides the kind prompt when near a townsperson
     if (npcSpeechT > 0) {

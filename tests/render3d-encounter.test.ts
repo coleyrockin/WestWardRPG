@@ -131,3 +131,102 @@ describe("render3d encounter system — controller shell", () => {
     expect(encounter.update({ x: 10, z: 5 }, 0.1).disposed).toBe(true);
   });
 });
+
+describe("render3d encounter system — player death (ironman stakes)", () => {
+  it("deals contact damage at point-blank (attack) range", () => {
+    const encounter = createEncounterSystem(null, SNAPSHOT, {
+      initialPlayerHp: 40,
+      playerDamagePerSecond: 10,
+    });
+    // Player standing on the slime → attack range.
+    const state = encounter.update({ x: 10, z: 5 }, 0.5);
+    expect(state.slime).toBe("attack");
+    expect(encounter.getState().playerHp).toBeCloseTo(35); // 40 - 10*0.5
+    expect(encounter.getState().playerMaxHp).toBe(40);
+  });
+
+  it("also chips the player across the engaged (aggro) range, not just point-blank", () => {
+    const encounter = createEncounterSystem(null, SNAPSHOT, {
+      initialPlayerHp: 40,
+      playerDamagePerSecond: 10,
+    });
+    // Player at distance 3 from the slime: inside aggro (4) but outside attack (1.5).
+    const state = encounter.update({ x: 7, z: 5 }, 0.5);
+    expect(state.slime).toBe("aggro");
+    expect(encounter.getState().playerHp).toBeCloseTo(35); // engaged → still taking damage
+  });
+
+  it("respects canDamagePlayer gate (no damage when the fight isn't live)", () => {
+    const onPlayerDeath = vi.fn();
+    const encounter = createEncounterSystem(null, SNAPSHOT, {
+      initialPlayerHp: 40,
+      playerDamagePerSecond: 100,
+      canDamagePlayer: () => false,
+      onPlayerDeath,
+    });
+    encounter.update({ x: 10, z: 5 }, 1.0); // in attack range but gate is closed
+    expect(encounter.getState().playerHp).toBe(40);
+    expect(onPlayerDeath).not.toHaveBeenCalled();
+  });
+
+  it("does no damage out of range / before engagement", () => {
+    const onPlayerDeath = vi.fn();
+    const encounter = createEncounterSystem(null, SNAPSHOT, {
+      initialPlayerHp: 40,
+      playerDamagePerSecond: 100,
+      onPlayerDeath,
+    });
+    encounter.update({ x: 0, z: 0 }, 1.0); // far → patrol
+    expect(encounter.getState().playerHp).toBe(40);
+    expect(onPlayerDeath).not.toHaveBeenCalled();
+  });
+
+  it("respects the canDamagePlayer gate (closed → no damage even in range)", () => {
+    const onPlayerDeath = vi.fn();
+    const encounter = createEncounterSystem(null, SNAPSHOT, {
+      initialPlayerHp: 40,
+      playerDamagePerSecond: 100,
+      canDamagePlayer: () => false, // e.g. not the slime-fight phase yet
+      onPlayerDeath,
+    });
+    encounter.update({ x: 10, z: 5 }, 0.5); // in range, but the gate is closed
+    expect(encounter.getState().playerHp).toBe(40);
+    expect(onPlayerDeath).not.toHaveBeenCalled();
+  });
+
+  it("fires onPlayerDeath exactly once when playerHp hits zero", () => {
+    const onPlayerDeath = vi.fn();
+    const encounter = createEncounterSystem(null, SNAPSHOT, {
+      initialPlayerHp: 10,
+      playerDamagePerSecond: 100,
+      onPlayerDeath,
+    });
+    encounter.update({ x: 10, z: 5 }, 0.2); // 20 dmg → 0
+    expect(encounter.getState().playerHp).toBe(0);
+    expect(encounter.getState().playerDefeated).toBe(true);
+    expect(onPlayerDeath).toHaveBeenCalledTimes(1);
+
+    encounter.update({ x: 10, z: 5 }, 0.2); // still standing in it
+    expect(onPlayerDeath).toHaveBeenCalledTimes(1); // not re-fired
+  });
+
+  it("stops the bleed once the slime is defeated (loop stays winnable)", () => {
+    const onPlayerDeath = vi.fn();
+    const mesh = fakeSlimeMesh();
+    const encounter = createEncounterSystem(null, SNAPSHOT, {
+      initialPlayerHp: 40,
+      playerDamagePerSecond: 10,
+      onPlayerDeath,
+      slimeMesh: mesh,
+    });
+    encounter.update({ x: 10, z: 5 }, 0.1); // engage + 1 dmg → 39
+    encounter.strike({ x: 10, z: 5 });
+    encounter.strike({ x: 10, z: 5 });
+    encounter.strike({ x: 10, z: 5 }); // slime dead
+    expect(encounter.getState().slime).toBe("dead");
+
+    encounter.update({ x: 10, z: 5 }, 5.0); // dead slime can't deal damage
+    expect(encounter.getState().playerHp).toBeCloseTo(39);
+    expect(onPlayerDeath).not.toHaveBeenCalled();
+  });
+});

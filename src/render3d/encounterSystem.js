@@ -5,6 +5,13 @@ export const SLIME_STATES = Object.freeze(["patrol", "aggro", "attack", "dead"])
 const DEFAULT_AGGRO_RADIUS = 4;
 const DEFAULT_ATTACK_RADIUS = 1.5;
 const DEFAULT_MAX_HITS = 3;
+const DEFAULT_PLAYER_HP = 40;
+// Contact damage per second while locked in the fight (player within the slime's
+// combat range). The slime is static, so we threaten across the whole engaged
+// range — not just the 1.5u attack bubble the player rarely sits in — making the
+// fight a real race: strike it down (3 hits) before it chips you out. Tuned so a
+// deliberate player wins comfortably but dawdling/AFK is lethal in a few seconds.
+const DEFAULT_PLAYER_DAMAGE_PER_SECOND = 7;
 
 function distance2(playerPos, slimePos) {
   if (!playerPos || !slimePos) return Infinity;
@@ -91,6 +98,14 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
   const onSlimeAttack = typeof options.onSlimeAttack === "function" ? options.onSlimeAttack : () => {};
   const onSlimeHit = typeof options.onSlimeHit === "function" ? options.onSlimeHit : () => {};
   const onSlimeDeath = typeof options.onSlimeDeath === "function" ? options.onSlimeDeath : () => {};
+  const onPlayerDeath = typeof options.onPlayerDeath === "function" ? options.onPlayerDeath : () => {};
+  // Gate so contact damage only applies when the consumer says the fight is live
+  // (spike passes () => phase === "slime_fight"). Default true for unit isolation.
+  const canDamagePlayer = typeof options.canDamagePlayer === "function" ? options.canDamagePlayer : () => true;
+  const initialPlayerHp = Number.isFinite(options.initialPlayerHp) ? options.initialPlayerHp : DEFAULT_PLAYER_HP;
+  const playerDamagePerSecond = Number.isFinite(options.playerDamagePerSecond)
+    ? options.playerDamagePerSecond
+    : DEFAULT_PLAYER_DAMAGE_PER_SECOND;
 
   let state = "patrol";
   let hitCount = 0;
@@ -100,6 +115,8 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
   let engageNotified = false;
   let attackNotified = false;
   let deathNotified = false;
+  let playerHp = initialPlayerHp;
+  let playerDeathNotified = false;
 
   function animate(dt) {
     if (!slimeMesh) return;
@@ -129,6 +146,16 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
     const nextState = getNextSlimeState({ state, playerPos, slimePos, aggroRadius, attackRadius });
     state = nextState;
     notifyForState(nextState);
+    // Slime chips the player while locked in the fight (aggro or attack range).
+    // A dead slime is always "dead" (getNextSlimeState short-circuits), so killing
+    // it stops the bleed — the loop stays completable.
+    if ((state === "aggro" || state === "attack") && playerHp > 0 && safeDt > 0 && canDamagePlayer()) {
+      playerHp = Math.max(0, playerHp - playerDamagePerSecond * safeDt);
+      if (playerHp <= 0 && !playerDeathNotified) {
+        playerDeathNotified = true;
+        onPlayerDeath({ phase: getPhase(), slimePlacement, scene, playerHp: 0 });
+      }
+    }
     animate(safeDt);
     return getState(playerPos);
   }
@@ -175,6 +202,9 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
         ? Math.sqrt(distance2(playerPos, slimePos))
         : Infinity,
       engaged: engageNotified,
+      playerHp: Math.max(0, playerHp),
+      playerMaxHp: initialPlayerHp,
+      playerDefeated: playerHp <= 0,
       disposed,
     };
   }

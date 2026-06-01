@@ -641,6 +641,55 @@
         background: rgba(20, 13, 24, 0.8);
         color: #cdb992;
       }
+      #run-summary[hidden] { display: none; }
+      #run-summary {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: grid;
+        place-items: center;
+        background: rgba(6, 3, 12, 0.72);
+        backdrop-filter: blur(6px);
+        font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+      }
+      #run-summary-card {
+        width: min(440px, 92vw);
+        padding: 26px;
+        text-align: center;
+        color: #f6e4c4;
+        background: linear-gradient(180deg, rgba(48, 22, 22, 0.97), rgba(16, 11, 20, 0.97));
+        border: 1px solid rgba(216, 120, 79, 0.7);
+        border-radius: 14px;
+        box-shadow: 0 22px 64px rgba(0, 0, 0, 0.66);
+      }
+      #run-summary-card h2 {
+        margin: 0 0 6px;
+        font-size: 26px;
+        letter-spacing: 0.4px;
+        color: #ffb98a;
+      }
+      #run-summary-card .run-summary-cause {
+        margin: 0 0 14px;
+        color: #e7c9a6;
+        font-style: italic;
+      }
+      #run-summary-card .run-summary-stats {
+        list-style: none;
+        margin: 0 0 20px;
+        padding: 0;
+        color: #dac6a5;
+        line-height: 1.6;
+      }
+      #run-summary-card .run-summary-newrun {
+        cursor: pointer;
+        border: 1px solid rgba(216, 168, 79, 0.75);
+        border-radius: 8px;
+        padding: 11px 22px;
+        color: #f6e4c4;
+        background: rgba(120, 60, 28, 0.85);
+        font: inherit;
+        font-size: 16px;
+      }
     </style>
   </head>
   <body>
@@ -734,6 +783,14 @@
           <button data-option="ask_danger" type="button">Ask danger</button>
           <button data-option="inspect_survey" type="button">Inspect survey</button>
         </div>
+      </div>
+    </div>
+    <div id="run-summary" role="dialog" aria-modal="true" aria-labelledby="run-summary-title" hidden>
+      <div id="run-summary-card">
+        <h2 id="run-summary-title">Your run has ended</h2>
+        <p class="run-summary-cause"></p>
+        <ul class="run-summary-stats"></ul>
+        <button class="run-summary-newrun" type="button">Begin a New Run</button>
       </div>
     </div>
     <script type="module" src="/src/render3d/spike.js"></script>
