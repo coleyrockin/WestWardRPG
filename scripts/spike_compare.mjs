@@ -359,8 +359,18 @@ async function captureNew(context) {
   const missingModels = Object.entries(modelReadability?.important || {})
     .filter(([, status]) => !status.loaded)
     .map(([kind]) => kind);
-  if (!modelReadability?.usesHeroCharacter || missingModels.length) {
-    errors.push(`render3d did not load the hero polish GLBs: ${JSON.stringify({ usesHeroCharacter: modelReadability?.usesHeroCharacter, missingModels })}`);
+  if (
+    !modelReadability?.usesHeroCharacter ||
+    !modelReadability?.playerModelSkinned ||
+    !modelReadability?.playerHasLocomotionClips ||
+    missingModels.length
+  ) {
+    errors.push(`render3d did not load the hero polish GLBs: ${JSON.stringify({
+      usesHeroCharacter: modelReadability?.usesHeroCharacter,
+      playerModelSkinned: modelReadability?.playerModelSkinned,
+      playerHasLocomotionClips: modelReadability?.playerHasLocomotionClips,
+      missingModels,
+    })}`);
   }
   const lightingMetrics = await page.evaluate(() => window.__westward3dTest.getLightingMetrics());
   console.log(`[probe] new lighting metrics: ${JSON.stringify(lightingMetrics)}`);

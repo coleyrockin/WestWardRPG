@@ -31,8 +31,17 @@ function reskin(mesh, tint) {
 export async function createAnimatedCharacter(url = "/models/character.glb", opts = {}) {
   const gltf = await loadTemplate(url);
   const group = cloneSkinned(gltf.scene);
+  const modelStats = {
+    meshCount: 0,
+    skinnedMeshCount: 0,
+    animationNames: gltf.animations.map((clip) => clip.name),
+  };
   group.traverse((o) => {
-    if (o.isMesh || o.isSkinnedMesh) reskin(o, opts.tint);
+    if (o.isMesh || o.isSkinnedMesh) {
+      modelStats.meshCount++;
+      if (o.isSkinnedMesh) modelStats.skinnedMeshCount++;
+      reskin(o, opts.tint);
+    }
   });
 
   const mixer = new THREE.AnimationMixer(group);
@@ -98,5 +107,5 @@ export async function createAnimatedCharacter(url = "/models/character.glb", opt
     oneShot = { action: a, remaining: a.getClip().duration };
   }
 
-  return { group, update, playOnce, mixer };
+  return { group, update, playOnce, mixer, modelStats };
 }

@@ -1308,9 +1308,17 @@ function createModelReadability({ modelLoadStatus, character }) {
       total: status.total || 0,
     };
   }
+  const animationNames = Array.isArray(character.modelStats?.animationNames)
+    ? character.modelStats.animationNames
+    : [];
   return {
     playerModelUrl: character.modelUrl || null,
     usesHeroCharacter: character.modelUrl === PLAYER_MODEL_URL,
+    playerModelSkinned: (character.modelStats?.skinnedMeshCount || 0) > 0,
+    playerSkinnedMeshCount: character.modelStats?.skinnedMeshCount || 0,
+    playerMeshCount: character.modelStats?.meshCount || 0,
+    playerAnimationNames: animationNames,
+    playerHasLocomotionClips: animationNames.includes("Idle") && animationNames.includes("Walk"),
     important,
   };
 }
