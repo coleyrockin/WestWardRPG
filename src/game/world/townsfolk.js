@@ -25,11 +25,13 @@ const VARIANT_URL = {
 const INTERACT_RADIUS = 2.0;
 
 const NPC_SPECS = [
-  { id: "mabel", name: "Mabel", variant: "vest", scale: 1.0, tint: "#e8dcc8", speed: 1.2, pause: 1.8, waypoints: [{ x: 3, z: 4 }, { x: 7, z: 4 }, { x: 7.5, z: 2 }, { x: 3, z: 2.2 }] },
-  { id: "cole", name: "Cole", variant: "drifter", scale: 1.06, tint: "#cdb39a", speed: 1.45, pause: 1.1, waypoints: [{ x: 5, z: 3.2 }, { x: 8, z: 5 }, { x: 6, z: 1.6 }] },
-  { id: "rosa", name: "Rosa", variant: "vendor", scale: 0.94, tint: "#f0e6d4", speed: 1.0, pause: 2.2, waypoints: [{ x: 2.6, z: 5.2 }, { x: 4.4, z: 3.4 }] },
-  { id: "hank", name: "Hank", variant: "drifter", scale: 0.99, tint: "#b59a82", speed: 1.35, pause: 1.5, waypoints: [{ x: 10.5, z: 6.8 }, { x: 16, z: 6.4 }, { x: 16, z: 7.6 }, { x: 11, z: 7.2 }] },
-  { id: "pearl", name: "Pearl", variant: "vendor", scale: 0.97, tint: "#d8c2a2", speed: 1.15, pause: 2.0, waypoints: [{ x: 13, z: 5.4 }, { x: 15.5, z: 6.6 }, { x: 12.5, z: 6.8 }] },
+  // Diversified tints + wider height range so the street reads as a distinct cast
+  // (rust coat / dark duster / pale linen / warm mids), not a sea of beige clones.
+  { id: "mabel", name: "Mabel", variant: "vest", scale: 0.92, tint: "#6b3822", speed: 1.2, pause: 1.8, waypoints: [{ x: 3, z: 4 }, { x: 7, z: 4 }, { x: 7.5, z: 2 }, { x: 3, z: 2.2 }] },
+  { id: "cole", name: "Cole", variant: "drifter", scale: 1.12, tint: "#1c1410", speed: 1.45, pause: 1.1, waypoints: [{ x: 5, z: 3.2 }, { x: 8, z: 5 }, { x: 6, z: 1.6 }] },
+  { id: "rosa", name: "Rosa", variant: "vendor", scale: 0.9, tint: "#f5eed8", speed: 1.0, pause: 2.2, waypoints: [{ x: 2.6, z: 5.2 }, { x: 4.4, z: 3.4 }] },
+  { id: "hank", name: "Hank", variant: "drifter", scale: 1.04, tint: "#7a3020", speed: 1.35, pause: 1.5, waypoints: [{ x: 10.5, z: 6.8 }, { x: 16, z: 6.4 }, { x: 16, z: 7.6 }, { x: 11, z: 7.2 }] },
+  { id: "pearl", name: "Pearl", variant: "vendor", scale: 0.98, tint: "#cdb39a", speed: 1.15, pause: 2.0, waypoints: [{ x: 13, z: 5.4 }, { x: 15.5, z: 6.6 }, { x: 12.5, z: 6.8 }] },
 ];
 
 // Per-NPC greeting flavour layered over npcMemory's trust-level defaults.

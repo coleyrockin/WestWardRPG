@@ -550,9 +550,11 @@ function attachBuildingWarmth(group, p, wl) {
   const faceZ = p.y + roadSide * 1.03; // toward the road, not through the back wall
   const paneMat = standard(wl.color, {
     emissive: wl.color,
-    emissiveIntensity: 0.28,
+    // Lifted 0.28→0.62 so panes read as warm lit interiors at golden hour and
+    // catch the bloom (threshold 0.86) — was dark glass before the beauty pass.
+    emissiveIntensity: 0.62,
     transparent: true,
-    opacity: 0.78,
+    opacity: 0.82,
     rimStrength: 0,
   });
   const frameMat = standard("#17100b", { rimStrength: 0.05 });
@@ -594,7 +596,7 @@ function attachBuildingWarmth(group, p, wl) {
   addLitWindow(p.x + 0.42, 1.55, 0.38, 0.42);
   addLitWindow(p.x, 0.62, 0.42, 0.82, false);
 
-  const l = new THREE.PointLight(col(wl.color), wl.intensity, wl.distance ?? 8, 2);
+  const l = new THREE.PointLight(col(wl.color), (wl.intensity ?? 1) * 1.3, wl.distance ?? 8, 2);
   l.position.set(p.x, wl.height ?? 1.5, p.y + roadSide * 0.42);
   group.add(l);
 }
