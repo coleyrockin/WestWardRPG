@@ -67,6 +67,9 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
     // so these shift colour, not brightness): cool-blue shadows, warm-amber lights.
     shadowTint: uniform(new THREE.Color("#3a4a7a")),
     highlightTint: uniform(new THREE.Color("#ffb050")),
+    // How hard the split-tone bites (palette-driven so dusk can push cinematic
+    // cool-shadow/warm-highlight separation; was a hardcoded 0.06 = invisible).
+    splitStrength: uniform(opts.splitStrength ?? 0.06),
     // grain is time-animated (non-deterministic) — visual-capture passes 0.
     grainIntensity: uniform(opts.grainIntensity ?? region.grainIntensity),
     godrayStrength: uniform(opts.godrayStrength ?? 0.08),
@@ -118,7 +121,7 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
   // drama across the whole frame instead of darkening it.
   const shTint = vec3(uniforms.shadowTint).sub(0.5);
   const hlTint = vec3(uniforms.highlightTint).sub(0.5);
-  const split = mix(shTint, hlTint, luma).mul(0.06); // gentle tint, not a heavy filter
+  const split = mix(shTint, hlTint, luma).mul(uniforms.splitStrength); // palette-driven split-tone
   const splitToned = saturated.add(split).clamp(0, 1);
   const graded = splitToned
     .mul(mix(vec3(1, 1, 1), vec3(uniforms.gradeTint).mul(1.6), uniforms.gradeAmount))
@@ -149,6 +152,14 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
       if (typeof p.grade.saturation === "number") uniforms.saturation.value = p.grade.saturation;
       if (p.grade.shadowTint) uniforms.shadowTint.value.set(p.grade.shadowTint);
       if (p.grade.highlightTint) uniforms.highlightTint.value.set(p.grade.highlightTint);
+      // Newly palette-driven so dusk can dial in full cinematic drama. Each guarded
+      // so palettes that omit them keep the constructor defaults (tests unaffected).
+      if (typeof p.grade.splitStrength === "number") uniforms.splitStrength.value = p.grade.splitStrength;
+      if (typeof p.grade.godrayStrength === "number") uniforms.godrayStrength.value = p.grade.godrayStrength;
+      if (typeof p.grade.vignetteStrength === "number") uniforms.vignetteStrength.value = p.grade.vignetteStrength;
+      if (typeof p.grade.bloomThreshold === "number" && bloomPass.threshold) {
+        bloomPass.threshold.value = p.grade.bloomThreshold;
+      }
     }
   }
 

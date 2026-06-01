@@ -17,15 +17,23 @@ export const PALETTES = Object.freeze({
   dusk: {
     key: "dusk",
     label: "Dusk",
-    sky: { top: "#0b1424", mid: "#3d4d61", horizon: "#a86339" },
-    fog: { color: "#4b5663", density: 0.014 },
-    sun: { color: "#d0804b", intensity: 0.62, dir: { x: -9, y: 4.1, z: -4.8 }, disc: 0.02, glow: 0.032 },
-    hemi: { sky: "#44526a", ground: "#332416", intensity: 0.54 },
-    rim: { color: "#8ea9d5", intensity: 0.94, dir: { x: 8, y: 4.8, z: 6 } },
-    exposure: 0.88,
-    stars: 0.2,
-    bloom: 0.105,
-    grade: { tint: "#d98a4c", amount: 0.012, contrast: 1.12, saturation: 1.03, shadowTint: "#26364a", highlightTint: "#d28b51" },
+    sky: { top: "#13203a", mid: "#4f586e", horizon: "#cf8347" },
+    fog: { color: "#5e5648", density: 0.016 },
+    sun: { color: "#f0a458", intensity: 1.05, dir: { x: -9, y: 4.1, z: -4.8 }, disc: 0.022, glow: 0.045 },
+    hemi: { sky: "#4a586e", ground: "#3c2c1c", intensity: 0.46 },
+    rim: { color: "#8ea9d5", intensity: 0.8, dir: { x: 8, y: 4.8, z: 6 } },
+    exposure: 0.92,
+    stars: 0.18,
+    bloom: 0.32,
+    // Cinematic golden-hour, balanced: warm amber key reads as the dominant source,
+    // lamps/windows bloom (threshold catches emissives but not the lit ground),
+    // gentle cool-shadow/warm-highlight split + soft vignette + faint god-rays.
+    // Tuned back from a too-hot first pass that crushed the frame to red-black.
+    grade: {
+      tint: "#f3a85e", amount: 0.04, contrast: 1.12, saturation: 1.12,
+      shadowTint: "#2a3a56", highlightTint: "#f4bb72",
+      splitStrength: 0.1, godrayStrength: 0.16, vignetteStrength: 0.08, bloomThreshold: 0.86,
+    },
     bodyBg: "#17131d",
   },
   goldenHour: {
