@@ -101,8 +101,35 @@ VARIANTS = {
     "drifter": dict(coat=(0.42, 0.29, 0.18), hat="full", hatw=0.54, kerch=(0.58, 0.20, 0.15), apron=None, vest=None),
     "vendor": dict(coat=(0.30, 0.33, 0.40), hat="cap", hatw=0.0, kerch=None, apron=(0.80, 0.74, 0.62), vest=None),
     "vest": dict(coat=(0.55, 0.42, 0.27), hat="full", hatw=0.62, kerch=(0.28, 0.40, 0.30), apron=None, vest=(0.22, 0.16, 0.10)),
-    "hero": dict(coat=(0.39, 0.24, 0.14), hat="full", hatw=0.74, kerch=(0.63, 0.18, 0.12), apron=None, vest=(0.20, 0.13, 0.08), gear="hero"),
+    "hero": dict(coat=(0.34, 0.20, 0.12), hat="full", hatw=0.84, kerch=(0.63, 0.18, 0.12), apron=None, vest=(0.18, 0.11, 0.07), gear="hero"),
 }
+
+
+def _bind_body_to_armature(body, arm):
+    # The character is built from boxy low-poly parts. Explicit rigid weights are
+    # more predictable than Blender bone heat, which can fail on disconnected gear.
+    groups = {name: body.vertex_groups.new(name=name) for name in ("hips", "spine", "head", "legL", "legR", "armL", "armR")}
+
+    for v in body.data.vertices:
+        x, z = v.co.x, v.co.z
+        if z >= 1.5:
+            bone = "head"
+        elif z >= 1.36 and abs(x) < 0.28:
+            bone = "head"
+        elif abs(x) > 0.27 and 0.78 <= z <= 1.38:
+            bone = "armL" if x < 0 else "armR"
+        elif z < 0.76 and abs(x) > 0.03:
+            bone = "legL" if x < 0 else "legR"
+        elif z < 0.88:
+            bone = "hips"
+        else:
+            bone = "spine"
+        groups[bone].add([v.index], 1.0, "REPLACE")
+
+    mod = body.modifiers.new(name="Armature", type="ARMATURE")
+    mod.object = arm
+    body.parent = arm
+    body.matrix_parent_inverse = arm.matrix_world.inverted()
 
 
 def build_character(name="character", textured=True, variant="drifter"):
@@ -149,12 +176,17 @@ def build_character(name="character", textured=True, variant="drifter"):
         poncho = _mat("hero_poncho", (0.30, 0.20, 0.12))
         # Back-facing gear is intentionally chunky: the opening camera mostly
         # sees the drifter from behind, so the silhouette needs readable shapes.
-        parts.append(_box("coat_tail", (0.5, 0.08, 0.5), (0, -0.13, 0.78), poncho))
-        parts.append(_box("bedroll", (0.62, 0.16, 0.18), (0, -0.23, 1.28), canvas))
-        parts.append(_box("bedroll_l", (0.12, 0.17, 0.2), (-0.35, -0.23, 1.28), leather))
-        parts.append(_box("bedroll_r", (0.12, 0.17, 0.2), (0.35, -0.23, 1.28), leather))
-        parts.append(_box("strap_l", (0.055, 0.035, 0.68), (-0.18, -0.235, 1.05), leather))
-        parts.append(_box("strap_r", (0.055, 0.035, 0.68), (0.18, -0.235, 1.05), leather))
+        parts.append(_box("duster_yoke", (0.64, 0.09, 0.16), (0, -0.17, 1.26), poncho))
+        parts.append(_box("coat_tail", (0.58, 0.08, 0.62), (0, -0.14, 0.68), poncho))
+        parts.append(_box("coat_tail_l", (0.22, 0.09, 0.52), (-0.18, -0.18, 0.55), poncho))
+        parts.append(_box("coat_tail_r", (0.22, 0.09, 0.52), (0.18, -0.18, 0.55), poncho))
+        parts.append(_box("bedroll", (0.72, 0.18, 0.2), (0, -0.25, 1.3), canvas))
+        parts.append(_box("bedroll_l", (0.13, 0.19, 0.22), (-0.4, -0.25, 1.3), leather))
+        parts.append(_box("bedroll_r", (0.13, 0.19, 0.22), (0.4, -0.25, 1.3), leather))
+        parts.append(_box("strap_l", (0.06, 0.04, 0.76), (-0.2, -0.25, 1.04), leather))
+        parts.append(_box("strap_r", (0.06, 0.04, 0.76), (0.2, -0.25, 1.04), leather))
+        parts.append(_box("back_buckle_l", (0.09, 0.045, 0.08), (-0.2, -0.285, 1.18), brass))
+        parts.append(_box("back_buckle_r", (0.09, 0.045, 0.08), (0.2, -0.285, 1.18), brass))
         parts.append(_box("holster", (0.12, 0.08, 0.34), (0.32, 0.08, 0.72), leather))
         parts.append(_box("lantern_frame", (0.16, 0.12, 0.2), (-0.33, 0.08, 0.86), brass))
         parts.append(_box("lantern_glass", (0.1, 0.08, 0.12), (-0.33, 0.13, 0.86), glow))
@@ -202,12 +234,7 @@ def build_character(name="character", textured=True, variant="drifter"):
     bone("armR", (0.34, 0, 1.3), (0.34, 0, 0.78), eb["spine"])
     bpy.ops.object.mode_set(mode="OBJECT")
 
-    # skin (auto weights)
-    bpy.ops.object.select_all(action="DESELECT")
-    body.select_set(True)
-    arm.select_set(True)
-    bpy.context.view_layer.objects.active = arm
-    bpy.ops.object.parent_set(type="ARMATURE_AUTO")
+    _bind_body_to_armature(body, arm)
 
     # --- animation clips -----------------------------------------------------
     bpy.context.view_layer.objects.active = arm
