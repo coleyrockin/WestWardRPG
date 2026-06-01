@@ -242,6 +242,7 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "productionSaloon", label: "Drifter Saloon", x: 6.4, y: 1.75, color: "#7a5230", size: 0.82, yaw: 0 },
   { kind: "productionStore", label: "Lamp Dry Goods", x: 11.4, y: 1.55, color: "#9a7144", size: 0.78, yaw: 0 },
   { kind: "productionAssay", label: "Boone Assay", x: 16.2, y: 1.62, color: "#6a4630", size: 0.72, yaw: 0 },
+  { kind: "productionAssay", label: "Distant Marshal Hall", x: 22.2, y: 2.28, color: "#4f3326", size: 0.66, yaw: -0.04 },
   { kind: "productionBoardwalk", label: "North Boardwalk", x: 6.7, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
   { kind: "productionBoardwalk", label: "North Boardwalk", x: 10.1, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
   { kind: "productionBoardwalk", label: "North Boardwalk", x: 13.5, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
@@ -252,6 +253,7 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "windowGlowPanel", label: "Saloon Window Glow", x: 7.4, y: 3.18, color: "#ffad63", size: 1.0, yaw: 0 },
   { kind: "windowGlowPanel", label: "Store Window Glow", x: 10.65, y: 3.12, color: "#ffbf72", size: 0.9, yaw: 0 },
   { kind: "windowGlowPanel", label: "Store Window Glow", x: 12.15, y: 3.12, color: "#ffbf72", size: 0.9, yaw: 0 },
+  { kind: "windowGlowPanel", label: "Marshal Hall Window Glow", x: 21.92, y: 3.42, color: "#ff9f5d", size: 0.74, yaw: -0.04 },
   { kind: "lanternString", label: "North Lantern String", x: 11.0, y: 4.15, color: "#ffb866", size: 0.9, yaw: 0 },
 
   // South boardwalk/storefront edge, mirrored to frame the road without
@@ -259,15 +261,22 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "productionStore", label: "Dustward Hotel", x: 7.2, y: 15.25, color: "#9a7144", size: 0.74, yaw: Math.PI },
   { kind: "productionSaloon", label: "South Porch Saloon", x: 12.2, y: 15.48, color: "#7a5230", size: 0.76, yaw: Math.PI },
   { kind: "productionAssay", label: "Marshal Office", x: 17.0, y: 15.3, color: "#6a4630", size: 0.7, yaw: Math.PI },
+  { kind: "productionStore", label: "Roadside Undertaker", x: 20.6, y: 13.7, color: "#70452f", size: 0.82, yaw: Math.PI - 0.08 },
+  { kind: "productionSaloon", label: "Far South Hotel", x: 24.4, y: 13.0, color: "#583626", size: 0.68, yaw: Math.PI - 0.12 },
   { kind: "productionBoardwalk", label: "South Boardwalk", x: 6.7, y: 13.42, color: "#5d3f24", size: 0.88, yaw: Math.PI },
   { kind: "productionBoardwalk", label: "South Boardwalk", x: 10.1, y: 13.42, color: "#5d3f24", size: 0.9, yaw: Math.PI },
   { kind: "productionBoardwalk", label: "South Boardwalk", x: 13.5, y: 13.42, color: "#5d3f24", size: 0.9, yaw: Math.PI },
   { kind: "productionBoardwalk", label: "South Boardwalk", x: 16.9, y: 13.42, color: "#5d3f24", size: 0.86, yaw: Math.PI },
+  { kind: "productionBoardwalk", label: "Undertaker Boardwalk", x: 20.5, y: 12.08, color: "#4a3423", size: 0.78, yaw: Math.PI - 0.08 },
   { kind: "windowGlowPanel", label: "Hotel Window Glow", x: 6.52, y: 13.72, color: "#ffbf72", size: 0.9, yaw: Math.PI },
   { kind: "windowGlowPanel", label: "Hotel Window Glow", x: 7.92, y: 13.72, color: "#ffbf72", size: 0.9, yaw: Math.PI },
   { kind: "windowGlowPanel", label: "South Saloon Glow", x: 11.35, y: 13.76, color: "#ffad63", size: 1.0, yaw: Math.PI },
   { kind: "windowGlowPanel", label: "South Saloon Glow", x: 12.9, y: 13.76, color: "#ffad63", size: 1.0, yaw: Math.PI },
   { kind: "lanternString", label: "South Lantern String", x: 12.0, y: 12.84, color: "#ffb866", size: 0.86, yaw: Math.PI },
+  { kind: "windowGlowPanel", label: "Undertaker Window Glow", x: 20.2, y: 12.32, color: "#ff9b58", size: 0.82, yaw: Math.PI - 0.08 },
+  { kind: "windowGlowPanel", label: "Far Hotel Window Glow", x: 23.96, y: 11.96, color: "#ff9b58", size: 0.72, yaw: Math.PI - 0.12 },
+  { kind: "hangingSign", label: "Undertaker Hanging Sign", x: 19.65, y: 12.28, color: "#ffc66e", size: 0.72, yaw: Math.PI - 0.08 },
+  { kind: "lanternString", label: "Street Crossing Lanterns", x: 15.0, y: 8.75, color: "#ffb866", size: 0.74, yaw: Math.PI / 2 },
 
   // Bounty street life: silhouettes and props read as inhabited without
   // becoming gameplay blockers in the main road lane.
@@ -277,6 +286,7 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "npcSilhouette", label: "Street Traveler", x: 19.1, y: 7.85, color: "#17100c", size: 0.64, yaw: -1.45 },
   { kind: "npcSilhouette", label: "South Porch Watcher", x: 8.8, y: 12.52, color: "#17100c", size: 0.78, yaw: 0.25 },
   { kind: "npcSilhouette", label: "Lantern Bystander", x: 14.4, y: 12.35, color: "#17100c", size: 0.72, yaw: -0.15 },
+  { kind: "npcSilhouette", label: "Undertaker Door Guard", x: 19.35, y: 11.82, color: "#120c09", size: 0.7, yaw: -0.25 },
   { kind: "hitchingRail", label: "North Hitching Rail", x: 5.2, y: 4.55, color: "#4a3526", size: 0.82, yaw: 0.04 },
   { kind: "hitchingRail", label: "South Hitching Rail", x: 15.6, y: 12.55, color: "#4a3526", size: 0.78, yaw: Math.PI - 0.08 },
   { kind: "barrelCrateCluster", label: "Saloon Cargo", x: 4.8, y: 4.25, color: "#7a5230", size: 0.88, yaw: 0.28 },

@@ -711,6 +711,11 @@ function createPlayerReadabilityRig() {
   };
 }
 
+function setPlayerMarkerVisibility(rig, enabled) {
+  if (!rig?.group) return;
+  rig.group.visible = Boolean(enabled);
+}
+
 function createObjectiveGuidance(snapshot) {
   const group = new THREE.Group();
   group.name = "objective-guidance";
@@ -1238,10 +1243,10 @@ function createOpeningLightPools(snapshot) {
   group.name = "opening-light-pools";
   const pools = [];
   const specs = [
-    { kind: "jobBoard", rx: 2.7, rz: 1.65, color: "#d78949", opacity: 0.12 },
-    { kind: "roadSign", rx: 1.85, rz: 1.08, color: "#d89455", opacity: 0.06 },
-    { kind: "smokeCache", rx: 1.75, rz: 1.02, color: "#b77945", opacity: 0.05 },
-    { kind: "brokenWagon", rx: 2.15, rz: 1.24, color: "#c27b48", opacity: 0.06 },
+    { kind: "jobBoard", rx: 2.7, rz: 1.65, color: "#d78949", opacity: 0.085 },
+    { kind: "roadSign", rx: 1.85, rz: 1.08, color: "#d89455", opacity: 0.045 },
+    { kind: "smokeCache", rx: 1.75, rz: 1.02, color: "#b77945", opacity: 0.04 },
+    { kind: "brokenWagon", rx: 2.15, rz: 1.24, color: "#c27b48", opacity: 0.045 },
   ];
 
   for (const spec of specs) {
@@ -1294,7 +1299,7 @@ function createRoadDust(snapshot) {
       const mat = new THREE.MeshBasicMaterial({
         color: col(i % 2 ? "#b77d46" : "#8f633c"),
         transparent: true,
-        opacity: 0.04,
+        opacity: 0.058,
         depthWrite: false,
         blending: THREE.NormalBlending,
       });
@@ -1403,10 +1408,10 @@ function buildGround(scene, snapshot) {
   // Segmenting it by route points makes the path visibly turn toward the marsh
   // instead of reading as a short flat alley.
   const ROAD_W = FIRST_ROAD_ART_STYLE.roadWidth;
-  const roadMat = standard("#a77d4e", { roughness: 1, emissive: "#46341f", emissiveIntensity: 0.025, rimStrength: 0.035 });
-  const edgeMat = standard("#c39a61", { roughness: 1, emissive: "#4a3a24", emissiveIntensity: 0.015, rimStrength: 0.035 });
-  const rutMat = standard("#6a4f32", { roughness: 1, rimStrength: 0.02 });
-  const centerMat = standard("#88643e", { roughness: 1, rimStrength: 0.02 });
+  const roadMat = standard("#9f7047", { roughness: 1, emissive: "#3b2819", emissiveIntensity: 0.06, rimStrength: 0.025 });
+  const edgeMat = standard("#bd8c56", { roughness: 1, emissive: "#3d2a19", emissiveIntensity: 0.045, rimStrength: 0.025 });
+  const rutMat = standard("#67462c", { roughness: 1, emissive: "#24170e", emissiveIntensity: 0.02, rimStrength: 0.015 });
+  const centerMat = standard("#7b5233", { roughness: 1, emissive: "#2d1d12", emissiveIntensity: 0.025, rimStrength: 0.015 });
   const sageShoulderMat = new THREE.MeshBasicMaterial({
     color: col("#6f7f46"),
     transparent: true,
@@ -1544,13 +1549,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     anchor: { x: snapshot.player.x, y: snapshot.player.y },
     playCore: { x: snapshot.player.x + 6, y: snapshot.player.y },
   });
-  scene.add(new THREE.AmbientLight(col("#b28a5d"), 0.62));
+  scene.add(new THREE.AmbientLight(col("#465166"), 0.32));
   // Continuous day/night: a slow world clock advances dayTime; sunArc(dayTime)
   // is the live palette so the sun arcs and colours drift. Starts at dusk. The
   // golden-image gate loads ?visual to freeze everything time-animated (sun,
   // clouds, water, weather, film grain) for a stable pixelmatch baseline.
   const visualCapture =
     typeof location !== "undefined" && new URLSearchParams(location.search).has("visual");
+  const debugPlayerMarker =
+    typeof location !== "undefined" && new URLSearchParams(location.search).has("debugPlayerMarker");
   const clock = createWorldClock(); // defaults to dusk (dayTime 1/3)
   if (visualCapture) pinClock(clock, "dusk");
   let appliedPalette = sunArc(clock.dayTime);
@@ -1675,12 +1682,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // so silhouettes rim-light and the god-ray shafts rake toward camera. Gameplay
   // third-person follow is untouched — this only applies under capture.
   function applyHeroCamera() {
-    camera.fov = 50;
-    // Elevated establishing 3/4: high + back enough to clear the ~3-tall
-    // rooflines and look DOWN onto the town + road junction, so the ground,
-    // street, and mesa ring all read instead of staring into a canyon of boxes.
-    camera.position.set(19, 11.5, 18);
-    camera.lookAt(9, 0.5, 6);
+    camera.fov = 53;
+    // Third-person production frame: low enough to feel playable, close enough
+    // for a strong back silhouette, and aimed past Boone's board so the street
+    // reads as a destination instead of a tabletop.
+    camera.position.set(4.65, 3.82, 13.7);
+    camera.lookAt(15.1, 1.48, 4.75);
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
   }
@@ -1786,10 +1793,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       character = createPlaceholderCharacter();
     }
   }
-  character.group.scale.setScalar(playerModelLoaded ? 1.08 : 1);
+  character.group.scale.setScalar(playerModelLoaded ? 1.18 : 1.04);
   character.modelUrl = playerModelLoaded ? PLAYER_MODEL_URL : "/models/character.glb";
   const playerReadability = createPlayerReadabilityRig();
   character.group.add(playerReadability.group);
+  setPlayerMarkerVisibility(playerReadability, debugPlayerMarker && !visualCapture);
   scene.add(character.group);
   // F → play the one-shot "draw" clip (no-op on the placeholder fallback)
   if (typeof window !== "undefined") {
@@ -1810,8 +1818,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     thirdPerson: true,
     character: character.group,
     cameraPreset: "exploration",
-    resetYaw: -Math.PI / 2,
+    resetYaw: -0.9,
   });
+  player.resetCameraBehind(-0.9);
   const proxies = buildProxies(snapshot.worldObjects);
   const promptEl = document.getElementById("prompt");
   const beatToast = createBeatToast(document);

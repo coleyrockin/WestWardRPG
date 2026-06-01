@@ -118,9 +118,9 @@ const tslFbm = Fn(([p]) =>
 // opts: { dirt, sand, scrub, center:{x,z}, amp }. `center` is the ground mesh's
 // world placement so the TSL height field lines up with the pure groundHeight().
 export function createGroundMaterial(opts = {}) {
-  const dirt = col(opts.dirt ?? "#6a5a36");
-  const sand = col(opts.sand ?? "#ad8958");
-  const scrub = col(opts.scrub ?? "#72864c");
+  const dirt = col(opts.dirt ?? "#463323");
+  const sand = col(opts.sand ?? "#8a603c");
+  const scrub = col(opts.scrub ?? "#58683e");
   const center = opts.center ?? { x: 14, z: 9 };
   const amp = opts.amp ?? AMP;
   const mat = new MeshToonNodeMaterial({ gradientMap: celGradientMap() });

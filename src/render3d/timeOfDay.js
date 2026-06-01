@@ -11,25 +11,21 @@
 export const TIME_KEYS = Object.freeze(["dusk", "goldenHour", "night"]);
 
 export const PALETTES = Object.freeze({
-  // Dusk is the hero showcase moment (the ?visual capture pins here) — pushed to a
-  // dramatic golden-hour-western mood: low warm amber sun for long raking shadows,
-  // warm (not purple-milk) haze, cut fill so shadows read, cool rim for silhouette pop.
+  // Dusk is the hero showcase moment (the ?visual capture pins here). Keep the
+  // lanterns warm, but make the world around them cool and contrasty so the
+  // frame reads like a playable RPG street instead of a sun-bleached diorama.
   dusk: {
     key: "dusk",
     label: "Dusk",
-    // Sunset gradient with real depth: deep indigo zenith → violet mid → warm amber
-    // horizon. Tamed so lit walls/roofs hold detail instead of blowing to white.
-    sky: { top: "#324760", mid: "#a38357", horizon: "#efb262" },
-    fog: { color: "#a87a53", density: 0.0072 },
-    sun: { color: "#ffc47e", intensity: 1.12, dir: { x: -10, y: 5.2, z: -5 }, disc: 0.026, glow: 0.055 },
-    // Warmer, brighter ground bounce lifts shadowed faces so the foreground reads
-    // instead of crushing to dead black — shadows stay rich but not empty.
-    hemi: { sky: "#9da3a0", ground: "#9a7b45", intensity: 1.28 },
-    rim: { color: "#7f92bd", intensity: 0.46, dir: { x: 9, y: 5, z: 6 } },
-    exposure: 1.0,
-    stars: 0.12,
-    bloom: 0.13,
-    grade: { tint: "#e6ad6a", amount: 0.006, contrast: 0.9, saturation: 1.08, shadowTint: "#737458", highlightTint: "#efb66f" },
+    sky: { top: "#111a2c", mid: "#4d5a6a", horizon: "#b87748" },
+    fog: { color: "#58616b", density: 0.0125 },
+    sun: { color: "#d99155", intensity: 0.78, dir: { x: -9, y: 4.1, z: -4.8 }, disc: 0.023, glow: 0.04 },
+    hemi: { sky: "#4d5c72", ground: "#3d2b1d", intensity: 0.68 },
+    rim: { color: "#92a8cf", intensity: 0.82, dir: { x: 8, y: 4.8, z: 6 } },
+    exposure: 0.94,
+    stars: 0.2,
+    bloom: 0.16,
+    grade: { tint: "#d98a4c", amount: 0.014, contrast: 1.08, saturation: 1.05, shadowTint: "#2f3d50", highlightTint: "#df9a58" },
     bodyBg: "#17131d",
   },
   goldenHour: {
