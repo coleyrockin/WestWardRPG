@@ -19,6 +19,7 @@ import {
   FIRST_FIVE_ROUTE,
   FIRST_ROAD_ART_STYLE,
   getArtDirectionLayoutMetrics,
+  getProductionFrameLayoutMetrics,
   getRouteMetrics,
   PLAYER_SPAWN,
 } from "./frontierLayout.js";
@@ -52,11 +53,39 @@ const IMPORTANT_MODEL_KINDS = Object.freeze([
   "heroTownSaloon",
   "heroTownStore",
   "heroTownAssay",
+  "productionBoardwalk",
+  "productionSaloon",
+  "productionStore",
+  "productionAssay",
+  "windowGlowPanel",
+  "hangingSign",
+  "hitchingRail",
+  "barrelCrateCluster",
+  "npcSilhouette",
+  "lanternString",
+  "mudRutDecal",
+  "dustSmokePlume",
+  "bountyEmblem",
   "sageCluster",
   "roadGrass",
   "heroMesaSkyline",
   "slimeTrailHero",
   "brokenWagon",
+]);
+const PRODUCTION_DENSITY_KINDS = new Set([
+  "productionBoardwalk",
+  "productionSaloon",
+  "productionStore",
+  "productionAssay",
+  "windowGlowPanel",
+  "hangingSign",
+  "hitchingRail",
+  "barrelCrateCluster",
+  "npcSilhouette",
+  "lanternString",
+  "mudRutDecal",
+  "dustSmokePlume",
+  "bountyEmblem",
 ]);
 
 // Sky dome, sun/rim/hemi lights, fog, and clouds now live in atmosphere.js,
@@ -969,6 +998,85 @@ function createBeatToast(rootDocument = globalThis.document) {
   };
 }
 
+function createProductionHudRefs(rootDocument = globalThis.document) {
+  const doc = rootDocument && typeof rootDocument.getElementById === "function" ? rootDocument : null;
+  return {
+    heroPanel: doc?.getElementById("hero-panel") || null,
+    jobToast: doc?.getElementById("job-toast") || null,
+    fieldMap: doc?.getElementById("field-map") || null,
+    jobTracker: doc?.getElementById("job-tracker") || null,
+    hotbar: doc?.getElementById("hotbar") || null,
+    commandDock: doc?.getElementById("command-dock") || null,
+    objective: doc?.getElementById("objective") || null,
+    activeJobLine: doc?.querySelector("#job-tracker .job-row.active .job-line") || null,
+    activeJobCount: doc?.querySelector("#job-tracker .job-row.active .job-count") || null,
+    surveyJobLine: doc?.querySelector("#job-tracker .job-row:not(.active) .job-line") || null,
+    surveyJobCount: doc?.querySelector("#job-tracker .job-row:not(.active) .job-count") || null,
+    toastTitle: doc?.querySelector("#job-toast .job-title") || null,
+  };
+}
+
+function syncProductionHud(refs, loopState = {}, encounterState = null) {
+  if (!refs) return;
+  const phase = loopState.phase || "spawn";
+  const index = Math.max(0, LOOP_PHASES.indexOf(phase));
+  const total = Math.max(1, LOOP_PHASES.length - 1);
+  const beats = loopState.routeBeats || {};
+  if (refs.activeJobLine) {
+    refs.activeJobLine.textContent = phase === "slime_fight" && encounterState
+      ? `Strike the Road Slime. ${encounterState.hitCount}/${encounterState.maxHp} clean hits.`
+      : loopState.objectiveText || "Find Boone's lit job board by the road.";
+  }
+  if (refs.activeJobCount) {
+    refs.activeJobCount.textContent = phase === "survey_teaser" ? "1/1" : `${Math.min(index, total)}/${total}`;
+  }
+  if (refs.surveyJobLine) {
+    refs.surveyJobLine.textContent = beats.returnToBoone
+      ? "Old Road Survey is ready on Boone's board."
+      : beats.wagonSalvage
+        ? "Return the Map Scrap to Boone."
+        : "Recover the wagon map scrap.";
+  }
+  if (refs.surveyJobCount) {
+    refs.surveyJobCount.textContent = beats.returnToBoone ? "1/1" : "0/1";
+  }
+  if (refs.toastTitle) {
+    refs.toastTitle.textContent = beats.boardChoice
+      ? "Road bounty accepted"
+      : "New road bounty available";
+  }
+  if (refs.jobToast?.dataset) refs.jobToast.dataset.phase = phase;
+  if (refs.jobTracker?.dataset) refs.jobTracker.dataset.phase = phase;
+  if (refs.hotbar?.dataset) refs.hotbar.dataset.phase = phase;
+}
+
+function getHudFantasyMetrics(rootDocument = globalThis.document) {
+  const doc = rootDocument && typeof rootDocument.getElementById === "function" ? rootDocument : null;
+  const ids = ["hero-panel", "job-toast", "field-map", "job-tracker", "hotbar", "command-dock", "objective"];
+  const vw = Math.max(1, rootDocument?.defaultView?.innerWidth || globalThis.innerWidth || 1);
+  const vh = Math.max(1, rootDocument?.defaultView?.innerHeight || globalThis.innerHeight || 1);
+  let area = 0;
+  const visible = {};
+  for (const id of ids) {
+    const el = doc?.getElementById(id) || null;
+    const isVisible = Boolean(el && !el.hidden);
+    visible[id] = isVisible;
+    if (!isVisible || typeof el.getBoundingClientRect !== "function") continue;
+    const r = el.getBoundingClientRect();
+    area += Math.max(0, r.width) * Math.max(0, r.height);
+  }
+  return {
+    heroPanelVisible: visible["hero-panel"],
+    jobToastVisible: visible["job-toast"],
+    fieldMapVisible: visible["field-map"],
+    jobTrackerVisible: visible["job-tracker"],
+    hotbarVisible: visible.hotbar,
+    commandDockVisible: visible["command-dock"],
+    objectiveVisible: visible.objective,
+    hudFootprint: Number((area / Math.max(1, vw * vh)).toFixed(4)),
+  };
+}
+
 function nodeScreenStats(node, camera) {
   if (!node || node.visible === false) return null;
   camera.updateMatrixWorld();
@@ -1066,6 +1174,43 @@ function createArtDirectionMetrics({ heroMeshes, placementNodes, character, came
     firstFrameNaturalCount: layout.firstFrameNaturalCount,
     firstFrameSlabBlockers: layout.firstFrameSlabBlockers,
     heroPolishKinds: layout.heroPolishKinds,
+  };
+}
+
+function createTownDensityMetrics({ placementNodes, camera, snapshot }) {
+  const layout = getProductionFrameLayoutMetrics(snapshot.worldObjects);
+  const visibleProductionKinds = new Set();
+  let visibleProductionPropCount = 0;
+  for (const record of placementNodes) {
+    if (!record?.node || !PRODUCTION_DENSITY_KINDS.has(record.kind)) continue;
+    const stats = nodeScreenStats(record.node, camera);
+    if (!stats?.inFrame) continue;
+    visibleProductionPropCount++;
+    visibleProductionKinds.add(record.kind);
+  }
+  return {
+    ...layout,
+    visibleProductionPropCount,
+    visibleProductionKinds: Array.from(visibleProductionKinds),
+  };
+}
+
+function createProductionFrameMetrics({ heroMeshes, placementNodes, character, camera, player, snapshot }) {
+  const art = createArtDirectionMetrics({ heroMeshes, placementNodes, character, camera, player, snapshot });
+  const town = createTownDensityMetrics({ placementNodes, camera, snapshot });
+  return {
+    playerVisible: art.playerVisible,
+    boardVisible: art.boardVisible,
+    playerScreenArea: art.playerScreenArea,
+    boardScreenArea: art.boardScreenArea,
+    roadFootprint: art.openingRoadWidth,
+    maxForegroundBlocker: art.maxForegroundBlocker,
+    streetDensity: town.productionStreetPropCount,
+    visibleProductionPropCount: town.visibleProductionPropCount,
+    storefrontCount: town.storefrontCount,
+    windowSignLightCount: town.windowLightCount,
+    npcSilhouetteCount: town.npcSilhouetteCount,
+    productionKinds: town.productionKinds,
   };
 }
 
@@ -1369,8 +1514,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const loopState = createLoopStateMachine();
   const objectiveRefs = createObjectiveDomRefs(document);
   const fieldMapRefs = createFieldMapDomRefs(document);
+  const productionHudRefs = createProductionHudRefs(document);
   syncObjectiveDom(objectiveRefs, snapshot, loopState.state);
   syncFieldMapDom(fieldMapRefs, loopState.state);
+  syncProductionHud(productionHudRefs, loopState.state);
   const publishLoopDebug = (state) => {
     if (!import.meta.env.DEV || typeof window === "undefined") return;
     window.__westward3dLoop = state;
@@ -1701,6 +1848,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     publishLoopDebug(state);
     syncObjectiveDom(objectiveRefs, snapshot, state);
     syncLiveFieldMap();
+    syncProductionHud(productionHudRefs, state, encounter?.getState?.(player.position) || null);
     interaction.update(player.position);
   };
 
@@ -1709,6 +1857,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     publishLoopDebug(state);
     syncObjectiveDom(objectiveRefs, snapshot, state);
     syncLiveFieldMap();
+    syncProductionHud(productionHudRefs, state, encounter?.getState?.(player.position) || null);
     interaction.update(player.position);
     return state;
   };
@@ -1744,11 +1893,13 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     onSlimeHit: ({ hp, maxHits, defeated }) => {
       if (defeated || loopState.phase !== "slime_fight") return;
       setPromptText(`E — Strike Road Slime · ${maxHits - hp}/${maxHits} hits`);
+      syncProductionHud(productionHudRefs, loopState.state, { hp, maxHp: maxHits, hitCount: maxHits - hp, defeated });
     },
     onSlimeDeath: () => {
       if (loopState.phase === "slime_fight") advance("defeat_slime");
     },
   });
+  syncProductionHud(productionHudRefs, loopState.state, encounter.getState(player.position));
 
   let beatFocusTimer = 0;
   const focusBeat = (preset = "inspection", seconds = 0.9) => {
@@ -1938,6 +2089,19 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       player,
       snapshot,
     });
+    const getTownDensityMetrics = () => createTownDensityMetrics({
+      placementNodes,
+      camera,
+      snapshot,
+    });
+    const getProductionFrameMetrics = () => createProductionFrameMetrics({
+      heroMeshes,
+      placementNodes,
+      character,
+      camera,
+      player,
+      snapshot,
+    });
     const getModelReadability = () => createModelReadability({ modelLoadStatus, character });
     const getLightingMetrics = () => {
       const metrics = {
@@ -1998,6 +2162,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         encounter: encounter.getState(player.position),
         composition: getCompositionMetrics(),
         artDirection: getArtDirectionMetrics(),
+        productionFrame: getProductionFrameMetrics(),
+        townDensity: getTownDensityMetrics(),
+        hudFantasy: getHudFantasyMetrics(document),
         modelReadability: getModelReadability(),
         beatVisibility: getBeatVisibility(),
         cameraPose: {
@@ -2046,6 +2213,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       getPlayerVisibility: () => getHeroVisibility({ player: character.group }, camera).player,
       getCompositionMetrics,
       getArtDirectionMetrics,
+      getProductionFrameMetrics,
+      getHudFantasyMetrics: () => getHudFantasyMetrics(document),
+      getTownDensityMetrics,
       getModelReadability,
       getLightingMetrics,
       getBeatVisibility,
@@ -2084,6 +2254,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     fieldMapLiveSyncT -= dt;
     if (fieldMapLiveSyncT <= 0) {
       syncLiveFieldMap();
+      syncProductionHud(productionHudRefs, loopState.state, encounter.getState(player.position));
       fieldMapLiveSyncT = 0.18;
     }
     encounter.update(player.position, dt);

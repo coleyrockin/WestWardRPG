@@ -20,6 +20,10 @@ export const FIRST_ROAD_ART_STYLE: Readonly<{
   openingRoadWidth: number;
   shoulderWidth: number;
   minNaturalClusters: number;
+  minProductionStreetProps: number;
+  minStorefronts: number;
+  minNpcSilhouettes: number;
+  minWindowLights: number;
 }>;
 export const FIRST_FIVE_ROUTE: ReadonlyArray<{ kind: string; label: string; x: number; y: number }>;
 
@@ -42,4 +46,13 @@ export function getArtDirectionLayoutMetrics(placements?: Placement[]): {
   naturalClusterCount: number;
   firstFrameNaturalCount: number;
   firstFrameSlabBlockers: string[];
+};
+export function getProductionFrameLayoutMetrics(placements?: Placement[]): {
+  style: typeof FIRST_ROAD_ART_STYLE;
+  productionKinds: string[];
+  productionStreetPropCount: number;
+  storefrontCount: number;
+  windowLightCount: number;
+  npcSilhouetteCount: number;
+  firstStreetBounds: { minX: number; maxX: number; minY: number; maxY: number };
 };

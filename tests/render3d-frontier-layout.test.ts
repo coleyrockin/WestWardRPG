@@ -4,6 +4,7 @@ import {
   buildFrontierPlacements,
   FIRST_ROAD_ART_STYLE,
   getArtDirectionLayoutMetrics,
+  getProductionFrameLayoutMetrics,
   getRouteMetrics,
   PLAYER_SPAWN,
 } from "../src/render3d/frontierLayout.js";
@@ -60,6 +61,46 @@ describe("render3d frontier layout", () => {
       expect(kinds.has(kind)).toBe(true);
       expect(modelFor(kind)?.url).toMatch(/\.glb$/);
     }
+  });
+
+  it("registers the production-frame Blender kit through the manifest and layout", () => {
+    const placements = buildFrontierPlacements();
+    const kinds = new Set(placements.map((placement) => placement.kind));
+
+    for (const kind of [
+      "productionBoardwalk",
+      "productionSaloon",
+      "productionStore",
+      "productionAssay",
+      "windowGlowPanel",
+      "hangingSign",
+      "hitchingRail",
+      "barrelCrateCluster",
+      "npcSilhouette",
+      "lanternString",
+      "mudRutDecal",
+      "dustSmokePlume",
+      "bountyEmblem",
+    ]) {
+      expect(kinds.has(kind)).toBe(true);
+      expect(modelFor(kind)?.url).toMatch(/\.glb$/);
+    }
+  });
+
+  it("keeps the production opening dense enough to read as a bounty street", () => {
+    const metrics = getProductionFrameLayoutMetrics(buildFrontierPlacements());
+
+    expect(metrics.productionStreetPropCount).toBeGreaterThanOrEqual(FIRST_ROAD_ART_STYLE.minProductionStreetProps);
+    expect(metrics.storefrontCount).toBeGreaterThanOrEqual(FIRST_ROAD_ART_STYLE.minStorefronts);
+    expect(metrics.npcSilhouetteCount).toBeGreaterThanOrEqual(FIRST_ROAD_ART_STYLE.minNpcSilhouettes);
+    expect(metrics.windowLightCount).toBeGreaterThanOrEqual(FIRST_ROAD_ART_STYLE.minWindowLights);
+    expect(metrics.productionKinds).toEqual(expect.arrayContaining([
+      "productionSaloon",
+      "productionBoardwalk",
+      "npcSilhouette",
+      "lanternString",
+      "bountyEmblem",
+    ]));
   });
 
   it("keeps the first-frame art direction away from slab blockers", () => {

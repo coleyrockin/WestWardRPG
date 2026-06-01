@@ -907,6 +907,258 @@ def build_hero_mesa_skyline(name="hero_mesa_skyline"):
     return export_glb(obj, name, bake=True)
 
 
+def build_production_boardwalk(name="production_boardwalk"):
+    clear_scene()
+    deck = make_mat("deck", "#5d3f24")
+    edge = make_mat("edge", "#2c2118")
+    dust = make_mat("dust", "#9a6a3e")
+    parts = [
+        add_box((3.4, 1.08, 0.12), (0, 0, 0.06), deck, "walk_base"),
+        add_box((3.48, 0.08, 0.18), (0, -0.56, 0.11), edge, "front_lip"),
+        add_box((3.48, 0.08, 0.14), (0, 0.56, 0.09), edge, "back_lip"),
+    ]
+    for i, x in enumerate((-1.36, -0.9, -0.44, 0.02, 0.48, 0.94, 1.38)):
+        parts.append(add_box((0.05, 1.02, 0.035), (x, 0, 0.145), edge if i % 2 else dust, "plank_gap"))
+    for x in (-1.25, 1.25):
+        parts.append(add_box((0.12, 0.12, 0.7), (x, -0.46, 0.35), edge, "rail_post"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name, bake=True)
+
+
+def build_production_facade(name="production_saloon", wall_key="saloon", width=3.0, height=3.5, sign_style="saloon"):
+    clear_scene()
+    wall = make_mat("wall", PALETTE[wall_key])
+    dark = make_mat("darktrim", "#24170e")
+    roof = make_mat("roof", "#21150d")
+    glass = make_mat("window_glow", "#ffb766", emissive="#ff8f32", emissive_strength=0.75)
+    sign = make_mat("sign", "#d8a84f", emissive="#d8a84f", emissive_strength=0.28)
+    parts = [
+        add_box((width * 0.92, 0.9, height * 0.64), (0, -0.38, height * 0.32), wall, "deep_body"),
+        add_box((width, 0.22, height), (0, 0, height / 2), wall, "false_front"),
+        add_box((width * 1.08, 0.32, 0.16), (0, 0.05, height - 0.08), dark, "cornice"),
+        add_box((width * 1.16, 1.02, 0.1), (0, 0.46, height * 0.62), roof, "deep_awning"),
+        add_box((width * 1.1, 0.72, 0.08), (0, 0.72, 0.08), dark, "porch_deck"),
+        add_box((0.58, 0.08, 1.08), (0, 0.145, 0.54), dark, "door"),
+    ]
+    if sign_style == "saloon":
+        parts.append(add_box((width * 0.64, 0.1, 0.34), (0, 0.62, height * 0.58), sign, "big_sign"))
+        parts.append(add_box((width * 0.5, 0.26, 0.28), (0, 0.07, height + 0.04), dark, "raised_crown"))
+    elif sign_style == "hotel":
+        parts.append(add_box((width * 0.5, 0.1, 0.46), (-width * 0.2, 0.62, height * 0.58), sign, "side_sign"))
+        parts.append(add_box((width * 0.82, 0.28, 0.2), (width * 0.08, 0.07, height + 0.02), dark, "offset_parapet"))
+    else:
+        parts.append(add_box((width * 0.42, 0.1, 0.32), (width * 0.2, 0.62, height * 0.56), sign, "assay_sign"))
+        parts.append(add_box((width * 0.44, 0.26, 0.32), (-width * 0.2, 0.07, height + 0.03), dark, "stepped_parapet"))
+
+    for i in range(7):
+        x = (-0.5 + i / 6) * width * 0.9
+        parts.append(add_box((0.035, 0.06, height * 0.78), (x, 0.15, height * 0.44), dark, "front_batten"))
+    for dx in (-width * 0.31, width * 0.31):
+        for z in (height * 0.42, height * 0.66):
+            parts.append(add_box((0.48, 0.075, 0.42), (dx, 0.14, z), glass, "warm_window"))
+            parts.append(add_box((0.56, 0.05, 0.5), (dx, 0.11, z), dark, "window_frame"))
+            parts.append(add_box((0.035, 0.08, 0.4), (dx, 0.18, z), dark, "window_mull_v"))
+            parts.append(add_box((0.42, 0.08, 0.035), (dx, 0.18, z), dark, "window_mull_h"))
+    for x in (-width * 0.48, 0, width * 0.48):
+        parts.append(add_box((0.1, 0.1, height * 0.58), (x, 0.78, height * 0.29), dark, "porch_post"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name, bake=True)
+
+
+def build_window_glow_panel(name="window_glow_panel"):
+    clear_scene()
+    glass = make_mat("glow", "#ffb766", emissive="#ff8f32", emissive_strength=1.2)
+    frame = make_mat("frame", "#22160e")
+    parts = [
+        add_box((0.72, 0.05, 0.52), (0, 0, 0.34), glass, "window_glass"),
+        add_box((0.82, 0.08, 0.08), (0, 0.01, 0.62), frame, "top_frame"),
+        add_box((0.82, 0.08, 0.08), (0, 0.01, 0.06), frame, "bottom_frame"),
+        add_box((0.08, 0.08, 0.6), (-0.4, 0.01, 0.34), frame, "left_frame"),
+        add_box((0.08, 0.08, 0.6), (0.4, 0.01, 0.34), frame, "right_frame"),
+        add_box((0.04, 0.09, 0.5), (0, 0.02, 0.34), frame, "mullion_v"),
+        add_box((0.68, 0.09, 0.035), (0, 0.02, 0.34), frame, "mullion_h"),
+    ]
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_hanging_sign(name="hanging_sign"):
+    clear_scene()
+    dark = make_mat("dark", "#24170e")
+    sign = make_mat("sign", "#d8a84f", emissive="#d8a84f", emissive_strength=0.35)
+    rope = make_mat("rope", "#b89255")
+    parts = [
+        add_box((0.12, 0.12, 1.0), (-0.42, 0, 0.5), dark, "post_l"),
+        add_box((0.12, 0.12, 1.0), (0.42, 0, 0.5), dark, "post_r"),
+        add_box((1.08, 0.08, 0.08), (0, 0, 1.03), dark, "crossbar"),
+        add_box((0.82, 0.08, 0.34), (0, 0.05, 0.72), sign, "signboard"),
+    ]
+    for x in (-0.26, 0.26):
+        parts.append(add_box((0.035, 0.035, 0.26), (x, 0.05, 0.9), rope, "hanger"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_hitching_rail(name="hitching_rail"):
+    clear_scene()
+    wood = make_mat("railwood", "#4a3526")
+    dark = make_mat("raildark", "#24170e")
+    parts = []
+    for x in (-1.1, 0, 1.1):
+        parts.append(add_box((0.12, 0.12, 0.78), (x, 0, 0.39), wood, "post"))
+        parts.append(add_box((0.18, 0.18, 0.08), (x, 0, 0.82), dark, "post_cap"))
+    parts.append(add_box((2.55, 0.1, 0.1), (0, 0, 0.62), wood, "top_rail"))
+    parts.append(add_box((2.35, 0.08, 0.08), (0, 0, 0.34), dark, "low_rail"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name, bake=True)
+
+
+def build_barrel_crate_cluster(name="barrel_crate_cluster"):
+    clear_scene()
+    crate = make_mat("crate", "#7a5230")
+    dark = make_mat("dark", "#24170e")
+    band = make_mat("band", "#1c1814")
+    parts = [
+        add_box((0.48, 0.44, 0.44), (-0.42, 0.02, 0.22), crate, "crate_a"),
+        add_box((0.4, 0.36, 0.38), (0.02, -0.2, 0.19), crate, "crate_b"),
+    ]
+    _cyl(12, 0.22, 0.55, (0.48, 0.16, 0.28), crate)
+    parts.append(bpy.context.active_object)
+    for z in (0.12, 0.44):
+        parts.append(add_box((0.48, 0.04, 0.035), (0.48, 0.16, z), band, "barrel_band"))
+    for x in (-0.52, -0.32, -0.08, 0.08):
+        parts.append(add_box((0.035, 0.46, 0.035), (x, 0.02, 0.45), dark, "crate_slat"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name, bake=True)
+
+
+def build_npc_silhouette(name="npc_silhouette"):
+    clear_scene()
+    coat = make_mat("coat", "#17100c")
+    hat = make_mat("hat", "#100b08")
+    rim = make_mat("rim", "#6c4b2d")
+    parts = [
+        add_box((0.22, 0.18, 0.68), (-0.11, 0, 0.34), coat, "leg_l"),
+        add_box((0.22, 0.18, 0.68), (0.11, 0, 0.34), coat, "leg_r"),
+        add_box((0.58, 0.22, 0.72), (0, 0, 0.94), coat, "duster"),
+        add_box((0.14, 0.16, 0.52), (-0.42, 0, 0.98), coat, "arm_l"),
+        add_box((0.14, 0.16, 0.52), (0.42, 0, 0.98), coat, "arm_r"),
+        add_box((0.26, 0.24, 0.24), (0, 0, 1.42), coat, "head"),
+        add_box((0.78, 0.58, 0.06), (0, 0, 1.56), hat, "wide_brim"),
+        add_box((0.36, 0.32, 0.18), (0, 0, 1.66), hat, "hat_crown"),
+        add_box((0.08, 0.03, 0.62), (0.31, -0.12, 1.02), rim, "rifle_sling"),
+    ]
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_lantern_string(name="lantern_string"):
+    clear_scene()
+    wire = make_mat("wire", "#1f160f")
+    glow = make_mat("glow", "#ffb866", emissive="#ff8f32", emissive_strength=1.25)
+    cap = make_mat("cap", "#2c2118")
+    parts = [add_box((3.2, 0.045, 0.045), (0, 0, 1.95), wire, "line")]
+    for x in (-1.18, -0.38, 0.42, 1.16):
+        parts.append(add_box((0.035, 0.035, 0.26), (x, 0, 1.8), wire, "drop"))
+        parts.append(add_box((0.2, 0.18, 0.24), (x, 0, 1.62), glow, "lantern"))
+        parts.append(add_box((0.25, 0.22, 0.04), (x, 0, 1.76), cap, "top"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_mud_rut_decal(name="mud_rut_decal"):
+    clear_scene()
+    mud = make_mat("mud", "#5a3923")
+    wet = make_mat("wet", "#2c2118")
+    dust = make_mat("dust", "#a06f43")
+    parts = [
+        add_box((3.0, 1.25, 0.035), (0, 0, 0.018), mud, "mud_patch"),
+        add_box((2.85, 0.14, 0.06), (0, -0.32, 0.05), wet, "rut_l"),
+        add_box((2.85, 0.14, 0.06), (0, 0.32, 0.05), wet, "rut_r"),
+    ]
+    for x, y in ((-1.1, 0.52), (-0.34, -0.5), (0.48, 0.47), (1.1, -0.44)):
+        parts.append(add_box((0.22, 0.12, 0.05), (x, y, 0.065), dust, "dry_patch"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name, bake=True)
+
+
+def build_dust_smoke_plume(name="dust_smoke_plume"):
+    clear_scene()
+    dust = make_mat("dust", "#b88551")
+    smoke = make_mat("smoke", "#6d5b4a")
+    parts = []
+    for i, (x, y, z, sx, sy, sz, mat) in enumerate((
+        (-0.42, 0.02, 0.22, 0.56, 0.18, 0.18, dust),
+        (0.06, -0.04, 0.42, 0.72, 0.2, 0.22, dust),
+        (0.44, 0.05, 0.68, 0.52, 0.16, 0.2, smoke),
+        (-0.05, 0.02, 0.94, 0.42, 0.12, 0.18, smoke),
+    )):
+        p = add_box((sx, sy, sz), (x, y, z), mat, f"plume_{i}")
+        p.rotation_euler = (0, 0, math.radians(12 * (i - 1)))
+        parts.append(p)
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_bounty_emblem(name="bounty_emblem"):
+    clear_scene()
+    metal = make_mat("metal", "#6b6258")
+    dark = make_mat("dark", "#17100c")
+    gold = make_mat("gold", "#ffd77b", emissive="#d8a84f", emissive_strength=0.5)
+    parts = []
+    _cyl(16, 0.36, 0.08, (0, 0, 0.36), metal, rot=(math.radians(90), 0, 0))
+    parts.append(bpy.context.active_object)
+    parts.append(add_box((0.12, 0.06, 0.7), (0, -0.04, 0.36), gold, "star_v"))
+    parts.append(add_box((0.7, 0.06, 0.12), (0, -0.04, 0.36), gold, "star_h"))
+    for ang in (45, -45):
+        b = add_box((0.56, 0.055, 0.09), (0, -0.04, 0.36), gold, "star_diag")
+        b.rotation_euler = (0, 0, math.radians(ang))
+        parts.append(b)
+    parts.append(add_box((0.42, 0.03, 0.12), (0, -0.08, 0.02), dark, "mount_shadow"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_production_frame_kit():
+    out = {}
+    out["production_boardwalk"] = build_production_boardwalk()
+    out["production_saloon"] = build_production_facade("production_saloon", "saloon", 3.15, 3.55, "saloon")
+    out["production_store"] = build_production_facade("production_store", "wall_warm", 2.72, 3.2, "hotel")
+    out["production_assay"] = build_production_facade("production_assay", "wall_dark", 2.45, 3.0, "assay")
+    out["window_glow_panel"] = build_window_glow_panel()
+    out["hanging_sign"] = build_hanging_sign()
+    out["hitching_rail"] = build_hitching_rail()
+    out["barrel_crate_cluster"] = build_barrel_crate_cluster()
+    out["npc_silhouette"] = build_npc_silhouette()
+    out["lantern_string"] = build_lantern_string()
+    out["mud_rut_decal"] = build_mud_rut_decal()
+    out["dust_smoke_plume"] = build_dust_smoke_plume()
+    out["bounty_emblem"] = build_bounty_emblem()
+    return out
+
+
 def build_hero_polish_kit():
     out = {}
     out["jobBoard_hero"] = build_jobboard_hero()
@@ -975,4 +1227,8 @@ def build_all():
     out["dead_tree"] = build_dead_tree()
     out["rock"] = build_rock("rock", r=0.5, seed=3)
     out["boulder"] = build_rock("boulder", r=0.78, seed=7)
+    out.update(build_recovery_kit())
+    out.update(build_max_mode_kit())
+    out.update(build_hero_polish_kit())
+    out.update(build_production_frame_kit())
     return out

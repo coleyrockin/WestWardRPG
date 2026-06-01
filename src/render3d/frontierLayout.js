@@ -30,6 +30,10 @@ export const FIRST_ROAD_ART_STYLE = Object.freeze({
   openingRoadWidth: 6.75,
   shoulderWidth: 2.65,
   minNaturalClusters: 34,
+  minProductionStreetProps: 36,
+  minStorefronts: 6,
+  minNpcSilhouettes: 6,
+  minWindowLights: 10,
 });
 
 export const FIRST_FIVE_ROUTE = Object.freeze([
@@ -232,6 +236,59 @@ const TOWN_EDGE = [
   { kind: "cactus",       label: "Town Cactus",      x: -1.3, y: 6.9,  color: "#5c7a3a", size: 0.64 },
 ];
 
+const PRODUCTION_MAIN_STREET = [
+  // North boardwalk/storefront edge. Facades sit just outside the first-frame
+  // blocker audit band while their windows/signs still read in the opening shot.
+  { kind: "productionSaloon", label: "Drifter Saloon", x: 6.4, y: 1.75, color: "#7a5230", size: 0.82, yaw: 0 },
+  { kind: "productionStore", label: "Lamp Dry Goods", x: 11.4, y: 1.55, color: "#9a7144", size: 0.78, yaw: 0 },
+  { kind: "productionAssay", label: "Boone Assay", x: 16.2, y: 1.62, color: "#6a4630", size: 0.72, yaw: 0 },
+  { kind: "productionBoardwalk", label: "North Boardwalk", x: 6.7, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
+  { kind: "productionBoardwalk", label: "North Boardwalk", x: 10.1, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
+  { kind: "productionBoardwalk", label: "North Boardwalk", x: 13.5, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
+  { kind: "productionBoardwalk", label: "North Boardwalk", x: 16.9, y: 3.28, color: "#5d3f24", size: 0.88, yaw: 0 },
+  { kind: "hangingSign", label: "Drifter Sign", x: 7.05, y: 3.55, color: "#ffd77b", size: 0.9, yaw: 0.08 },
+  { kind: "hangingSign", label: "Dry Goods Sign", x: 12.0, y: 3.5, color: "#ffd77b", size: 0.82, yaw: -0.06 },
+  { kind: "windowGlowPanel", label: "Saloon Window Glow", x: 5.35, y: 3.18, color: "#ffad63", size: 1.0, yaw: 0 },
+  { kind: "windowGlowPanel", label: "Saloon Window Glow", x: 7.4, y: 3.18, color: "#ffad63", size: 1.0, yaw: 0 },
+  { kind: "windowGlowPanel", label: "Store Window Glow", x: 10.65, y: 3.12, color: "#ffbf72", size: 0.9, yaw: 0 },
+  { kind: "windowGlowPanel", label: "Store Window Glow", x: 12.15, y: 3.12, color: "#ffbf72", size: 0.9, yaw: 0 },
+  { kind: "lanternString", label: "North Lantern String", x: 11.0, y: 4.15, color: "#ffb866", size: 0.9, yaw: 0 },
+
+  // South boardwalk/storefront edge, mirrored to frame the road without
+  // swallowing the third-person camera or blocking the spawn-to-board lane.
+  { kind: "productionStore", label: "Dustward Hotel", x: 7.2, y: 15.25, color: "#9a7144", size: 0.74, yaw: Math.PI },
+  { kind: "productionSaloon", label: "South Porch Saloon", x: 12.2, y: 15.48, color: "#7a5230", size: 0.76, yaw: Math.PI },
+  { kind: "productionAssay", label: "Marshal Office", x: 17.0, y: 15.3, color: "#6a4630", size: 0.7, yaw: Math.PI },
+  { kind: "productionBoardwalk", label: "South Boardwalk", x: 6.7, y: 13.42, color: "#5d3f24", size: 0.88, yaw: Math.PI },
+  { kind: "productionBoardwalk", label: "South Boardwalk", x: 10.1, y: 13.42, color: "#5d3f24", size: 0.9, yaw: Math.PI },
+  { kind: "productionBoardwalk", label: "South Boardwalk", x: 13.5, y: 13.42, color: "#5d3f24", size: 0.9, yaw: Math.PI },
+  { kind: "productionBoardwalk", label: "South Boardwalk", x: 16.9, y: 13.42, color: "#5d3f24", size: 0.86, yaw: Math.PI },
+  { kind: "windowGlowPanel", label: "Hotel Window Glow", x: 6.52, y: 13.72, color: "#ffbf72", size: 0.9, yaw: Math.PI },
+  { kind: "windowGlowPanel", label: "Hotel Window Glow", x: 7.92, y: 13.72, color: "#ffbf72", size: 0.9, yaw: Math.PI },
+  { kind: "windowGlowPanel", label: "South Saloon Glow", x: 11.35, y: 13.76, color: "#ffad63", size: 1.0, yaw: Math.PI },
+  { kind: "windowGlowPanel", label: "South Saloon Glow", x: 12.9, y: 13.76, color: "#ffad63", size: 1.0, yaw: Math.PI },
+  { kind: "lanternString", label: "South Lantern String", x: 12.0, y: 12.84, color: "#ffb866", size: 0.86, yaw: Math.PI },
+
+  // Bounty street life: silhouettes and props read as inhabited without
+  // becoming gameplay blockers in the main road lane.
+  { kind: "npcSilhouette", label: "Porch Bounty Hunter", x: 7.9, y: 4.55, color: "#17100c", size: 0.88, yaw: 2.85 },
+  { kind: "npcSilhouette", label: "Boardwalk Lookout", x: 11.4, y: 4.4, color: "#17100c", size: 0.78, yaw: 2.95 },
+  { kind: "npcSilhouette", label: "Road Deputy", x: 15.4, y: 7.15, color: "#17100c", size: 0.72, yaw: -1.5 },
+  { kind: "npcSilhouette", label: "Street Traveler", x: 19.1, y: 7.85, color: "#17100c", size: 0.64, yaw: -1.45 },
+  { kind: "npcSilhouette", label: "South Porch Watcher", x: 8.8, y: 12.52, color: "#17100c", size: 0.78, yaw: 0.25 },
+  { kind: "npcSilhouette", label: "Lantern Bystander", x: 14.4, y: 12.35, color: "#17100c", size: 0.72, yaw: -0.15 },
+  { kind: "hitchingRail", label: "North Hitching Rail", x: 5.2, y: 4.55, color: "#4a3526", size: 0.82, yaw: 0.04 },
+  { kind: "hitchingRail", label: "South Hitching Rail", x: 15.6, y: 12.55, color: "#4a3526", size: 0.78, yaw: Math.PI - 0.08 },
+  { kind: "barrelCrateCluster", label: "Saloon Cargo", x: 4.8, y: 4.25, color: "#7a5230", size: 0.88, yaw: 0.28 },
+  { kind: "barrelCrateCluster", label: "Dry Goods Cargo", x: 13.8, y: 4.1, color: "#7a5230", size: 0.82, yaw: -0.18 },
+  { kind: "barrelCrateCluster", label: "South Porch Cargo", x: 10.0, y: 12.55, color: "#7a5230", size: 0.84, yaw: 0.12 },
+  { kind: "mudRutDecal", label: "Opening Mud Rut", x: 10.8, y: 8.0, color: "#5a3923", size: 1.1, yaw: -0.7 },
+  { kind: "mudRutDecal", label: "Board Road Mud Rut", x: 14.2, y: 7.1, color: "#5a3923", size: 1.0, yaw: -0.65 },
+  { kind: "dustSmokePlume", label: "Boardwalk Dust", x: 8.0, y: 4.85, color: "#b88551", size: 0.9, yaw: 0.2 },
+  { kind: "dustSmokePlume", label: "Street Dust", x: 17.6, y: 7.35, color: "#b88551", size: 0.74, yaw: -0.3 },
+  { kind: "bountyEmblem", label: "Boone Bounty Emblem", x: 13.0, y: 5.35, color: "#ffd77b", size: 0.75, yaw: Math.PI / 2 },
+];
+
 // Western flora flanking the road corridor — shoulders only (out of the wedge).
 const ROAD_FLORA = [
   { kind: "sageCluster", label: "Roadside Sage", x: 10.9, y: 6.1, color: "#687a42", size: 1.1 },
@@ -310,6 +367,7 @@ function world(anchor, dx, dy, depthLane) {
 // carry x/y. Project the former, pass the latter through untouched.
 const ABSOLUTE_ZONES = [
   ...TOWN_EDGE,
+  ...PRODUCTION_MAIN_STREET,
   ...ROAD_CORRIDOR,
   ...ROUTE_LIGHTS,
   ...routeRuts(),
@@ -368,6 +426,33 @@ const HERO_POLISH_KINDS = new Set([
   "slimeTrailHero",
 ]);
 
+const PRODUCTION_FRAME_KINDS = new Set([
+  "productionBoardwalk",
+  "productionSaloon",
+  "productionStore",
+  "productionAssay",
+  "windowGlowPanel",
+  "hangingSign",
+  "hitchingRail",
+  "barrelCrateCluster",
+  "npcSilhouette",
+  "lanternString",
+  "mudRutDecal",
+  "dustSmokePlume",
+  "bountyEmblem",
+]);
+
+const PRODUCTION_STOREFRONT_KINDS = new Set([
+  "productionSaloon",
+  "productionStore",
+  "productionAssay",
+  "heroTownSaloon",
+  "heroTownStore",
+  "heroTownAssay",
+]);
+
+const PRODUCTION_WINDOW_KINDS = new Set(["windowGlowPanel", "lanternString", "hangingSign", "bountyEmblem"]);
+
 const NATURAL_KINDS = new Set(["sageCluster", "roadGrass", "slimeTrailHero", "marshCluster", "reeds"]);
 
 export function getArtDirectionLayoutMetrics(placements = buildFrontierPlacements()) {
@@ -386,5 +471,26 @@ export function getArtDirectionLayoutMetrics(placements = buildFrontierPlacement
     naturalClusterCount: placements.filter((p) => NATURAL_KINDS.has(p.kind)).length,
     firstFrameNaturalCount: firstFrame.filter((p) => NATURAL_KINDS.has(p.kind)).length,
     firstFrameSlabBlockers: slabBlockers.map((p) => p.kind),
+  };
+}
+
+export function getProductionFrameLayoutMetrics(placements = buildFrontierPlacements()) {
+  const kinds = new Set(placements.map((placement) => placement.kind));
+  const firstStreet = placements.filter((p) => (
+    p.x >= 4.0 && p.x <= 21.0 &&
+    p.y >= 1.0 && p.y <= 16.2
+  ));
+  const productionProps = firstStreet.filter((p) => PRODUCTION_FRAME_KINDS.has(p.kind));
+  const storefronts = firstStreet.filter((p) => PRODUCTION_STOREFRONT_KINDS.has(p.kind));
+  const windowLights = firstStreet.filter((p) => PRODUCTION_WINDOW_KINDS.has(p.kind));
+  const npcSilhouettes = firstStreet.filter((p) => p.kind === "npcSilhouette");
+  return {
+    style: FIRST_ROAD_ART_STYLE,
+    productionKinds: Array.from(PRODUCTION_FRAME_KINDS).filter((kind) => kinds.has(kind)),
+    productionStreetPropCount: productionProps.length,
+    storefrontCount: storefronts.length,
+    windowLightCount: windowLights.length,
+    npcSilhouetteCount: npcSilhouettes.length,
+    firstStreetBounds: { minX: 4.0, maxX: 21.0, minY: 1.0, maxY: 16.2 },
   };
 }

@@ -15,10 +15,13 @@ const KINDS_THAT_BLOCK = new Set([
   "saloon", "saloonFacade", "townFacadeWarm", "townFacadeStore", "townFacadeDark", "storefront", "porch",
   "heroTownSaloon", "heroTownStore", "heroTownAssay",
   "brokenFence", "mesaSkyline", "heroMesaSkyline",
+  "productionSaloon", "productionStore", "productionAssay", "hitchingRail", "barrelCrateCluster",
 ]);
 const KINDS_THAT_PASS = new Set([
   "road", "roadPlank", "roadRut", "townBark", "slimeTell", "marshCluster", "slimeTrailHero",
   "roadSlime", "brush", "sagePatch", "sageCluster", "roadGrass", "reeds",
+  "productionBoardwalk", "windowGlowPanel", "hangingSign", "npcSilhouette", "lanternString",
+  "mudRutDecal", "dustSmokePlume", "bountyEmblem",
 ]);
 
 describe("worldProxies — buildProxies", () => {

@@ -6,10 +6,150 @@
     <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23131c20'/%3E%3Cstop offset='1' stop-color='%23d27238'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='6' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='20' r='5' fill='%23f5d8a8' opacity='0.9'/%3E%3C/svg%3E" />
     <title>WestWard — 3D First Road Slice</title>
     <style>
-      :root { color-scheme: dark; }
+      :root {
+        color-scheme: dark;
+        --hud-bg: rgba(12, 12, 15, 0.72);
+        --hud-bg-strong: rgba(10, 10, 13, 0.84);
+        --hud-line: rgba(255, 198, 110, 0.46);
+        --hud-gold: #ffd77b;
+        --hud-text: #f6e4c4;
+        --hud-dim: rgba(246, 228, 196, 0.68);
+        --hud-red: #b93c31;
+        --hud-blue: #4d8fc7;
+      }
       * { box-sizing: border-box; }
       html, body { margin: 0; height: 100%; background: #1a1226; overflow: hidden; }
       #scene { display: block; width: 100vw; height: 100vh; }
+
+      .rpg-panel {
+        font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+        color: var(--hud-text);
+        background:
+          linear-gradient(180deg, rgba(255, 198, 110, 0.08), rgba(255, 198, 110, 0)),
+          var(--hud-bg);
+        border: 1px solid var(--hud-line);
+        box-shadow: 0 14px 36px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 230, 180, 0.07);
+        backdrop-filter: blur(5px);
+      }
+
+      #hero-panel {
+        position: fixed;
+        top: 14px;
+        left: 16px;
+        z-index: 22;
+        width: 244px;
+        min-height: 78px;
+        display: grid;
+        grid-template-columns: 58px 1fr;
+        gap: 10px;
+        align-items: center;
+        padding: 9px 11px;
+        border-radius: 8px;
+      }
+      #hero-panel .portrait {
+        width: 58px;
+        height: 58px;
+        display: grid;
+        place-items: center;
+        color: #1b1209;
+        font-weight: 800;
+        letter-spacing: 0.8px;
+        background:
+          radial-gradient(circle at 50% 38%, #f1c58c 0 24%, #362215 25% 38%, #101014 39% 100%);
+        border: 1px solid rgba(255, 215, 123, 0.66);
+        border-radius: 50%;
+        box-shadow: 0 0 0 3px rgba(0,0,0,0.32), 0 0 18px rgba(255, 184, 90, 0.2);
+      }
+      #hero-panel .hero-name {
+        display: block;
+        color: #fff0c8;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+      #hero-panel .hero-sub {
+        display: block;
+        margin-top: 2px;
+        color: var(--hud-dim);
+        font-size: 11px;
+      }
+      #hero-panel .hp-label {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 9px;
+        color: #f6d6c8;
+        font-size: 10px;
+        letter-spacing: 0.9px;
+        text-transform: uppercase;
+      }
+      #hero-panel .hp-track {
+        display: block;
+        height: 8px;
+        margin-top: 4px;
+        overflow: hidden;
+        background: rgba(20, 10, 10, 0.85);
+        border: 1px solid rgba(255, 230, 180, 0.16);
+      }
+      #hero-panel .hp-fill {
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, #7f201d, #d64c3f);
+        box-shadow: 0 0 12px rgba(214, 76, 63, 0.5);
+      }
+
+      #job-toast {
+        position: fixed;
+        top: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 24;
+        width: min(382px, calc(100vw - 560px));
+        min-width: 320px;
+        display: grid;
+        grid-template-columns: 54px 1fr auto;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 7px;
+      }
+      #job-toast .job-medal {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        color: #111014;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.8px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #e5d1a5 0 44%, #6b6258 45% 68%, #221913 69% 100%);
+        border: 1px solid rgba(255, 236, 173, 0.62);
+      }
+      #job-toast .job-kicker,
+      #job-tracker .jobs-kicker {
+        display: block;
+        color: var(--hud-gold);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 1.7px;
+        text-transform: uppercase;
+      }
+      #job-toast .job-title {
+        display: block;
+        margin-top: 3px;
+        color: #fff0c8;
+        font-size: 15px;
+        line-height: 1.1;
+      }
+      #job-toast .job-view {
+        align-self: end;
+        color: #ffe1a0;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
 
       /* DOM objective strip — stays out of the 3D scene, low-chrome */
       #objective {
@@ -103,7 +243,7 @@
         top: 14px;
         right: 16px;
         z-index: 18;
-        width: 224px;
+        width: 214px;
         padding: 10px 10px 9px;
         color: #f6e4c4;
         font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
@@ -151,7 +291,7 @@
       #field-map-svg {
         display: block;
         width: 100%;
-        height: 142px;
+        height: 136px;
         margin-top: 1px;
         overflow: visible;
       }
@@ -255,11 +395,118 @@
       }
 
       #tag {
-        position: fixed; top: 14px; left: 16px;
+        position: fixed; top: 104px; left: 16px;
+        display: none;
         font: 12px/1.4 ui-monospace, monospace;
         color: rgba(246, 228, 196, 0.6);
         background: rgba(24, 16, 30, 0.5);
         padding: 6px 10px; border-radius: 6px;
+      }
+
+      #job-tracker {
+        position: fixed;
+        top: 218px;
+        right: 16px;
+        z-index: 18;
+        width: 214px;
+        padding: 10px 11px;
+        border-radius: 8px;
+      }
+      #job-tracker .job-row {
+        display: grid;
+        grid-template-columns: 14px 1fr auto;
+        gap: 8px;
+        align-items: start;
+        padding: 8px 0;
+        border-top: 1px solid rgba(255, 215, 123, 0.12);
+      }
+      #job-tracker .job-row:first-of-type { border-top: 0; }
+      #job-tracker .job-dot {
+        width: 8px;
+        height: 8px;
+        margin-top: 4px;
+        background: var(--hud-gold);
+        box-shadow: 0 0 9px rgba(255, 215, 123, 0.68);
+        transform: rotate(45deg);
+      }
+      #job-tracker .job-dot.secondary {
+        background: rgba(246, 228, 196, 0.5);
+        box-shadow: none;
+        border-radius: 50%;
+        transform: none;
+      }
+      #job-tracker .job-name {
+        display: block;
+        color: #fff0c8;
+        font-size: 12px;
+        line-height: 1.15;
+      }
+      #job-tracker .job-line {
+        display: block;
+        margin-top: 3px;
+        color: var(--hud-dim);
+        font-size: 11px;
+        line-height: 1.25;
+      }
+      #job-tracker .job-count {
+        color: #ffe1a0;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      #hotbar {
+        position: fixed;
+        left: 50%;
+        bottom: 18px;
+        z-index: 19;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 5px;
+        padding: 7px 9px;
+        border-radius: 7px;
+      }
+      #hotbar .slot {
+        position: relative;
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        color: #ffe1a0;
+        font: 700 13px/1 ui-monospace, monospace;
+        background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.18)), rgba(24, 17, 20, 0.84);
+        border: 1px solid rgba(255, 215, 123, 0.3);
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2);
+      }
+      #hotbar .slot.active {
+        border-color: #ffe1a0;
+        box-shadow: 0 0 12px rgba(255, 215, 123, 0.5), inset 0 0 0 1px rgba(255, 236, 173, 0.18);
+      }
+      #hotbar .slot small {
+        position: absolute;
+        right: 4px;
+        bottom: 3px;
+        color: rgba(246, 228, 196, 0.62);
+        font-size: 9px;
+      }
+
+      #command-dock {
+        position: fixed;
+        right: 16px;
+        bottom: 18px;
+        z-index: 19;
+        display: flex;
+        gap: 8px;
+        padding: 7px 8px;
+        border-radius: 7px;
+      }
+      #command-dock button {
+        width: 36px;
+        height: 36px;
+        cursor: default;
+        color: #ffe1a0;
+        background: rgba(18, 15, 18, 0.86);
+        border: 1px solid rgba(255, 215, 123, 0.28);
+        font: 700 11px/1 ui-monospace, monospace;
       }
 
       /* Interaction prompt — sits just above the objective strip, smaller. */
@@ -375,6 +622,23 @@
   </head>
   <body>
     <canvas id="scene" role="img" aria-label="Playable Three.js preview of WestWard's first road slice"></canvas>
+    <div id="hero-panel" class="rpg-panel" aria-label="Player status">
+      <span class="portrait">WW</span>
+      <span>
+        <span class="hero-name">Rowan Vale</span>
+        <span class="hero-sub">Level 3 Road Bounty Hunter</span>
+        <span class="hp-label"><span>HP</span><span>100 / 100</span></span>
+        <span class="hp-track" aria-hidden="true"><span class="hp-fill"></span></span>
+      </span>
+    </div>
+    <div id="job-toast" class="rpg-panel" role="status" aria-live="polite">
+      <span class="job-medal">JOB</span>
+      <span>
+        <span class="job-kicker">Boone Board Update</span>
+        <span class="job-title">New road bounty available</span>
+      </span>
+      <span class="job-view">View</span>
+    </div>
     <div id="field-map" aria-label="Dustward first-road field map">
       <div class="map-topline">
         <span class="map-title">Dustward Road</span>
@@ -384,6 +648,25 @@
       <span class="map-target">Boone's Job Board</span>
     </div>
     <div id="tag" aria-hidden="true">WestWard · Dustward · 3D first road</div>
+    <div id="job-tracker" class="rpg-panel" aria-label="Active jobs">
+      <span class="jobs-kicker">Jobs</span>
+      <div class="job-row active">
+        <span class="job-dot"></span>
+        <span>
+          <span class="job-name">Marsh Slime Bounty</span>
+          <span class="job-line">Find Boone's lit job board by the road.</span>
+        </span>
+        <span class="job-count">0/1</span>
+      </div>
+      <div class="job-row">
+        <span class="job-dot secondary"></span>
+        <span>
+          <span class="job-name">Old Road Survey</span>
+          <span class="job-line">Recover the wagon map scrap.</span>
+        </span>
+        <span class="job-count">0/1</span>
+      </div>
+    </div>
     <div id="prompt" role="status" aria-live="polite" hidden></div>
     <div id="beat-toast" role="status" aria-live="polite" hidden>
       <span class="toast-title"></span>
@@ -400,6 +683,21 @@
           <span class="progress-track" aria-hidden="true"><span class="progress-fill"></span></span>
         </div>
       </span>
+    </div>
+    <div id="hotbar" class="rpg-panel" aria-label="Action bar">
+      <span class="slot active">E<small>Use</small></span>
+      <span class="slot">F<small>Draw</small></span>
+      <span class="slot">R<small>Cam</small></span>
+      <span class="slot">1<small>Shot</small></span>
+      <span class="slot">2<small>Kit</small></span>
+      <span class="slot">3<small>Map</small></span>
+    </div>
+    <div id="command-dock" class="rpg-panel" aria-label="Game menus">
+      <button type="button" title="Character">CHR</button>
+      <button type="button" title="Inventory">INV</button>
+      <button type="button" title="Skills">SKL</button>
+      <button type="button" title="Journal">JRN</button>
+      <button type="button" title="Options">OPT</button>
     </div>
     <div id="board-modal" hidden>
       <div id="board-card" role="dialog" aria-modal="true" aria-labelledby="board-title">

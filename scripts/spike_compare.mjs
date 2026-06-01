@@ -262,6 +262,9 @@ async function captureNew(context) {
       && window.__westward3dTest?.getRouteMetrics
       && window.__westward3dTest?.getCompositionMetrics
       && window.__westward3dTest?.getArtDirectionMetrics
+      && window.__westward3dTest?.getProductionFrameMetrics
+      && window.__westward3dTest?.getHudFantasyMetrics
+      && window.__westward3dTest?.getTownDensityMetrics
       && window.__westward3dTest?.getModelReadability
       && window.__westward3dTest?.getLightingMetrics
       && window.__westward3dTest?.getBeatVisibility
@@ -311,6 +314,46 @@ async function captureNew(context) {
   ) {
     errors.push(`render3d first-frame art direction below bar: ${JSON.stringify(artDirectionMetrics)}`);
   }
+  const productionFrameMetrics = await page.evaluate(() => window.__westward3dTest.getProductionFrameMetrics());
+  console.log(`[probe] new production frame metrics: ${JSON.stringify(productionFrameMetrics)}`);
+  if (
+    !productionFrameMetrics?.playerVisible ||
+    !productionFrameMetrics?.boardVisible ||
+    productionFrameMetrics.playerScreenArea < 0.01 ||
+    productionFrameMetrics.boardScreenArea < 0.002 ||
+    productionFrameMetrics.roadFootprint < 6.5 ||
+    productionFrameMetrics.streetDensity < 36 ||
+    productionFrameMetrics.storefrontCount < 6 ||
+    productionFrameMetrics.windowSignLightCount < 10 ||
+    productionFrameMetrics.npcSilhouetteCount < 6 ||
+    productionFrameMetrics.visibleProductionPropCount < 10 ||
+    productionFrameMetrics.maxForegroundBlocker?.screenArea > 0.24
+  ) {
+    errors.push(`render3d production frame below Claude-competitive bar: ${JSON.stringify(productionFrameMetrics)}`);
+  }
+  const townDensityMetrics = await page.evaluate(() => window.__westward3dTest.getTownDensityMetrics());
+  console.log(`[probe] new town density metrics: ${JSON.stringify(townDensityMetrics)}`);
+  if (
+    townDensityMetrics?.productionStreetPropCount < 36 ||
+    townDensityMetrics?.visibleProductionPropCount < 10 ||
+    !townDensityMetrics?.visibleProductionKinds?.includes("npcSilhouette")
+  ) {
+    errors.push(`render3d town density does not read as inhabited: ${JSON.stringify(townDensityMetrics)}`);
+  }
+  const hudFantasyMetrics = await page.evaluate(() => window.__westward3dTest.getHudFantasyMetrics());
+  console.log(`[probe] new HUD fantasy metrics: ${JSON.stringify(hudFantasyMetrics)}`);
+  if (
+    !hudFantasyMetrics?.heroPanelVisible ||
+    !hudFantasyMetrics?.jobToastVisible ||
+    !hudFantasyMetrics?.fieldMapVisible ||
+    !hudFantasyMetrics?.jobTrackerVisible ||
+    !hudFantasyMetrics?.hotbarVisible ||
+    !hudFantasyMetrics?.commandDockVisible ||
+    !hudFantasyMetrics?.objectiveVisible ||
+    hudFantasyMetrics.hudFootprint > 0.22
+  ) {
+    errors.push(`render3d HUD fantasy layer missing or too heavy: ${JSON.stringify(hudFantasyMetrics)}`);
+  }
   const modelReadability = await page.evaluate(() => window.__westward3dTest.getModelReadability());
   console.log(`[probe] new model readability: ${JSON.stringify(modelReadability)}`);
   const missingModels = Object.entries(modelReadability?.important || {})
@@ -358,7 +401,7 @@ async function captureNew(context) {
     errors.push(`render3d field map missing first-road route state: ${JSON.stringify(fieldMapState)}`);
   }
   const hudFootprint = await page.evaluate(() => {
-    const ids = ["objective", "prompt", "tag", "field-map"];
+    const ids = ["objective", "prompt", "tag", "field-map", "hero-panel", "job-toast", "job-tracker", "hotbar", "command-dock"];
     const vw = window.innerWidth || 1;
     const vh = window.innerHeight || 1;
     let area = 0;
@@ -371,7 +414,7 @@ async function captureNew(context) {
     return area / Math.max(1, vw * vh);
   });
   console.log(`[probe] new HUD footprint: ${hudFootprint.toFixed(4)}`);
-  if (hudFootprint > 0.13) {
+  if (hudFootprint > 0.22) {
     errors.push(`render3d HUD footprint too large: ${(hudFootprint * 100).toFixed(2)}%`);
   }
   await sleep(300);
