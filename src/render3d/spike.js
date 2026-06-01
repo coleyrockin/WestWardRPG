@@ -14,7 +14,14 @@ import { createPostProcessing } from "../game/renderer/postStacks.js";
 import { instanceModel, hashYaw } from "../game/renderer/assetLoader.js";
 import { modelFor } from "../game/renderer/assetManifest.js";
 import { createRenderSnapshot } from "../bridge/stateSnapshot.js";
-import { buildFrontierPlacements, FIRST_FIVE_ROUTE, getRouteMetrics, PLAYER_SPAWN } from "./frontierLayout.js";
+import {
+  buildFrontierPlacements,
+  FIRST_FIVE_ROUTE,
+  FIRST_ROAD_ART_STYLE,
+  getArtDirectionLayoutMetrics,
+  getRouteMetrics,
+  PLAYER_SPAWN,
+} from "./frontierLayout.js";
 import { createPlayerController } from "./playerController.js";
 import { buildProxies } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
@@ -39,6 +46,18 @@ import { createWeatherSystem } from "../game/world/weatherView.js";
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
 const col = (hex) => new THREE.Color(hex);
 const HERO_KINDS = Object.freeze(["jobBoard", "roadSign", "townBark", "smokeCache", "slimeTell", "roadSlime", "brokenWagon"]);
+const PLAYER_MODEL_URL = "/models/character_hero.glb";
+const IMPORTANT_MODEL_KINDS = Object.freeze([
+  "jobBoard",
+  "heroTownSaloon",
+  "heroTownStore",
+  "heroTownAssay",
+  "sageCluster",
+  "roadGrass",
+  "heroMesaSkyline",
+  "slimeTrailHero",
+  "brokenWagon",
+]);
 
 // Sky dome, sun/rim/hemi lights, fog, and clouds now live in atmosphere.js,
 // driven by the time-of-day palettes in timeOfDay.js.
@@ -432,6 +451,9 @@ function buildPlacement(group, p) {
     case "townFacadeWarm": return buildBuilding(group, p, 0.95);
     case "townFacadeStore": return buildBuilding(group, p, 0.86);
     case "townFacadeDark": return buildBuilding(group, p, 0.8);
+    case "heroTownSaloon": return buildBuilding(group, p, 1.05);
+    case "heroTownStore": return buildBuilding(group, p, 0.95);
+    case "heroTownAssay": return buildBuilding(group, p, 0.86);
     case "gate": return buildBuilding(group, p, 0.8);
     case "watchtower":
     case "landmark": return buildWatchtower(group, p);
@@ -448,6 +470,7 @@ function buildPlacement(group, p) {
     case "smokeCache": return buildSmokeCache(group, p);
     case "slimeTell":
     case "marshCluster": return buildSlimeTell(group, p);
+    case "slimeTrailHero": return buildSlimeTell(group, p);
     case "brokenWagon":
     case "wagonSalvage": return buildWagon(group, p);
     case "roadSlime": return buildSlime(group, p);
@@ -458,6 +481,7 @@ function buildPlacement(group, p) {
     case "mesa":
     case "mesaSilhouette":
     case "mesaSkyline":
+    case "heroMesaSkyline":
     case "cliff": return buildMesa(group, p);
     case "rock":
     case "boulder": return buildRock(group, p);
@@ -467,6 +491,8 @@ function buildPlacement(group, p) {
     case "roadRut": return buildRoadPlank(group, { ...p, size: p.kind === "roadRut" ? 1.35 * p.size : p.size });
     case "brush": return buildBrush(group, p);
     case "sagePatch": return buildSagePatch(group, p);
+    case "sageCluster":
+    case "roadGrass": return buildSagePatch(group, p);
     case "reeds": return buildReeds(group, p);
     case "cart":
     case "crate": return buildGeneric(group, p, 0.7);
@@ -1023,6 +1049,45 @@ function createCompositionMetrics({ heroMeshes, placementNodes, character, camer
   };
 }
 
+function createArtDirectionMetrics({ heroMeshes, placementNodes, character, camera, player, snapshot }) {
+  const composition = createCompositionMetrics({ heroMeshes, placementNodes, character, camera, player });
+  const playerStats = nodeScreenStats(character.group, camera);
+  const boardStats = nodeScreenStats(heroMeshes.jobBoard, camera);
+  const layout = getArtDirectionLayoutMetrics(snapshot.worldObjects);
+  return {
+    ...composition,
+    playerScreenArea: Number((playerStats?.area || 0).toFixed(4)),
+    boardScreenArea: Number((boardStats?.area || 0).toFixed(4)),
+    playerNdc: playerStats?.ndc || null,
+    boardNdc: boardStats?.ndc || null,
+    openingRoadWidth: FIRST_ROAD_ART_STYLE.openingRoadWidth,
+    roadWidth: FIRST_ROAD_ART_STYLE.roadWidth,
+    naturalClusterCount: layout.naturalClusterCount,
+    firstFrameNaturalCount: layout.firstFrameNaturalCount,
+    firstFrameSlabBlockers: layout.firstFrameSlabBlockers,
+    heroPolishKinds: layout.heroPolishKinds,
+  };
+}
+
+function createModelReadability({ modelLoadStatus, character }) {
+  const important = {};
+  for (const kind of IMPORTANT_MODEL_KINDS) {
+    const status = modelLoadStatus[kind] || { kind, loadedCount: 0, fallbackCount: 0, total: 0 };
+    important[kind] = {
+      url: status.url || modelFor(kind)?.url || null,
+      loaded: (status.loadedCount || 0) > 0,
+      loadedCount: status.loadedCount || 0,
+      fallbackCount: status.fallbackCount || 0,
+      total: status.total || 0,
+    };
+  }
+  return {
+    playerModelUrl: character.modelUrl || null,
+    usesHeroCharacter: character.modelUrl === PLAYER_MODEL_URL,
+    important,
+  };
+}
+
 function createOpeningLightPools(snapshot) {
   const group = new THREE.Group();
   group.name = "opening-light-pools";
@@ -1192,11 +1257,11 @@ function buildGround(scene, snapshot) {
   // Dusty S-road ribbon running through the entire first-five-minute route.
   // Segmenting it by route points makes the path visibly turn toward the marsh
   // instead of reading as a short flat alley.
-  const ROAD_W = 6.45;
-  const roadMat = standard("#9c794f", { roughness: 1, emissive: "#46341f", emissiveIntensity: 0.025, rimStrength: 0.035 });
-  const edgeMat = standard("#b99561", { roughness: 1, emissive: "#4a3a24", emissiveIntensity: 0.015, rimStrength: 0.035 });
-  const rutMat = standard("#675036", { roughness: 1, rimStrength: 0.02 });
-  const centerMat = standard("#806242", { roughness: 1, rimStrength: 0.02 });
+  const ROAD_W = FIRST_ROAD_ART_STYLE.roadWidth;
+  const roadMat = standard("#a77d4e", { roughness: 1, emissive: "#46341f", emissiveIntensity: 0.025, rimStrength: 0.035 });
+  const edgeMat = standard("#c39a61", { roughness: 1, emissive: "#4a3a24", emissiveIntensity: 0.015, rimStrength: 0.035 });
+  const rutMat = standard("#6a4f32", { roughness: 1, rimStrength: 0.02 });
+  const centerMat = standard("#88643e", { roughness: 1, rimStrength: 0.02 });
   const sageShoulderMat = new THREE.MeshBasicMaterial({
     color: col("#6f7f46"),
     transparent: true,
@@ -1231,12 +1296,12 @@ function buildGround(scene, snapshot) {
     // The near spawn segment fills the foreground fast in third-person view; a
     // slightly tapered width keeps it from reading like a red carpet while later
     // segments stay broad enough to guide the eye down-road.
-    const segmentWidth = i === 1 ? 5.15 : ROAD_W;
-    for (const off of [-(segmentWidth / 2 + 1.65), segmentWidth / 2 + 1.65]) {
+    const segmentWidth = i === 1 ? FIRST_ROAD_ART_STYLE.openingRoadWidth : ROAD_W;
+    for (const off of [-(segmentWidth / 2 + 1.75), segmentWidth / 2 + 1.75]) {
       const shoulder = addRoadPlane(
         { x: from.x + nx * off, y: from.y + nz * off },
         { x: to.x + nx * off, y: to.y + nz * off },
-        2.45,
+        FIRST_ROAD_ART_STYLE.shoulderWidth,
         0.018,
         sageShoulderMat,
       );
@@ -1363,6 +1428,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const heroMeshes = {};
   const placementNodes = [];
   const modelJobs = [];
+  const modelLoadStatus = {};
+  const recordModelLoad = (kind, url, loaded) => {
+    const current = modelLoadStatus[kind] || { kind, url, loadedCount: 0, fallbackCount: 0, total: 0 };
+    current.url = url || current.url;
+    current.total += 1;
+    if (loaded) current.loadedCount += 1;
+    else current.fallbackCount += 1;
+    modelLoadStatus[kind] = current;
+  };
   for (const p of snapshot.worldObjects) {
     const entry = modelFor(p.kind);
     if (entry) {
@@ -1375,6 +1449,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
           .then((node) => {
             props.add(node);
             placementNodes.push({ kind: p.kind, node });
+            recordModelLoad(p.kind, entry.url, true);
             // lamps/beacon/board carried their PointLight inside the old builder;
             // re-add it here for the model path (height is in local model units).
             if (entry.light) attachLight(props, p, entry.light, effScale);
@@ -1385,6 +1460,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
           })
           .catch((err) => {
             console.warn(`[render3d] model load failed for ${p.kind}, using fallback`, err);
+            recordModelLoad(p.kind, entry.url, false);
             const mesh = buildPlacement(props, p);
             if (mesh) placementNodes.push({ kind: p.kind, node: mesh });
             if (HERO_KINDS.includes(p.kind) && mesh) {
@@ -1550,12 +1626,21 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // crossfades its Idle/Walk clips by movement. Falls back to the procedural
   // placeholder if the glTF fails to load.
   let character;
+  let playerModelLoaded = false;
   try {
-    character = await createAnimatedCharacter("/models/character.glb");
+    character = await createAnimatedCharacter(PLAYER_MODEL_URL);
+    playerModelLoaded = true;
   } catch (err) {
-    console.warn("[render3d] animated character failed, using placeholder", err);
-    character = createPlaceholderCharacter();
+    console.warn("[render3d] hero character failed, trying base character", err);
+    try {
+      character = await createAnimatedCharacter("/models/character.glb");
+    } catch (fallbackErr) {
+      console.warn("[render3d] animated character failed, using placeholder", fallbackErr);
+      character = createPlaceholderCharacter();
+    }
   }
+  character.group.scale.setScalar(playerModelLoaded ? 1.08 : 1);
+  character.modelUrl = playerModelLoaded ? PLAYER_MODEL_URL : "/models/character.glb";
   const playerReadability = createPlayerReadabilityRig();
   character.group.add(playerReadability.group);
   scene.add(character.group);
@@ -1845,6 +1930,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         boardNotice: boardReturnNotice.group,
       },
     });
+    const getArtDirectionMetrics = () => createArtDirectionMetrics({
+      heroMeshes,
+      placementNodes,
+      character,
+      camera,
+      player,
+      snapshot,
+    });
+    const getModelReadability = () => createModelReadability({ modelLoadStatus, character });
     const getLightingMetrics = () => {
       const metrics = {
         pointLights: 0,
@@ -1903,6 +1997,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         fieldMap: buildFieldMapRouteModel(loopState.state, { playerPosition: player.position }),
         encounter: encounter.getState(player.position),
         composition: getCompositionMetrics(),
+        artDirection: getArtDirectionMetrics(),
+        modelReadability: getModelReadability(),
         beatVisibility: getBeatVisibility(),
         cameraPose: {
           x: Number(camera.position.x.toFixed(2)),
@@ -1949,6 +2045,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       getHeroVisibility: () => getHeroVisibility(heroMeshes, camera),
       getPlayerVisibility: () => getHeroVisibility({ player: character.group }, camera).player,
       getCompositionMetrics,
+      getArtDirectionMetrics,
+      getModelReadability,
       getLightingMetrics,
       getBeatVisibility,
       getBeatFeedback: () => beatToast.getState(),

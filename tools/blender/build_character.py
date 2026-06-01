@@ -101,6 +101,7 @@ VARIANTS = {
     "drifter": dict(coat=(0.42, 0.29, 0.18), hat="full", hatw=0.54, kerch=(0.58, 0.20, 0.15), apron=None, vest=None),
     "vendor": dict(coat=(0.30, 0.33, 0.40), hat="cap", hatw=0.0, kerch=None, apron=(0.80, 0.74, 0.62), vest=None),
     "vest": dict(coat=(0.55, 0.42, 0.27), hat="full", hatw=0.62, kerch=(0.28, 0.40, 0.30), apron=None, vest=(0.22, 0.16, 0.10)),
+    "hero": dict(coat=(0.39, 0.24, 0.14), hat="full", hatw=0.74, kerch=(0.63, 0.18, 0.12), apron=None, vest=(0.20, 0.13, 0.08), gear="hero"),
 }
 
 
@@ -140,6 +141,24 @@ def build_character(name="character", textured=True, variant="drifter"):
         parts.append(_box("apron", (0.38, 0.03, 0.66), (0, 0.15, 0.95), _mat("apron", V["apron"])))
     if V["vest"]:
         parts.append(_box("vest", (0.46, 0.04, 0.52), (0, 0.135, 1.04), _mat("vest", V["vest"])))
+    if V.get("gear") == "hero":
+        leather = _mat("hero_leather", (0.13, 0.08, 0.045))
+        canvas = _mat("hero_canvas", (0.58, 0.48, 0.32))
+        brass = _mat("hero_brass", (0.76, 0.55, 0.24))
+        glow = _mat("hero_lantern_glass", (0.95, 0.60, 0.24))
+        poncho = _mat("hero_poncho", (0.30, 0.20, 0.12))
+        # Back-facing gear is intentionally chunky: the opening camera mostly
+        # sees the drifter from behind, so the silhouette needs readable shapes.
+        parts.append(_box("coat_tail", (0.5, 0.08, 0.5), (0, -0.13, 0.78), poncho))
+        parts.append(_box("bedroll", (0.62, 0.16, 0.18), (0, -0.23, 1.28), canvas))
+        parts.append(_box("bedroll_l", (0.12, 0.17, 0.2), (-0.35, -0.23, 1.28), leather))
+        parts.append(_box("bedroll_r", (0.12, 0.17, 0.2), (0.35, -0.23, 1.28), leather))
+        parts.append(_box("strap_l", (0.055, 0.035, 0.68), (-0.18, -0.235, 1.05), leather))
+        parts.append(_box("strap_r", (0.055, 0.035, 0.68), (0.18, -0.235, 1.05), leather))
+        parts.append(_box("holster", (0.12, 0.08, 0.34), (0.32, 0.08, 0.72), leather))
+        parts.append(_box("lantern_frame", (0.16, 0.12, 0.2), (-0.33, 0.08, 0.86), brass))
+        parts.append(_box("lantern_glass", (0.1, 0.08, 0.12), (-0.33, 0.13, 0.86), glow))
+        parts.append(_box("hat_pin", (0.08, 0.04, 0.04), (0.2, 0.23, 1.64), brass))
     if V["hat"] == "full":
         hw = V["hatw"]
         parts += [

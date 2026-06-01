@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildFrontierPlacements, getRouteMetrics, PLAYER_SPAWN } from "../src/render3d/frontierLayout.js";
+import { modelFor } from "../src/game/renderer/assetManifest.js";
+import {
+  buildFrontierPlacements,
+  FIRST_ROAD_ART_STYLE,
+  getArtDirectionLayoutMetrics,
+  getRouteMetrics,
+  PLAYER_SPAWN,
+} from "../src/render3d/frontierLayout.js";
 
 describe("render3d frontier layout", () => {
   it("keeps the first-road hero interactables in the opening layout", () => {
@@ -41,6 +48,37 @@ describe("render3d frontier layout", () => {
     expect(kinds.has("mesaSkyline")).toBe(true);
     expect(ruts.length).toBeGreaterThanOrEqual(10);
     expect(ruts.every((placement) => Number.isFinite(placement.yaw))).toBe(true);
+  });
+
+  it("registers the hero-polish model kit through the manifest and layout", () => {
+    const placements = buildFrontierPlacements();
+    const kinds = new Set(placements.map((placement) => placement.kind));
+
+    expect(modelFor("jobBoard")?.url).toBe("/models/jobBoard_hero.glb");
+    expect(modelFor("brokenWagon")?.url).toBe("/models/wagon_wreck_hero_v2.glb");
+    for (const kind of ["heroTownSaloon", "heroTownStore", "heroTownAssay", "heroMesaSkyline", "sageCluster", "roadGrass", "slimeTrailHero"]) {
+      expect(kinds.has(kind)).toBe(true);
+      expect(modelFor(kind)?.url).toMatch(/\.glb$/);
+    }
+  });
+
+  it("keeps the first-frame art direction away from slab blockers", () => {
+    const metrics = getArtDirectionLayoutMetrics(buildFrontierPlacements());
+
+    expect(metrics.style.openingRoadWidth).toBe(FIRST_ROAD_ART_STYLE.openingRoadWidth);
+    expect(metrics.style.openingRoadWidth).toBeGreaterThanOrEqual(6.5);
+    expect(metrics.heroPolishKinds).toEqual(expect.arrayContaining([
+      "heroTownSaloon",
+      "heroTownStore",
+      "heroTownAssay",
+      "heroMesaSkyline",
+      "sageCluster",
+      "roadGrass",
+      "slimeTrailHero",
+    ]));
+    expect(metrics.naturalClusterCount).toBeGreaterThanOrEqual(FIRST_ROAD_ART_STYLE.minNaturalClusters);
+    expect(metrics.firstFrameNaturalCount).toBeGreaterThanOrEqual(4);
+    expect(metrics.firstFrameSlabBlockers).toEqual([]);
   });
 
   it("emits finite coordinates and sizes for every placement", () => {

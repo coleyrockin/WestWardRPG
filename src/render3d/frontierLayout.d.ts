@@ -15,6 +15,12 @@ export interface Placement {
 export const FRONTIER_ANCHOR: { x: number; y: number };
 export const PLAYER_SPAWN: { x: number; y: number };
 export const ROUTE_BEAT_SECONDS: Readonly<Record<string, number>>;
+export const FIRST_ROAD_ART_STYLE: Readonly<{
+  roadWidth: number;
+  openingRoadWidth: number;
+  shoulderWidth: number;
+  minNaturalClusters: number;
+}>;
 export const FIRST_FIVE_ROUTE: ReadonlyArray<{ kind: string; label: string; x: number; y: number }>;
 
 export function buildFrontierPlacements(): Placement[];
@@ -29,4 +35,11 @@ export function getRouteMetrics(placements?: Placement[], options?: {
   runSeconds: number;
   expectedBeatSeconds: number;
   estimatedPlaySeconds: number;
+};
+export function getArtDirectionLayoutMetrics(placements?: Placement[]): {
+  style: typeof FIRST_ROAD_ART_STYLE;
+  heroPolishKinds: string[];
+  naturalClusterCount: number;
+  firstFrameNaturalCount: number;
+  firstFrameSlabBlockers: string[];
 };

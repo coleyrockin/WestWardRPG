@@ -261,6 +261,8 @@ async function captureNew(context) {
       && window.__westward3dTest?.getPlayerVisibility
       && window.__westward3dTest?.getRouteMetrics
       && window.__westward3dTest?.getCompositionMetrics
+      && window.__westward3dTest?.getArtDirectionMetrics
+      && window.__westward3dTest?.getModelReadability
       && window.__westward3dTest?.getLightingMetrics
       && window.__westward3dTest?.getBeatVisibility
       && window.__westward3dTest?.captureRouteFrame,
@@ -294,6 +296,28 @@ async function captureNew(context) {
   }
   if (compositionMetrics?.maxForegroundBlocker?.screenArea > 0.24) {
     errors.push(`render3d has a giant foreground blocker: ${JSON.stringify(compositionMetrics.maxForegroundBlocker)}`);
+  }
+  const artDirectionMetrics = await page.evaluate(() => window.__westward3dTest.getArtDirectionMetrics());
+  console.log(`[probe] new art direction metrics: ${JSON.stringify(artDirectionMetrics)}`);
+  if (
+    !artDirectionMetrics?.playerVisible ||
+    !artDirectionMetrics?.boardVisible ||
+    artDirectionMetrics.playerScreenArea < 0.0012 ||
+    artDirectionMetrics.boardScreenArea < 0.0014 ||
+    artDirectionMetrics.openingRoadWidth < 6.5 ||
+    artDirectionMetrics.naturalClusterCount < 34 ||
+    artDirectionMetrics.firstFrameNaturalCount < 4 ||
+    artDirectionMetrics.firstFrameSlabBlockers?.length > 0
+  ) {
+    errors.push(`render3d first-frame art direction below bar: ${JSON.stringify(artDirectionMetrics)}`);
+  }
+  const modelReadability = await page.evaluate(() => window.__westward3dTest.getModelReadability());
+  console.log(`[probe] new model readability: ${JSON.stringify(modelReadability)}`);
+  const missingModels = Object.entries(modelReadability?.important || {})
+    .filter(([, status]) => !status.loaded)
+    .map(([kind]) => kind);
+  if (!modelReadability?.usesHeroCharacter || missingModels.length) {
+    errors.push(`render3d did not load the hero polish GLBs: ${JSON.stringify({ usesHeroCharacter: modelReadability?.usesHeroCharacter, missingModels })}`);
   }
   const lightingMetrics = await page.evaluate(() => window.__westward3dTest.getLightingMetrics());
   console.log(`[probe] new lighting metrics: ${JSON.stringify(lightingMetrics)}`);

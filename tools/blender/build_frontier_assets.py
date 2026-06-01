@@ -710,6 +710,217 @@ def build_mesa_skyline(name="mesa_skyline"):
     return export_glb(obj, name, bake=True)
 
 
+def build_jobboard_hero(name="jobBoard_hero"):
+    clear_scene()
+    wood = make_mat("jbwood", PALETTE["wood"])
+    dark = make_mat("jbdark", PALETTE["wood_dark"])
+    roof = make_mat("jbroof", "#21150d")
+    paper = make_mat("jbpaper", "#eadbb8")
+    aged = make_mat("agedpaper", "#d4bd88")
+    red = make_mat("seal", "#9d3f2e")
+    rope = make_mat("rope", "#b89255")
+    board = make_mat("jbboard", "#c9893e", emissive="#c9893e", emissive_strength=0.5)
+    glow = make_mat("jblamp", PALETTE["lamp_glow"], emissive=PALETTE["lamp_glow"], emissive_strength=0.95)
+    parts = [
+        add_box((0.2, 0.2, 2.04), (-0.86, 0, 1.02), wood, "post_l"),
+        add_box((0.2, 0.2, 2.04), (0.86, 0, 1.02), wood, "post_r"),
+        add_box((2.08, 0.16, 1.28), (0, 0, 1.28), board, "board"),
+        add_box((2.32, 0.2, 0.18), (0, 0.03, 2.05), dark, "top_beam"),
+        add_box((2.24, 0.78, 0.1), (0, 0.13, 2.24), roof, "deep_awning"),
+        add_box((1.8, 0.08, 0.1), (0, 0.1, 0.62), dark, "lower_rail"),
+        add_box((0.72, 0.035, 0.42), (-0.5, 0.105, 1.45), paper, "bounty_note_big"),
+        add_box((0.5, 0.035, 0.32), (0.42, 0.105, 1.18), aged, "survey_note"),
+        add_box((0.34, 0.035, 0.26), (0.02, 0.11, 1.56), paper, "road_sketch"),
+        add_box((0.12, 0.04, 0.12), (-0.2, 0.135, 1.34), red, "wax_seal"),
+        add_box((0.28, 0.28, 0.3), (0, 0.2, 2.02), glow, "reading_lamp"),
+    ]
+    # Rope, pins, and linework: tiny geometry that the NPR edge pass turns into
+    # a readable posted-notice board, not a single glowing rectangle.
+    for x in (-0.78, 0.78):
+        parts.append(add_box((0.05, 0.05, 1.36), (x, 0.135, 1.3), rope, "rope_drop"))
+    for y in (1.56, 1.45, 1.34):
+        parts.append(add_box((0.5, 0.038, 0.018), (-0.5, 0.145, y), dark, "bounty_line"))
+    for y in (1.24, 1.12):
+        parts.append(add_box((0.3, 0.038, 0.016), (0.42, 0.145, y), dark, "survey_line"))
+    for x in (-0.62, -0.34, 0.34, 0.58):
+        parts.append(add_box((0.045, 0.045, 0.22), (x, 0.13, 2.16), dark, "awning_bracket"))
+    for x, z in ((-0.82, 1.82), (0.82, 1.82), (-0.68, 0.76), (0.68, 0.76)):
+        parts.append(add_box((0.09, 0.05, 0.09), (x, 0.15, z), rope, "peg"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_hero_town_facade(name="hero_town_saloon", wall_key="wall_warm", width=2.1, height=2.95, roofline="saloon"):
+    clear_scene()
+    wall = make_mat("wall", PALETTE[wall_key])
+    trim = make_mat("trim", PALETTE["wood_dark"])
+    roof = make_mat("roof", PALETTE["roof"])
+    glass = make_mat("glass", "#1f2528")
+    sign = make_mat("sign", PALETTE["board"], emissive=PALETTE["board"], emissive_strength=0.2)
+    parts = [
+        add_box((width * 0.9, 0.86, height * 0.66), (0, -0.38, height * 0.33), wall, "body_depth"),
+        add_box((width, 0.22, height), (0, 0, height / 2), wall, "false_front"),
+        add_box((width * 1.14, 0.32, 0.16), (0, 0.04, height - 0.08), trim, "cornice"),
+        add_box((width * 1.1, 0.82, 0.08), (0, 0.44, height * 0.68), roof, "porch_awning"),
+        add_box((width * 1.08, 0.58, 0.08), (0, 0.61, 0.08), trim, "porch_deck"),
+        add_box((0.52, 0.08, 1.05), (0, 0.135, 0.525), trim, "door"),
+    ]
+    if roofline == "saloon":
+        parts.append(add_box((width * 0.68, 0.27, 0.24), (0, 0.07, height + 0.04), trim, "raised_crown"))
+        parts.append(add_box((width * 0.7, 0.08, 0.32), (0, 0.55, height * 0.64), sign, "hanging_sign"))
+    elif roofline == "store":
+        parts.append(add_box((width * 0.86, 0.28, 0.18), (0.08, 0.06, height + 0.02), trim, "offset_parapet"))
+        parts.append(add_box((width * 0.58, 0.08, 0.26), (0.1, 0.55, height * 0.62), sign, "store_sign"))
+    else:
+        parts.append(add_box((width * 0.48, 0.25, 0.28), (-width * 0.18, 0.06, height + 0.04), trim, "assay_parapet"))
+    for i in range(6):
+        x = (-0.5 + i / 5) * width * 0.9;
+        parts.append(add_box((0.035, 0.05, height * 0.78), (x, 0.14, height * 0.44), trim, "front_batten"))
+    for dx in (-width * 0.28, width * 0.28):
+        parts.append(add_box((0.4, 0.08, 0.48), (dx, 0.13, height * 0.48), glass, "window"))
+        parts.append(add_box((0.48, 0.045, 0.56), (dx, 0.11, height * 0.48), trim, "window_frame"))
+        parts.append(add_box((0.035, 0.075, 0.46), (dx, 0.16, height * 0.48), trim, "window_mull_v"))
+        parts.append(add_box((0.36, 0.075, 0.035), (dx, 0.16, height * 0.48), trim, "window_mull_h"))
+    for x in (-width * 0.48, width * 0.48):
+        parts.append(add_box((0.085, 0.085, height * 0.58), (x, 0.62, height * 0.29), trim, "porch_post"))
+        rail = add_box((0.48, 0.07, 0.07), (x * 0.72, 0.64, height * 0.34), trim, "porch_rail")
+        rail.rotation_euler = (0, 0, math.radians(5 if x > 0 else -5))
+        parts.append(rail)
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name, bake=True)
+
+
+def build_sage_cluster(name="sage_cluster"):
+    clear_scene()
+    sage = make_mat("sage", "#70814b")
+    sage2 = make_mat("sage_warm", "#8f8a56")
+    dry = make_mat("dry_seed", "#b49a62")
+    parts = []
+    for i in range(18):
+        a = i * 2.399963
+        r = 0.08 + (i % 6) * 0.055
+        h = 0.34 + (i % 5) * 0.07
+        mat = sage2 if i % 4 == 0 else sage
+        blade = add_box((0.045, 0.045, h), (math.cos(a) * r, math.sin(a) * r, h / 2), mat, "sage_blade")
+        blade.rotation_euler = (math.radians(5 + i % 5), 0, a)
+        parts.append(blade)
+    for x, y in ((0.18, -0.12), (-0.2, 0.08), (0.04, 0.2)):
+        parts.append(add_box((0.06, 0.06, 0.52), (x, y, 0.26), dry, "seed_stem"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_road_grass_cluster(name="road_grass_cluster"):
+    clear_scene()
+    grass = make_mat("roadgrass", "#7f8c52")
+    gold = make_mat("goldgrass", "#b99a5d")
+    shadow = make_mat("grass_shadow", "#53633b")
+    parts = []
+    for i in range(22):
+        a = i * 1.783
+        r = 0.06 + (i % 7) * 0.07
+        h = 0.42 + (i % 6) * 0.08
+        mat = gold if i % 5 == 0 else (shadow if i % 3 == 0 else grass)
+        blade = add_box((0.04, 0.04, h), (math.cos(a) * r, math.sin(a) * r, h / 2), mat, "grass_blade")
+        blade.rotation_euler = (math.radians(8 + i % 7), 0, a)
+        parts.append(blade)
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_slime_trail_hero(name="slime_trail_hero"):
+    clear_scene()
+    slime = make_mat("slime", "#79dc6b", emissive="#2a6820", emissive_strength=1.25)
+    reed = make_mat("reed", "#536f35")
+    mud = make_mat("mud", "#3c3328")
+    parts = [add_box((1.9, 0.72, 0.035), (0, 0, 0.02), mud, "mud_patch")]
+    for i, x in enumerate((-0.82, -0.42, -0.05, 0.34, 0.76)):
+        parts.append(add_box((0.62 - i * 0.04, 0.18, 0.048), (x, math.sin(i) * 0.16, 0.065), slime, "slick"))
+    for x, y, h, tilt in ((-0.88, 0.34, 0.9, 10), (-0.42, -0.38, 0.7, -16), (0.1, 0.42, 1.02, 8), (0.58, -0.28, 0.78, -10), (0.92, 0.28, 0.62, 12)):
+        r = add_box((0.045, 0.045, h), (x, y, h / 2), reed, "reed")
+        r.rotation_euler = (math.radians(tilt), 0, math.radians(tilt * 0.4))
+        parts.append(r)
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name)
+
+
+def build_wagon_wreck_hero_v2(name="wagon_wreck_hero_v2"):
+    clear_scene()
+    wood = make_mat("wreckwood", PALETTE["wagon"])
+    dark = make_mat("wheel", PALETTE["wheel"])
+    paper = make_mat("survey", "#e8dcc0")
+    iron = make_mat("iron", "#1c1814")
+    parts = [
+        add_box((1.7, 0.78, 0.28), (0, 0, 0.52), wood, "tilted_bed"),
+        add_box((1.58, 0.09, 0.24), (0, -0.43, 0.76), wood, "side_rail"),
+        add_box((1.02, 0.09, 0.18), (0.18, 0.45, 0.76), wood, "broken_side_rail"),
+        add_box((1.12, 0.08, 0.08), (1.0, 0, 0.3), wood, "tongue"),
+        add_box((0.56, 0.04, 0.34), (-0.34, 0.04, 0.98), paper, "map_scrap"),
+        add_box((0.92, 0.1, 0.09), (-0.86, 0.62, 0.12), wood, "fallen_plank"),
+        add_box((0.68, 0.08, 0.08), (0.7, -0.62, 0.16), wood, "splinter_a"),
+        add_box((0.44, 0.06, 0.06), (0.42, 0.66, 0.2), iron, "axle_pin"),
+    ]
+    parts[0].rotation_euler = (0, 0, math.radians(-8))
+    parts[-2].rotation_euler = (0, 0, math.radians(19))
+    for x, y, z, broken in ((0.58, -0.5, 0.36, False), (0.58, 0.5, 0.36, False), (-0.62, -0.48, 0.36, False), (-0.9, 0.62, 0.16, True)):
+        rot = (math.radians(90), 0, 0) if not broken else (math.radians(18), math.radians(70), 0)
+        _cyl(12, 0.45 if not broken else 0.38, 0.085, (x, y, z), dark, rot=rot)
+        parts.append(bpy.context.active_object)
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name, bake=True)
+
+
+def build_hero_mesa_skyline(name="hero_mesa_skyline"):
+    clear_scene()
+    rock = make_mat("mesa", "#5c4230")
+    warm = make_mat("mesa_warm", "#725038")
+    shadow = make_mat("mesa_shadow", "#342920")
+    parts = [add_box((7.4, 0.7, 0.36), (0, 0, 0.18), shadow, "long_shadow_base")]
+    shelves = [
+        (-3.05, 1.3, 1.65, rock),
+        (-2.1, 1.75, 2.55, warm),
+        (-0.8, 2.05, 3.25, rock),
+        (0.6, 2.35, 3.65, warm),
+        (2.05, 1.55, 2.45, rock),
+        (3.02, 1.1, 1.68, warm),
+    ]
+    for i, (x, w, h, mat) in enumerate(shelves):
+        parts.append(add_box((w, 0.78, h), (x, 0.02 * i, h / 2), mat, f"butte_{i}"))
+        parts.append(add_box((w * 0.72, 0.9, h * 0.16), (x + w * 0.07, -0.03, h + h * 0.08), mat, f"cap_{i}"))
+        if i % 2 == 0:
+            parts.append(add_box((0.07, 0.8, h * 0.58), (x - w * 0.18, 0.08, h * 0.38), shadow, f"crack_{i}"))
+    obj = join_as(parts, name)
+    shade_flat(obj)
+    origin_to_base(obj)
+    return export_glb(obj, name, bake=True)
+
+
+def build_hero_polish_kit():
+    out = {}
+    out["jobBoard_hero"] = build_jobboard_hero()
+    out["hero_town_saloon"] = build_hero_town_facade("hero_town_saloon", "saloon", 2.25, 3.05, "saloon")
+    out["hero_town_store"] = build_hero_town_facade("hero_town_store", "wall_warm", 1.95, 2.7, "store")
+    out["hero_town_assay"] = build_hero_town_facade("hero_town_assay", "wall_dark", 1.72, 2.48, "assay")
+    out["sage_cluster"] = build_sage_cluster()
+    out["road_grass_cluster"] = build_road_grass_cluster()
+    out["slime_trail_hero"] = build_slime_trail_hero()
+    out["wagon_wreck_hero_v2"] = build_wagon_wreck_hero_v2()
+    out["hero_mesa_skyline"] = build_hero_mesa_skyline()
+    return out
+
+
 def build_max_mode_kit():
     out = {}
     out["jobBoard_max"] = build_jobboard_max()

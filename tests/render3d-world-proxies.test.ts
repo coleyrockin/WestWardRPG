@@ -13,9 +13,13 @@ const KINDS_THAT_BLOCK = new Set([
   // bigger-world expansion
   "mesa", "mesaSilhouette", "cliff", "rock", "boulder", "cactus", "deadTree",
   "saloon", "saloonFacade", "townFacadeWarm", "townFacadeStore", "townFacadeDark", "storefront", "porch",
-  "brokenFence", "mesaSkyline",
+  "heroTownSaloon", "heroTownStore", "heroTownAssay",
+  "brokenFence", "mesaSkyline", "heroMesaSkyline",
 ]);
-const KINDS_THAT_PASS = new Set(["road", "roadPlank", "roadRut", "townBark", "slimeTell", "marshCluster", "roadSlime", "brush", "sagePatch", "reeds"]);
+const KINDS_THAT_PASS = new Set([
+  "road", "roadPlank", "roadRut", "townBark", "slimeTell", "marshCluster", "slimeTrailHero",
+  "roadSlime", "brush", "sagePatch", "sageCluster", "roadGrass", "reeds",
+]);
 
 describe("worldProxies — buildProxies", () => {
   const placements = buildFrontierPlacements();
