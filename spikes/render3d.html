@@ -8,9 +8,9 @@
     <style>
       :root {
         color-scheme: dark;
-        --hud-bg: rgba(12, 12, 15, 0.72);
-        --hud-bg-strong: rgba(10, 10, 13, 0.84);
-        --hud-line: rgba(255, 198, 110, 0.46);
+        --hud-bg: rgba(10, 10, 13, 0.68);
+        --hud-bg-strong: rgba(8, 8, 11, 0.82);
+        --hud-line: rgba(255, 198, 110, 0.38);
         --hud-gold: #ffd77b;
         --hud-text: #f6e4c4;
         --hud-dim: rgba(246, 228, 196, 0.68);
@@ -37,28 +37,51 @@
         top: 14px;
         left: 16px;
         z-index: 22;
-        width: 244px;
-        min-height: 78px;
+        width: 232px;
+        min-height: 72px;
         display: grid;
-        grid-template-columns: 58px 1fr;
+        grid-template-columns: 54px 1fr;
         gap: 10px;
         align-items: center;
-        padding: 9px 11px;
+        padding: 8px 10px;
         border-radius: 8px;
       }
       #hero-panel .portrait {
-        width: 58px;
-        height: 58px;
+        position: relative;
+        width: 54px;
+        height: 54px;
         display: grid;
         place-items: center;
-        color: #1b1209;
-        font-weight: 800;
-        letter-spacing: 0.8px;
+        color: transparent;
+        font-size: 0;
         background:
-          radial-gradient(circle at 50% 38%, #f1c58c 0 24%, #362215 25% 38%, #101014 39% 100%);
+          radial-gradient(circle at 50% 43%, #d39a69 0 18%, #7c4a2c 19% 27%, transparent 28%),
+          radial-gradient(circle at 50% 58%, #312018 0 32%, #111014 33% 100%);
         border: 1px solid rgba(255, 215, 123, 0.66);
         border-radius: 50%;
         box-shadow: 0 0 0 3px rgba(0,0,0,0.32), 0 0 18px rgba(255, 184, 90, 0.2);
+      }
+      #hero-panel .portrait::before,
+      #hero-panel .portrait::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #15100d;
+      }
+      #hero-panel .portrait::before {
+        top: 15px;
+        width: 34px;
+        height: 5px;
+        border-radius: 50%;
+        box-shadow: 0 -4px 0 2px #1f1711;
+      }
+      #hero-panel .portrait::after {
+        bottom: 12px;
+        width: 22px;
+        height: 13px;
+        border-radius: 4px 4px 7px 7px;
+        background: #2d2119;
       }
       #hero-panel .hero-name {
         display: block;
@@ -104,8 +127,8 @@
         left: 50%;
         transform: translateX(-50%);
         z-index: 24;
-        width: min(382px, calc(100vw - 560px));
-        min-width: 320px;
+        width: min(360px, calc(100vw - 560px));
+        min-width: 300px;
         display: grid;
         grid-template-columns: 54px 1fr auto;
         align-items: center;
@@ -156,11 +179,11 @@
         position: fixed;
         left: 22px;
         bottom: 22px;
-        max-width: min(420px, calc(100vw - 44px));
+        max-width: min(382px, calc(100vw - 44px));
         display: flex;
         align-items: flex-start;
         gap: 13px;
-        padding: 13px 17px 13px 16px;
+        padding: 12px 15px 12px 14px;
         font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
         color: #f6e4c4;
         /* warm gold left-accent rule ties the card to the in-world objective ring */
@@ -191,7 +214,7 @@
         color: #e9b863; font-weight: 600;
       }
       #objective .text {
-        font-size: 16px; line-height: 1.25; display: block; margin-top: 4px;
+        font-size: 15px; line-height: 1.24; display: block; margin-top: 4px;
         color: #fbedd2;
       }
       #objective .meta {

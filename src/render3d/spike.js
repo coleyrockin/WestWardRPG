@@ -546,21 +546,56 @@ function attachLight(group, p, light, effScale) {
 // panes + a soft interior PointLight, placed on the side facing the road/player so
 // the glow is visible from the street. `face` is the +z (south) road-facing offset.
 function attachBuildingWarmth(group, p, wl) {
-  const faceZ = p.y + 1.05; // toward the road (south, +z in world→3D)
-  const winMat = standard(wl.color, { emissive: wl.color, emissiveIntensity: 0.9, rimStrength: 0 });
-  for (const [dx, wy] of [[-0.42, 1.55], [0.42, 1.55], [0, 0.62]]) {
-    // two upper windows + a low door-glow slit, all on the road face
-    const isDoor = wy < 1.0;
-    const pane = new THREE.Mesh(
-      new THREE.PlaneGeometry(isDoor ? 0.5 : 0.42, isDoor ? 1.05 : 0.5),
-      winMat,
-    );
-    pane.position.set(p.x + dx, wy, faceZ);
-    pane.renderOrder = 1;
-    group.add(pane);
-  }
+  const roadSide = p.y > PLAYER_SPAWN.y ? -1 : 1;
+  const faceZ = p.y + roadSide * 1.03; // toward the road, not through the back wall
+  const paneMat = standard(wl.color, {
+    emissive: wl.color,
+    emissiveIntensity: 0.28,
+    transparent: true,
+    opacity: 0.78,
+    rimStrength: 0,
+  });
+  const frameMat = standard("#17100b", { rimStrength: 0.05 });
+  const glassDepth = 0.025;
+
+  const addLitWindow = (cx, cy, ww, wh, split = true) => {
+    const back = new THREE.Mesh(new THREE.BoxGeometry(ww + 0.16, wh + 0.16, glassDepth), frameMat);
+    back.position.set(cx, cy, faceZ - roadSide * 0.006);
+    group.add(back);
+
+    const paneW = split ? (ww - 0.08) / 2 : ww;
+    const paneH = split ? (wh - 0.08) / 2 : wh;
+    const xs = split ? [-paneW / 2 - 0.02, paneW / 2 + 0.02] : [0];
+    const ys = split ? [-paneH / 2 - 0.02, paneH / 2 + 0.02] : [0];
+    for (const ox of xs) {
+      for (const oy of ys) {
+        const pane = new THREE.Mesh(new THREE.BoxGeometry(paneW, paneH, glassDepth * 1.35), paneMat);
+        pane.position.set(cx + ox, cy + oy, faceZ + roadSide * 0.01);
+        pane.renderOrder = 1;
+        group.add(pane);
+      }
+    }
+
+    const framePieces = [
+      [ww + 0.18, 0.045, 0, wh / 2 + 0.07],
+      [ww + 0.18, 0.045, 0, -wh / 2 - 0.07],
+      [0.045, wh + 0.18, -ww / 2 - 0.07, 0],
+      [0.045, wh + 0.18, ww / 2 + 0.07, 0],
+      [0.04, wh + 0.08, 0, 0],
+    ];
+    for (const [fw, fh, ox, oy] of framePieces) {
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, glassDepth * 1.8), frameMat);
+      frame.position.set(cx + ox, cy + oy, faceZ + roadSide * 0.022);
+      group.add(frame);
+    }
+  };
+
+  addLitWindow(p.x - 0.42, 1.55, 0.38, 0.42);
+  addLitWindow(p.x + 0.42, 1.55, 0.38, 0.42);
+  addLitWindow(p.x, 0.62, 0.42, 0.82, false);
+
   const l = new THREE.PointLight(col(wl.color), wl.intensity, wl.distance ?? 8, 2);
-  l.position.set(p.x, wl.height ?? 1.5, p.y + 0.4);
+  l.position.set(p.x, wl.height ?? 1.5, p.y + roadSide * 0.42);
   group.add(l);
 }
 
@@ -896,6 +931,48 @@ function createBoardReturnNotice(snapshot) {
       const pulse = 1 + Math.sin(t * 3.1) * 0.035;
       notice.scale.set(pulse, pulse, pulse);
       tack.scale.setScalar(1 + Math.sin(t * 4.7) * 0.08);
+    },
+  };
+}
+
+function createHeroSilhouetteAccent() {
+  const group = new THREE.Group();
+  group.name = "hero-silhouette-accent";
+
+  const bedroll = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.18, 0.22),
+    standard("#5c3c27", { rimColor: "#d8ad76", rimStrength: 0.22 }),
+  );
+  bedroll.position.set(0, 1.08, 0.2);
+  bedroll.rotation.x = 0.06;
+  group.add(bedroll);
+
+  const scarf = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.08, 0.08),
+    standard("#9d3b2e", { emissive: "#5a1712", emissiveIntensity: 0.08, rimStrength: 0.16 }),
+  );
+  scarf.position.set(0.02, 1.42, 0.18);
+  group.add(scarf);
+
+  const lantern = new THREE.Mesh(
+    new THREE.SphereGeometry(0.095, 9, 7),
+    standard("#f0b45f", { emissive: "#e07a30", emissiveIntensity: 0.7, rimStrength: 0 }),
+  );
+  lantern.position.set(0.27, 1.18, 0.27);
+  group.add(lantern);
+
+  const lamp = new THREE.PointLight(col("#e07a30"), 0.52, 2.15, 2.1);
+  lamp.position.copy(lantern.position);
+  group.add(lamp);
+
+  return {
+    group,
+    update(player, t = 0) {
+      const pos = player?.position || PLAYER_SPAWN;
+      group.position.set(pos.x, 0, pos.z);
+      group.rotation.y = Number.isFinite(player?.yaw) ? player.yaw : 0;
+      lantern.scale.setScalar(0.92 + Math.sin(t * 3.4) * 0.05);
+      lamp.intensity = 0.42 + Math.max(0, Math.sin(t * 2.6)) * 0.12;
     },
   };
 }
@@ -1408,10 +1485,17 @@ function buildGround(scene, snapshot) {
   // Segmenting it by route points makes the path visibly turn toward the marsh
   // instead of reading as a short flat alley.
   const ROAD_W = FIRST_ROAD_ART_STYLE.roadWidth;
-  const roadMat = standard("#9f7047", { roughness: 1, emissive: "#3b2819", emissiveIntensity: 0.06, rimStrength: 0.025 });
-  const edgeMat = standard("#bd8c56", { roughness: 1, emissive: "#3d2a19", emissiveIntensity: 0.045, rimStrength: 0.025 });
-  const rutMat = standard("#67462c", { roughness: 1, emissive: "#24170e", emissiveIntensity: 0.02, rimStrength: 0.015 });
-  const centerMat = standard("#7b5233", { roughness: 1, emissive: "#2d1d12", emissiveIntensity: 0.025, rimStrength: 0.015 });
+  const roadMat = standard("#b47745", { roughness: 1, emissive: "#55351f", emissiveIntensity: 0.1, rimStrength: 0.025 });
+  const edgeMat = standard("#d49a5a", { roughness: 1, emissive: "#5f3a20", emissiveIntensity: 0.07, rimStrength: 0.025 });
+  const rutMat = standard("#765032", { roughness: 1, emissive: "#2d1d12", emissiveIntensity: 0.025, rimStrength: 0.015 });
+  const centerMat = standard("#8f5f39", { roughness: 1, emissive: "#352113", emissiveIntensity: 0.035, rimStrength: 0.015 });
+  const roadWashMat = new THREE.MeshBasicMaterial({
+    color: col("#d9ad78"),
+    transparent: true,
+    opacity: 0.5,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+  });
   const sageShoulderMat = new THREE.MeshBasicMaterial({
     color: col("#6f7f46"),
     transparent: true,
@@ -1458,12 +1542,14 @@ function buildGround(scene, snapshot) {
       if (shoulder) shoulder.renderOrder = -2;
     }
     addRoadPlane(from, to, segmentWidth, 0.02, roadMat);
+    const roadWash = addRoadPlane(from, to, segmentWidth * 0.96, 0.034, roadWashMat);
+    if (roadWash) roadWash.renderOrder = -1;
     for (const off of [-(segmentWidth / 2 + 0.18), segmentWidth / 2 + 0.18]) {
       addRoadPlane(
         { x: from.x + nx * off, y: from.y + nz * off },
         { x: to.x + nx * off, y: to.y + nz * off },
         0.42,
-        0.03,
+        0.042,
         edgeMat,
       );
     }
@@ -1472,11 +1558,11 @@ function buildGround(scene, snapshot) {
         { x: from.x + nx * off, y: from.y + nz * off },
         { x: to.x + nx * off, y: to.y + nz * off },
         0.28,
-        0.027,
+        0.044,
         rutMat,
       );
     }
-    addRoadPlane(from, to, 0.16, 0.028, centerMat);
+    addRoadPlane(from, to, 0.16, 0.045, centerMat);
   }
 }
 
@@ -1686,8 +1772,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     // Third-person production frame: low enough to feel playable, close enough
     // for a strong back silhouette, and aimed past Boone's board so the street
     // reads as a destination instead of a tabletop.
-    camera.position.set(4.65, 3.82, 13.7);
-    camera.lookAt(15.1, 1.48, 4.75);
+    camera.position.set(5.08, 3.36, 13.42);
+    camera.lookAt(15.55, 1.34, 5.08);
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
   }
@@ -1799,6 +1885,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   character.group.add(playerReadability.group);
   setPlayerMarkerVisibility(playerReadability, debugPlayerMarker && !visualCapture);
   scene.add(character.group);
+  const heroSilhouetteAccent = createHeroSilhouetteAccent();
+  scene.add(heroSilhouetteAccent.group);
   // F → play the one-shot "draw" clip (no-op on the placeholder fallback)
   if (typeof window !== "undefined") {
     window.addEventListener("keydown", (e) => {
@@ -2270,6 +2358,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     updateBeatVisibility();
     character.update(visualCapture ? 0 : dt, player.moving && !visualCapture, player.running && !visualCapture);
     playerReadability.update(now / 1000);
+    heroSilhouetteAccent.update(player, now / 1000);
     openingLightPools.update(now / 1000);
     roadDust.update(now / 1000);
     objectiveGuidance.update(now / 1000, loopState.state);

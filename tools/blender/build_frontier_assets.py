@@ -932,8 +932,8 @@ def build_production_facade(name="production_saloon", wall_key="saloon", width=3
     wall = make_mat("wall", PALETTE[wall_key])
     dark = make_mat("darktrim", "#24170e")
     roof = make_mat("roof", "#21150d")
-    glass = make_mat("window_glow", "#ffb766", emissive="#ff8f32", emissive_strength=0.75)
-    sign = make_mat("sign", "#d8a84f", emissive="#d8a84f", emissive_strength=0.28)
+    glass = make_mat("window_glow", "#b86d3a", emissive="#b85b28", emissive_strength=0.34)
+    sign = make_mat("sign", "#bd8843", emissive="#bd8843", emissive_strength=0.18)
     parts = [
         add_box((width * 0.92, 0.9, height * 0.64), (0, -0.38, height * 0.32), wall, "deep_body"),
         add_box((width, 0.22, height), (0, 0, height / 2), wall, "false_front"),
@@ -971,16 +971,22 @@ def build_production_facade(name="production_saloon", wall_key="saloon", width=3
 
 def build_window_glow_panel(name="window_glow_panel"):
     clear_scene()
-    glass = make_mat("glow", "#ffb766", emissive="#ff8f32", emissive_strength=1.2)
+    glass = make_mat("glow", "#b96f3c", emissive="#b85b28", emissive_strength=0.42)
     frame = make_mat("frame", "#22160e")
+    soot = make_mat("soot", "#120d09")
     parts = [
-        add_box((0.72, 0.05, 0.52), (0, 0, 0.34), glass, "window_glass"),
+        add_box((0.78, 0.035, 0.58), (0, -0.015, 0.34), soot, "window_shadow"),
+        add_box((0.26, 0.045, 0.18), (-0.18, 0, 0.46), glass, "pane_a"),
+        add_box((0.26, 0.045, 0.18), (0.18, 0, 0.46), glass, "pane_b"),
+        add_box((0.26, 0.045, 0.18), (-0.18, 0, 0.22), glass, "pane_c"),
+        add_box((0.26, 0.045, 0.18), (0.18, 0, 0.22), glass, "pane_d"),
         add_box((0.82, 0.08, 0.08), (0, 0.01, 0.62), frame, "top_frame"),
         add_box((0.82, 0.08, 0.08), (0, 0.01, 0.06), frame, "bottom_frame"),
         add_box((0.08, 0.08, 0.6), (-0.4, 0.01, 0.34), frame, "left_frame"),
         add_box((0.08, 0.08, 0.6), (0.4, 0.01, 0.34), frame, "right_frame"),
-        add_box((0.04, 0.09, 0.5), (0, 0.02, 0.34), frame, "mullion_v"),
-        add_box((0.68, 0.09, 0.035), (0, 0.02, 0.34), frame, "mullion_h"),
+        add_box((0.055, 0.09, 0.54), (0, 0.02, 0.34), frame, "mullion_v"),
+        add_box((0.68, 0.09, 0.055), (0, 0.02, 0.34), frame, "mullion_h"),
+        add_box((0.92, 0.1, 0.08), (0, 0.02, 0.68), frame, "heavy_header"),
     ]
     obj = join_as(parts, name)
     shade_flat(obj)
@@ -1069,7 +1075,7 @@ def build_npc_silhouette(name="npc_silhouette"):
 def build_lantern_string(name="lantern_string"):
     clear_scene()
     wire = make_mat("wire", "#1f160f")
-    glow = make_mat("glow", "#ffb866", emissive="#ff8f32", emissive_strength=1.25)
+    glow = make_mat("glow", "#c9823f", emissive="#b85b28", emissive_strength=0.58)
     cap = make_mat("cap", "#2c2118")
     parts = [add_box((3.2, 0.045, 0.045), (0, 0, 1.95), wire, "line")]
     for x in (-1.18, -0.38, 0.42, 1.16):

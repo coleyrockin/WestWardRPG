@@ -277,6 +277,8 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "windowGlowPanel", label: "Far Hotel Window Glow", x: 23.96, y: 11.96, color: "#ff9b58", size: 0.72, yaw: Math.PI - 0.12 },
   { kind: "hangingSign", label: "Undertaker Hanging Sign", x: 19.65, y: 12.28, color: "#ffc66e", size: 0.72, yaw: Math.PI - 0.08 },
   { kind: "lanternString", label: "Street Crossing Lanterns", x: 15.0, y: 8.75, color: "#ffb866", size: 0.74, yaw: Math.PI / 2 },
+  { kind: "lanternString", label: "High Street Wire", x: 10.1, y: 8.7, color: "#d88946", size: 1.18, yaw: Math.PI / 2 },
+  { kind: "lanternString", label: "Far Bounty Wire", x: 18.4, y: 8.35, color: "#d88946", size: 1.02, yaw: Math.PI / 2 },
 
   // Bounty street life: silhouettes and props read as inhabited without
   // becoming gameplay blockers in the main road lane.
@@ -294,8 +296,13 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "barrelCrateCluster", label: "South Porch Cargo", x: 10.0, y: 12.55, color: "#7a5230", size: 0.84, yaw: 0.12 },
   { kind: "mudRutDecal", label: "Opening Mud Rut", x: 10.8, y: 8.0, color: "#5a3923", size: 1.1, yaw: -0.7 },
   { kind: "mudRutDecal", label: "Board Road Mud Rut", x: 14.2, y: 7.1, color: "#5a3923", size: 1.0, yaw: -0.65 },
+  { kind: "mudRutDecal", label: "Saloon Wheel Rut", x: 8.6, y: 9.4, color: "#5a3923", size: 0.82, yaw: -0.55 },
+  { kind: "mudRutDecal", label: "Boardwalk Wheel Rut", x: 16.9, y: 8.45, color: "#5a3923", size: 0.9, yaw: -0.62 },
+  { kind: "mudRutDecal", label: "Far Street Wheel Rut", x: 21.8, y: 8.7, color: "#5a3923", size: 0.78, yaw: -0.58 },
+  { kind: "mudRutDecal", label: "Marshal Road Wheel Rut", x: 25.6, y: 9.65, color: "#5a3923", size: 0.8, yaw: -0.42 },
   { kind: "dustSmokePlume", label: "Boardwalk Dust", x: 8.0, y: 4.85, color: "#b88551", size: 0.9, yaw: 0.2 },
   { kind: "dustSmokePlume", label: "Street Dust", x: 17.6, y: 7.35, color: "#b88551", size: 0.74, yaw: -0.3 },
+  { kind: "dustSmokePlume", label: "Far Street Dust", x: 23.2, y: 8.25, color: "#b88551", size: 0.56, yaw: -0.18 },
   { kind: "bountyEmblem", label: "Boone Bounty Emblem", x: 13.0, y: 5.35, color: "#ffd77b", size: 0.75, yaw: Math.PI / 2 },
 ];
 
@@ -337,11 +344,11 @@ const MARSH = [
 // overlaps by ~0.76, so there is no gap wide enough to slip through.
 const BOUNDARY_RING = [
   // north wall (behind town), pushed back so it reads as horizon, not a first-frame slab
-  { kind: "heroMesaSkyline", label: "North Mesa", x: 1.0, y: -6.2, color: "#5a4636", size: 0.95 },
-  { kind: "heroMesaSkyline", label: "North Mesa", x: 9.5, y: -6.6, color: "#63503c", size: 0.98 },
-  { kind: "heroMesaSkyline", label: "North Mesa", x: 18.0, y: -6.4, color: "#5a4636", size: 0.94 },
-  { kind: "heroMesaSkyline", label: "North Cliff", x: 28.0, y: -6.3, color: "#544234", size: 1.0 },
-  { kind: "heroMesaSkyline", label: "North Mesa", x: 39.0, y: -6.3, color: "#63503c", size: 1.0 },
+  { kind: "heroMesaSkyline", label: "North Mesa", x: 1.0, y: -6.2, color: "#5a4636", size: 1.08 },
+  { kind: "heroMesaSkyline", label: "North Mesa", x: 9.5, y: -6.6, color: "#63503c", size: 1.18 },
+  { kind: "heroMesaSkyline", label: "North Mesa", x: 18.0, y: -6.4, color: "#5a4636", size: 1.14 },
+  { kind: "heroMesaSkyline", label: "North Cliff", x: 28.0, y: -6.3, color: "#544234", size: 1.18 },
+  { kind: "heroMesaSkyline", label: "North Mesa", x: 39.0, y: -6.3, color: "#63503c", size: 1.12 },
   { kind: "mesaSkyline", label: "North Mesa", x: 42.0, y: -5.4, color: "#5a4636", size: 1.08 },
   { kind: "mesaSkyline", label: "Northeast Mesa", x: 62.0, y: -5.3, color: "#5a4636", size: 1.12 },
   // east wall (the eastern horizon backdrop), x ≈ 70
