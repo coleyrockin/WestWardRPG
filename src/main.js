@@ -101,12 +101,14 @@ import { generateSideJobs } from "./sideJobGenerator.js";
 import { createCombatSubtitleState, recordCombatEvent, tickCombatSubtitles, drawCombatSubtitles, playCombatAudioCue } from "./combatAccessibility.js";
 import { createInputManager } from "./inputManager.js";
 import { createSaveStateManager } from "./saveStateManager.js";
-import { canAttack, canDodge, resolveNextComboStep, resolveStaminaRegenRate, isInSwingArc, resolveEnemyStagger, BASE_COMBOS, DODGE_STAMINA_COST, DODGE_COOLDOWN } from "./combatProcessor.js";
+import { canAttack, canDodge, resolveNextComboStep, resolveStaminaRegenRate, isInSwingArc, resolveEnemyStagger, BASE_COMBOS, DODGE_STAMINA_COST, DODGE_COOLDOWN, resolveDodgeCooldown } from "./combatProcessor.js";
+import { tickExpiringMessages, tickFloatingTexts, tickPlayerCooldowns, resolveRespawnDelay } from "./loopTick.js";
 import { resolveDiscoveryRewardFeedback } from "./discoveryRewardFeedback.js";
 import {
   ORIGINS,
   applyOrigin,
   buildCharacterIdentitySummary,
+  deriveAttributeEffects,
   normalizeCharacterIdentity,
   resolveIdentityShopPriceMultiplier,
 } from "./characterIdentity.js";
@@ -377,9 +379,6 @@ import {
 import {
   resolveShopPriceMultiplier,
   canSmithUpgradeWeapon,
-  resolvePatrolModifier,
-  resolveAllFactionEffects,
-  FACTION_NAMES,
 } from "./factionEffects.js";
 import {
   POI_KINDS,
@@ -3375,7 +3374,8 @@ const canvas = document.getElementById("game");
     const dx = Math.cos(heading) * 0.82;
     const dy = Math.sin(heading) * 0.82;
     moveWithCollision(dx, dy);
-    state.player.dodgeCooldown = 1.1;
+    const dodgeFocusPct = deriveAttributeEffects(state.progression.identity).dodgeFocusPct;
+    state.player.dodgeCooldown = resolveDodgeCooldown(dodgeFocusPct);
     const freedomBonus = state.progression.traits.includes("freedom_strider") ? 0.78 : 1;
     state.player.stamina = Math.max(0, state.player.stamina - 12 * freedomBonus);
 
@@ -5096,7 +5096,7 @@ const canvas = document.getElementById("game");
         const patrolMult = resolvePatrolDensityMult(state.regions?.activeRegion || "frontier", state.narrative?.factionRep);
         const seasonMods = resolveSeasonModifiers(resolveCurrentSeason(state.world.calendarDay || 0), state.regions?.activeRegion || "frontier");
         const totalDensity = Math.max(0.4, spawnMods.spawnDensityMult * phaseMods.hostileMult * influenceMult * patrolMult * seasonMods.spawnMult);
-        enemy.respawn = (22 + Math.random() * 8) / totalDensity;
+        enemy.respawn = resolveRespawnDelay(totalDensity);
         state.inventory["Slime Core"] += 1;
         const civicBounty = state.narrative.globalFlags.curfewNormalized ? 3 : 0;
         const truthBonusXp = state.narrative.globalFlags.ledgerPublished ? 4 : 0;
@@ -5791,7 +5791,7 @@ const canvas = document.getElementById("game");
     const patrolMult = resolvePatrolDensityMult(state.regions?.activeRegion || "frontier", state.narrative?.factionRep);
     const seasonMods = resolveSeasonModifiers(resolveCurrentSeason(state.world.calendarDay || 0), state.regions?.activeRegion || "frontier");
     const totalDensity = Math.max(0.4, spawnMods.spawnDensityMult * phaseMods.hostileMult * influenceMult * patrolMult * seasonMods.spawnMult);
-    enemy.respawn = (22 + Math.random() * 8) / totalDensity;
+    enemy.respawn = resolveRespawnDelay(totalDensity);
     if (enemy.miniBossId) {
       const def = MINI_BOSS_DEFS[enemy.miniBossId];
       if (def) {
@@ -5828,9 +5828,7 @@ const canvas = document.getElementById("game");
       state.weather.quality = resolveVisualQualitySettingForPreset(recommended);
     }
 
-    for (const m of state.msg) {
-      m.ttl -= dt;
-    }
+    tickExpiringMessages(state.msg, dt);
     if (discoveryBanner) {
       discoveryBanner.ttl -= dt;
       if (discoveryBanner.ttl <= 0) discoveryBanner = null;
@@ -5843,30 +5841,13 @@ const canvas = document.getElementById("game");
       combatReadabilityNotice.ttl -= dt;
       if (combatReadabilityNotice.ttl <= 0) combatReadabilityNotice = null;
     }
-    // Use reverse loop to remove expired messages without creating new array
-    for (let i = state.msg.length - 1; i >= 0; i--) {
-      if (state.msg[i].ttl <= 0) {
-        state.msg.splice(i, 1);
-      }
-    }
 
     const player = state.player;
-    player.attackCooldown = Math.max(0, player.attackCooldown - dt);
-    player.hurtCooldown = Math.max(0, player.hurtCooldown - dt);
+    tickPlayerCooldowns(player, dt);
     tickParryChain(player, dt);
-    player.comboWindow = Math.max(0, player.comboWindow - dt);
-    player.swingTimer = Math.max(0, player.swingTimer - dt);
-    player.hitPulse = Math.max(0, player.hitPulse - dt * 2.4);
-    player.cameraKick = Math.max(0, player.cameraKick - dt * 1.8);
-    player.screenShake = Math.max(0, player.screenShake - dt * 7);
     const strafeDir = (state.keys.KeyD ? 1 : 0) - (state.keys.KeyA ? 1 : 0);
     player.weaponSway = lerp(player.weaponSway, strafeDir * -20, Math.min(1, dt * 9));
-    for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
-      const ft = state.floatingTexts[i];
-      ft.life -= dt;
-      ft.wy -= 0.55 * dt;
-      if (ft.life <= 0) state.floatingTexts.splice(i, 1);
-    }
+    tickFloatingTexts(state.floatingTexts, dt);
     state.pigJokeCooldown = Math.max(0, state.pigJokeCooldown - dt);
     updateWeather(dt);
 

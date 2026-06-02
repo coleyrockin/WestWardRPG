@@ -78,6 +78,16 @@ export function canDodge(player) {
   return true;
 }
 
+// Effective dodge cooldown after Cunning's dodgeFocusPct (see
+// characterIdentity.deriveAttributeEffects). Reduction is capped at 40% so a
+// high-Cunning build sharpens dodge cadence without trivializing it.
+const DODGE_FOCUS_REDUCTION_CAP = 40;
+
+export function resolveDodgeCooldown(dodgeFocusPct = 0) {
+  const pct = Math.min(DODGE_FOCUS_REDUCTION_CAP, Math.max(0, dodgeFocusPct || 0));
+  return DODGE_COOLDOWN * (1 - pct / 100);
+}
+
 export { DODGE_STAMINA_COST, DODGE_COOLDOWN };
 
 // ─── Enemy stagger ────────────────────────────────────────────────────────────

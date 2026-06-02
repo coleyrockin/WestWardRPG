@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canAttack, canDodge, resolveNextComboStep, resolveStaminaRegenRate, isInSwingArc, resolveEnemyStagger, BASE_COMBOS, DODGE_STAMINA_COST } from "../src/combatProcessor.js";
+import { canAttack, canDodge, resolveNextComboStep, resolveStaminaRegenRate, isInSwingArc, resolveEnemyStagger, BASE_COMBOS, DODGE_STAMINA_COST, DODGE_COOLDOWN, resolveDodgeCooldown } from "../src/combatProcessor.js";
 
 function makePlayer(overrides = {}) {
   return { stamina: 100, attackCooldown: 0, chargeAttackWindup: 0, blocking: false, guardBroken: false, dodgeCooldown: 0, ...overrides };
@@ -43,6 +43,30 @@ describe("combatProcessor — canDodge", () => {
 
   it("returns false when stamina too low", () => {
     expect(canDodge(makePlayer({ stamina: DODGE_STAMINA_COST - 1 }))).toBe(false);
+  });
+});
+
+describe("combatProcessor — resolveDodgeCooldown (Cunning wiring)", () => {
+  it("returns the base DODGE_COOLDOWN with no Cunning focus", () => {
+    expect(resolveDodgeCooldown(0)).toBeCloseTo(DODGE_COOLDOWN);
+  });
+
+  it("defaults missing focus to the base cooldown", () => {
+    expect(resolveDodgeCooldown()).toBeCloseTo(DODGE_COOLDOWN);
+  });
+
+  it("reduces cooldown by the dodge-focus percentage", () => {
+    // dodgeFocusPct 16 (Cunning 10) → 0.65 * 0.84
+    expect(resolveDodgeCooldown(16)).toBeCloseTo(DODGE_COOLDOWN * 0.84);
+  });
+
+  it("caps the reduction so dodge can never be trivialized", () => {
+    // beyond the 40% cap, cooldown floors at 60% of base
+    expect(resolveDodgeCooldown(100)).toBeCloseTo(DODGE_COOLDOWN * 0.6);
+  });
+
+  it("ignores negative focus values", () => {
+    expect(resolveDodgeCooldown(-50)).toBeCloseTo(DODGE_COOLDOWN);
   });
 });
 

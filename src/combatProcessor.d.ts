@@ -5,6 +5,7 @@ export function resolveNextComboStep(currentStep: number, comboWindow: number): 
 export function getComboForStep(step: number): any;
 export function canAttack(player: any, minStamina?: number): boolean;
 export function canDodge(player: any): boolean;
+export function resolveDodgeCooldown(dodgeFocusPct?: number): number;
 export function resolveStaminaRegenRate(player: any, progressionMods?: any): number;
 export function isInSwingArc(px: number, py: number, angle: number, tx: number, ty: number, reach: number, arc: number): boolean;
 export function resolveEnemyStagger(baseDamage: number, swing: any, enemy: any): { knockback: number; stagger: number };
