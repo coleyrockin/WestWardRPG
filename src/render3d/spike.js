@@ -1,3 +1,7 @@
+// @experimental — ARCHIVED, not the shipping path. The Canvas game
+// (index.html → src/main.js) is the source of truth as of the 2026-06-02 renderer
+// decision. See docs/EXPERIMENTS.md. Do not build new gameplay against this spike.
+//
 // WestWard engine-rewrite spike — static Dustward opening scene in Three.js.
 //
 // Milestone 1 of docs/roadmap.md. This renders ONE static first-view scene with

@@ -8,9 +8,9 @@
 ![QA](https://github.com/coleyrockin/WestWardRPG/actions/workflows/qa.yml/badge.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat)
 
-Story-first browser frontier RPG built on a custom Canvas raycasting stack, deterministic gameplay systems, and a growing Three.js renderer spike.
+Story-first browser frontier RPG built on a custom Canvas raycasting stack. The Canvas build is the **source of truth** — the whole game and its full test suite live here. A Three.js renderer experiment is **archived**, not on the critical path (see [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md)).
 
-The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction with a new visual target: a stylized dark western RPG, closer to *Oblivion meets Weird West meets a low-poly graphic novel*. The Canvas game is the playable reference build; `spikes/render3d.html` is the in-progress 3D first-road slice.
+The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction with a stylized dark-western art target — *Oblivion meets Weird West meets a low-poly graphic novel* — pursued **within the Canvas renderer** (palette, post-process, sprite/silhouette work). The Canvas game at `index.html` is the playable build; `spikes/render3d.html` is an archived 3D look-spike that is not the shipping path.
 
 ## Preview
 
@@ -105,29 +105,40 @@ Latest local fast gate: `npm test` reports **1174 passing tests across 107 files
 
 ## Current Direction
 
-> **Active next direction: a renderer rewrite spike.** WestWard is migrating its
-> presentation layer to a **Three.js** engine for richer scene depth, lighting,
-> and characters. The current Canvas build is the **reference build** — it stays
-> the playable source of truth for shipped gameplay until the new renderer proves
-> the same first-road slice. The spike lives behind the `spikes/render3d.html` dev route
-> (`npm run dev` → open `/spikes/render3d.html`) and does not touch the Canvas game. See
-> [`docs/roadmap.md`](docs/roadmap.md).
+> **Renderer decision (2026-06-02): Canvas is the source of truth; the Three.js
+> fork is archived.** An audit found three parallel architectures — the shipped
+> Canvas game (`src/main.js`, ~100% of the game, the entire test suite), a Three.js
+> look-spike (`src/render3d/`, ~10% of the game), and an orphaned deterministic sim
+> core (`src/game/sim.js`, wired to nothing). The game and its value live on Canvas,
+> and story-first means the renderer serves the game, not the reverse. The 3D
+> graphic-novel look genuinely exceeds raycasting, but a from-scratch 3D rebuild
+> would discard every shipped system and test. So: **ship the Canvas game, pursue
+> the art target within Canvas, and treat the Three.js work as an archived
+> experiment** — reconsidered only if the 3D look proves essential, and only ever
+> via the sim seam, deliberately. See [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md).
 
 Current playable path:
 
-- `index.html` is the current playable/reference RPG build.
-- `spikes/render3d.html` is an experimental Three.js first-road slice.
-- New 3D work should stay under `src/render3d/` until it reaches parity with the Canvas first-road loop.
+- `index.html` → `src/main.js` is the shipping Canvas RPG. This is the product.
+- `spikes/render3d.html` → `src/render3d/` is an **archived** Three.js look-spike,
+  not the shipping path. It has the first-road slice and the target look but only a
+  fraction of the systems.
+- `src/game/sim.js` / `ecs.js` are an **archived** deterministic sim core, not yet
+  wired into the shipped game.
 
-The current `main` branch includes the first five-minute 3D opening polish: third-person RPG camera framing, smooth follow motion, a player readability ring/marker, foreground prop fading, a wider first road, calmer dusk lighting, and in-world guidance toward Boone's board.
+The high-level build order (Canvas-first):
 
-The detailed roadmap lives in [`docs/roadmap.md`](docs/roadmap.md), which is the single source of truth. The high-level active build order is:
+1. **Truth-in-advertising** — fix the small correctness gaps the audit surfaced
+   (done: Cunning now affects dodge cadence; dodge cooldown uses the tuned constant).
+2. **De-risk the loop** — add integration coverage for `src/main.js`'s game loop
+   before carving it; the suite currently covers extracted modules, not the loop.
+3. **Carve the god-object** — lift systems out of the 4,651-line `update()` into
+   tested modules, following the existing extraction pattern.
+4. **The look, on Canvas** — palette grading, the `postProcess.js` pipeline, and
+   sprite/silhouette work toward the graphic-novel target.
 
-1. **3D foundation hardening** — keep Canvas stable while the Three.js spike becomes modular, testable, and smoke-gated.
-2. **First-road 3D loop** — finish the board, cache, slime, wagon, Map Scrap, and return-to-Boone sequence in `spikes/render3d.html`, with the first 30 seconds clearly framing the player, road, and Boone's board.
-3. **Visual and accessibility proof** — add screenshot review, HUD readability, prompt semantics, and modal focus polish.
-4. **System parity planning** — design the safe bridge from 3D phase completions back to save-safe Canvas systems.
-5. **Release polish** — package the strongest playable path honestly, with known limits and current screenshots.
+The legacy 3D-rebuild plan is retained for the record in [`docs/roadmap.md`](docs/roadmap.md)
+under a superseding decision banner.
 
 ## MVP Test Path
 

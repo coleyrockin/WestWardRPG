@@ -1,3 +1,9 @@
+// @experimental — ARCHIVED / ORPHANED. Imported by nothing in production (not
+// src/main.js, not the render3d spike). This is the deterministic renderer seam that
+// was never wired in. Per the 2026-06-02 renderer decision, Canvas (src/main.js) is the
+// source of truth; revive this only to route shipped systems through it. See
+// docs/EXPERIMENTS.md.
+//
 // Event-sourced, fixed-timestep simulation core for the WestWard 3D engine.
 //
 // The whole game is a pure function of (seed, input-log): createInitialState
