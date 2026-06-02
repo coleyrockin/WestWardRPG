@@ -97,6 +97,32 @@ export function rightVector(yaw) {
   return { x: Math.cos(yaw), z: -Math.sin(yaw) };
 }
 
+// --- Dodge-roll (Space) -----------------------------------------------------
+export const DODGE = { duration: 0.35, iframes: 0.22, speed: 11 };
+
+// Pure dodge step. state = { position:{x,z}, dir:{x,z}, elapsed }. Speed eases out
+// over the duration so the roll has a snappy start and a soft stop. Returns a new
+// state plus `done`. Never mutates input.
+export function stepDodge(state, dt, cfg = DODGE) {
+  const d = Number.isFinite(dt) && dt > 0 ? dt : 0;
+  const elapsed = (state.elapsed || 0) + d;
+  const p = Math.min(1, elapsed / cfg.duration);
+  const speed = cfg.speed * (1 - p) * (1 - p); // ease-out
+  return {
+    position: {
+      x: state.position.x + state.dir.x * speed * d,
+      z: state.position.z + state.dir.z * speed * d,
+    },
+    dir: { x: state.dir.x, z: state.dir.z },
+    elapsed,
+    done: elapsed >= cfg.duration,
+  };
+}
+
+export function dodgeIsInvulnerable(elapsed, cfg = DODGE) {
+  return (elapsed || 0) <= cfg.iframes;
+}
+
 export function resolveCameraPreset(name = "exploration", overrides = {}) {
   const base = CAMERA_PRESETS[name] || CAMERA_PRESETS.exploration;
   return { ...base, ...overrides };
