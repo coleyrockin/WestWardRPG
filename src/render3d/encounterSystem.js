@@ -106,6 +106,10 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
   const playerDamagePerSecond = Number.isFinite(options.playerDamagePerSecond)
     ? options.playerDamagePerSecond
     : DEFAULT_PLAYER_DAMAGE_PER_SECOND;
+  // Real-time combat: the slime's lunge is the lethal hit (burst damage on contact),
+  // negated by player dodge i-frames. spike passes () => player.isInvulnerable.
+  const playerInvulnerable = typeof options.playerInvulnerable === "function" ? options.playerInvulnerable : () => false;
+  const lungeDamage = Number.isFinite(options.lungeDamage) ? options.lungeDamage : 14;
 
   let state = "patrol";
   let hitCount = 0;
@@ -117,6 +121,8 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
   let deathNotified = false;
   let playerHp = initialPlayerHp;
   let playerDeathNotified = false;
+  let flashTimer = 0;
+  const FLASH_TIME = 0.18;
 
   function animate(dt) {
     if (!slimeMesh) return;
@@ -125,7 +131,14 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
       return;
     }
     idleBob(slimeMesh, elapsed);
-    if (state === "aggro" || state === "attack") interactGlow(slimeMesh, elapsed + dt);
+    if (flashTimer > 0) {
+      // Decay the hit flash back toward base instead of a one-frame snap.
+      flashTimer = Math.max(0, flashTimer - dt);
+      const k = flashTimer / FLASH_TIME; // 1 → 0
+      flashSlime(slimeMesh, 0.5 + k * 2.2);
+    } else if (state === "aggro" || state === "attack") {
+      interactGlow(slimeMesh, elapsed + dt);
+    }
   }
 
   function notifyForState(nextState) {
@@ -146,32 +159,23 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
     const nextState = getNextSlimeState({ state, playerPos, slimePos, aggroRadius, attackRadius });
     state = nextState;
     notifyForState(nextState);
-    // Slime chips the player while locked in the fight (aggro or attack range).
-    // A dead slime is always "dead" (getNextSlimeState short-circuits), so killing
-    // it stops the bleed — the loop stays completable.
-    if ((state === "aggro" || state === "attack") && playerHp > 0 && safeDt > 0 && canDamagePlayer()) {
-      playerHp = Math.max(0, playerHp - playerDamagePerSecond * safeDt);
-      if (playerHp <= 0 && !playerDeathNotified) {
-        playerDeathNotified = true;
-        onPlayerDeath({ phase: getPhase(), slimePlacement, scene, playerHp: 0 });
-      }
-    }
     animate(safeDt);
     return getState(playerPos);
   }
 
-  function strike(playerPos) {
-    if (disposed) return false;
-    if (!canStrikeSlime({ state, playerPos, slimePos, strikeRadius })) return false;
-    if (hp <= 0 || state === "dead") return false;
+  // Apply one landed melee hit (the caller's hitbox already validated range + the
+  // active swing window). Drives flash + slump + death. Returns the new state.
+  function registerHit() {
+    if (disposed || hp <= 0 || state === "dead") return getState();
     hitCount = Math.min(maxHits, hitCount + 1);
     hp = Math.max(0, maxHits - hitCount);
     flashSlime(slimeMesh, hp <= 0 ? 3.5 : 2.6);
+    flashTimer = FLASH_TIME;
     slumpSlime(slimeMesh, hp, maxHits);
     onSlimeHit({ state, phase: getPhase(), slimePlacement, hp, maxHits, hitCount, defeated: hp <= 0 });
     if (hp > 0) {
       state = "attack";
-      return true;
+      return getState();
     }
     state = "dead";
     deathCollapse(slimeMesh, 1);
@@ -179,7 +183,30 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
       deathNotified = true;
       onSlimeDeath({ state, phase: getPhase(), slimePlacement, scene, hp, maxHits, hitCount, defeated: true });
     }
+    return getState();
+  }
+
+  // Legacy proximity-gated strike (older interaction path): validates range, then
+  // registers a hit. Returns true if a hit landed.
+  function strike(playerPos) {
+    if (disposed) return false;
+    if (!canStrikeSlime({ state, playerPos, slimePos, strikeRadius })) return false;
+    if (hp <= 0 || state === "dead") return false;
+    registerHit();
     return true;
+  }
+
+  // Burst damage from a slime lunge connecting. spike calls this when slimeBehavior
+  // reports contact. Gated by the fight phase and negated by player i-frames.
+  function applyLungeContact() {
+    if (disposed || playerHp <= 0) return getState();
+    if (!canDamagePlayer() || playerInvulnerable()) return getState();
+    playerHp = Math.max(0, playerHp - lungeDamage);
+    if (playerHp <= 0 && !playerDeathNotified) {
+      playerDeathNotified = true;
+      onPlayerDeath({ phase: getPhase(), slimePlacement, scene, playerHp: 0 });
+    }
+    return getState();
   }
 
   function engage() {
@@ -217,6 +244,8 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
     update,
     engage,
     strike,
+    registerHit,
+    applyLungeContact,
     dispose,
     getState,
   };

@@ -49,10 +49,14 @@ export function createEncounterSystem(scene?: any, snapshot?: any, options?: {
   onSlimeHit?: (event: any) => void;
   onSlimeDeath?: (event: any) => void;
   onPlayerDeath?: (event: any) => void;
+  playerInvulnerable?: () => boolean;
+  lungeDamage?: number;
 }): {
   update(playerPos: { x: number; z: number }, dt?: number): EncounterState;
   engage(): EncounterState;
   strike(playerPos: { x: number; z: number }): boolean;
+  registerHit(): EncounterState;
+  applyLungeContact(): EncounterState;
   dispose(): void;
   getState(playerPos?: { x: number; z: number } | null): EncounterState;
 };
