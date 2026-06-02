@@ -1659,14 +1659,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     anchor: { x: snapshot.player.x, y: snapshot.player.y },
     playCore: { x: snapshot.player.x + 6, y: snapshot.player.y },
   });
-  scene.add(new THREE.AmbientLight(col("#465166"), 0.32));
+  scene.add(new THREE.AmbientLight(col("#8aa0d0"), 0.55));
   // Continuous day/night: a slow world clock advances dayTime; sunArc(dayTime)
-  // is the live palette so the sun arcs and colours drift. Starts at dusk. The
+  // is the live palette so the sun arcs and colours drift. Opens at golden hour
+  // and drifts into dusk as you play (readable first frame, moody payoff). The
   // golden-image gate loads ?visual to freeze everything time-animated (sun,
   // clouds, water, weather, film grain) for a stable pixelmatch baseline.
   const debugPlayerMarker =
     typeof location !== "undefined" && new URLSearchParams(location.search).has("debugPlayerMarker");
-  const clock = createWorldClock(); // defaults to dusk (dayTime 1/3)
+  const clock = createWorldClock({ dayTime: 0 }); // open at golden hour, drift to dusk
   if (visualCapture) pinClock(clock, "dusk");
   else if (resumeRun && Number.isFinite(resumeRun.world?.dayTime)) clock.dayTime = resumeRun.world.dayTime;
 

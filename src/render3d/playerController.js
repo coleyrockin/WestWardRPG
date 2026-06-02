@@ -55,11 +55,11 @@ const CAMERA_BLOCKING_KINDS = new Set([
 
 export const CAMERA_PRESETS = Object.freeze({
   exploration: Object.freeze({
-    distance: 7.35,
-    height: 4.0,
+    distance: 9.0,
+    height: 4.8,
     lookHeight: 1.02,
-    lookAhead: 7.05,
-    shoulder: 0.68,
+    lookAhead: 8.0,
+    shoulder: 0.55,
     smoothing: 10.5,
   }),
   town: Object.freeze({
@@ -341,6 +341,9 @@ export function createPlayerController(camera, opts = {}) {
   // Dodge-roll state: elapsed === null means not rolling; otherwise seconds into the roll.
   let dodge = { dir: { x: 0, z: 1 }, elapsed: null };
   let thirdPersonCameraSeeded = false;
+  // The look-at target is lerped (not just the camera body) so fast turns and
+  // preset changes don't snap the gaze — removes the swimmy-rotation jitter.
+  let smoothLookAt = null;
 
   // Seed yaw + pitch from the camera's current heading so the spike's hero
   // pose is preserved on the first frame. We project the forward vector onto
@@ -423,7 +426,8 @@ export function createPlayerController(camera, opts = {}) {
   const resetCameraBehind = (nextYaw = resetYaw) => {
     if (Number.isFinite(nextYaw)) yaw = nextYaw;
     pitch = 0;
-    thirdPersonCameraSeeded = false;
+    // Blend back behind the player rather than snapping (the camera body + look-at
+    // lerp toward the new pose); only genuine teleports (setPosition) snap.
   };
   const onKeyDown = (e) => {
     if (e.code === "Escape") {
@@ -567,8 +571,18 @@ export function createPlayerController(camera, opts = {}) {
         camera.position.y + (cameraPoint.y - camera.position.y) * alpha,
         camera.position.z + (cameraPoint.z - camera.position.z) * alpha,
       );
+      // Lerp the gaze target at the same rate as the body. On the first frame (or
+      // after a teleport) snap it; otherwise it trails smoothly so sharp turns and
+      // preset changes don't whip the camera around.
+      if (!smoothLookAt) {
+        smoothLookAt = { x: pose.lookAt.x, y: pose.lookAt.y, z: pose.lookAt.z };
+      } else {
+        smoothLookAt.x += (pose.lookAt.x - smoothLookAt.x) * alpha;
+        smoothLookAt.y += (pose.lookAt.y - smoothLookAt.y) * alpha;
+        smoothLookAt.z += (pose.lookAt.z - smoothLookAt.z) * alpha;
+      }
       if (camera.lookAt) {
-        camera.lookAt(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z);
+        camera.lookAt(smoothLookAt.x, smoothLookAt.y, smoothLookAt.z);
       }
     } else if (camera) {
       camera.position.x = position.x;
@@ -594,12 +608,16 @@ export function createPlayerController(camera, opts = {}) {
       camera.position.x = incoming.x;
       camera.position.z = incoming.z;
     }
+    // Genuine teleport: re-seed so the camera body + gaze snap to the new spot
+    // instead of lerping across the map.
     thirdPersonCameraSeeded = false;
+    smoothLookAt = null;
   }
 
   function setCameraPreset(name, overrides = {}) {
     activeCameraPreset = resolveCameraPreset(name, { ...presetOverrides, ...overrides });
-    thirdPersonCameraSeeded = false;
+    // Do NOT unseed here — beat/preset changes should blend the camera to the new
+    // framing, not teleport it. The position + smoothLookAt lerps handle the move.
   }
 
   function dispose() {

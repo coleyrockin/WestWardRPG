@@ -29,7 +29,7 @@ export const FIRST_ROAD_ART_STYLE = Object.freeze({
   roadWidth: 7.25,
   openingRoadWidth: 6.75,
   shoulderWidth: 2.65,
-  minNaturalClusters: 34,
+  minNaturalClusters: 24,
   minProductionStreetProps: 36,
   minStorefronts: 6,
   minNpcSilhouettes: 6,
@@ -70,7 +70,7 @@ function routePlanks() {
     const ny = dx / len;
     for (let i = 1; i <= count; i++) {
       const t = i / (count + 1);
-      const side = ((i + seg) % 2 === 0 ? -1 : 1) * (3.65 + (i % 3) * 0.28);
+      const side = ((i + seg) % 2 === 0 ? -1 : 1) * (4.7 + (i % 3) * 0.28);
       planks.push({
         kind: "roadPlank",
         label: `Road Plank ${seg}-${i}`,
@@ -123,11 +123,11 @@ function routeNaturalClusters() {
     if (len < 0.1) continue;
     const nx = -dy / len;
     const ny = dx / len;
-    const count = Math.max(4, Math.floor(len / 2.6));
+    const count = Math.max(2, Math.floor(len / 4.4));
     for (let i = 0; i < count; i++) {
       const t = (i + 0.45 + hash01(seg * 37 + i) * 0.25) / count;
       const sideSign = hash01(seg * 101 + i * 17) > 0.5 ? 1 : -1;
-      const shoulder = sideSign * (4.35 + hash01(seg * 59 + i * 23) * 2.8);
+      const shoulder = sideSign * (5.3 + hash01(seg * 59 + i * 23) * 2.6);
       const alongJitter = (hash01(seg * 71 + i * 29) - 0.5) * 0.7;
       const kind = i % 3 === 0 ? "sageCluster" : "roadGrass";
       clusters.push({
@@ -154,19 +154,17 @@ const VISTAS = [
   { kind: "brokenFence", label: "Ranch Rail",        dx: -1.15, dy: 4.6,   color: "#8d6540", size: 0.42, depthLane: "foreground" },
 ];
 
-const ROADS = [
-  { kind: "road", label: "Marshal Road Post", dx: 1.2, dy: 0.24, color: "#c8a56a", size: 0.56 },
-  { kind: "road", label: "Town Circle Marker", dx: 2.14, dy: 0.18, color: "#d7b06d", size: 0.58 },
-  { kind: "road", label: "Broken Wagon Roadmark", dx: 3.02, dy: 0.04, color: "#d89f62", size: 0.64 },
-  { kind: "road", label: "Watchtower Milepost", dx: 4.0, dy: -0.14, color: "#ffd77b", size: 0.64 },
-  { kind: "road", label: "Marsh Fence Marker", dx: 4.78, dy: 0.42, color: "#9fc17c", size: 0.58 },
-];
+// Cleared: these five sign posts resolved onto the road centreline (y≈8.5–9.1,
+// 1.3u apart) and read as a picket fence of identical markers straight down the
+// opening lane. The road planes, ruts, and shoulder planks already mark the route,
+// so the lane stays clean. (Add route signage on the shoulders if needed later.)
+const ROADS = [];
 
 const PROPS = [
   { kind: "sign",  label: "Boone Road Sign",    dx: 1.5,  dy: 0.9,  color: "#ffd77b", size: 0.82, depthLane: "foreground" },
   { kind: "fence", label: "Left Split Fence",   dx: 2.1,  dy: 1.8,  color: "#a47b4c", size: 0.6,  depthLane: "foreground" },
   { kind: "fence", label: "Right Split Fence",  dx: 3.4,  dy: -1.1, color: "#a47b4c", size: 0.54, depthLane: "midground" },
-  { kind: "cart",  label: "Supply Cart",        dx: 4.2,  dy: -0.7, color: "#b9824d", size: 0.7,  depthLane: "midground" },
+  { kind: "cart",  label: "Supply Cart",        dx: 3.2,  dy: -0.7, color: "#b9824d", size: 0.7,  depthLane: "midground" },
   { kind: "lamp",  label: "Road Lantern",       dx: 5.0,  dy: 0.5,  color: "#ffd77b", size: 0.68, depthLane: "midground" },
   { kind: "lamp",  label: "Board Lantern",      dx: 1.0,  dy: -0.5, color: "#ffe6a8", size: 0.58, depthLane: "midground" },
   { kind: "lamp",  label: "Town Gate Lantern",  dx: 3.0,  dy: -0.7, color: "#ffe6a8", size: 0.56, depthLane: "background" },
@@ -194,7 +192,7 @@ const ROUTE_LIGHTS = [
   { kind: "lampTall", label: "Marshal Bend Lamp", x: 25.2, y: 4.2, color: "#ffd8a0", size: 0.82 },
   { kind: "lampLow", label: "Town Edge Low Lamp", x: 32.2, y: 12.1, color: "#ffd8a0", size: 0.74 },
   { kind: "lampLow", label: "Cache Glimmer Lamp", x: 41.9, y: 9.6, color: "#ffc88d", size: 0.7 },
-  { kind: "lampLow", label: "Wagon Salvage Lamp", x: 60.0, y: 9.1, color: "#ffc88d", size: 0.72 },
+  { kind: "lampLow", label: "Wagon Salvage Lamp", x: 60.0, y: 12.0, color: "#ffc88d", size: 0.72 },
 ];
 
 // Tall hero landmark — should read as the tallest first-view shape.
@@ -303,7 +301,7 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "dustSmokePlume", label: "Boardwalk Dust", x: 8.0, y: 4.85, color: "#b88551", size: 0.9, yaw: 0.2 },
   { kind: "dustSmokePlume", label: "Street Dust", x: 17.6, y: 7.35, color: "#b88551", size: 0.74, yaw: -0.3 },
   { kind: "dustSmokePlume", label: "Far Street Dust", x: 23.2, y: 8.25, color: "#b88551", size: 0.56, yaw: -0.18 },
-  { kind: "bountyEmblem", label: "Boone Bounty Emblem", x: 13.0, y: 5.35, color: "#ffd77b", size: 0.75, yaw: Math.PI / 2 },
+  { kind: "bountyEmblem", label: "Boone Bounty Emblem", x: 13.0, y: 4.6, color: "#ffd77b", size: 0.75, yaw: Math.PI / 2 },
 ];
 
 // Western flora flanking the road corridor — shoulders only (out of the wedge).

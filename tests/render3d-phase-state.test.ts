@@ -119,7 +119,7 @@ describe("render3d phase state", () => {
     const view = getPhaseView("cache_clue", state);
 
     expect(BOARD_OPTIONS.map((option) => option.id)).toContain("ask_danger");
-    expect(view.objectiveText).toContain("marsh grass");
+    expect(view.objectiveText).toContain("broken wagon");
     expect(view.objectiveMeta[1]).toContain("Ask about road danger");
   });
 

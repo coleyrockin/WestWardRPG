@@ -29,13 +29,13 @@ export const BOARD_OPTIONS = Object.freeze([
   {
     id: "accept_bounty",
     label: "Accept bounty",
-    followUp: "Boone marks the cache road in lamp chalk.",
+    followUp: "Boone chalks the cache road and rings the broken wagon at the marsh end — that wreck is your salvage.",
     returnLine: "Boone counts the bounty and pins your Map Scrap beside the old survey.",
   },
   {
     id: "ask_danger",
     label: "Ask about road danger",
-    followUp: "Boone warns you to watch the marsh grass before the cache.",
+    followUp: "Boone says the slime nests by the broken wagon — clear it before you salvage the wreck.",
     returnLine: "Boone marks the marsh warning in red and circles the safe road home.",
   },
   {
@@ -87,7 +87,7 @@ const PHASE_COPY = {
   },
   slime_tell: {
     label: "Marsh Sign",
-    text: "Inspect the green trail before the Road Slime breaks cover.",
+    text: "Green trail to the broken wagon — inspect it before the Road Slime breaks cover.",
     meta: ["Target: Slime trail", "Threat: Close"],
     targetKind: "slimeTell",
     prompt: "E — Inspect Slime Trail",
@@ -101,8 +101,8 @@ const PHASE_COPY = {
   },
   wagon_salvage: {
     label: "Broken Wagon",
-    text: "Salvage the broken wagon for whatever the slime was guarding.",
-    meta: ["Action: Salvage wagon", "Reward: Map Scrap"],
+    text: "The wagon the slime was guarding — pry the strongbox for the map scrap Boone wants.",
+    meta: ["The slime died guarding this wreck", "Action: Salvage wagon", "Reward: Map Scrap"],
     targetKind: "brokenWagon",
     prompt: "E — Salvage Wagon",
   },
