@@ -8,9 +8,9 @@
 ![QA](https://github.com/coleyrockin/WestWardRPG/actions/workflows/qa.yml/badge.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat)
 
-Story-first browser frontier RPG built on a custom Canvas raycasting stack. The Canvas build is the **source of truth** — the whole game and its full test suite live here. A Three.js renderer experiment is **archived**, not on the critical path (see [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md)).
+Story-first frontier RPG moving to a single **Three.js 3D** renderer as its one visual direction. The legacy Canvas raycaster build (`index.html`) still ships today and serves as the **behavioral oracle** — its systems and ~1,250 tests are being ported into the 3D game, after which the Canvas style is retired.
 
-The current build pushes the original Shattered Frontier into a compact Skyrim/Oblivion-style direction with a stylized dark-western art target — *Oblivion meets Weird West meets a low-poly graphic novel* — pursued **within the Canvas renderer** (palette, post-process, sprite/silhouette work). The Canvas game at `index.html` is the playable build; `spikes/render3d.html` is an archived 3D look-spike that is not the shipping path.
+The art target is a stylized dark-western world — *Oblivion meets Weird West meets a low-poly graphic novel* — which needs real scene depth and lighting, so the project commits to the Three.js path (`spikes/render3d.html` → `src/render3d/`). See [`docs/roadmap.md`](docs/roadmap.md) for the migration plan.
 
 ## Preview
 
@@ -105,37 +105,38 @@ Latest local fast gate: `npm test` reports **1174 passing tests across 107 files
 
 ## Current Direction
 
-> **Renderer decision (2026-06-02): Canvas is the source of truth; the Three.js
-> fork is archived.** An audit found three parallel architectures — the shipped
-> Canvas game (`src/main.js`, ~100% of the game, the entire test suite), a Three.js
-> look-spike (`src/render3d/`, ~10% of the game), and an orphaned deterministic sim
-> core (`src/game/sim.js`, wired to nothing). The game and its value live on Canvas,
-> and story-first means the renderer serves the game, not the reverse. The 3D
-> graphic-novel look genuinely exceeds raycasting, but a from-scratch 3D rebuild
-> would discard every shipped system and test. So: **ship the Canvas game, pursue
-> the art target within Canvas, and treat the Three.js work as an archived
-> experiment** — reconsidered only if the 3D look proves essential, and only ever
-> via the sim seam, deliberately. See [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md).
+> **Renderer direction (2026-06-02): one direction — Three.js 3D. The Canvas
+> raycaster style is being retired.** A prior audit recommended shipping Canvas and
+> archiving the 3D work; after reviewing both builds side by side, that call was
+> **overridden by the product owner** — the 3D look is the product, and the project
+> will not carry two renderers. The Three.js build (`src/render3d/`, `spikes/render3d.html`)
+> is now the single visual direction.
+>
+> **Migration, not demolition.** The Canvas game (`src/main.js`) still ships today
+> and is the **behavioral oracle**: its renderer-agnostic systems and their ~1,250
+> tests are ported into the 3D game, and the Canvas raycaster is retired only as the
+> 3D build reaches parity. The working game and the test suite are preserved through
+> the port — nothing is deleted ahead of its 3D replacement.
 
 Current playable path:
 
-- `index.html` → `src/main.js` is the shipping Canvas RPG. This is the product.
-- `spikes/render3d.html` → `src/render3d/` is an **archived** Three.js look-spike,
-  not the shipping path. It has the first-road slice and the target look but only a
-  fraction of the systems.
-- `src/game/sim.js` / `ecs.js` are an **archived** deterministic sim core, not yet
-  wired into the shipped game.
+- `spikes/render3d.html` → `src/render3d/` is the **target** — the single 3D direction.
+- `src/game/` (sim/ecs/renderer/world) is the engine seam the 3D build grows on.
+- `index.html` → `src/main.js` is the **legacy Canvas build**: still the live deploy
+  and the systems/tests oracle being ported from, retired as 3D reaches parity.
 
-The high-level build order (Canvas-first):
+The high-level build order (3D-first migration):
 
-1. **Truth-in-advertising** — fix the small correctness gaps the audit surfaced
-   (done: Cunning now affects dodge cadence; dodge cooldown uses the tuned constant).
-2. **De-risk the loop** — add integration coverage for `src/main.js`'s game loop
-   before carving it; the suite currently covers extracted modules, not the loop.
-3. **Carve the god-object** — lift systems out of the 4,651-line `update()` into
-   tested modules, following the existing extraction pattern.
-4. **The look, on Canvas** — palette grading, the `postProcess.js` pipeline, and
-   sprite/silhouette work toward the graphic-novel target.
+1. **Reuse, don't reimplement** — point the 3D build at the renderer-agnostic logic
+   modules (`jobBoard`, `combatProcessor`, `lootSystem`, `progressionSystem`,
+   `npcMemory`, …) instead of the spike's bespoke reimplementations, preserving their
+   tests.
+2. **Close the systems gap** — bring gear/crafting/factions/economy/quests/NG+ into
+   the 3D game on top of those modules.
+3. **Polish the 3D look** — lift the dark/murky lighting, finish the hero + props,
+   land the graphic-novel grade.
+4. **Retire Canvas** — once the 3D first-road + core systems reach parity, switch the
+   deploy to 3D and remove the raycaster.
 
 The legacy 3D-rebuild plan is retained for the record in [`docs/roadmap.md`](docs/roadmap.md)
 under a superseding decision banner.

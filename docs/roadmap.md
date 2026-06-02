@@ -1,35 +1,21 @@
-# WestWardRPG Execution Roadmap
+# WestWardRPG Execution Roadmap — 3D Hardcore Rebuild
 
-> ## ⛔ SUPERSEDED — Renderer Decision Record, 2026-06-02
+> **Direction confirmed 2026-06-02: this 3D rebuild is the single direction.** An
+> architecture audit briefly recommended the opposite — ship the Canvas game and
+> archive this 3D work — on the grounds that ~100% of the systems and the ~1,250-test
+> suite live on Canvas while the 3D build is ~10% complete. After reviewing both
+> builds side by side, the product owner **overrode that recommendation**: the 3D look
+> is the product, and the project will not carry two renderers.
 >
-> **The "3D Hardcore Rebuild" plan below is no longer the active direction.** An
-> architecture audit found three parallel architectures and a deferred renderer
-> decision taxing every change:
->
-> - `src/main.js` — the shipped Canvas game: ~100% of the systems and the **entire
->   1,227-test suite**. The shipped game-loop itself is untested.
-> - `src/render3d/` — a Three.js look-spike with the target art but only ~10% of the
->   game (first-road loop, one enemy, day/night, visual weather).
-> - `src/game/sim.js` + `ecs.js` — a clean, tested, deterministic event-sourced core
->   that is **imported by nothing in production** (the would-be renderer seam, orphaned).
->
-> **Decision: commit to Canvas as the source of truth; archive the Three.js fork.**
-> Story-first is the product; the renderer serves the game. A from-scratch 3D rebuild
-> discards every shipped system and test for a look — that trade is rejected. The
-> graphic-novel art target is pursued *within Canvas*. A Three.js migration is
-> reconsidered only if the look proves essential, and only ever by wiring the shipped
-> systems through the `src/game/sim.js` seam — never by promoting the spike.
->
-> The active plan is the Canvas-first build order in [`../README.md`](../README.md)
-> (Current Direction) and [`EXPERIMENTS.md`](EXPERIMENTS.md). **Everything below this
-> banner is retained for the record only** — it is the rejected rebuild plan, kept so
-> the reasoning and the 3D design notes aren't lost.
+> The audit's one durable caveat is folded in as the **migration rule**: the Canvas
+> build is the *behavioral oracle*, and its renderer-agnostic systems + tests are
+> **ported** into the 3D game (not reimplemented, not deleted) — the Canvas raycaster
+> is retired only once the 3D build reaches parity. See §8 port-ledger.
 
----
+Single source of truth. Do not create parallel `TODO.md`, `PLAN.md`, `ROADMAP-*.md`,
+or another roadmap file.
 
-## Legacy plan (retained for record): 3D Hardcore Rebuild
-
-Last updated: `2026-05-31`
+Last updated: `2026-06-02`
 Branch: `main`
 
 ---

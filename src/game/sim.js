@@ -1,10 +1,8 @@
-// @experimental — ARCHIVED / ORPHANED. Imported by nothing in production (not
-// src/main.js, not the render3d spike). This is the deterministic renderer seam that
-// was never wired in. Per the 2026-06-02 renderer decision, Canvas (src/main.js) is the
-// source of truth; revive this only to route shipped systems through it. See
-// docs/EXPERIMENTS.md.
-//
 // Event-sourced, fixed-timestep simulation core for the WestWard 3D engine.
+//
+// Not yet wired into the render3d build's loop — the spike still drives its own
+// mutable state. Wiring the 3D game through this deterministic seam is part of the
+// migration (see docs/roadmap.md): port shipped systems onto it, render via toRenderState.
 //
 // The whole game is a pure function of (seed, input-log): createInitialState
 // seeds a world, stepSimulation(state, commands, dt) folds one tick WITHOUT
