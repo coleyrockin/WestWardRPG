@@ -641,6 +641,24 @@
         background: rgba(20, 13, 24, 0.8);
         color: #cdb992;
       }
+      #damage-numbers { position: fixed; inset: 0; pointer-events: none; z-index: 35; }
+      #damage-numbers .dmg-num {
+        position: absolute; transform: translate(-50%, -50%);
+        font: 700 22px "Iowan Old Style", Georgia, serif; color: #fff;
+        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+      }
+      #combo-count {
+        position: fixed; top: 18%; left: 50%; transform: translateX(-50%); z-index: 36;
+        font: 800 28px "Iowan Old Style", Georgia, serif; color: #ffd77b;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85); pointer-events: none;
+      }
+      #combo-count[hidden] { display: none; }
+      #hitmarker {
+        position: fixed; top: 50%; left: 50%; width: 22px; height: 22px;
+        transform: translate(-50%, -50%) rotate(45deg); z-index: 36; pointer-events: none;
+        border: 2px solid rgba(255, 255, 255, 0.9); border-radius: 3px;
+      }
+      #hitmarker[hidden] { display: none; }
       #run-summary[hidden] { display: none; }
       #run-summary {
         position: fixed;
@@ -785,6 +803,9 @@
         </div>
       </div>
     </div>
+    <div id="damage-numbers" aria-hidden="true"></div>
+    <div id="combo-count" aria-hidden="true" hidden></div>
+    <div id="hitmarker" aria-hidden="true" hidden></div>
     <div id="run-summary" role="dialog" aria-modal="true" aria-labelledby="run-summary-title" hidden>
       <div id="run-summary-card">
         <h2 id="run-summary-title">Your run has ended</h2>
