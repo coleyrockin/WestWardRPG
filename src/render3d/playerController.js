@@ -97,6 +97,32 @@ export function rightVector(yaw) {
   return { x: Math.cos(yaw), z: -Math.sin(yaw) };
 }
 
+// --- Dodge-roll (Space) -----------------------------------------------------
+export const DODGE = { duration: 0.35, iframes: 0.22, speed: 11 };
+
+// Pure dodge step. state = { position:{x,z}, dir:{x,z}, elapsed }. Speed eases out
+// over the duration so the roll has a snappy start and a soft stop. Returns a new
+// state plus `done`. Never mutates input.
+export function stepDodge(state, dt, cfg = DODGE) {
+  const d = Number.isFinite(dt) && dt > 0 ? dt : 0;
+  const elapsed = (state.elapsed || 0) + d;
+  const p = Math.min(1, elapsed / cfg.duration);
+  const speed = cfg.speed * (1 - p) * (1 - p); // ease-out
+  return {
+    position: {
+      x: state.position.x + state.dir.x * speed * d,
+      z: state.position.z + state.dir.z * speed * d,
+    },
+    dir: { x: state.dir.x, z: state.dir.z },
+    elapsed,
+    done: elapsed >= cfg.duration,
+  };
+}
+
+export function dodgeIsInvulnerable(elapsed, cfg = DODGE) {
+  return (elapsed || 0) <= cfg.iframes;
+}
+
 export function resolveCameraPreset(name = "exploration", overrides = {}) {
   const base = CAMERA_PRESETS[name] || CAMERA_PRESETS.exploration;
   return { ...base, ...overrides };
@@ -257,6 +283,7 @@ export function stepPlayer({
 function makeInputState() {
   return {
     forward: false, back: false, left: false, right: false, shift: false,
+    dodge: false,
     lookDx: 0, lookDy: 0,
   };
 }
@@ -311,6 +338,8 @@ export function createPlayerController(camera, opts = {}) {
   let activeCameraPreset = resolveCameraPreset(cameraPreset, presetOverrides);
   let moving = false;
   let running = false; // moving AND sprint held — drives the Run animation blend
+  // Dodge-roll state: elapsed === null means not rolling; otherwise seconds into the roll.
+  let dodge = { dir: { x: 0, z: 1 }, elapsed: null };
   let thirdPersonCameraSeeded = false;
 
   // Seed yaw + pitch from the camera's current heading so the spike's hero
@@ -408,6 +437,10 @@ export function createPlayerController(camera, opts = {}) {
     const key = KEY_MAP[e.code];
     if (key) { input[key] = true; }
     if (e.code === "ShiftLeft" || e.code === "ShiftRight") input.shift = true;
+    if (e.code === "Space") {
+      input.dodge = true;
+      if (typeof e.preventDefault === "function") e.preventDefault();
+    }
   };
   const onKeyUp = (e) => {
     const key = KEY_MAP[e.code];
@@ -469,6 +502,27 @@ export function createPlayerController(camera, opts = {}) {
     yaw = stepped.yaw;
     pitch = stepped.pitch;
     let nextPos = stepped.position;
+
+    // Dodge-roll: edge-triggered by Space. Locks direction from the current WASD
+    // heading (or facing if idle) and OVERRIDES normal movement for DODGE.duration.
+    // Look (yaw/pitch from stepPlayer) is preserved so you can steer while rolling.
+    if (input.dodge && dodge.elapsed === null) {
+      const f = (input.forward ? 1 : 0) - (input.back ? 1 : 0);
+      const r = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+      const fwd = forwardVector(yaw);
+      const rt = rightVector(yaw);
+      let dx = fwd.x * f + rt.x * r;
+      let dz = fwd.z * f + rt.z * r;
+      const m = Math.hypot(dx, dz);
+      if (m < 1e-6) { dx = fwd.x; dz = fwd.z; } else { dx /= m; dz /= m; }
+      dodge = { dir: { x: dx, z: dz }, elapsed: 0 };
+    }
+    input.dodge = false; // consume the edge
+    if (dodge.elapsed !== null) {
+      const rolled = stepDodge({ position, dir: dodge.dir, elapsed: dodge.elapsed }, dt, DODGE);
+      nextPos = rolled.position;
+      dodge.elapsed = rolled.done ? null : rolled.elapsed;
+    }
 
     moving = !!(input.forward || input.back || input.left || input.right);
     running = moving && !!input.shift; // sprint speed already applied in stepPlayer
@@ -573,6 +627,9 @@ export function createPlayerController(camera, opts = {}) {
     dispose,
     get position() { return { x: position.x, z: position.z }; },
     get yaw() { return yaw; },
+    get isDodging() { return dodge.elapsed !== null; },
+    get isInvulnerable() { return dodge.elapsed !== null && dodgeIsInvulnerable(dodge.elapsed, DODGE); },
+    get dodgeProgress() { return dodge.elapsed === null ? 0 : Math.min(1, dodge.elapsed / DODGE.duration); },
     get pitch() { return pitch; },
     get moving() { return moving; },
     get running() { return running; },

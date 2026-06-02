@@ -44,6 +44,10 @@ import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
 import { createSaveStateManager } from "../saveStateManager.js";
 import { buildRunPayload, loadRun, writeRun, sealRun } from "./runSave.js";
+import { stagger } from "./animationHelpers.js";
+import { createPlayerCombat, hitboxHitsTarget } from "./combat/playerCombat.js";
+import { createSlimeState, stepSlime } from "./combat/slimeBehavior.js";
+import { createHitStop, createCameraShake, createBurstPool } from "./combat/hitFx.js";
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
@@ -2015,6 +2019,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     maxHits: 3,
     initialPlayerHp: resumeRun?.loopState?.encounterState?.playerHp ?? 40,
     canDamagePlayer: () => loopState.phase === "slime_fight",
+    playerInvulnerable: () => player.isInvulnerable,
     onPlayerDeath: () => sealCurrentRun("slain by the roadside slime"),
     getPhase: () => loopState.phase,
     onSlimeEngage: () => {
@@ -2032,6 +2037,116 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     },
   });
   syncProductionHud(productionHudRefs, loopState.state, encounter.getState(player.position));
+
+  // --- Real-time combat systems (all gated behind !visualCapture in loop()) ---
+  const playerCombat = createPlayerCombat();
+  const hitStop = createHitStop();
+  const camShake = createCameraShake();
+  const burst = createBurstPool(scene, { count: 28 });
+  let slimeAI = heroMeshes.roadSlime
+    ? createSlimeState({ x: heroMeshes.roadSlime.position.x, z: heroMeshes.roadSlime.position.z })
+    : null;
+  let comboCount = 0;
+  let comboTimer = 0;
+  let hitmarkerT = 0;
+
+  // Swing: left-click or E during the slime fight. Plays an attack/draw clip if the
+  // rig has one (no-op otherwise — the swing is procedural via the state machine).
+  function trySwing() {
+    if (visualCapture || loopState.phase !== "slime_fight") return;
+    if (playerCombat.tryAttack()) {
+      character.playOnce?.("attack");
+      character.playOnce?.("draw");
+    }
+  }
+  if (typeof window !== "undefined") {
+    window.addEventListener("keydown", (e) => { if (e.code === "KeyE") trySwing(); });
+    canvas?.addEventListener?.("mousedown", (e) => { if (e.button === 0) trySwing(); });
+  }
+
+  // Telegraph tell: bulge the slime's footprint as it winds up the lunge.
+  function applySlimeTelegraph(mesh, mode, telegraphT) {
+    if (!mesh?.scale) return;
+    if (mesh.userData.slimeBaseXZ == null) mesh.userData.slimeBaseXZ = mesh.scale.x;
+    const base = mesh.userData.slimeBaseXZ || 1;
+    const k = mode === "telegraph" ? 1 + telegraphT * 0.35 : 1;
+    mesh.scale.x = base * k;
+    mesh.scale.z = base * k;
+  }
+
+  function applyCameraShakeOffset(off) {
+    if (!off || off.trauma <= 0) return;
+    camera.position.x += off.x;
+    camera.position.y += off.y;
+    camera.position.z += off.z;
+    if (camera.rotation) camera.rotation.y += off.yaw;
+  }
+
+  // --- Combat HUD ---
+  const hpFillEl = document.querySelector("#hero-panel .hp-fill");
+  const hpLabelEl = document.querySelector("#hero-panel .hp-label");
+  function updateHpHud(st) {
+    if (!st || !Number.isFinite(st.playerHp)) return;
+    const max = st.playerMaxHp || 40;
+    const pct = Math.max(0, Math.min(1, st.playerHp / max));
+    if (hpFillEl) hpFillEl.style.width = `${(pct * 100).toFixed(1)}%`;
+    if (hpLabelEl) {
+      const v = hpLabelEl.querySelector("span:last-child");
+      if (v) v.textContent = `${Math.ceil(st.playerHp)} / ${max}`;
+    }
+  }
+  function updateComboHud(n) {
+    const el = document.getElementById("combo-count");
+    if (!el) return;
+    el.textContent = n > 1 ? `${n} HIT` : "";
+    el.hidden = n < 2;
+  }
+  function pulseHitmarker() {
+    const el = document.getElementById("hitmarker");
+    if (el) { el.hidden = false; hitmarkerT = 0.12; }
+  }
+  const dmgPool = [];
+  function spawnDamageNumber(worldPos, text) {
+    const layer = document.getElementById("damage-numbers");
+    if (!layer) return;
+    let el = dmgPool.find((d) => d.life <= 0);
+    if (!el) {
+      const span = document.createElement("span");
+      span.className = "dmg-num";
+      layer.appendChild(span);
+      el = { span, life: 0, wx: 0, wy: 0, wz: 0 };
+      dmgPool.push(el);
+    }
+    el.span.textContent = text;
+    el.life = 0.9;
+    el.wx = worldPos.x;
+    el.wy = 1.4;
+    el.wz = worldPos.z;
+    el.span.hidden = false;
+  }
+  const _dmgTmp = new THREE.Vector3();
+  function updateDamageNumbers(dt) {
+    for (const d of dmgPool) {
+      if (d.life <= 0) continue;
+      d.life -= dt;
+      if (d.life <= 0) { d.span.hidden = true; continue; }
+      _dmgTmp.set(d.wx, d.wy + (0.9 - d.life) * 0.8, d.wz).project(camera);
+      d.span.style.left = `${(_dmgTmp.x * 0.5 + 0.5) * 100}%`;
+      d.span.style.top = `${(-_dmgTmp.y * 0.5 + 0.5) * 100}%`;
+      d.span.style.opacity = `${Math.max(0, d.life / 0.9)}`;
+    }
+    if (hitmarkerT > 0) {
+      hitmarkerT -= dt;
+      if (hitmarkerT <= 0) { const el = document.getElementById("hitmarker"); if (el) el.hidden = true; }
+    }
+  }
+  function postHitPulse() {
+    const u = postUniforms?.exposure;
+    if (!u || !Number.isFinite(u.value)) return;
+    const base = u.value;
+    u.value = base * 1.35;
+    setTimeout(() => { u.value = base; }, 90);
+  }
 
   let beatFocusTimer = 0;
   const focusBeat = (preset = "inspection", seconds = 0.9) => {
@@ -2478,8 +2593,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   let fieldMapLiveSyncT = 0;
   function loop(now = performance.now()) {
     // dt in seconds, clamped to keep big tab-resume jumps from teleporting.
-    const dt = Math.min((now - prevTs) / 1000, 0.05);
+    // Hit-stop scales the loop dt on a connecting strike (freeze-frame punch); the
+    // freeze itself is advanced by real dt. Bypassed under visualCapture.
+    const rawDt = Math.min((now - prevTs) / 1000, 0.05);
     prevTs = now;
+    const dt = visualCapture ? rawDt : rawDt * hitStop.scale(rawDt);
     if (!boardModalController.isOpen()) player.update(dt, proxies);
     if (beatFocusTimer > 0) {
       beatFocusTimer = Math.max(0, beatFocusTimer - dt);
@@ -2494,7 +2612,42 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       syncProductionHud(productionHudRefs, loopState.state, encounter.getState(player.position));
       fieldMapLiveSyncT = 0.18;
     }
-    encounter.update(player.position, dt);
+    encounter.update(player.position, visualCapture ? 0 : dt);
+    if (
+      !visualCapture && slimeAI && heroMeshes.roadSlime &&
+      loopState.phase === "slime_fight" && !encounter.getState().defeated
+    ) {
+      slimeAI = stepSlime(slimeAI, { x: player.position.x, z: player.position.z }, dt);
+      heroMeshes.roadSlime.position.x = slimeAI.pos.x;
+      heroMeshes.roadSlime.position.z = slimeAI.pos.z;
+      applySlimeTelegraph(heroMeshes.roadSlime, slimeAI.mode, slimeAI.telegraphT);
+      if (slimeAI.contact) {
+        encounter.applyLungeContact();
+        camShake.add(0.6);
+      }
+    }
+    if (!visualCapture) {
+      playerCombat.update(dt);
+      if (
+        playerCombat.isHitboxLive && heroMeshes.roadSlime &&
+        loopState.phase === "slime_fight" && !encounter.getState().defeated
+      ) {
+        const sp = heroMeshes.roadSlime.position;
+        if (hitboxHitsTarget(player.position, player.yaw, { x: sp.x, z: sp.z }) && playerCombat.tryRegisterHit()) {
+          const res = encounter.registerHit();
+          hitStop.punch(res.defeated ? 0.12 : 0.06, res.defeated ? 0.02 : 0.05);
+          camShake.add(res.defeated ? 0.9 : 0.5);
+          burst.burst({ x: sp.x, y: 0.7, z: sp.z }, res.defeated ? 22 : 12, "#6be873", res.defeated ? 5 : 3);
+          stagger(heroMeshes.roadSlime, { x: Math.sin(player.yaw), z: Math.cos(player.yaw) }, 1);
+          comboCount += 1;
+          comboTimer = 1.6;
+          updateComboHud(comboCount);
+          spawnDamageNumber(sp, res.defeated ? "SLAIN" : "HIT");
+          pulseHitmarker();
+          if (res.defeated) postHitPulse();
+        }
+      }
+    }
     updateBeatVisibility();
     character.update(visualCapture ? 0 : dt, player.moving && !visualCapture, player.running && !visualCapture);
     playerReadability.update(now / 1000);
@@ -2517,6 +2670,16 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     } else {
       const who = townsfolk.getInteractable();
       if (who && loopState.phase !== "spawn" && !currentPromptText) setPromptText(`E — Talk to ${who.name}`);
+    }
+    if (!visualCapture) {
+      burst.update(dt);
+      applyCameraShakeOffset(camShake.sample(dt, now / 1000));
+      updateHpHud(encounter.getState());
+      if (comboTimer > 0) {
+        comboTimer -= dt;
+        if (comboTimer <= 0) { comboCount = 0; updateComboHud(0); }
+      }
+      updateDamageNumbers(dt);
     }
     stepWorld(dt);
     post.render();

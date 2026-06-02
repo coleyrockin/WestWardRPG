@@ -60,6 +60,22 @@ export function avoidCameraObstacles(args?: {
 }): { x: number; y?: number; z: number };
 export function stepPlayer(args: StepPlayerArgs): StepPlayerResult;
 
+export const DODGE: { duration: number; iframes: number; speed: number };
+export interface DodgeStepState {
+  position: Vec2;
+  dir: Vec2;
+  elapsed?: number;
+}
+export function stepDodge(
+  state: DodgeStepState,
+  dt: number,
+  cfg?: { duration: number; iframes: number; speed: number },
+): { position: Vec2; dir: Vec2; elapsed: number; done: boolean };
+export function dodgeIsInvulnerable(
+  elapsed: number,
+  cfg?: { duration: number; iframes: number; speed: number },
+): boolean;
+
 export interface CreatePlayerControllerOptions {
   canvas?: any;
   document?: any;
@@ -92,6 +108,9 @@ export interface PlayerController {
   readonly position: Vec2;
   readonly yaw: number;
   readonly pitch: number;
+  readonly isDodging: boolean;
+  readonly isInvulnerable: boolean;
+  readonly dodgeProgress: number;
 }
 
 export function createPlayerController(camera: any, opts?: CreatePlayerControllerOptions): PlayerController;
