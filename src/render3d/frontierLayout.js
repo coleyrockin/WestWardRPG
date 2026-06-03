@@ -447,6 +447,16 @@ const FOREGROUND_FRAME = [
   { kind: "cart", label: "Spawn Frame Cart", x: 8.3, y: 11.7, color: "#a87542", size: 0.68, yaw: 0.6 },
 ];
 
+// Board plaza life — Boone's board (13, 5.65) is the opening focal point + first
+// interaction. A couple of townsfolk gathered reading the bounties + a supply stack
+// make it the lively heart of town instead of a lone signpost. Low props only (not
+// slab-blockers), so the spawn→board camera wedge stays clear.
+const BOARD_PLAZA = [
+  { kind: "npcSilhouette", label: "Bounty Reader", x: 12.3, y: 6.7, color: "#17100c", size: 0.74, yaw: -0.7 },
+  { kind: "npcSilhouette", label: "Board Onlooker", x: 14.4, y: 6.8, color: "#120c09", size: 0.7, yaw: -2.3 },
+  { kind: "barrelCrateCluster", label: "Board Supplies", x: 15.2, y: 5.0, color: "#7a5230", size: 0.66, yaw: 0.2 },
+];
+
 // Soft world boundary — mesas/cliffs/boulders ring the playable rectangle. Mesa
 // footprints are square (3.2*size); spacing 5 with size ~1.8 (half-width 2.88)
 // overlaps by ~0.76, so there is no gap wide enough to slip through.
@@ -507,6 +517,7 @@ const ABSOLUTE_ZONES = [
   ...MARSH_DISTRICT,
   ...SOUTH_BACK_ROW,
   ...FOREGROUND_FRAME,
+  ...BOARD_PLAZA,
   ...BOUNDARY_RING,
 ];
 
