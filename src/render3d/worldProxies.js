@@ -115,6 +115,11 @@ const FOOTPRINTS = {
   bountyEmblem: null,
   storefront:  (p) => box(p, 1.3 * p.size, 1.3 * p.size),
   walkInSaloon: saloonWalls,                     // returns an ARRAY of wall AABBs (door gap open)
+  church:      (p) => box(p, 2.8 * p.size, 4.2 * p.size),
+  windmill:    (p) => box(p, 1.5 * p.size, 1.5 * p.size),   // tower base; blades clear head height
+  waterTower:  (p) => box(p, 3.0 * p.size, 3.0 * p.size),   // leg spread
+  blacksmith:  (p) => box(p, 4.0 * p.size, 3.0 * p.size),
+  hotel:       (p) => box(p, 4.5 * p.size, 3.5 * p.size),
   porch:       (p) => box(p, 1.4 * p.size, 0.5 * p.size),
   brush:       null,                            // low scrub — visual only
   sagePatch:   null,                            // low scrub — visual only

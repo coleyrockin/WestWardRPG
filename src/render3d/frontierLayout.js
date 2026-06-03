@@ -462,6 +462,19 @@ const WALKIN_SALOON = [
   { kind: "walkInSaloon", label: "The Lucky Lantern Saloon", x: 24.0, y: 1.5, color: "#6b4a2c", size: 1 },
 ];
 
+// Landmark skyline — five distinctive procedural buildings set on the open north
+// side (y < 0, behind the storefront row, clear of the mesa ring) so they rise over
+// the rooftops as a varied silhouette: a church spire, a grand hotel, a water tower,
+// a blacksmith chimney, and a prairie windmill. Each has a real collision footprint
+// (worldProxies). North of the first-frame wedge; none are slab-blocker kinds.
+const LANDMARK_BUILDINGS = [
+  { kind: "church",     label: "Dustward Chapel",     x: 16.0, y: -3.0, color: "#cdb89a", size: 1.0 },
+  { kind: "hotel",      label: "The Frontier Hotel",  x: 9.8,  y: -3.6, color: "#8a5a3a", size: 1.0 },
+  { kind: "waterTower", label: "Town Water Tower",    x: 25.0, y: -1.6, color: "#6e5236", size: 1.0 },
+  { kind: "blacksmith", label: "Dustward Forge",      x: 31.2, y: -2.5, color: "#463528", size: 1.0 },
+  { kind: "windmill",   label: "Prairie Windmill",    x: 39.0, y: 0.4,  color: "#7a5c3a", size: 1.05 },
+];
+
 // Soft world boundary — mesas/cliffs/boulders ring the playable rectangle. Mesa
 // footprints are square (3.2*size); spacing 5 with size ~1.8 (half-width 2.88)
 // overlaps by ~0.76, so there is no gap wide enough to slip through.
@@ -524,6 +537,7 @@ const ABSOLUTE_ZONES = [
   ...FOREGROUND_FRAME,
   ...BOARD_PLAZA,
   ...WALKIN_SALOON,
+  ...LANDMARK_BUILDINGS,
   ...BOUNDARY_RING,
 ];
 

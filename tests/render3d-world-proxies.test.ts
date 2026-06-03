@@ -16,6 +16,7 @@ const KINDS_THAT_BLOCK = new Set([
   "heroTownSaloon", "heroTownStore", "heroTownAssay",
   "brokenFence", "mesaSkyline", "heroMesaSkyline",
   "productionSaloon", "productionStore", "productionAssay", "hitchingRail", "barrelCrateCluster",
+  "church", "windmill", "waterTower", "blacksmith", "hotel",
 ]);
 const KINDS_THAT_PASS = new Set([
   "road", "roadPlank", "roadRut", "townBark", "slimeTell", "marshCluster", "slimeTrailHero",
@@ -64,6 +65,7 @@ describe("worldProxies — buildProxies", () => {
     expect(walls.length).toBe(SALOON_WALLS);
     // every wall AABB sits inside the building's overall footprint near the placement
     const s = placements.find((p) => p.kind === "walkInSaloon");
+    if (!s) throw new Error("walkInSaloon placement missing");
     for (const w of walls) {
       expect(w.minX).toBeGreaterThanOrEqual(s.x - 3.2);
       expect(w.maxX).toBeLessThanOrEqual(s.x + 3.2);

@@ -555,6 +555,201 @@ function buildWalkInSaloon(group, p) {
   group.add(lamp);
 }
 
+// --- Distinctive landmark buildings (procedural; authored as a builder fleet) ----
+// Each anchors at (p.x, p.y) via toVec and adds to the shared props group, matching
+// the existing builders. Footprints live in worldProxies.
+
+function buildChurch(group, p) {
+  const s = p.size || 1;
+  const mWall = standard("#cdb89a", { roughness: 0.92 });
+  const mTrim = standard("#5a4631", { roughness: 0.85 });
+  const mRoof = standard("#3d2c1a", { roughness: 0.88 });
+  const mDoor = standard("#2e1e0f", { roughness: 0.90 });
+  const mWindow = standard("#ffcf86", { emissive: "#ffcf86", emissiveIntensity: 0.85 });
+  const mCross = standard("#7a6248", { roughness: 0.80 });
+  const mBelfry = standard("#b9a07e", { roughness: 0.90 });
+  const mStone = standard("#a08a6e", { roughness: 0.95 });
+  const naveW = 2.8 * s, naveD = 4.2 * s, naveH = 3.6 * s;
+  const towerW = 1.2 * s, towerD = 1.2 * s, towerH = 6.2 * s, belfryH = 1.1 * s;
+  const towerX = p.x, towerY = p.y - naveD * 0.5 + towerD * 0.5;
+  addBox(group, naveW, naveH, naveD, mWall, toVec(p.x, p.y, 0));
+  const roofH = 1.2 * s;
+  const roofMesh = new THREE.Mesh(new THREE.ConeGeometry((naveW * 0.5 + 0.18 * s) * 1.41, roofH, 4), mRoof);
+  roofMesh.rotation.y = Math.PI / 4; roofMesh.position.copy(toVec(p.x, p.y, naveH + roofH * 0.5));
+  roofMesh.castShadow = true; group.add(roofMesh);
+  addBox(group, towerW, towerH, towerD, mWall, toVec(towerX, towerY, 0));
+  addBox(group, towerW + 0.08 * s, 0.12 * s, towerD + 0.08 * s, mTrim, toVec(towerX, towerY, towerH * 0.45));
+  addBox(group, towerW + 0.08 * s, 0.12 * s, towerD + 0.08 * s, mTrim, toVec(towerX, towerY, towerH * 0.72));
+  const belfryY = towerH;
+  addBox(group, towerW + 0.15 * s, belfryH, towerD + 0.15 * s, mBelfry, toVec(towerX, towerY, belfryY));
+  const slotZ = belfryY + belfryH * 0.55, push = towerW * 0.5 + 0.06 * s;
+  addBox(group, 0.32 * s, 0.55 * s, 0.06 * s, mDoor, toVec(towerX, towerY - push, slotZ));
+  addBox(group, 0.32 * s, 0.55 * s, 0.06 * s, mDoor, toVec(towerX, towerY + push, slotZ));
+  addBox(group, 0.06 * s, 0.55 * s, 0.32 * s, mDoor, toVec(towerX + push, towerY, slotZ));
+  addBox(group, 0.06 * s, 0.55 * s, 0.32 * s, mDoor, toVec(towerX - push, towerY, slotZ));
+  const bRoofH = 0.55 * s;
+  const bRoof = new THREE.Mesh(new THREE.ConeGeometry((towerW * 0.5 + 0.12 * s) * 1.41, bRoofH, 4), mRoof);
+  bRoof.rotation.y = Math.PI / 4; bRoof.position.copy(toVec(towerX, towerY, belfryY + belfryH + bRoofH * 0.5));
+  bRoof.castShadow = true; group.add(bRoof);
+  const crossZ = belfryY + belfryH + bRoofH + 0.08 * s;
+  addBox(group, 0.07 * s, 0.72 * s, 0.07 * s, mCross, toVec(towerX, towerY, crossZ));
+  addBox(group, 0.46 * s, 0.07 * s, 0.07 * s, mCross, toVec(towerX, towerY, crossZ + 0.36 * s));
+  const doorPush = towerD * 0.5 + 0.04 * s;
+  addBox(group, 0.55 * s, 2.2 * s, 0.08 * s, mDoor, toVec(towerX, towerY - doorPush, 0));
+  addBox(group, 0.69 * s, 2.3 * s, 0.06 * s, mTrim, toVec(towerX, towerY - doorPush - 0.01 * s, 0));
+  const rosePush = naveD * 0.5 + 0.05 * s;
+  const rose = new THREE.Mesh(new THREE.CylinderGeometry(0.38 * s, 0.38 * s, 0.09 * s, 12), mWindow);
+  rose.rotation.x = Math.PI / 2; rose.position.copy(toVec(p.x, p.y - rosePush, naveH * 0.68)); group.add(rose);
+  const sPush = naveW * 0.5 + 0.04 * s;
+  for (const oy of [-0.8 * s, 0.8 * s]) {
+    addBox(group, 0.08 * s, 0.55 * s, 0.22 * s, mWindow, toVec(p.x + sPush, p.y + oy, naveH * 0.58));
+    addBox(group, 0.08 * s, 0.55 * s, 0.22 * s, mWindow, toVec(p.x - sPush, p.y + oy, naveH * 0.58));
+  }
+  const il = new THREE.PointLight(col("#ffba6e"), 3.5, 8, 2);
+  il.position.copy(toVec(p.x, p.y - rosePush + 0.6 * s, naveH * 0.66)); group.add(il);
+  addBox(group, towerW + 0.5 * s, 0.22 * s, 0.55 * s, mStone, toVec(towerX, towerY - towerD * 0.5 - 0.3 * s, 0));
+}
+
+function buildWindmill(group, p) {
+  const tx = p.x, ty = p.y, sz = p.size || 1;
+  const postMat = standard("#7a5c3a", { roughness: 0.97 });
+  const plankMat = standard("#6b4f2e", { roughness: 0.98 });
+  const bladeMat = standard("#8a6a44", { roughness: 0.92 });
+  const hubMat = standard("#5a3e22", { roughness: 0.85 });
+  const towerH = 5.6 * sz, baseW = 1.4 * sz, topW = 0.38 * sz, segments = 6;
+  for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+    for (let i = 0; i < segments; i++) {
+      const frac = i / segments, frac1 = (i + 1) / segments;
+      const bw = THREE.MathUtils.lerp(baseW, topW, frac) * 0.5;
+      const bw1 = THREE.MathUtils.lerp(baseW, topW, frac1) * 0.5;
+      const midW = (bw + bw1) * 0.5;
+      addBox(group, 0.11 * sz, towerH / segments + 0.02, 0.11 * sz, postMat, toVec(tx + sx * midW, ty + sy * midW, frac * towerH));
+    }
+  }
+  for (let i = 0; i < 3; i++) {
+    const frac = (i + 0.5) / 3.5, bw = THREE.MathUtils.lerp(baseW, topW, frac) * 0.5, zH = frac * towerH;
+    for (let face = 0; face < 4; face++) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(bw * Math.SQRT2 * 1.95, 0.07 * sz, 0.06 * sz), plankMat);
+      m.position.copy(toVec(tx, ty, zH)); m.rotation.y = (face / 4) * Math.PI * 2 + Math.PI / 4;
+      m.castShadow = true; group.add(m);
+    }
+  }
+  addBox(group, topW * 2.8, 0.18 * sz, topW * 2.8, plankMat, toVec(tx, ty, towerH));
+  const hubMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * sz, 0.22 * sz, 0.28 * sz, 8), hubMat);
+  hubMesh.position.copy(toVec(tx, ty - 0.1 * sz, towerH + 0.25 * sz)); hubMesh.rotation.x = Math.PI / 2;
+  hubMesh.castShadow = true; group.add(hubMesh);
+  const bladeLen = 1.55 * sz, fanZ = towerH + 0.25 * sz, fanOffset = -0.12 * sz;
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2, midR = bladeLen * 0.5 + 0.2 * sz;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.19 * sz, bladeLen, 0.055 * sz), bladeMat);
+    m.position.copy(toVec(tx + Math.cos(angle) * midR, ty + fanOffset, fanZ + Math.sin(angle) * midR));
+    m.rotation.z = -angle; m.rotation.y = i % 2 === 0 ? 0.38 : -0.38;
+    m.castShadow = true; group.add(m);
+  }
+  addBox(group, 0.06 * sz, 1.1 * sz, 0.05 * sz, plankMat, toVec(tx, ty + 0.55 * sz, towerH + 0.04));
+  const vane = new THREE.Mesh(new THREE.BoxGeometry(0.04 * sz, 0.8 * sz, 0.62 * sz), bladeMat);
+  vane.position.copy(toVec(tx, ty + 0.82 * sz, towerH + 0.6 * sz)); vane.castShadow = true; group.add(vane);
+  addBox(group, baseW * 1.1, 0.18 * sz, baseW * 1.1, standard("#5a3e22", { roughness: 0.99 }), toVec(tx, ty, 0));
+}
+
+function buildWaterTower(group, p) {
+  const ox = p.x, oy = p.y, s = p.size || 1;
+  const matLeg = standard("#4f3a26", { roughness: 0.98 });
+  const matTank = standard("#6e5236", { roughness: 0.95 });
+  const matBand = standard("#3a2c1c", { roughness: 0.85 });
+  const matLid = standard("#5a4128", { roughness: 0.97 });
+  const legH = 4.6 * s, spread = 1.5 * s, topSpread = 0.85 * s, tankR = 1.3 * s, tankH = 2.4 * s, tankY = legH;
+  for (const [tx, ty, bx, by] of [[-topSpread, -topSpread, -spread, -spread], [topSpread, -topSpread, spread, -spread], [topSpread, topSpread, spread, spread], [-topSpread, topSpread, -spread, spread]]) {
+    const leg = addBox(group, 0.14 * s, legH, 0.14 * s, matLeg, toVec(ox + (tx + bx) / 2, oy + (ty + by) / 2, 0));
+    leg.rotation.x = -Math.atan2(by - ty, legH); leg.rotation.z = Math.atan2(bx - tx, legH);
+  }
+  for (const [bh, frac] of [[1.4 * s, 1.4 / 4.6], [3.0 * s, 3.0 / 4.6]]) {
+    const bo = spread - frac * (spread - topSpread);
+    addBox(group, bo * 2, 0.1 * s, 0.1 * s, matBand, toVec(ox, oy - bo, bh));
+    addBox(group, bo * 2, 0.1 * s, 0.1 * s, matBand, toVec(ox, oy + bo, bh));
+    addBox(group, 0.1 * s, 0.1 * s, bo * 2, matBand, toVec(ox - bo, oy, bh));
+    addBox(group, 0.1 * s, 0.1 * s, bo * 2, matBand, toVec(ox + bo, oy, bh));
+  }
+  const tank = new THREE.Mesh(new THREE.CylinderGeometry(tankR, tankR * 1.04, tankH, 12), matTank);
+  tank.position.copy(toVec(ox, oy, tankY + tankH / 2)); tank.castShadow = true; tank.receiveShadow = true; group.add(tank);
+  for (const ringOffset of [0.45 * s, 1.2 * s, 1.95 * s]) {
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(tankR + 0.07, tankR + 0.07, 0.1, 14), matBand);
+    ring.position.copy(toVec(ox, oy, tankY + ringOffset)); ring.castShadow = true; group.add(ring);
+  }
+  const lid = new THREE.Mesh(new THREE.ConeGeometry(tankR + 0.12, 0.9 * s, 12), matLid);
+  lid.position.copy(toVec(ox, oy, tankY + tankH + 0.45 * s)); lid.castShadow = true; group.add(lid);
+  addBox(group, 0.12 * s, 0.12 * s, 0.55 * s, matBand, toVec(ox, oy + tankR + 0.2 * s, tankY + 0.38 * s));
+}
+
+function buildBlacksmith(group, p) {
+  const ox = p.x, oy = p.y;
+  const matTimber = standard("#463528", { roughness: 0.97 });
+  const matSoot = standard("#2e2118", { roughness: 0.99 });
+  const matStone = standard("#6a5f55", { roughness: 0.93 });
+  const matStoneDk = standard("#514a42", { roughness: 0.95 });
+  const matRoof = standard("#3a2e22", { roughness: 0.96 });
+  const matCoal = standard("#ff7a2a", { emissive: "#ff5a18", emissiveIntensity: 1.4 });
+  const matAnvil = standard("#1e1a17", { roughness: 0.85 });
+  const matMetal = standard("#35302c", { roughness: 0.6 });
+  const matDirt = standard("#6e5340", { roughness: 1.0 });
+  addBox(group, 4.4, 0.12, 3.2, matDirt, toVec(ox, oy + 1.5));
+  addBox(group, 4.0, 3.0, 0.22, matTimber, toVec(ox, oy, 0));
+  addBox(group, 0.22, 3.0, 3.0, matTimber, toVec(ox - 2.0, oy + 1.5, 0));
+  addBox(group, 0.22, 3.0, 3.0, matTimber, toVec(ox + 2.0, oy + 1.5, 0));
+  for (const [px, py] of [[ox - 1.85, oy + 0.12], [ox + 1.85, oy + 0.12]]) addBox(group, 0.2, 3.2, 0.2, matSoot, toVec(px, py, 0));
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.2, 3.4), matRoof);
+  roof.rotation.x = -0.18; roof.position.set(ox, 3.15, oy + 1.5); roof.castShadow = true; roof.receiveShadow = true; group.add(roof);
+  addBox(group, 0.9, 5.4, 0.9, matStone, toVec(ox + 1.55, oy + 0.6, 0));
+  addBox(group, 0.72, 3.2, 0.72, matStoneDk, toVec(ox + 1.55, oy + 0.62, 2.2));
+  addBox(group, 0.88, 0.22, 0.88, matSoot, toVec(ox + 1.55, oy + 0.62, 5.18));
+  addBox(group, 1.1, 0.9, 0.9, matStone, toVec(ox + 1.1, oy + 0.35, 0));
+  addBox(group, 0.7, 0.14, 0.55, matCoal, toVec(ox + 1.1, oy + 0.35, 0.9));
+  const forgeLight = new THREE.PointLight(col("#ff8a3a"), 8, 8, 2);
+  forgeLight.position.copy(toVec(ox + 1.1, oy + 0.35, 1.2)); group.add(forgeLight);
+  const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.5, 7), standard("#5a3e28", { roughness: 0.98 }));
+  stump.position.copy(toVec(ox - 0.4, oy + 1.1, 0.25)); stump.castShadow = true; group.add(stump);
+  addBox(group, 0.55, 0.28, 0.32, matAnvil, toVec(ox - 0.4, oy + 1.1, 0.5));
+  addBox(group, 0.52, 0.05, 0.28, matMetal, toVec(ox - 0.4, oy + 1.1, 0.78));
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.22, 0.72, 8), standard("#7a5c38", { roughness: 0.94 }));
+  barrel.position.copy(toVec(ox - 1.5, oy + 0.5, 0.36)); barrel.castShadow = true; group.add(barrel);
+}
+
+function buildHotel(group, p) {
+  const bx = p.x, by = p.y, sz = p.size || 1;
+  const matBody = standard("#8a5a3a", { roughness: 0.92 });
+  const matTrim = standard("#d8c8a8", { roughness: 0.85 });
+  const matDark = standard("#3d2510", { roughness: 0.97 });
+  const matSign = standard("#caa24f", { emissive: "#3a2c12", emissiveIntensity: 0.3 });
+  const matGlass = standard("#ffcf86", { emissive: "#ffcf86", emissiveIntensity: 0.85 });
+  const matGlassDim = standard("#ffb850", { emissive: "#ffb850", emissiveIntensity: 0.45 });
+  const matRoof = standard("#4a2e18", { roughness: 0.98 });
+  const W = 4.5 * sz, D = 3.5 * sz, H1 = 2.7 * sz, H2 = 2.8 * sz, HT = H1 + H2;
+  const BDK = 0.2 * sz, BPJ = 1.0 * sz, FPH = 1.0 * sz, PH = 0.12 * sz, frontZ = by + D / 2;
+  addBox(group, W, HT, D, matBody, toVec(bx, by, 0));
+  addBox(group, W + 0.06, 0.18 * sz, D + 0.06, matTrim, toVec(bx, by, H1 - 0.09 * sz));
+  for (const wx of [-1.3 * sz, 1.3 * sz]) {
+    addBox(group, 0.84 * sz, 1.0 * sz, 0.06 * sz, matTrim, toVec(bx + wx, frontZ - 0.03, 0.97 * sz));
+    addBox(group, 0.72 * sz, 0.9 * sz, 0.08 * sz, matGlassDim, toVec(bx + wx, frontZ - 0.05, 1.0 * sz));
+  }
+  addBox(group, 0.96 * sz, 2.3 * sz, 0.07 * sz, matTrim, toVec(bx, frontZ - 0.035, 0));
+  addBox(group, 0.8 * sz, 2.2 * sz, 0.1 * sz, matDark, toVec(bx, frontZ - 0.06, 0));
+  const wBase2 = H1 + 0.55 * sz;
+  [-1.55 * sz, -0.52 * sz, 0.52 * sz, 1.55 * sz].forEach((wx, i) => {
+    addBox(group, 0.8 * sz, 1.0 * sz, 0.05 * sz, matTrim, toVec(bx + wx, frontZ - 0.025, wBase2 - 0.04 * sz));
+    addBox(group, 0.68 * sz, 0.88 * sz, 0.08 * sz, [1, 2].includes(i) ? matGlass : matGlassDim, toVec(bx + wx, frontZ - 0.045, wBase2));
+  });
+  addBox(group, W + 0.1 * sz, BDK, BPJ, matDark, toVec(bx, frontZ + BPJ / 2, H1 - BDK));
+  addBox(group, W + 0.12 * sz, PH, PH, matTrim, toVec(bx, frontZ + BPJ, H1 + 0.8 * sz - PH));
+  for (const px of [-W / 2, -W / 4, 0, W / 4, W / 2]) addBox(group, PH, 0.8 * sz, PH, matTrim, toVec(bx + px, frontZ + BPJ, H1));
+  for (const px of [-W / 2 + 0.15 * sz, 0, W / 2 - 0.15 * sz]) addBox(group, 0.15 * sz, H1, 0.15 * sz, matTrim, toVec(bx + px, frontZ + BPJ, 0));
+  addBox(group, W + 0.12 * sz, 0.1 * sz, BPJ + 0.12 * sz, matRoof, toVec(bx, frontZ + BPJ / 2, H1 - BDK - 0.12 * sz));
+  addBox(group, W, 0.1 * sz, D, matRoof, toVec(bx, by, HT - 0.05 * sz));
+  addBox(group, W, FPH, 0.28 * sz, matBody, toVec(bx, by - D / 2 + 0.14 * sz, HT));
+  addBox(group, W + 0.1 * sz, 0.14 * sz, 0.34 * sz, matTrim, toVec(bx, by - D / 2 + 0.17 * sz, HT + FPH - 0.07 * sz));
+  addBox(group, W * 0.72, FPH * 0.55, 0.1 * sz, matSign, toVec(bx, by - D / 2 + 0.02, HT + FPH * 0.25));
+  for (const [cx, cz] of [[bx - W / 2, by - D / 2], [bx + W / 2, by - D / 2], [bx - W / 2, by + D / 2], [bx + W / 2, by + D / 2]]) addBox(group, 0.18 * sz, HT + 0.05, 0.18 * sz, matTrim, toVec(cx, cz, 0));
+}
+
 function buildPlacement(group, p) {
   // Guard size once here: every per-kind builder multiplies p.size, so an entry
   // missing it (undefined * k = NaN) would silently produce zero-scaled geometry.
@@ -589,6 +784,11 @@ function buildPlacement(group, p) {
     case "wagonSalvage": return buildWagon(group, p);
     case "roadSlime": return buildSlime(group, p);
     case "walkInSaloon": return buildWalkInSaloon(group, p);
+    case "church": return buildChurch(group, p);
+    case "windmill": return buildWindmill(group, p);
+    case "waterTower": return buildWaterTower(group, p);
+    case "blacksmith": return buildBlacksmith(group, p);
+    case "hotel": return buildHotel(group, p);
     case "saloon":
     case "saloonFacade": return buildBuilding(group, p, 1.15);
     case "storefront": return buildBuilding(group, p, 0.95);
