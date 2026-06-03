@@ -42,7 +42,7 @@ const v3 = (c) => vec3(c.r, c.g, c.b);
 // Relief tuning — shared by the pure height fn and the TSL graph so props seat
 // exactly on the visible surface. Keep amplitude gentle: low slope across a
 // building footprint avoids edge gaps; the corridor mask keeps gameplay flat.
-const AMP = 0.4; // peak dune height (world units)
+const AMP = 0.48; // peak dune height — gentle flank undulation; kept low so off-corridor buildings don't tilt
 const ROAD_Z = 8.9; // play/road corridor centreline (world z) kept flat
 const MASK_LO = 2.6; // |z-ROAD_Z| below this → fully flat
 const MASK_HI = 5.2; // above this → full relief
@@ -130,9 +130,10 @@ export function createGroundMaterial(opts = {}) {
   const big = tslNoise(pc.mul(0.045)); // broad dirt/sand patches
   const fine = tslNoise(pc.mul(0.32)); // fine grain
   const base = mix(v3(dirt), v3(sand), big);
-  const tinted = mix(base, v3(scrub), big.mul(fine).mul(0.6));
+  // More scrub variation + a fine grain break so the ground reads as worn earth, not a flat wash.
+  const tinted = mix(base, v3(scrub), big.mul(fine).mul(0.82)).mul(mix(float(0.94), float(1.06), fine));
   const fbmC = tslFbm(pc);
-  mat.colorNode = tinted.mul(mix(float(0.62), float(1.18), fbmC)); // valley shade → crest light (floor raised 0.52→0.62 so near-field ground stops crushing to dark red)
+  mat.colorNode = tinted.mul(mix(float(0.62), float(1.24), fbmC)); // valley shade → crest light (floor 0.62 keeps the near-field readable; brighter crest adds dimension)
 
   // Relief: displace local +z (plane is rotated flat → local +z is world up).
   // Height input uses positionLocal mapped to world XZ to avoid positionWorld

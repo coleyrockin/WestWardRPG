@@ -60,6 +60,13 @@ const BUILDING_KINDS = new Set([
   "saloon", "saloonFacade", "storefront", "town", "ranch",
   "townFacadeWarm", "townFacadeStore", "townFacadeDark",
 ]);
+// Solid objects (besides buildings) that should drop a grounding contact shadow.
+// Excludes flat ground cover (grass/reeds/decals) and the distant boundary mesas.
+const GROUNDABLE_KINDS = new Set([
+  "gate", "watchtower", "landmark", "jobBoard", "smokeCache", "brokenWagon",
+  "wagonSalvage", "cart", "crate", "barrelCrateCluster", "rock", "boulder",
+  "cactus", "deadTree", "hitchingRail",
+]);
 const PLAYER_MODEL_URL = "/models/character_hero.glb";
 const IMPORTANT_MODEL_KINDS = Object.freeze([
   "jobBoard",
@@ -125,16 +132,23 @@ function addBox(group, w, h, d, mat, pos) {
 // post stack (postStacks.js, Sobel on linear depth) — the backface-expansion
 // outline hack and its per-mesh duplicate draws are retired.
 
-// Blob shadow projected under a world-space point.
+// Blob shadow projected under a world-space point. Two stacked discs — a darker
+// core inside a wider, fainter penumbra — give a soft-edged grounding shadow that
+// kills the "floating" look without a gradient texture.
 function addContactShadow(group, x, z, rx = 1.0, rz = 0.7) {
-  const m = new THREE.Mesh(
-    new THREE.CircleGeometry(1, 24),
-    new THREE.MeshBasicMaterial({ color: col("#000000"), transparent: true, opacity: 0.38, depthWrite: false }),
-  );
-  m.rotation.x = -Math.PI / 2;
-  m.scale.set(rx, 1, rz);
-  m.position.set(x, 0.012, z);
-  group.add(m);
+  const make = (scale, opacity) => {
+    const m = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 24),
+      new THREE.MeshBasicMaterial({ color: col("#1a120c"), transparent: true, opacity, depthWrite: false }),
+    );
+    m.rotation.x = -Math.PI / 2;
+    m.scale.set(rx * scale, 1, rz * scale);
+    m.position.set(x, 0.018, z);
+    m.renderOrder = -1;
+    return m;
+  };
+  group.add(make(1.32, 0.22)); // soft penumbra
+  group.add(make(0.92, 0.34)); // darker core
 }
 
 // Augment an authored building box with western false-front architecture so it
@@ -520,6 +534,7 @@ function buildWalkInSaloon(group, p) {
   const depth = df + db;
   const cz = p.y + (df - db) / 2;
   const segW = hw - doorHW;
+  addContactShadow(group, p.x, cz, hw * 1.08, depth / 2 * 1.08); // ground the building
   const wood = standard("#6b4a2c", { roughness: 1 });
   const woodDark = standard("#4f381f", { roughness: 1 });
   const trim = standard("#835d38", { roughness: 1 });
@@ -2015,6 +2030,14 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
           .then((node) => {
             props.add(node);
             if (isBuilding) addWesternFacadeDetail(props, node, p);
+            // Ground solid models with a contact shadow sized to their footprint —
+            // kills the "floating" look. Skip flat cover + the distant boundary ring.
+            if (isBuilding || GROUNDABLE_KINDS.has(p.kind)) {
+              const bb = new THREE.Box3().setFromObject(node);
+              const rx = Math.max(0.4, (bb.max.x - bb.min.x) * 0.46);
+              const rz = Math.max(0.4, (bb.max.z - bb.min.z) * 0.46);
+              addContactShadow(props, p.x, p.y, rx, rz);
+            }
             placementNodes.push({ kind: p.kind, node });
             recordModelLoad(p.kind, entry.url, true);
             // lamps/beacon/board carried their PointLight inside the old builder;
