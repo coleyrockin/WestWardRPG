@@ -158,6 +158,31 @@ Gated on you (can't be done from the throttled headless preview):
 - **Atmosphere, hero character, audio** (pillars 5/7/9) — code is sound but the payoff is motion
   + sound, best authored against a real-browser session.
 
+### Districts pass — map content (later 2026-06-02, all pushed, suite green at 1251)
+
+Turned the map from a town-on-an-empty-plane into a frontier with depth and districts
+(layout-only, `frontierLayout.js`; every array placed outside the guarded test boxes):
+- **Town depth** — north + south **back-rank** buildings behind the storefront strips
+  (staggered, smaller, in the front-row gaps) so the town reads as overlapping masses, not
+  two facade walls.
+- **Per-district landmarks** — four interior buttes give the outskirts / marsh / wagon legs a
+  tall "you are here" silhouette (town had only the watchtower).
+- **Outskirts district** — corral + lone outpost + abandoned wagons + scrub: leaving town now
+  reads as crossing into the frontier.
+- **Marsh district** — reeds line the water's shore, snags + a half-sunk boulder in the
+  shallows, mud on the road approach: the slime/wagon climax reads as a wetland crossing.
+- **Board plaza** — townsfolk reading the bounties + supplies make the opening focal point the
+  lively heart of town.
+- **Opening foreground frame** — a thin near-field snag + cart at the spawn shot's edges (subtle).
+- **Less-red foreground** — lifted the ground dirt base + shade floor so the near field stops
+  crushing to red murk.
+
+Verification note: the preview tab throttles hard once the scene is this dense — `window.__spike`
+teleport + screenshots become unreliable mid-session. Composition was verified at the spawn view
+and a couple of teleported beats; judge motion/density at full framerate in a real browser.
+Next map wins (see [`map-editing-guide.md`](map-editing-guide.md)): a town cross-street, road
+shaping (curve / marsh plank-crossing), and skyline color variety once real building models land.
+
 ## Anti-goals — what NOT to do
 
 - **Don't chase realism.** No PBR, no photoscanned textures, no realistic lighting. Every hour
