@@ -13,6 +13,31 @@
 
 const PLAYER_RADIUS_DEFAULT = 0.3;
 
+// Walk-in saloon footprint — shared by the collision walls here and the visual
+// builder in spike.js so they stay in lock-step. Axis-aligned; the door faces +Z
+// (south, toward the road). Collision is the 3 solid walls + 2 front segments that
+// flank the doorway gap — the gap, roof, and interior have no collision so the
+// player walks straight through the door.
+export const SALOON_DIMS = { hw: 2.75, df: 2.4, db: 2.4, wallH: 4.0, wallT: 0.3, doorHW: 1.1 };
+
+function aabb(cx, cz, w, d, src) {
+  return { minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, source: src };
+}
+
+function saloonWalls(p) {
+  const { hw, df, db, wallT, doorHW } = SALOON_DIMS;
+  const depth = df + db;
+  const cz = p.y + (df - db) / 2;
+  const segW = hw - doorHW; // each front segment beside the door gap
+  return [
+    aabb(p.x, p.y - db, hw * 2, wallT, p),                       // back wall
+    aabb(p.x - hw, cz, wallT, depth, p),                          // left wall
+    aabb(p.x + hw, cz, wallT, depth, p),                          // right wall
+    aabb(p.x - (doorHW + hw) / 2, p.y + df, segW, wallT, p),      // front-left of door
+    aabb(p.x + (doorHW + hw) / 2, p.y + df, segW, wallT, p),      // front-right of door
+  ];
+}
+
 // (placement, w, d) → AABB. `source` is preserved so debug overlays can map
 // back to the original placement record.
 function box(p, w, d) {
@@ -89,6 +114,7 @@ const FOOTPRINTS = {
   dustSmokePlume: null,
   bountyEmblem: null,
   storefront:  (p) => box(p, 1.3 * p.size, 1.3 * p.size),
+  walkInSaloon: saloonWalls,                     // returns an ARRAY of wall AABBs (door gap open)
   porch:       (p) => box(p, 1.4 * p.size, 0.5 * p.size),
   brush:       null,                            // low scrub — visual only
   sagePatch:   null,                            // low scrub — visual only
@@ -106,7 +132,10 @@ export function buildProxies(placements) {
       ? FOOTPRINTS[p.kind]
       : (q) => box(q, 0.6 * (q.size || 0.8), 0.6 * (q.size || 0.8));
     if (fn == null) continue;
-    out.push(fn(p));
+    const result = fn(p);
+    if (result == null) continue;
+    if (Array.isArray(result)) out.push(...result); // multi-AABB footprints (walk-in saloon walls)
+    else out.push(result);
   }
   return out;
 }

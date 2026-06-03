@@ -24,7 +24,7 @@ import {
   PLAYER_SPAWN,
 } from "./frontierLayout.js";
 import { createPlayerController, CAMERA_PRESETS } from "./playerController.js";
-import { buildProxies } from "./worldProxies.js";
+import { buildProxies, SALOON_DIMS } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
 import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine } from "./phaseState.js";
 import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
@@ -510,6 +510,51 @@ function buildPorch(group, p) {
   return deck;
 }
 
+// Walk-in saloon — a hollow building you physically enter. The collision walls live
+// in worldProxies (FOOTPRINTS.walkInSaloon, same SALOON_DIMS); here we draw those
+// walls + a doorway gap, a roof + false-front (no collision, so they never block the
+// door), and an interior bar so the inside rewards the walk-in. Door faces +Z (south).
+function buildWalkInSaloon(group, p) {
+  const { hw, df, db, wallH, wallT, doorHW } = SALOON_DIMS;
+  const doorH = 2.7;
+  const depth = df + db;
+  const cz = p.y + (df - db) / 2;
+  const segW = hw - doorHW;
+  const wood = standard("#6b4a2c", { roughness: 1 });
+  const woodDark = standard("#4f381f", { roughness: 1 });
+  const trim = standard("#835d38", { roughness: 1 });
+
+  addBox(group, hw * 2, 0.08, depth, standard("#46331e", { roughness: 1 }), toVec(p.x, cz, 0));       // floor
+  addBox(group, hw * 2, wallH, wallT, wood, toVec(p.x, p.y - db, 0));                                  // back wall
+  addBox(group, wallT, wallH, depth, wood, toVec(p.x - hw, cz, 0));                                    // left wall
+  addBox(group, wallT, wallH, depth, wood, toVec(p.x + hw, cz, 0));                                    // right wall
+  addBox(group, segW, wallH, wallT, wood, toVec(p.x - (doorHW + hw) / 2, p.y + df, 0));                // front-left
+  addBox(group, segW, wallH, wallT, wood, toVec(p.x + (doorHW + hw) / 2, p.y + df, 0));                // front-right
+  addBox(group, doorHW * 2, wallH - doorH, wallT, wood, toVec(p.x, p.y + df, doorH));                  // door lintel
+  addBox(group, hw * 2 + 0.4, 0.22, depth + 0.4, woodDark, toVec(p.x, cz, wallH));                     // roof
+  addBox(group, hw * 2 + 0.4, 1.5, 0.3, trim, toVec(p.x, p.y + df, wallH));                            // false-front parapet
+  addBox(group, 3.0, 0.82, 0.12, standard("#caa24f", { emissive: "#3a2c12", emissiveIntensity: 0.35 }),
+    toVec(p.x, p.y + df + 0.16, wallH + 0.42));                                                        // SALOON signboard
+  // porch posts + awning at the doorway
+  addBox(group, 0.16, 2.5, 0.16, trim, toVec(p.x - doorHW - 0.12, p.y + df + 1.1, 0));
+  addBox(group, 0.16, 2.5, 0.16, trim, toVec(p.x + doorHW + 0.12, p.y + df + 1.1, 0));
+  addBox(group, doorHW * 2 + 0.7, 0.12, 1.3, woodDark, toVec(p.x, p.y + df + 0.75, 2.5));
+  // --- interior ---
+  addBox(group, hw * 1.5, 1.05, 0.6, woodDark, toVec(p.x + 0.3, p.y - db + 0.95, 0));                  // bar counter
+  addBox(group, hw * 1.5 + 0.2, 0.12, 0.72, trim, toVec(p.x + 0.3, p.y - db + 0.95, 1.05));            // bar top
+  for (let i = 0; i < 5; i++) {                                                                        // back-bar bottles
+    const c = ["#7fae6a", "#b06a4a", "#caa24f"][i % 3];
+    addBox(group, 0.15, 0.38 + (i % 2) * 0.14, 0.15, standard(c, { emissive: "#1c1410", emissiveIntensity: 0.25 }),
+      toVec(p.x - 1.3 + i * 0.7, p.y - db + 0.5, 1.55));
+  }
+  addBox(group, 0.5, 1.4, 0.3, standard("#161009"), toVec(p.x + 1.3, p.y - db + 0.95, 0.4));           // bartender silhouette
+  for (const sx of [-1.1, 0.0, 1.1]) addBox(group, 0.34, 0.66, 0.34, woodDark, toVec(p.x + sx, p.y - db + 1.55, 0)); // stools
+  addBox(group, 0.85, 0.62, 0.85, woodDark, toVec(p.x - 1.4, p.y + 0.7, 0));                           // table
+  const lamp = new THREE.PointLight(col("#ffba6e"), 7, 10, 2);
+  lamp.position.copy(toVec(p.x, cz, 2.7));
+  group.add(lamp);
+}
+
 function buildPlacement(group, p) {
   // Guard size once here: every per-kind builder multiplies p.size, so an entry
   // missing it (undefined * k = NaN) would silently produce zero-scaled geometry.
@@ -543,6 +588,7 @@ function buildPlacement(group, p) {
     case "brokenWagon":
     case "wagonSalvage": return buildWagon(group, p);
     case "roadSlime": return buildSlime(group, p);
+    case "walkInSaloon": return buildWalkInSaloon(group, p);
     case "saloon":
     case "saloonFacade": return buildBuilding(group, p, 1.15);
     case "storefront": return buildBuilding(group, p, 0.95);

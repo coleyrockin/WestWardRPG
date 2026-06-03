@@ -28,9 +28,14 @@ describe("worldProxies — buildProxies", () => {
   const placements = buildFrontierPlacements();
   const proxies = buildProxies(placements);
 
-  it("emits one proxy per physical placement", () => {
-    const expected = placements.filter((p) => KINDS_THAT_BLOCK.has(p.kind)).length;
-    expect(proxies.length).toBe(expected);
+  // Most physical kinds emit exactly one AABB; the walk-in saloon emits a 5-wall
+  // ring (back + 2 sides + 2 front segments flanking the doorway gap).
+  const SALOON_WALLS = 5;
+
+  it("emits one proxy per physical placement (saloon emits its wall ring)", () => {
+    const singles = placements.filter((p) => KINDS_THAT_BLOCK.has(p.kind)).length;
+    const saloons = placements.filter((p) => p.kind === "walkInSaloon").length;
+    expect(proxies.length).toBe(singles + saloons * SALOON_WALLS);
   });
 
   it("emits zero proxies for roads and the road slime", () => {
@@ -41,14 +46,33 @@ describe("worldProxies — buildProxies", () => {
     }
   });
 
-  it("each proxy's AABB contains its placement's (x, y)", () => {
+  it("each single-box proxy's AABB contains its placement's (x, y)", () => {
     for (const p of proxies) {
+      // The saloon's wall AABBs are intentionally offset from the placement centre
+      // (they sit at the building's edges, not its middle) — checked separately below.
+      if (p.source.kind === "walkInSaloon") continue;
       const { x, y } = p.source;
       expect(x).toBeGreaterThanOrEqual(p.minX);
       expect(x).toBeLessThanOrEqual(p.maxX);
       expect(y).toBeGreaterThanOrEqual(p.minZ);
       expect(y).toBeLessThanOrEqual(p.maxZ);
     }
+  });
+
+  it("walk-in saloon emits a solid wall ring with an open doorway gap", () => {
+    const walls = proxies.filter((p) => p.source.kind === "walkInSaloon");
+    expect(walls.length).toBe(SALOON_WALLS);
+    // every wall AABB sits inside the building's overall footprint near the placement
+    const s = placements.find((p) => p.kind === "walkInSaloon");
+    for (const w of walls) {
+      expect(w.minX).toBeGreaterThanOrEqual(s.x - 3.2);
+      expect(w.maxX).toBeLessThanOrEqual(s.x + 3.2);
+    }
+    // the doorway gap (centre-front) is open: no wall covers the placement's front-centre
+    const frontCentre = { x: s.x, z: s.y + 2.4 };
+    const covered = walls.some((w) =>
+      frontCentre.x > w.minX && frontCentre.x < w.maxX && frontCentre.z > w.minZ && frontCentre.z < w.maxZ);
+    expect(covered).toBe(false);
   });
 
   it("includes the job board, smoke cache, and broken wagon by kind", () => {

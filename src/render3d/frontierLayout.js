@@ -240,7 +240,6 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "productionSaloon", label: "Drifter Saloon", x: 6.4, y: 1.75, color: "#7a5230", size: 0.82, yaw: 0 },
   { kind: "productionStore", label: "Lamp Dry Goods", x: 11.4, y: 1.55, color: "#9a7144", size: 0.78, yaw: 0 },
   { kind: "productionAssay", label: "Boone Assay", x: 16.2, y: 1.62, color: "#6a4630", size: 0.72, yaw: 0 },
-  { kind: "productionAssay", label: "Distant Marshal Hall", x: 22.2, y: 2.28, color: "#4f3326", size: 0.66, yaw: -0.04 },
   { kind: "productionBoardwalk", label: "North Boardwalk", x: 6.7, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
   { kind: "productionBoardwalk", label: "North Boardwalk", x: 10.1, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
   { kind: "productionBoardwalk", label: "North Boardwalk", x: 13.5, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
@@ -319,7 +318,6 @@ const BACK_ROW = [
   { kind: "productionStore",  label: "Back Row Granary",     x: 8.9,  y: -0.9,  color: "#634330", size: 0.66, yaw: 0.04 },
   { kind: "productionSaloon", label: "Back Row Saloon",      x: 13.8, y: -1.1,  color: "#583828", size: 0.7,  yaw: -0.05 },
   { kind: "productionStore",  label: "Back Row Mercantile",  x: 19.0, y: -0.5,  color: "#6a4a32", size: 0.64, yaw: -0.07 },
-  { kind: "productionAssay",  label: "Back Row Surveyor",    x: 24.6, y: 0.15,  color: "#5f4030", size: 0.62, yaw: -0.09 },
   { kind: "productionSaloon", label: "Back Row Livery",      x: 29.0, y: 0.55,  color: "#4f3326", size: 0.68, yaw: -0.11 },
 ];
 
@@ -457,6 +455,13 @@ const BOARD_PLAZA = [
   { kind: "barrelCrateCluster", label: "Board Supplies", x: 15.2, y: 5.0, color: "#7a5230", size: 0.66, yaw: 0.2 },
 ];
 
+// The walk-in saloon — one building you can physically enter (door faces south toward
+// the road at the town edge, x>21 so it's outside the production-count box). Geometry
+// + collision walls share SALOON_DIMS (spike.js buildWalkInSaloon / worldProxies).
+const WALKIN_SALOON = [
+  { kind: "walkInSaloon", label: "The Lucky Lantern Saloon", x: 24.0, y: 1.5, color: "#6b4a2c", size: 1 },
+];
+
 // Soft world boundary — mesas/cliffs/boulders ring the playable rectangle. Mesa
 // footprints are square (3.2*size); spacing 5 with size ~1.8 (half-width 2.88)
 // overlaps by ~0.76, so there is no gap wide enough to slip through.
@@ -518,6 +523,7 @@ const ABSOLUTE_ZONES = [
   ...SOUTH_BACK_ROW,
   ...FOREGROUND_FRAME,
   ...BOARD_PLAZA,
+  ...WALKIN_SALOON,
   ...BOUNDARY_RING,
 ];
 
