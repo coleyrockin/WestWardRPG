@@ -342,7 +342,9 @@ const MARSH = [
 // marsh edge) instead of a lone marker in a field. All on the shoulders, clear of
 // the y~12-13 travel lane and the hero interaction objects.
 const SCENE_DRESSING = [
-  // Smoke Cache (hero at 40.5, 12.9): signal smoke + a salvage stash
+  // Smoke Cache (hero at 40.5, 12.9): a warm lantern (so it's a lit focal point like
+  // the board + wagon), signal smoke, and a salvage stash
+  { kind: "lampLow", label: "Cache Lantern", x: 39.5, y: 12.4, color: "#ffc88d", size: 0.7 },
   { kind: "dustSmokePlume", label: "Cache Signal Smoke", x: 40.1, y: 11.2, color: "#b88551", size: 0.9, yaw: 0.2 },
   { kind: "barrelCrateCluster", label: "Cache Stash", x: 42.1, y: 14.0, color: "#7a5230", size: 0.8, yaw: -0.3 },
   { kind: "brokenFence", label: "Cache Rail", x: 38.7, y: 13.8, color: "#8d6540", size: 0.7, yaw: 0.4 },
