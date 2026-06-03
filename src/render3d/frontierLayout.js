@@ -304,6 +304,25 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "bountyEmblem", label: "Boone Bounty Emblem", x: 13.0, y: 4.6, color: "#ffd77b", size: 0.75, yaw: Math.PI / 2 },
 ];
 
+// Set-back SECOND building rank behind the north storefront strip. The town used
+// to be two parallel facade walls with an empty void to the north (y < 1.5) up to
+// the mesa horizon — a flat frontal stage. This rank fills that void with smaller,
+// staggered facades whose centres fall in the GAPS between the front-row buildings,
+// so the town reads as overlapping masses receding in depth with a broken roofline.
+// Sized 0.58–0.72 (smaller than the y~1.6 front row) to read as further away; the
+// renderer's per-instance height/yaw jitter breaks the skyline further. Placed
+// entirely NORTH of y = 1.0, so it sits outside both guarded boxes
+// (first-frame y[2.4,14.2], first-street y[1.0,16.2]) and changes no test counts —
+// and the production* kinds are not slab-blockers, so the spawn wedge stays clear.
+const BACK_ROW = [
+  { kind: "productionAssay",  label: "Back Row Land Office", x: 3.9,  y: -0.1,  color: "#54382a", size: 0.6,  yaw: 0.06 },
+  { kind: "productionStore",  label: "Back Row Granary",     x: 8.9,  y: -0.9,  color: "#634330", size: 0.66, yaw: 0.04 },
+  { kind: "productionSaloon", label: "Back Row Saloon",      x: 13.8, y: -1.1,  color: "#583828", size: 0.7,  yaw: -0.05 },
+  { kind: "productionStore",  label: "Back Row Mercantile",  x: 19.0, y: -0.5,  color: "#6a4a32", size: 0.64, yaw: -0.07 },
+  { kind: "productionAssay",  label: "Back Row Surveyor",    x: 24.6, y: 0.15,  color: "#5f4030", size: 0.62, yaw: -0.09 },
+  { kind: "productionSaloon", label: "Back Row Livery",      x: 29.0, y: 0.55,  color: "#4f3326", size: 0.68, yaw: -0.11 },
+];
+
 // Western flora flanking the road corridor — shoulders only (out of the wedge).
 const ROAD_FLORA = [
   { kind: "sageCluster", label: "Roadside Sage", x: 10.9, y: 6.1, color: "#687a42", size: 1.1 },
@@ -357,6 +376,20 @@ const SCENE_DRESSING = [
   { kind: "marshCluster", label: "Arena Goo Slick", x: 52.4, y: 16.1, color: "#75d06b", size: 0.6, yaw: -0.4 },
 ];
 
+// Per-district "you are here" silhouettes for the eastern legs. The lone watchtower
+// anchors town, but outskirts / marsh / wagon had NO tall vertical landmark — the
+// eastern half read as the same flat dusty plane with an empty skyline. These four
+// interior buttes (NOT the boundary ring) give each eastern leg a silhouette to
+// travel toward. All sit x ≥ 44 (far outside every guarded box → zero test impact),
+// 8–10u off the travel lane and clear of hero beats / marsh props, using the already
+// manifested mesaSkyline / heroMesaSkyline kinds (no manifest change).
+const EASTERN_LANDMARKS = [
+  { kind: "mesaSkyline",     label: "Outskirts Butte", x: 44.0, y: 4.6,  color: "#5a4636", size: 1.35 },
+  { kind: "heroMesaSkyline", label: "Wagon Rise Mesa", x: 58.5, y: 4.2,  color: "#63503c", size: 1.6 },
+  { kind: "heroMesaSkyline", label: "Marsh Butte",     x: 45.5, y: 22.6, color: "#5a4636", size: 1.5 },
+  { kind: "mesaSkyline",     label: "Slimewater Spur", x: 56.5, y: 22.4, color: "#544234", size: 1.4 },
+];
+
 // Soft world boundary — mesas/cliffs/boulders ring the playable rectangle. Mesa
 // footprints are square (3.2*size); spacing 5 with size ~1.8 (half-width 2.88)
 // overlaps by ~0.76, so there is no gap wide enough to slip through.
@@ -403,6 +436,7 @@ function world(anchor, dx, dy, depthLane) {
 const ABSOLUTE_ZONES = [
   ...TOWN_EDGE,
   ...PRODUCTION_MAIN_STREET,
+  ...BACK_ROW,
   ...ROAD_CORRIDOR,
   ...ROUTE_LIGHTS,
   ...routeRuts(),
@@ -411,6 +445,7 @@ const ABSOLUTE_ZONES = [
   ...ROAD_FLORA,
   ...MARSH,
   ...SCENE_DRESSING,
+  ...EASTERN_LANDMARKS,
   ...BOUNDARY_RING,
 ];
 
