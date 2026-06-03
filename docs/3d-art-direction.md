@@ -134,6 +134,30 @@ establishing camera. Those four are all small/medium, need zero new models, and 
 the build from "prototype" to "intentional" — the fastest visible jump. Models, character, and
 audio are the bigger lifts that take it from "intentional" to "amazing."
 
+## Progress log — 2026-06-02 foundation + polish pass
+
+Landed (committed + pushed to `main`, render3d-only, suite green at 1251):
+- **Readable lighting** — fill light 0.34→1.0, raised + neutralized the sun (no more red raking
+  shadows), exposure/contrast/vignette rebalanced. Fixed "too dark to see."
+- **Real building scale** — `heightMul`/`scaleY` (tall-without-wide) + storefront proportions;
+  buildings tower over the 1.8u hero without footprint collisions. Fixed "cardboard boxes."
+- **Per-building variety** — height + yaw jitter + road-facing **signboards** (from each model's
+  real bbox). Less stamped-clone.
+- **Cleaner road**, warmer desert ground, **richer color grade**.
+- **Establishing push-in** — wall-clock-driven (survives rAF throttling).
+- **Beat staging** — Smoke Cache (lantern + signal smoke + crate stash) and the slime arena
+  (marsh-edge clearing) now read as authored scenes; the wagon lamp lights the wreck.
+- **Dev teleport hook** (`window.__spike`) to review every beat without driving.
+
+Gated on you (can't be done from the throttled headless preview):
+- **Real building geometry** → needs **Blender running** with the MCP addon (`localhost:9876`).
+  Code-side signboards are as far as primitives go cleanly; the false-front cornice/porch
+  augmentation was tried and reverted (chunky slabs). This is pillar 1, the biggest payoff.
+- **Motion / combat / push-in feel** → needs a **real-browser playtest at full framerate**;
+  the preview tab throttles the render loop so animation/combat can't be judged here.
+- **Atmosphere, hero character, audio** (pillars 5/7/9) — code is sound but the payoff is motion
+  + sound, best authored against a real-browser session.
+
 ## Anti-goals — what NOT to do
 
 - **Don't chase realism.** No PBR, no photoscanned textures, no realistic lighting. Every hour
