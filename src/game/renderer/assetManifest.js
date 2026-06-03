@@ -50,13 +50,16 @@ export const MODELS = {
   // 1.8u hero (toy-diorama read). Now a modest 1.5x footprint × heightMul 1.9 → ~3.5u tall
   // false-fronts with doorways taller than the player, WITHOUT the footprint growing enough
   // to crowd the road/camera. windowLight heights ride effScale so they stay put.
-  heroTownSaloon: { url: "/models/hero_town_saloon.glb", scale: 1.5, heightMul: 1.9, windowLight: { color: "#ffb867", intensity: 0.95, distance: 5.0, height: 1.55 } },
-  heroTownStore: { url: "/models/hero_town_store.glb", scale: 1.5, heightMul: 1.9, windowLight: { color: "#ffc070", intensity: 0.82, distance: 4.7, height: 1.4 } },
-  heroTownAssay: { url: "/models/hero_town_assay.glb", scale: 1.5, heightMul: 1.85, windowLight: { color: "#ffad6a", intensity: 0.62, distance: 4.2, height: 1.25 } },
-  productionBoardwalk: { url: "/models/production_boardwalk.glb", scale: 1.3 },
-  productionSaloon: { url: "/models/production_saloon.glb", scale: 1.5, heightMul: 1.95, windowLight: { color: "#dc8342", intensity: 0.68, distance: 4.4, height: 1.7 } },
-  productionStore: { url: "/models/production_store.glb", scale: 1.5, heightMul: 1.85, windowLight: { color: "#e59b52", intensity: 0.58, distance: 4.1, height: 1.55 } },
-  productionAssay: { url: "/models/production_assay.glb", scale: 1.5, heightMul: 1.8, windowLight: { color: "#d57a3e", intensity: 0.48, distance: 3.7, height: 1.45 } },
+  // Tall false-front storefronts: wider footprint (1.65x) + a modest height boost
+  // (heightMul ~1.5) so they read as imposing 1-2 story western shops with doorways
+  // taller than the 1.8u hero — not the narrow skyscrapers an aggressive heightMul gave.
+  heroTownSaloon: { url: "/models/hero_town_saloon.glb", scale: 1.65, heightMul: 1.5, windowLight: { color: "#ffb867", intensity: 0.95, distance: 5.0, height: 1.55 } },
+  heroTownStore: { url: "/models/hero_town_store.glb", scale: 1.6, heightMul: 1.5, windowLight: { color: "#ffc070", intensity: 0.82, distance: 4.7, height: 1.4 } },
+  heroTownAssay: { url: "/models/hero_town_assay.glb", scale: 1.6, heightMul: 1.45, windowLight: { color: "#ffad6a", intensity: 0.62, distance: 4.2, height: 1.25 } },
+  productionBoardwalk: { url: "/models/production_boardwalk.glb", scale: 1.35 },
+  productionSaloon: { url: "/models/production_saloon.glb", scale: 1.65, heightMul: 1.55, windowLight: { color: "#dc8342", intensity: 0.68, distance: 4.4, height: 1.7 } },
+  productionStore: { url: "/models/production_store.glb", scale: 1.6, heightMul: 1.5, windowLight: { color: "#e59b52", intensity: 0.58, distance: 4.1, height: 1.55 } },
+  productionAssay: { url: "/models/production_assay.glb", scale: 1.6, heightMul: 1.45, windowLight: { color: "#d57a3e", intensity: 0.48, distance: 3.7, height: 1.45 } },
   windowGlowPanel: { url: "/models/window_glow_panel.glb", scale: 0.84, light: { color: "#d87538", intensity: 0.48, distance: 2.6, decay: 2, height: 0.7 } },
   hangingSign: { url: "/models/hanging_sign.glb", scale: 1.0, light: { color: "#e5aa58", intensity: 0.38, distance: 2.5, decay: 2, height: 1.25 } },
   hitchingRail: { url: "/models/hitching_rail.glb", scale: 1.0 },
