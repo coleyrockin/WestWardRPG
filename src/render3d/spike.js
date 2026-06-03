@@ -1801,8 +1801,8 @@ function buildGround(scene, snapshot) {
   const ROAD_W = FIRST_ROAD_ART_STYLE.roadWidth;
   const roadMat = standard("#c08a55", { roughness: 1, emissive: "#5a3a20", emissiveIntensity: 0.08, rimStrength: 0.02 });
   const edgeMat = standard("#e0aa68", { roughness: 1, emissive: "#5f3a20", emissiveIntensity: 0.06, rimStrength: 0.02 });
-  const rutMat = standard("#6a4a2e", { roughness: 1, emissive: "#241710", emissiveIntensity: 0.02, rimStrength: 0.01 });
-  const centerMat = standard("#9c6a40", { roughness: 1, emissive: "#352113", emissiveIntensity: 0.03, rimStrength: 0.01 });
+  const rutMat = standard("#49301c", { roughness: 1, emissive: "#1a0f08", emissiveIntensity: 0.015, rimStrength: 0.01 }); // darker = worn wheel tracks with weight
+  const centerMat = standard("#a87446", { roughness: 1, emissive: "#3a2415", emissiveIntensity: 0.035, rimStrength: 0.01 });
   // The opacity-0.5 dust wash was muddying the whole road to a flat band; dropped
   // to a faint haze so the warm surface + ruts read instead of a cardboard strip.
   const roadWashMat = new THREE.MeshBasicMaterial({

@@ -38,12 +38,12 @@ export function createWaterMaterial(opts = {}) {
   };
   const t = uniforms.time;
 
-  const mat = new MeshBasicNodeMaterial({ transparent: true, opacity: 0.85, fog: true });
+  const mat = new MeshBasicNodeMaterial({ transparent: true, opacity: 0.74, fog: true }); // lower opacity reads as deeper water
 
   // vertex waves (displace local Z; the plane is rotated flat so Z → world up)
   const px = positionLocal.x;
   const py = positionLocal.y;
-  const wave = sin(px.mul(0.8).add(t.mul(1.2))).add(sin(py.mul(1.1).add(t.mul(0.9)))).mul(0.04);
+  const wave = sin(px.mul(0.8).add(t.mul(1.2))).add(sin(py.mul(1.1).add(t.mul(0.9)))).mul(0.06);
   mat.positionNode = positionLocal.add(vec3(0, 0, wave));
 
   // moving ripple bands → subtle deep/shallow mix
@@ -52,7 +52,7 @@ export function createWaterMaterial(opts = {}) {
   // fresnel sky tint at grazing angles
   const ndv = clamp(dot(normalize(transformedNormalView), normalize(positionViewDirection)), 0, 1);
   const fres = ndv.oneMinus().pow(3);
-  const tinted = mix(base, vec3(uniforms.skyTint), fres.mul(0.5));
+  const tinted = mix(base, vec3(uniforms.skyTint), fres.mul(0.72));
   // sun-glint highlight on the ripple crests
   const glint = pow(band, 8).mul(0.4);
   mat.colorNode = tinted.add(vec3(uniforms.skyTint).mul(glint));
