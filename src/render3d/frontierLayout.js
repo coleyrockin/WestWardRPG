@@ -409,6 +409,34 @@ const OUTSKIRTS_DRESSING = [
   { kind: "rock", label: "Outskirts Stone", x: 31.6, y: 13.2, color: "#6a5f55", size: 0.85 },
 ];
 
+// Marsh district — the slime/wagon climax runs the north shore of the water pond
+// (centre 48,19, ~x[34,62] y[16,22]). Line the shore with reeds, set snags + a
+// half-sunk boulder in the shallows, and mud the road approach so the beat reads as
+// a real wetland crossing, not sand with a blue rectangle. All south of the y~12-16
+// travel lane / on the water; outside guarded boxes.
+const MARSH_DISTRICT = [
+  { kind: "reeds", label: "Shore Reeds", x: 43.5, y: 16.1, color: "#5f7a4a", size: 0.95 },
+  { kind: "reeds", label: "Shore Reeds", x: 46.6, y: 16.3, color: "#577038", size: 0.9 },
+  { kind: "reeds", label: "Shore Reeds", x: 57.2, y: 16.1, color: "#5f7a4a", size: 0.9 },
+  { kind: "reeds", label: "Shallows Reeds", x: 44.6, y: 18.3, color: "#577038", size: 0.85 },
+  { kind: "reeds", label: "Shallows Reeds", x: 56.4, y: 18.7, color: "#5f7a4a", size: 0.85 },
+  { kind: "deadTree", label: "Sunken Snag", x: 53.6, y: 19.2, color: "#3e3224", size: 1.05 },
+  { kind: "boulder", label: "Half-Sunk Boulder", x: 47.6, y: 19.4, color: "#544c44", size: 0.95 },
+  { kind: "mudRutDecal", label: "Marsh Approach Mud", x: 50.0, y: 15.9, color: "#5a3923", size: 1.0, yaw: -0.5 },
+  { kind: "mudRutDecal", label: "Crossing Mud", x: 55.4, y: 15.6, color: "#5a3923", size: 0.9, yaw: -0.4 },
+  { kind: "marshCluster", label: "Goo Pool", x: 54.6, y: 18.0, color: "#75d06b", size: 0.62, yaw: 0.3 },
+];
+
+// South town back-rank — depth behind the south storefronts (mirrors BACK_ROW on the
+// north), west of the marsh water (x < 26). Small, set back at y~16.5-17.5, facing
+// the street; outside the guarded first-street box (y < 16.2 there is the boundary).
+const SOUTH_BACK_ROW = [
+  { kind: "productionStore",  label: "South Back Granary", x: 7.6,  y: 17.0, color: "#5e4030", size: 0.62, yaw: Math.PI + 0.05 },
+  { kind: "productionSaloon", label: "South Back Lodge",   x: 12.7, y: 17.3, color: "#583828", size: 0.66, yaw: Math.PI - 0.05 },
+  { kind: "productionAssay",  label: "South Back Office",  x: 17.6, y: 16.7, color: "#54382a", size: 0.6,  yaw: Math.PI + 0.07 },
+  { kind: "productionStore",  label: "South Back Depot",   x: 22.6, y: 16.5, color: "#634330", size: 0.64, yaw: Math.PI - 0.09 },
+];
+
 // Soft world boundary — mesas/cliffs/boulders ring the playable rectangle. Mesa
 // footprints are square (3.2*size); spacing 5 with size ~1.8 (half-width 2.88)
 // overlaps by ~0.76, so there is no gap wide enough to slip through.
@@ -466,6 +494,8 @@ const ABSOLUTE_ZONES = [
   ...SCENE_DRESSING,
   ...EASTERN_LANDMARKS,
   ...OUTSKIRTS_DRESSING,
+  ...MARSH_DISTRICT,
+  ...SOUTH_BACK_ROW,
   ...BOUNDARY_RING,
 ];
 
