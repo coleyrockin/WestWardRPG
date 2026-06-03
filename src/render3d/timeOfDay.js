@@ -44,16 +44,16 @@ export const PALETTES = Object.freeze({
     sun: { color: "#ffe2b4", intensity: 3.1, dir: { x: -9, y: 8.5, z: -4 }, disc: 0.034, glow: 0.22 },
     // Hemisphere is the SHADOW FILL — at 0.34 (ported from dusk) it crushed every
     // shadow to black. Lifted hard so unlit faces stay readable in the demo.
-    hemi: { sky: "#9fb4d8", ground: "#4a4436", intensity: 1.0 },
+    hemi: { sky: "#9fb4d8", ground: "#4a4436", intensity: 0.82 },
     rim: { color: "#6a8fff", intensity: 0.85, dir: { x: 9, y: 5, z: 6 } },
-    exposure: 1.55,
+    exposure: 1.4,
     stars: 0,
     bloom: 0.55,
     // Cinematic grade: a strong cool-shadow / warm-highlight split so the golden key
     // reads as warm light against cool shadow rather than a single-hue orange wash.
     // contrast + vignette eased from the dusk values so the brighter fill stays readable.
     grade: {
-      tint: "#ffb060", amount: 0.04, contrast: 1.06, saturation: 1.0,
+      tint: "#ffb060", amount: 0.05, contrast: 1.1, saturation: 1.1,
       shadowTint: "#2c3b5e", highlightTint: "#ffc880",
       splitStrength: 0.12, godrayStrength: 0.16, vignetteStrength: 0.05, bloomThreshold: 0.86,
     },

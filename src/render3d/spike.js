@@ -23,7 +23,7 @@ import {
   getRouteMetrics,
   PLAYER_SPAWN,
 } from "./frontierLayout.js";
-import { createPlayerController } from "./playerController.js";
+import { createPlayerController, CAMERA_PRESETS } from "./playerController.js";
 import { buildProxies } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
 import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine } from "./phaseState.js";
@@ -2597,6 +2597,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   let frames = 0;
   let prevTs = performance.now();
   let fieldMapLiveSyncT = 0;
+  // Establishing push-in: for the first CAM_INTRO_DUR seconds at spawn the camera
+  // eases from a wide/high vantage into the gameplay framing. Gated to spawn (no
+  // active beat focus, no modal, not visual capture) so it never fights focusBeat or
+  // the golden-image gate. Driven by WALL-CLOCK elapsed (not accumulated dt) so it
+  // settles correctly even if rAF is throttled (e.g. a backgrounded tab renders only
+  // sparse frames — each still computes true elapsed time and lands settled).
+  let camIntroStart = null;
+  const CAM_INTRO_DUR = 2.4;
+  let camIntroSettled = false;
   function loop(now = performance.now()) {
     // dt in seconds, clamped to keep big tab-resume jumps from teleporting.
     // Hit-stop scales the loop dt on a connecting strike (freeze-frame punch); the
@@ -2604,6 +2613,22 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     const rawDt = Math.min((now - prevTs) / 1000, 0.05);
     prevTs = now;
     const dt = visualCapture ? rawDt : rawDt * hitStop.scale(rawDt);
+    if (!camIntroSettled && !visualCapture && beatFocusTimer === 0 && !boardModalController.isOpen()) {
+      if (camIntroStart === null) camIntroStart = now; // first eligible frame
+      const elapsed = (now - camIntroStart) / 1000;
+      const k = Math.pow(1 - Math.min(1, elapsed / CAM_INTRO_DUR), 2); // ease-out
+      const base = CAMERA_PRESETS.exploration;
+      if (k > 0.004) {
+        player.setCameraPreset("exploration", {
+          distance: base.distance + k * 6.5,
+          height: base.height + k * 4.0,
+          lookAhead: base.lookAhead + k * 2.0,
+        });
+      } else {
+        player.setCameraPreset("exploration"); // settle to the base preset once
+        camIntroSettled = true;
+      }
+    }
     if (!boardModalController.isOpen()) player.update(dt, proxies);
     if (beatFocusTimer > 0) {
       beatFocusTimer = Math.max(0, beatFocusTimer - dt);
