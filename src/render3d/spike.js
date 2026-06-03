@@ -1659,7 +1659,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     anchor: { x: snapshot.player.x, y: snapshot.player.y },
     playCore: { x: snapshot.player.x + 6, y: snapshot.player.y },
   });
-  scene.add(new THREE.AmbientLight(col("#8aa0d0"), 0.55));
+  scene.add(new THREE.AmbientLight(col("#9fb0d8"), 0.4));
   // Continuous day/night: a slow world clock advances dayTime; sunArc(dayTime)
   // is the live palette so the sun arcs and colours drift. Opens at golden hour
   // and drifts into dusk as you play (readable first frame, moody payoff). The
@@ -1714,9 +1714,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       // Authored .glb model for this kind; fall back to the procedural builder if
       // it fails to load so the scene is never missing a placement.
       const effScale = (entry.scale ?? 1) * (p.size ?? 1);
+      // heightMul (manifest, optional) grows a model taller than wide — false-front
+      // buildings read as tall without their footprint colliding with the road/camera.
+      const effScaleY = entry.heightMul ? effScale * entry.heightMul : null;
       const yaw = (entry.yaw ?? 0) + (p.yaw ?? 0) + (entry.vary ? hashYaw(p.x, p.y) : 0);
       modelJobs.push(
-        instanceModel(entry.url, { x: p.x, z: p.y, y: groundHeight(p.x, p.y), yaw, scale: effScale })
+        instanceModel(entry.url, { x: p.x, z: p.y, y: groundHeight(p.x, p.y), yaw, scale: effScale, scaleY: effScaleY })
           .then((node) => {
             props.add(node);
             placementNodes.push({ kind: p.kind, node });

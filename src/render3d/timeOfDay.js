@@ -40,14 +40,23 @@ export const PALETTES = Object.freeze({
     key: "goldenHour",
     label: "Golden Hour",
     sky: { top: "#2a3a6b", mid: "#c4825a", horizon: "#ffd27a" },
-    fog: { color: "#caa074", density: 0.008 },
-    sun: { color: "#ffcf86", intensity: 3.0, dir: { x: -12, y: 3, z: -4 }, disc: 0.034, glow: 0.22 },
-    hemi: { sky: "#8aa0d0", ground: "#3a2a18", intensity: 0.34 },
+    fog: { color: "#bfae98", density: 0.006 },
+    sun: { color: "#ffe2b4", intensity: 3.1, dir: { x: -9, y: 8.5, z: -4 }, disc: 0.034, glow: 0.22 },
+    // Hemisphere is the SHADOW FILL — at 0.34 (ported from dusk) it crushed every
+    // shadow to black. Lifted hard so unlit faces stay readable in the demo.
+    hemi: { sky: "#9fb4d8", ground: "#4a4436", intensity: 1.0 },
     rim: { color: "#6a8fff", intensity: 0.85, dir: { x: 9, y: 5, z: 6 } },
-    exposure: 1.32,
+    exposure: 1.55,
     stars: 0,
     bloom: 0.55,
-    grade: { tint: "#ffb060", amount: 0.04, contrast: 1.08, saturation: 1.08, shadowTint: "#46527a", highlightTint: "#ffc880" },
+    // Cinematic grade: a strong cool-shadow / warm-highlight split so the golden key
+    // reads as warm light against cool shadow rather than a single-hue orange wash.
+    // contrast + vignette eased from the dusk values so the brighter fill stays readable.
+    grade: {
+      tint: "#ffb060", amount: 0.04, contrast: 1.06, saturation: 1.0,
+      shadowTint: "#2c3b5e", highlightTint: "#ffc880",
+      splitStrength: 0.12, godrayStrength: 0.16, vignetteStrength: 0.05, bloomThreshold: 0.86,
+    },
     bodyBg: "#2a1f2e",
   },
   night: {

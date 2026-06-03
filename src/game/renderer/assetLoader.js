@@ -55,14 +55,18 @@ export function loadModel(url, { npr = true } = {}) {
 
 // Load + return a fresh instance positioned in the world. Geometry/materials are
 // shared with the template; only the transform is per-instance.
-// opts: { x, z, y, yaw, scale }  (world x/z plane, y up — engine convention)
+// opts: { x, z, y, yaw, scale, scaleY }  (world x/z plane, y up — engine convention)
+// scaleY (optional) overrides the vertical scale so a model can grow tall without
+// widening its footprint — the western false-front look, and it keeps re-scaled
+// buildings from colliding with the road/camera. Omit for uniform scale.
 export async function instanceModel(url, opts = {}) {
   const template = await loadModel(url, opts);
   const node = template.clone(true);
-  const { x = 0, z = 0, y = 0, yaw = 0, scale = 1 } = opts;
+  const { x = 0, z = 0, y = 0, yaw = 0, scale = 1, scaleY = null } = opts;
   node.position.set(x, y, z);
   node.rotation.y = yaw;
-  node.scale.setScalar(scale);
+  if (scaleY != null) node.scale.set(scale, scaleY, scale);
+  else node.scale.setScalar(scale);
   return node;
 }
 
