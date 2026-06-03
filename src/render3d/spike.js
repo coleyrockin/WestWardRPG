@@ -1501,14 +1501,16 @@ function buildGround(scene, snapshot) {
   // Segmenting it by route points makes the path visibly turn toward the marsh
   // instead of reading as a short flat alley.
   const ROAD_W = FIRST_ROAD_ART_STYLE.roadWidth;
-  const roadMat = standard("#b47745", { roughness: 1, emissive: "#55351f", emissiveIntensity: 0.1, rimStrength: 0.025 });
-  const edgeMat = standard("#d49a5a", { roughness: 1, emissive: "#5f3a20", emissiveIntensity: 0.07, rimStrength: 0.025 });
-  const rutMat = standard("#765032", { roughness: 1, emissive: "#2d1d12", emissiveIntensity: 0.025, rimStrength: 0.015 });
-  const centerMat = standard("#8f5f39", { roughness: 1, emissive: "#352113", emissiveIntensity: 0.035, rimStrength: 0.015 });
+  const roadMat = standard("#c08a55", { roughness: 1, emissive: "#5a3a20", emissiveIntensity: 0.08, rimStrength: 0.02 });
+  const edgeMat = standard("#e0aa68", { roughness: 1, emissive: "#5f3a20", emissiveIntensity: 0.06, rimStrength: 0.02 });
+  const rutMat = standard("#6a4a2e", { roughness: 1, emissive: "#241710", emissiveIntensity: 0.02, rimStrength: 0.01 });
+  const centerMat = standard("#9c6a40", { roughness: 1, emissive: "#352113", emissiveIntensity: 0.03, rimStrength: 0.01 });
+  // The opacity-0.5 dust wash was muddying the whole road to a flat band; dropped
+  // to a faint haze so the warm surface + ruts read instead of a cardboard strip.
   const roadWashMat = new THREE.MeshBasicMaterial({
-    color: col("#d9ad78"),
+    color: col("#e3c08a"),
     transparent: true,
-    opacity: 0.5,
+    opacity: 0.18,
     depthWrite: false,
     blending: THREE.NormalBlending,
   });
