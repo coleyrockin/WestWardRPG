@@ -610,58 +610,83 @@ function buildWesternBuilding(group, p, spec = {}) {
   const roofMat = standard(spec.roof ?? "#37271a", { roughness: 1 });
   const dark = standard("#241910", { roughness: 1 });
   const pane = standard("#ffd190", { emissive: "#b9762e", emissiveIntensity: 0.55 });
+  const shutterMat = standard(spec.shutter ?? spec.roof ?? "#3a2a1a", { roughness: 1 });
+  const jit2 = hashYaw(p.x * 2.3 - 1.0, p.y * 1.9 + 4.0) / (Math.PI * 2); // independent variety hash
 
   // place a thin panel flat on the front face: u=horizontal from centre, vBase=bottom Y
   const onFront = (u, vBase, pw, h, mat, out = 0.04, thick = 0.08) =>
     addBox(group, pw, h, thick, mat, toVec(p.x + u, fz + front * out, vBase));
-  const windowAt = (u, vBase, ww, wh) => {
+  const windowAt = (u, vBase, ww, wh, shutters = false) => {
     onFront(u, vBase - 0.07, ww + 0.18, wh + 0.16, trim, 0.02, 0.06); // frame
     onFront(u, vBase, ww, wh, pane, 0.05, 0.05);                       // lit pane
+    if (shutters) {
+      onFront(u - ww / 2 - 0.11, vBase, 0.12, wh, shutterMat, 0.05, 0.05);
+      onFront(u + ww / 2 + 0.11, vBase, 0.12, wh, shutterMat, 0.05, 0.05);
+    }
   };
 
   addContactShadow(group, p.x, cz, hw * 1.16, depth / 2 * 1.22);
 
-  // body + roof cap + false-front parapet with cornice
+  // body + board-and-batten siding (proud battens the ink pass draws as plank seams)
   addBox(group, w, bodyH, depth, body, toVec(p.x, cz, 0));
+  const nb = Math.max(4, Math.round(w / 0.46));
+  for (let i = 0; i <= nb; i++) onFront((i / nb - 0.5) * (w - 0.04), 0, 0.05, bodyH, roofMat, 0.015, 0.035);
+  // roof cap
   addBox(group, w + 0.22, 0.2, depth + 0.22, roofMat, toVec(p.x, cz, bodyH));
+  // false-front parapet — shape varies (flat / stepped / pediment) for a broken skyline
   const parapetH = 0.9 + jit * 0.6;
-  addBox(group, w + 0.1, parapetH, 0.2, body, toVec(p.x, fz, bodyH));                       // parapet panel (front)
-  addBox(group, w + 0.26, 0.2, 0.3, trim, toVec(p.x, fz, bodyH + parapetH - 0.2));          // cornice
-  addBox(group, w + 0.26, 0.16, 0.28, trim, toVec(p.x, fz, bodyH - 0.05));                  // storefront cornice band
-  // corner pilasters (front)
+  addBox(group, w + 0.1, parapetH, 0.2, body, toVec(p.x, fz, bodyH));
+  const pshape = Math.floor(jit2 * 3);
+  if (pshape === 1) {            // stepped
+    addBox(group, w * 0.5, parapetH * 0.55, 0.22, body, toVec(p.x, fz, bodyH + parapetH));
+    addBox(group, w * 0.5 + 0.18, 0.16, 0.3, trim, toVec(p.x, fz, bodyH + parapetH * 1.55 - 0.16));
+  } else if (pshape === 2) {     // centred pediment
+    addBox(group, w * 0.34, parapetH * 0.7, 0.24, body, toVec(p.x, fz, bodyH + parapetH * 0.55));
+  }
+  addBox(group, w + 0.26, 0.2, 0.3, trim, toVec(p.x, fz, bodyH + parapetH - 0.2));    // cornice
+  addBox(group, w + 0.26, 0.16, 0.28, trim, toVec(p.x, fz, bodyH - 0.05));            // mid band
+  // corner pilasters
   addBox(group, 0.18, bodyH, 0.18, trim, toVec(p.x - hw + 0.05, fz, 0));
   addBox(group, 0.18, bodyH, 0.18, trim, toVec(p.x + hw - 0.05, fz, 0));
 
-  // ground-floor storefront: door + flanking display windows
-  addBox(group, 0.95, 2.0, 0.12, dark, toVec(p.x + (jit - 0.5) * 0.3, fz + front * 0.04, 0));   // recessed doorway
-  addBox(group, 1.1, 0.14, 0.16, trim, toVec(p.x + (jit - 0.5) * 0.3, fz + front * 0.05, 2.0)); // door lintel
+  // storefront: recessed door + flanking display windows
+  const doorU = (jit - 0.5) * 0.3;
+  addBox(group, 0.95, 2.0, 0.12, dark, toVec(p.x + doorU, fz + front * 0.04, 0));
+  addBox(group, 1.12, 0.16, 0.18, trim, toVec(p.x + doorU, fz + front * 0.05, 2.0));   // lintel
   windowAt(-hw * 0.55, 0.85, w * 0.3, 1.0);
   windowAt(hw * 0.55, 0.85, w * 0.3, 1.0);
 
-  // upper-storey windows
+  // upper-storey windows (shutters on roughly half the buildings)
+  const shut = jit2 > 0.45;
   for (let s = 1; s < stories; s++) {
     const vy = s * storyH + 0.45;
     const cols = w > 2.4 ? 3 : 2;
-    for (let i = 0; i < cols; i++) {
-      const u = (i / (cols - 1) - 0.5) * (w - 0.7);
-      windowAt(u, vy, 0.5, 0.8);
-    }
+    for (let i = 0; i < cols; i++) windowAt((i / (cols - 1) - 0.5) * (w - 0.7), vy, 0.5, 0.8, shut);
   }
 
-  // porch: boardwalk + awning + posts
+  // porch: boardwalk + awning + posts + hitching rail + a barrel
   if (spec.porch) {
     const pd = 1.1 * size;
-    addBox(group, w + 0.3, 0.1, pd, roofMat, toVec(p.x, fz + front * (pd / 2 + 0.1), 0));            // boardwalk
-    addBox(group, w + 0.3, 0.12, pd + 0.2, roofMat, toVec(p.x, fz + front * (pd / 2), storyH - 0.05)); // awning
-    addBox(group, 0.15, storyH - 0.05, 0.15, trim, toVec(p.x - hw + 0.08, fz + front * (pd + 0.05), 0));
-    addBox(group, 0.15, storyH - 0.05, 0.15, trim, toVec(p.x + hw - 0.08, fz + front * (pd + 0.05), 0));
+    const pz = fz + front * (pd + 0.05);
+    addBox(group, w + 0.3, 0.1, pd, roofMat, toVec(p.x, fz + front * (pd / 2 + 0.1), 0));               // boardwalk
+    addBox(group, w + 0.3, 0.12, pd + 0.2, roofMat, toVec(p.x, fz + front * (pd / 2), storyH - 0.05));  // awning
+    addBox(group, 0.15, storyH - 0.05, 0.15, trim, toVec(p.x - hw + 0.08, pz, 0));
+    addBox(group, 0.15, storyH - 0.05, 0.15, trim, toVec(p.x + hw - 0.08, pz, 0));
+    addBox(group, w - 0.1, 0.07, 0.07, trim, toVec(p.x, pz, 0.92));                                     // hitching rail
+    addBox(group, 0.42, 0.55, 0.42, roofMat, toVec(p.x + hw * 0.62, fz + front * (pd * 0.66), 0));      // barrel/crate
   }
 
-  // signboard on the false front
+  // sign: a flat false-front board, or (variety) a hanging board on a bracket
   if (spec.sign) {
-    addBox(group, w * 0.74, Math.min(0.8, parapetH * 0.7), 0.1,
-      standard(spec.sign, { emissive: "#3a2a10", emissiveIntensity: 0.4 }),
-      toVec(p.x, fz + front * 0.13, bodyH + parapetH * 0.28));
+    const signMat = standard(spec.sign, { emissive: "#3a2a10", emissiveIntensity: 0.45 });
+    if (jit2 > 0.5) {
+      const su = -hw * 0.4, sv = storyH + 0.2;
+      addBox(group, 0.08, 0.08, 0.62, trim, toVec(p.x + su, fz + front * 0.33, sv + 0.52));   // bracket arm
+      addBox(group, 0.1, 0.62, 0.8, signMat, toVec(p.x + su, fz + front * 0.62, sv));         // hanging board
+    } else {
+      addBox(group, w * 0.74, Math.min(0.8, parapetH * 0.7), 0.1, signMat,
+        toVec(p.x, fz + front * 0.13, bodyH + parapetH * 0.28));                              // flat board
+    }
   }
 }
 
