@@ -437,6 +437,16 @@ const SOUTH_BACK_ROW = [
   { kind: "productionStore",  label: "South Back Depot",   x: 22.6, y: 16.5, color: "#634330", size: 0.64, yaw: Math.PI - 0.09 },
 ];
 
+// Opening foreground frame — near-camera props just behind the spawn (x < 9.5, west
+// of the wedge, so zero blocker/test impact) that sit at the lower frame EDGES to add
+// a depth layer to the establishing shot: a thin dead-tree silhouette upper-left, a
+// low cart lower-right. Deliberately off-centre so they frame without blocking the
+// road's leading line to the board. (If they read as clutter, delete this array.)
+const FOREGROUND_FRAME = [
+  { kind: "deadTree", label: "Spawn Frame Snag", x: 7.9, y: 5.4, color: "#3e3224", size: 1.15 },
+  { kind: "cart", label: "Spawn Frame Cart", x: 8.3, y: 11.7, color: "#a87542", size: 0.68, yaw: 0.6 },
+];
+
 // Soft world boundary — mesas/cliffs/boulders ring the playable rectangle. Mesa
 // footprints are square (3.2*size); spacing 5 with size ~1.8 (half-width 2.88)
 // overlaps by ~0.76, so there is no gap wide enough to slip through.
@@ -496,6 +506,7 @@ const ABSOLUTE_ZONES = [
   ...OUTSKIRTS_DRESSING,
   ...MARSH_DISTRICT,
   ...SOUTH_BACK_ROW,
+  ...FOREGROUND_FRAME,
   ...BOUNDARY_RING,
 ];
 
