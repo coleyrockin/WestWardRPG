@@ -53,6 +53,13 @@ import { createHitStop, createCameraShake, createBurstPool } from "./combat/hitF
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
 const col = (hex) => new THREE.Color(hex);
 const HERO_KINDS = Object.freeze(["jobBoard", "roadSign", "townBark", "smokeCache", "slimeTell", "roadSlime", "brokenWagon"]);
+// Building kinds get per-instance height + yaw jitter so the street isn't stamped clones.
+const BUILDING_KINDS = new Set([
+  "productionSaloon", "productionStore", "productionAssay",
+  "heroTownSaloon", "heroTownStore", "heroTownAssay",
+  "saloon", "saloonFacade", "storefront", "town", "ranch",
+  "townFacadeWarm", "townFacadeStore", "townFacadeDark",
+]);
 const PLAYER_MODEL_URL = "/models/character_hero.glb";
 const IMPORTANT_MODEL_KINDS = Object.freeze([
   "jobBoard",
@@ -1721,8 +1728,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       const effScale = (entry.scale ?? 1) * (p.size ?? 1);
       // heightMul (manifest, optional) grows a model taller than wide — false-front
       // buildings read as tall without their footprint colliding with the road/camera.
-      const effScaleY = entry.heightMul ? effScale * entry.heightMul : null;
-      const yaw = (entry.yaw ?? 0) + (p.yaw ?? 0) + (entry.vary ? hashYaw(p.x, p.y) : 0);
+      // Per-instance height + yaw jitter (deterministic from position) breaks the
+      // stamped-clone roofline/grid so the street reads as a real built-up town. Only
+      // height varies (not footprint) so nothing starts overlapping.
+      const isBuilding = BUILDING_KINDS.has(p.kind);
+      const hHash = isBuilding ? hashYaw(p.x * 1.7 + 3.1, p.y * 1.3 - 1.9) / (Math.PI * 2) : 0;
+      let effScaleY = entry.heightMul ? effScale * entry.heightMul : null;
+      if (isBuilding && effScaleY) effScaleY *= 0.86 + hHash * 0.3; // ±~15% roofline variance
+      const yaw = (entry.yaw ?? 0) + (p.yaw ?? 0) + (entry.vary ? hashYaw(p.x, p.y) : 0)
+        + (isBuilding ? (hashYaw(p.y + 5.0, p.x - 2.0) / (Math.PI * 2) - 0.5) * 0.1 : 0);
       modelJobs.push(
         instanceModel(entry.url, { x: p.x, z: p.y, y: groundHeight(p.x, p.y), yaw, scale: effScale, scaleY: effScaleY })
           .then((node) => {
