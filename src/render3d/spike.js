@@ -137,6 +137,33 @@ function addContactShadow(group, x, z, rx = 1.0, rz = 0.7) {
   group.add(m);
 }
 
+// Augment an authored building box with western false-front architecture so it
+// stops reading as a plain box: a cornice trim cap, a painted signboard on the
+// road-facing front, and a porch awning on two posts. Positioned from the model's
+// real world bbox + the side that faces the road (z ~ 8.9), so it adapts to any
+// building model/scale/orientation.
+function addWesternFacadeDetail(group, node, p) {
+  node.updateWorldMatrix(true, true);
+  const box = new THREE.Box3().setFromObject(node);
+  if (!Number.isFinite(box.min.x) || !Number.isFinite(box.max.y)) return;
+  const w = box.max.x - box.min.x;
+  const d = box.max.z - box.min.z;
+  const h = box.max.y - box.min.y;
+  if (w < 0.3 || h < 0.6) return;
+  const cx = (box.min.x + box.max.x) / 2;
+  const cz = (box.min.z + box.max.z) / 2;
+  const baseY = box.min.y;
+  const frontSign = (8.9 - p.y) >= 0 ? 1 : -1; // road runs in x; front faces road centre
+  const frontZ = frontSign > 0 ? box.max.z : box.min.z;
+
+  // Signboard — a painted plank on the upper road-facing false front. Flat against
+  // the wall, so it gives each shop signage without chunky caps/awnings jutting out.
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(w * 0.72, Math.min(0.85, h * 0.13), 0.1), standard(p.color || "#c8a25a"));
+  sign.position.set(cx, box.max.y - h * 0.24, frontZ + frontSign * 0.07);
+  sign.castShadow = true;
+  group.add(sign);
+}
+
 // --- per-kind placeholder builders ---------------------------------------
 
 function buildBuilding(group, p, heightScale) {
@@ -1741,6 +1768,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         instanceModel(entry.url, { x: p.x, z: p.y, y: groundHeight(p.x, p.y), yaw, scale: effScale, scaleY: effScaleY })
           .then((node) => {
             props.add(node);
+            if (isBuilding) addWesternFacadeDetail(props, node, p);
             placementNodes.push({ kind: p.kind, node });
             recordModelLoad(p.kind, entry.url, true);
             // lamps/beacon/board carried their PointLight inside the old builder;
