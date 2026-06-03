@@ -31,8 +31,13 @@ const col = (hex) => new THREE.Color(hex);
 // One shared hard-stepped gradient map for every NPR surface — three luminance
 // bands (deep shadow → mid → lit). Built lazily so module import stays side-
 // effect-free for node tests.
+//
+// Floor lifted from [55,100,255] to [100,160,255]: the old 55 (≈21%) shadow band,
+// multiplied by the already-dark building/ground albedos (~0.2–0.4), crushed
+// shadowed faces to near-black — the murk no hemi fill could beat. 100/160 keeps
+// three clearly-separated painted bands while letting unlit faces read as surfaces.
 let gradientMap = null;
-export function celGradientMap(steps = [55, 100, 255]) {
+export function celGradientMap(steps = [100, 160, 255]) {
   if (gradientMap) return gradientMap;
   const data = Uint8Array.from(steps);
   const tex = new THREE.DataTexture(data, data.length, 1, THREE.RedFormat);

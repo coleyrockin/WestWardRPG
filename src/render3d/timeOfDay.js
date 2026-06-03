@@ -20,9 +20,14 @@ export const PALETTES = Object.freeze({
     sky: { top: "#13203a", mid: "#4f586e", horizon: "#cf8347" },
     fog: { color: "#5e5648", density: 0.016 },
     sun: { color: "#f0a458", intensity: 1.05, dir: { x: -9, y: 4.1, z: -4.8 }, disc: 0.022, glow: 0.045 },
-    hemi: { sky: "#4a586e", ground: "#3c2c1c", intensity: 0.46 },
+    // Hemisphere is the SHADOW FILL. The dim colors (#4a586e/#3c2c1c) made the
+    // fill weak even at higher intensity, so backlit faces stayed near-black —
+    // brightened the sky/ground COLORS (cool dusk sky bounce + warm ground bounce)
+    // and lifted intensity to 0.66 so unlit faces read. Pairs with the camera-side
+    // warm fill light in atmosphere.js.
+    hemi: { sky: "#7c8cae", ground: "#5e4836", intensity: 0.66 },
     rim: { color: "#8ea9d5", intensity: 0.8, dir: { x: 8, y: 4.8, z: 6 } },
-    exposure: 0.92,
+    exposure: 1.0,
     stars: 0.18,
     bloom: 0.32,
     // Cinematic golden-hour, balanced: warm amber key reads as the dominant source,

@@ -146,6 +146,19 @@ export function createAtmosphere(scene, renderer, opts = {}) {
   scene.add(rim);
   scene.add(rim.target);
 
+  // Camera-side warm fill. The hero/gameplay camera looks toward the low sun, so
+  // the sun key + cool rim only rake the FAR edges — every building shows its
+  // shadow side and reads as a black silhouette. This soft raking fill from the
+  // SW (camera side, no shadow cast) lifts the camera-facing faces so they read
+  // as lit surfaces, while the sun still rim-lights the far silhouettes. Intensity
+  // is palette-driven via p.fill (falls back to this default for palettes that
+  // omit it, so night etc. stay unchanged until tuned).
+  const fill = new THREE.DirectionalLight(col("#ffca8a"), 1.15);
+  fill.position.set(anchor.x - 6, 7, anchor.y + 9);
+  fill.target.position.set(playCore.x, 0, playCore.y);
+  scene.add(fill);
+  scene.add(fill.target);
+
   const clouds = makeClouds(anchor);
   scene.add(clouds.group);
 
