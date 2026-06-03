@@ -390,6 +390,25 @@ const EASTERN_LANDMARKS = [
   { kind: "mesaSkyline",     label: "Slimewater Spur", x: 56.5, y: 22.4, color: "#544234", size: 1.4 },
 ];
 
+// Outskirts district (x ~26-38, between the road sign and the cache): leaving town
+// should FEEL like leaving town. A corral with a paddock wagon, a lone outpost, an
+// abandoned wagon and desert scrub turn the empty transition leg into frontier edge.
+// All on the shoulders, clear of the diagonal travel lane and outside guarded boxes;
+// `ranch` is not a slab-blocker kind.
+const OUTSKIRTS_DRESSING = [
+  { kind: "ranch", label: "Outskirts Outpost", x: 34.5, y: 3.6, color: "#6a4a32", size: 0.58, yaw: -0.12 },
+  { kind: "brokenFence", label: "Corral Rail North", x: 29.5, y: 3.8, color: "#8d6540", size: 0.8, yaw: 0.0 },
+  { kind: "fence", label: "Corral Rail East", x: 31.6, y: 4.6, color: "#a47b4c", size: 0.75, yaw: 1.45 },
+  { kind: "brokenFence", label: "Corral Rail West", x: 27.7, y: 4.8, color: "#8d6540", size: 0.7, yaw: 1.45 },
+  { kind: "cart", label: "Paddock Wagon", x: 30.2, y: 5.0, color: "#b9824d", size: 0.7, yaw: 0.5 },
+  { kind: "barrelCrateCluster", label: "Outpost Cargo", x: 33.0, y: 4.2, color: "#7a5230", size: 0.68, yaw: 0.3 },
+  { kind: "deadTree", label: "Outskirts Snag", x: 26.4, y: 11.6, color: "#3e3224", size: 1.1 },
+  { kind: "wagonSalvage", label: "Abandoned Wagon", x: 35.8, y: 15.2, color: "#a87542", size: 0.7, yaw: -0.4 },
+  { kind: "cactus", label: "Outskirts Cactus", x: 29.2, y: 12.0, color: "#577538", size: 0.95 },
+  { kind: "cactus", label: "Frontier Cactus", x: 37.6, y: 5.6, color: "#5c7a3a", size: 0.85 },
+  { kind: "rock", label: "Outskirts Stone", x: 31.6, y: 13.2, color: "#6a5f55", size: 0.85 },
+];
+
 // Soft world boundary — mesas/cliffs/boulders ring the playable rectangle. Mesa
 // footprints are square (3.2*size); spacing 5 with size ~1.8 (half-width 2.88)
 // overlaps by ~0.76, so there is no gap wide enough to slip through.
@@ -446,6 +465,7 @@ const ABSOLUTE_ZONES = [
   ...MARSH,
   ...SCENE_DRESSING,
   ...EASTERN_LANDMARKS,
+  ...OUTSKIRTS_DRESSING,
   ...BOUNDARY_RING,
 ];
 
