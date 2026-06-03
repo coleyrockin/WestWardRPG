@@ -570,6 +570,101 @@ function buildWalkInSaloon(group, p) {
   group.add(lamp);
 }
 
+// ── Procedural western building kit ─────────────────────────────────────────
+// Replaces the box .glb main-street buildings with composed false-front facades:
+// body + the iconic tall parapet + cornice, a storefront (door + display windows),
+// a porch with posts + awning, framed upper windows, corner pilasters, and a sign.
+// `great` = confident western silhouette in the cel look, not high-poly. Per-kind
+// spec + per-instance jitter so no two repeat. Front faces the road (z = 8.9 line).
+const WESTERN_SPECS = {
+  productionSaloon: { stories: 2, body: "#7c4f2f", trim: "#c79355", roof: "#3a2616", sign: "#d8a64f", porch: true, label: "saloon" },
+  heroTownSaloon:   { stories: 2, body: "#824f2c", trim: "#cb9a5a", roof: "#3c2716", sign: "#dcab52", porch: true, label: "saloon" },
+  saloon:           { stories: 2, body: "#7c4f2f", trim: "#c79355", roof: "#3a2616", sign: "#d8a64f", porch: true, label: "saloon" },
+  saloonFacade:     { stories: 2, body: "#7c4f2f", trim: "#c79355", roof: "#3a2616", sign: "#d8a64f", porch: true, label: "saloon" },
+  productionStore:  { stories: 2, body: "#8a6a3c", trim: "#bd9a5e", roof: "#41301c", sign: "#caa45c", porch: true, label: "store" },
+  heroTownStore:    { stories: 2, body: "#90703f", trim: "#c2a064", roof: "#43321e", sign: "#cea860", porch: true, label: "store" },
+  storefront:       { stories: 2, body: "#8a6a3c", trim: "#bd9a5e", roof: "#41301c", sign: "#caa45c", porch: true, label: "store" },
+  town:             { stories: 2, body: "#7a5a39", trim: "#a98a58", roof: "#3a2c1c", sign: null,      porch: false, label: "house" },
+  ranch:            { stories: 1, body: "#785538", trim: "#a07e50", roof: "#3a2a1b", sign: null,      porch: true,  label: "house" },
+  productionAssay:  { stories: 2, body: "#6f4a30", trim: "#a07c4c", roof: "#352519", sign: "#b88f4e", porch: false, label: "office" },
+  heroTownAssay:    { stories: 2, body: "#73502f", trim: "#a4824f", roof: "#372719", sign: "#bc934f", porch: false, label: "office" },
+  townFacadeWarm:   { stories: 2, body: "#7e5836", trim: "#b08a54", roof: "#3a2a1b", sign: null,      porch: false, label: "house" },
+  townFacadeStore:  { stories: 2, body: "#876338", trim: "#b8945a", roof: "#3e2d1d", sign: "#c3a05a", porch: true,  label: "store" },
+  townFacadeDark:   { stories: 2, body: "#5f4029", trim: "#8a6c44", roof: "#2e2014", sign: null,      porch: false, label: "house" },
+};
+
+function buildWesternBuilding(group, p, spec = {}) {
+  const size = p.size || 1;
+  const jit = hashYaw(p.x * 1.7 + 2.0, p.y * 1.3 - 1.0) / (Math.PI * 2); // 0..1 deterministic
+  const w = (spec.w ?? 2.5) * size;
+  const depth = (spec.depth ?? 1.7) * size;
+  const stories = spec.stories ?? 2;
+  const storyH = 1.75;
+  const bodyH = stories * storyH * (0.94 + jit * 0.14);
+  const hw = w / 2;
+  const front = (8.9 - p.y) >= 0 ? 1 : -1;   // +1 → front faces +z (road on the south)
+  const fz = p.y + front * depth / 2;        // front-face world z
+  const cz = p.y;
+  const body = standard(spec.body ?? "#7a5536", { roughness: 1 });
+  const trim = standard(spec.trim ?? "#b08a52", { roughness: 1 });
+  const roofMat = standard(spec.roof ?? "#37271a", { roughness: 1 });
+  const dark = standard("#241910", { roughness: 1 });
+  const pane = standard("#ffd190", { emissive: "#b9762e", emissiveIntensity: 0.55 });
+
+  // place a thin panel flat on the front face: u=horizontal from centre, vBase=bottom Y
+  const onFront = (u, vBase, pw, h, mat, out = 0.04, thick = 0.08) =>
+    addBox(group, pw, h, thick, mat, toVec(p.x + u, fz + front * out, vBase));
+  const windowAt = (u, vBase, ww, wh) => {
+    onFront(u, vBase - 0.07, ww + 0.18, wh + 0.16, trim, 0.02, 0.06); // frame
+    onFront(u, vBase, ww, wh, pane, 0.05, 0.05);                       // lit pane
+  };
+
+  addContactShadow(group, p.x, cz, hw * 1.16, depth / 2 * 1.22);
+
+  // body + roof cap + false-front parapet with cornice
+  addBox(group, w, bodyH, depth, body, toVec(p.x, cz, 0));
+  addBox(group, w + 0.22, 0.2, depth + 0.22, roofMat, toVec(p.x, cz, bodyH));
+  const parapetH = 0.9 + jit * 0.6;
+  addBox(group, w + 0.1, parapetH, 0.2, body, toVec(p.x, fz, bodyH));                       // parapet panel (front)
+  addBox(group, w + 0.26, 0.2, 0.3, trim, toVec(p.x, fz, bodyH + parapetH - 0.2));          // cornice
+  addBox(group, w + 0.26, 0.16, 0.28, trim, toVec(p.x, fz, bodyH - 0.05));                  // storefront cornice band
+  // corner pilasters (front)
+  addBox(group, 0.18, bodyH, 0.18, trim, toVec(p.x - hw + 0.05, fz, 0));
+  addBox(group, 0.18, bodyH, 0.18, trim, toVec(p.x + hw - 0.05, fz, 0));
+
+  // ground-floor storefront: door + flanking display windows
+  addBox(group, 0.95, 2.0, 0.12, dark, toVec(p.x + (jit - 0.5) * 0.3, fz + front * 0.04, 0));   // recessed doorway
+  addBox(group, 1.1, 0.14, 0.16, trim, toVec(p.x + (jit - 0.5) * 0.3, fz + front * 0.05, 2.0)); // door lintel
+  windowAt(-hw * 0.55, 0.85, w * 0.3, 1.0);
+  windowAt(hw * 0.55, 0.85, w * 0.3, 1.0);
+
+  // upper-storey windows
+  for (let s = 1; s < stories; s++) {
+    const vy = s * storyH + 0.45;
+    const cols = w > 2.4 ? 3 : 2;
+    for (let i = 0; i < cols; i++) {
+      const u = (i / (cols - 1) - 0.5) * (w - 0.7);
+      windowAt(u, vy, 0.5, 0.8);
+    }
+  }
+
+  // porch: boardwalk + awning + posts
+  if (spec.porch) {
+    const pd = 1.1 * size;
+    addBox(group, w + 0.3, 0.1, pd, roofMat, toVec(p.x, fz + front * (pd / 2 + 0.1), 0));            // boardwalk
+    addBox(group, w + 0.3, 0.12, pd + 0.2, roofMat, toVec(p.x, fz + front * (pd / 2), storyH - 0.05)); // awning
+    addBox(group, 0.15, storyH - 0.05, 0.15, trim, toVec(p.x - hw + 0.08, fz + front * (pd + 0.05), 0));
+    addBox(group, 0.15, storyH - 0.05, 0.15, trim, toVec(p.x + hw - 0.08, fz + front * (pd + 0.05), 0));
+  }
+
+  // signboard on the false front
+  if (spec.sign) {
+    addBox(group, w * 0.74, Math.min(0.8, parapetH * 0.7), 0.1,
+      standard(spec.sign, { emissive: "#3a2a10", emissiveIntensity: 0.4 }),
+      toVec(p.x, fz + front * 0.13, bodyH + parapetH * 0.28));
+  }
+}
+
 // --- Distinctive landmark buildings (procedural; authored as a builder fleet) ----
 // Each anchors at (p.x, p.y) via toVec and adds to the shared props group, matching
 // the existing builders. Footprints live in worldProxies.
@@ -769,6 +864,14 @@ function buildPlacement(group, p) {
   // Guard size once here: every per-kind builder multiplies p.size, so an entry
   // missing it (undefined * k = NaN) would silently produce zero-scaled geometry.
   if (typeof p.size !== "number" || !Number.isFinite(p.size)) p = { ...p, size: 1 };
+  // Composed western facade (replaces the box .glb) — built into its own sub-group
+  // so it's one occlusion/fade node and grounds itself.
+  if (WESTERN_SPECS[p.kind]) {
+    const g = new THREE.Group();
+    buildWesternBuilding(g, p, WESTERN_SPECS[p.kind]);
+    group.add(g);
+    return g;
+  }
   switch (p.kind) {
     case "town":
     case "ranch": return buildBuilding(group, p, p.depthLane === "background" ? 1.3 : 1.0);
@@ -2009,6 +2112,14 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     modelLoadStatus[kind] = current;
   };
   for (const p of snapshot.worldObjects) {
+    // Composed western buildings bypass the box .glb entirely — straight to the kit.
+    if (WESTERN_SPECS[p.kind]) {
+      const node = buildPlacement(props, p);
+      if (node) placementNodes.push({ kind: p.kind, node });
+      recordModelLoad(p.kind, "procedural:western", true);
+      if (HERO_KINDS.includes(p.kind) && node) heroMeshes[p.kind] = node;
+      continue;
+    }
     const entry = modelFor(p.kind);
     if (entry) {
       // Authored .glb model for this kind; fall back to the procedural builder if
