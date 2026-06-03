@@ -1478,7 +1478,10 @@ function buildGround(scene, snapshot) {
   // with the pure groundHeight() that seats props/scatter.
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(120, 110, 96, 88),
-    createGroundMaterial({ center: { x: 35, z: 13 } }),
+    // Lighter, less-red desert tones than the defaults — the dark #5a3d22 dirt was
+    // crushing to a heavy red in shadow under the warm key. Warmer sand + neutral
+    // dirt keep the off-road ground readable instead of a red murk.
+    createGroundMaterial({ center: { x: 35, z: 13 }, dirt: "#6f5b40", sand: "#bb9162", scrub: "#6b733f" }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(35, 0, 13);
@@ -1945,6 +1948,21 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     resetYaw: -0.9,
   });
   player.resetCameraBehind(-0.9);
+  // Dev inspection hook (spike route only): teleport the player/camera to any world
+  // point or named route waypoint so the whole loop can be reviewed without driving.
+  // Harmless in prod (the spike is a dev route); no effect unless called.
+  if (typeof window !== "undefined") {
+    window.__spike = {
+      setPos: (x, y) => { player.setPosition({ x, z: y }); return player.position; },
+      pos: () => player.position,
+      goto: (kind) => {
+        const wp = FIRST_FIVE_ROUTE.find((p) => p.kind === kind);
+        if (wp) player.setPosition({ x: wp.x, z: wp.y });
+        return wp || null;
+      },
+      waypoints: () => FIRST_FIVE_ROUTE.map((p) => p.kind),
+    };
+  }
   // Ironman resume: restore saved player position + heading (best-effort).
   if (resumeRun && Number.isFinite(resumeRun.player?.x) && Number.isFinite(resumeRun.player?.z)) {
     player.setPosition({ x: resumeRun.player.x, z: resumeRun.player.z });
