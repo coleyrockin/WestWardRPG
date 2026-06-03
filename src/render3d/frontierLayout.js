@@ -337,6 +337,24 @@ const MARSH = [
   { kind: "marshCluster", label: "Far Marsh Slick", x: 44.4, y: 19.4, color: "#75d06b", size: 0.62, yaw: 0.35 },
 ];
 
+// Beat staging — frames the Smoke Cache and the slime arena so they read as
+// authored scenes (a cache among crates and signal-smoke; a fight clearing at the
+// marsh edge) instead of a lone marker in a field. All on the shoulders, clear of
+// the y~12-13 travel lane and the hero interaction objects.
+const SCENE_DRESSING = [
+  // Smoke Cache (hero at 40.5, 12.9): signal smoke + a salvage stash
+  { kind: "dustSmokePlume", label: "Cache Signal Smoke", x: 40.1, y: 11.2, color: "#b88551", size: 0.9, yaw: 0.2 },
+  { kind: "barrelCrateCluster", label: "Cache Stash", x: 42.1, y: 14.0, color: "#7a5230", size: 0.8, yaw: -0.3 },
+  { kind: "brokenFence", label: "Cache Rail", x: 38.7, y: 13.8, color: "#8d6540", size: 0.7, yaw: 0.4 },
+  { kind: "crate", label: "Cache Crate", x: 42.6, y: 11.4, color: "#b9824d", size: 0.6 },
+  { kind: "rock", label: "Cache Stone", x: 37.9, y: 11.1, color: "#6a5f55", size: 0.7 },
+  // Slime arena (roadSlime 53.5, 15 / slimeTell 48.2, 16.4): a marsh-edge clearing
+  { kind: "deadTree", label: "Arena Snag", x: 49.4, y: 17.5, color: "#3e3224", size: 1.05 },
+  { kind: "reeds", label: "Arena Reeds", x: 51.6, y: 17.3, color: "#5f7a4a", size: 0.85 },
+  { kind: "rock", label: "Arena Stone", x: 55.4, y: 16.2, color: "#5a5048", size: 0.8 },
+  { kind: "marshCluster", label: "Arena Goo Slick", x: 52.4, y: 16.1, color: "#75d06b", size: 0.6, yaw: -0.4 },
+];
+
 // Soft world boundary — mesas/cliffs/boulders ring the playable rectangle. Mesa
 // footprints are square (3.2*size); spacing 5 with size ~1.8 (half-width 2.88)
 // overlaps by ~0.76, so there is no gap wide enough to slip through.
@@ -390,6 +408,7 @@ const ABSOLUTE_ZONES = [
   ...routeNaturalClusters(),
   ...ROAD_FLORA,
   ...MARSH,
+  ...SCENE_DRESSING,
   ...BOUNDARY_RING,
 ];
 
