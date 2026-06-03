@@ -15,6 +15,14 @@
 Single source of truth. Do not create parallel `TODO.md`, `PLAN.md`, `ROADMAP-*.md`,
 or another roadmap file.
 
+**Subsystem guides (tactical how-tos, not competing roadmaps):**
+- [`map-editing-guide.md`](map-editing-guide.md) — how to edit the 3D world map
+  (`src/render3d/frontierLayout.js`): coordinate system, the beat route, guardrail tests, the
+  `window.__spike` inspection hook, and prioritized ideas to make the map better. **Start here
+  for map/world work.**
+- [`3d-art-direction.md`](3d-art-direction.md) — the look target + a progress log of the
+  lighting/scale/building/staging pass landed 2026-06-02.
+
 Last updated: `2026-06-02`
 Branch: `main`
 
