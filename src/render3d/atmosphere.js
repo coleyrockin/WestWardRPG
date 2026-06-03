@@ -153,7 +153,7 @@ export function createAtmosphere(scene, renderer, opts = {}) {
   // as lit surfaces, while the sun still rim-lights the far silhouettes. Intensity
   // is palette-driven via p.fill (falls back to this default for palettes that
   // omit it, so night etc. stay unchanged until tuned).
-  const fill = new THREE.DirectionalLight(col("#ffce9e"), 0.78);
+  const fill = new THREE.DirectionalLight(col("#ffd0a6"), 0.55);
   fill.position.set(anchor.x - 6, 7, anchor.y + 9);
   fill.target.position.set(playCore.x, 0, playCore.y);
   scene.add(fill);
