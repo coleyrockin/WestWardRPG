@@ -46,6 +46,40 @@ real game." The engine, loop, and pipeline already work — what's missing is *b
 
 ---
 
+## 1.5 What the field shows — and our response
+
+A 101-agent deep-research survey of Claude/AI-coded RPGs (Three.js showcases, itch.io, practitioner
+postmortems, skeptical writeups — 18 sources, 84 claims, 20 confirmed under adversarial 3-vote
+verification) produced five conclusions that directly shape this roadmap:
+
+1. **Story-first 3D + Claude-coded is essentially unprecedented.** Nearly every surveyed "Claude RPG"
+   is a tech demo, tactics game, arcade title, or multiplayer arena; the story-first narrative 3D RPG
+   is absent from the landscape. → *Our moat (§1 ①) — we lean into narrative depth, not another
+   systems sandbox.*
+2. **The stack is the proven, repeatable path.** AI-coded 3D browser games converge on Three.js +
+   Vite + JS/TS — exactly ours. → *Validated; no stack pivot (§3 Bet 3, §6).*
+3. **The binding constraint is architecture specification, not feature-coding.** Claude nails bounded
+   domain logic from general knowledge (Risk rules "without being told"), but cannot invent
+   architecture the human hasn't specified — *"spend your specification budget on architecture, not
+   only features."* → *Why the §5 decide-it-now checklist, the §3 bets, and `ARCHITECTURE.md` are
+   written **before** delegating; why the port-ledger (§8) rides Claude's domain-logic strength while
+   the human owns the event-sourced/ECS architecture.*
+4. **Visual/shader iteration is materially slower** — LLMs are weak at visual-spatial reasoning, and
+   turning visual intent into language is a lossy bottleneck. → *Why the live tuning harness
+   (§3.6 T1a) is the #1 near-term priority + a Phase-1 deliverable, why golden-image is a standing
+   gate (§2), and why visual work budgets extra human time (§3.6).*
+5. **A screenshot-in-the-loop QA agent is the reusable best practice** — build → headless runtime →
+   gameplay → architecture → visual-review-via-screenshots, with a bounded autofix loop. → *Folded
+   into the verification protocol (§7) on top of the perf + golden-image gates.*
+
+*Caveats honored:* source quality skews to self-report, and the "visual gap" is described as a
+frontier actively (not yet) closing — so we treat the harness as **risk reduction, not a fix**, and
+re-evaluate as multimodal tooling improves. Branded "AI game studio" framework repos with big star
+counts ship zero games — **we build the game, not a framework** (judge by artifacts, not feature
+lists).
+
+---
+
 ## 2. Principles that bind every phase
 
 **Pure / shell discipline (non-negotiable).** Every module = a pure exported function (unit-tested
@@ -57,6 +91,13 @@ shell is rejected in review. Vitest stays `environment: "node"`. The seeds alrea
 faction rep — is a **first-class save-payload field in format v1**, not a Phase-5 retrofit. Build
 the container early; pour the content in later. Every combat and economy interaction should be able
 to push or pull these values.
+
+**Own the architecture, then delegate.** The research is unambiguous: Claude implements bounded
+domain logic well, but the binding wall is *architecture the human hasn't specified* — absent a spec,
+it defaults to a generic best-guess that breaks. So the human owns and writes down the architecture
+(the §3 bets, the §5 decide-it-now seams, `ARCHITECTURE.md`) **before** delegating implementation.
+Spec budget goes to architecture first, features second. The port-ledger (§8) is the inverse lever —
+it rides Claude's domain-logic strength on the renderer-agnostic rules.
 
 **Event-sourced, render-decoupled core.** The whole game state reconstructs from `seed + input-log`.
 From that one commitment fall replay, time-travel debugging, the determinism gate, the ironman
@@ -433,6 +474,17 @@ per-region snapshots extending `test:visual`).
 
 **Visual-session protocol:** confirm `__spike.captureMode()` is available before any tuning session;
 call `dumpLook()` to persist the values before closing the browser.
+
+**Screenshot-in-the-loop QA agent (the research's reusable best-practice loop).** For substantive
+render/loop changes, run a dedicated QA pass that mirrors the verified five-phase pattern, with a
+bounded autofix loop (≤3 attempts per failing step before surfacing to a human):
+1. **Build** — `npm run build` clean.
+2. **Headless runtime** — boot `spikes/render3d.html` headless; no console errors, `__spikeReady` set.
+3. **Gameplay** — drive the loop via `__spike.goto(...)`; assert each beat's phase transition.
+4. **Architecture** — the determinism + perf gates above hold.
+5. **Visual review** — `captureMode()` + `settle()` screenshots vs the golden-image baseline.
+This closes (partially) the visual-spatial gap the research flagged — it does not eliminate it; treat
+it as risk reduction and keep a human in the aesthetic loop.
 
 ---
 
