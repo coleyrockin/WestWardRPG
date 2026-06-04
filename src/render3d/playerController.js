@@ -56,8 +56,8 @@ const CAMERA_BLOCKING_KINDS = new Set([
 export const CAMERA_PRESETS = Object.freeze({
   exploration: Object.freeze({
     distance: 8.4,
-    height: 4.3,
-    lookHeight: 1.2,
+    height: 4.5,
+    lookHeight: 1.35,
     lookAhead: 7.2,
     shoulder: 0.55,
     smoothing: 10.5,

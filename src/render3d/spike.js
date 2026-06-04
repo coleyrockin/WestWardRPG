@@ -366,26 +366,33 @@ function buildWagon(group, p) {
 }
 
 function buildSlime(group, p) {
+  const sz = p.size || 1;
+  const gooMat = standard(p.color || "#7fd06a", { emissive: "#2a6820", emissiveIntensity: 1.1, roughness: 0.35 });
   const body = new THREE.Mesh(
-    new THREE.SphereGeometry(0.72, 18, 14, 0, Math.PI * 2, 0, Math.PI / 1.75),
-    standard(p.color, { emissive: "#2a6820", emissiveIntensity: 1.1, roughness: 0.35 }),
+    new THREE.SphereGeometry(0.72 * sz, 18, 14, 0, Math.PI * 2, 0, Math.PI / 1.75),
+    gooMat,
   );
-  body.scale.set(1.2, 0.82, 1.2);
+  body.scale.set(1.35 * sz, 0.78 * sz, 1.28 * sz);
   body.position.copy(toVec(p.x, p.y, 0.04));
   body.castShadow = true;
   group.add(body);
-  addContactShadow(group, p.x, p.y, 1.0, 0.8);
-  // sickly green ambient glow
+  // Wobble lobes — gooey silhouette with weight
+  for (const [dx, dz, sy] of [[-0.42, -0.18, 0.55], [0.38, 0.22, 0.48], [0.12, -0.38, 0.42]]) {
+    const lobe = new THREE.Mesh(new THREE.SphereGeometry(0.28 * sz, 12, 10), gooMat);
+    lobe.scale.set(1.1, sy, 0.9);
+    lobe.position.copy(toVec(p.x + dx * sz, p.y + dz * sz, 0.12));
+    group.add(lobe);
+  }
+  addContactShadow(group, p.x, p.y, 1.0 * sz, 0.8 * sz);
   const slimeLight = new THREE.PointLight(col("#58d040"), 5, 5, 2);
   slimeLight.position.copy(toVec(p.x, p.y, 0.6));
   group.add(slimeLight);
-  // hostile glowing eyes
   for (const dx of [-0.18, 0.18]) {
     const eye = new THREE.Mesh(
-      new THREE.SphereGeometry(0.085, 8, 6),
+      new THREE.SphereGeometry(0.085 * sz, 8, 6),
       standard("#fff2c0", { emissive: "#ffd24d", emissiveIntensity: 4 }),
     );
-    eye.position.copy(toVec(p.x + dx, p.y - 0.52, 0.6));
+    eye.position.copy(toVec(p.x + dx * sz, p.y - 0.52 * sz, 0.6));
     group.add(eye);
   }
   return body;
@@ -401,13 +408,24 @@ function buildGeneric(group, p, h = 0.6) {
 // walls the playable area. cliff uses a thinner, lower profile.
 function buildMesa(group, p) {
   const isCliff = p.kind === "cliff";
+  const heightMul = p.heightMul ?? 1;
   const w = (isCliff ? 2.2 : 2.9) * p.size;
   const d = (isCliff ? 1.3 : 2.9) * p.size;
-  const h = (isCliff ? 2.6 : 3.5) * p.size;
-  const mat = standard(p.color, { roughness: 1 });
+  const h = (isCliff ? 2.6 : 3.5) * p.size * heightMul;
+  // Aerial perspective: distant boundary mesas cool-shift toward fog blue-violet.
+  const dist = Math.hypot(p.x - 35, p.y - 13);
+  const fade = Math.min(1, dist / 55);
+  const baseCol = col(p.color);
+  const fogCol = col("#4a5568");
+  baseCol.lerp(fogCol, fade * 0.38);
+  const mat = standard(`#${baseCol.getHexString()}`, { roughness: 1, rimStrength: 0.35 + fade * 0.25 });
   const base = addBox(group, w, h, d, mat, toVec(p.x, p.y));
-  // inset flat-top cap for the classic mesa read
-  const cap = addBox(group, w * 0.72, h * 0.4, d * 0.72, mat, toVec(p.x, p.y, h));
+  // inset flat-top cap for the classic mesa read; hero peaks get a taller cap stack
+  const capH = h * (p.heroPeak ? 0.55 : 0.4);
+  const cap = addBox(group, w * (p.heroPeak ? 0.62 : 0.72), capH, d * (p.heroPeak ? 0.62 : 0.72), mat, toVec(p.x, p.y, h));
+  if (p.heroPeak) {
+    addBox(group, w * 0.38, capH * 0.55, d * 0.38, mat, toVec(p.x, p.y, h + capH * 0.72));
+  }
   addContactShadow(group, p.x, p.y, w * 0.62, d * 0.62);
   return base;
 }
@@ -576,21 +594,17 @@ function buildWalkInSaloon(group, p) {
 // a porch with posts + awning, framed upper windows, corner pilasters, and a sign.
 // `great` = confident western silhouette in the cel look, not high-poly. Per-kind
 // spec + per-instance jitter so no two repeat. Front faces the road (z = 8.9 line).
+// 3-zone albedo: warm key (sunlit siding), cool-leaning shadow (roof/trim/dark
+// facades read blue under the split-tone grade), accent reserved for signs only.
 const WESTERN_SPECS = {
-  productionSaloon: { stories: 2, body: "#7c4f2f", trim: "#c79355", roof: "#3a2616", sign: "#d8a64f", porch: true, label: "saloon" },
-  heroTownSaloon:   { stories: 2, body: "#824f2c", trim: "#cb9a5a", roof: "#3c2716", sign: "#dcab52", porch: true, label: "saloon" },
-  saloon:           { stories: 2, body: "#7c4f2f", trim: "#c79355", roof: "#3a2616", sign: "#d8a64f", porch: true, label: "saloon" },
-  saloonFacade:     { stories: 2, body: "#7c4f2f", trim: "#c79355", roof: "#3a2616", sign: "#d8a64f", porch: true, label: "saloon" },
-  productionStore:  { stories: 2, body: "#8a6a3c", trim: "#bd9a5e", roof: "#41301c", sign: "#caa45c", porch: true, label: "store" },
-  heroTownStore:    { stories: 2, body: "#90703f", trim: "#c2a064", roof: "#43321e", sign: "#cea860", porch: true, label: "store" },
-  storefront:       { stories: 2, body: "#8a6a3c", trim: "#bd9a5e", roof: "#41301c", sign: "#caa45c", porch: true, label: "store" },
-  town:             { stories: 2, body: "#7a5a39", trim: "#a98a58", roof: "#3a2c1c", sign: null,      porch: false, label: "house" },
-  ranch:            { stories: 1, body: "#785538", trim: "#a07e50", roof: "#3a2a1b", sign: null,      porch: true,  label: "house" },
-  productionAssay:  { stories: 2, body: "#6f4a30", trim: "#a07c4c", roof: "#352519", sign: "#b88f4e", porch: false, label: "office" },
-  heroTownAssay:    { stories: 2, body: "#73502f", trim: "#a4824f", roof: "#372719", sign: "#bc934f", porch: false, label: "office" },
-  townFacadeWarm:   { stories: 2, body: "#7e5836", trim: "#b08a54", roof: "#3a2a1b", sign: null,      porch: false, label: "house" },
-  townFacadeStore:  { stories: 2, body: "#876338", trim: "#b8945a", roof: "#3e2d1d", sign: "#c3a05a", porch: true,  label: "store" },
-  townFacadeDark:   { stories: 2, body: "#5f4029", trim: "#8a6c44", roof: "#2e2014", sign: null,      porch: false, label: "house" },
+  saloon:           { stories: 2, body: "#a87848", trim: "#6a5848", roof: "#3a4858", sign: "#d8a64f", porch: true, label: "saloon" },
+  saloonFacade:     { stories: 2, body: "#a87848", trim: "#6a5848", roof: "#3a4858", sign: "#d8a64f", porch: true, label: "saloon" },
+  storefront:       { stories: 2, body: "#9a7840", trim: "#645848", roof: "#384858", sign: "#caa45c", porch: true, label: "store" },
+  town:             { stories: 2, body: "#907040", trim: "#5e5040", roof: "#364656", sign: null,      porch: false, label: "house" },
+  ranch:            { stories: 1, body: "#886840", trim: "#5a4c3c", roof: "#344454", sign: null,      porch: true,  label: "house" },
+  townFacadeWarm:   { stories: 2, body: "#987848", trim: "#625040", roof: "#384656", sign: null,      porch: false, label: "house" },
+  townFacadeStore:  { stories: 2, body: "#9a7842", trim: "#645848", roof: "#3a4656", sign: "#c3a05a", porch: true,  label: "store" },
+  townFacadeDark:   { stories: 2, body: "#5a4838", trim: "#4a4038", roof: "#2a3448", sign: null,      porch: false, label: "house" },
 };
 
 function buildWesternBuilding(group, p, spec = {}) {
@@ -600,7 +614,7 @@ function buildWesternBuilding(group, p, spec = {}) {
   const depth = (spec.depth ?? 1.7) * size;
   const stories = spec.stories ?? 2;
   const storyH = 1.75;
-  const bodyH = stories * storyH * (0.94 + jit * 0.14);
+  const bodyH = stories * storyH * (0.88 + jit * 0.28);
   const hw = w / 2;
   const front = (8.9 - p.y) >= 0 ? 1 : -1;   // +1 → front faces +z (road on the south)
   const fz = p.y + front * depth / 2;        // front-face world z
@@ -609,7 +623,7 @@ function buildWesternBuilding(group, p, spec = {}) {
   const trim = standard(spec.trim ?? "#b08a52", { roughness: 1 });
   const roofMat = standard(spec.roof ?? "#37271a", { roughness: 1 });
   const dark = standard("#241910", { roughness: 1 });
-  const pane = standard("#ffd190", { emissive: "#b9762e", emissiveIntensity: 0.55 });
+  const pane = standard("#ffd190", { emissive: "#b9762e", emissiveIntensity: 0.32 });
   const shutterMat = standard(spec.shutter ?? spec.roof ?? "#3a2a1a", { roughness: 1 });
   const jit2 = hashYaw(p.x * 2.3 - 1.0, p.y * 1.9 + 4.0) / (Math.PI * 2); // independent variety hash
 
@@ -979,9 +993,8 @@ function attachBuildingWarmth(group, p, wl) {
   const faceZ = p.y + roadSide * 1.03; // toward the road, not through the back wall
   const paneMat = standard(wl.color, {
     emissive: wl.color,
-    // Lifted 0.28→0.62 so panes read as warm lit interiors at golden hour and
-    // catch the bloom (threshold 0.86) — was dark glass before the beauty pass.
-    emissiveIntensity: 0.62,
+    // Dim ambient tier — below bloom threshold so only reserved objective lights pop.
+    emissiveIntensity: 0.28,
     transparent: true,
     opacity: 0.82,
     rimStrength: 0,
@@ -1904,7 +1917,7 @@ function buildGround(scene, snapshot) {
     // Lighter, less-red desert tones than the defaults — the dark #5a3d22 dirt was
     // crushing to a heavy red in shadow under the warm key. Warmer sand + neutral
     // dirt keep the off-road ground readable instead of a red murk.
-    createGroundMaterial({ center: { x: 35, z: 13 }, dirt: "#6f5b40", sand: "#bb9162", scrub: "#6b733f" }),
+    createGroundMaterial({ center: { x: 35, z: 13 }, dirt: "#5a5048", sand: "#c49a62", scrub: "#5a6848" }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(35, 0, 13);
@@ -2087,7 +2100,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     anchor: { x: snapshot.player.x, y: snapshot.player.y },
     playCore: { x: snapshot.player.x + 6, y: snapshot.player.y },
   });
-  scene.add(new THREE.AmbientLight(col("#9fb0d8"), 0.4));
+  // Cool blue ambient floor — lifts the deepest shadows (left facades, near-field
+  // ground) toward cool blue instead of crushed maroon, so the warm/cool read holds
+  // even in the darkest corners of the frame.
+  scene.add(new THREE.AmbientLight(col("#acbde6"), 0.52));
   // Continuous day/night: a slow world clock advances dayTime; sunArc(dayTime)
   // is the live palette so the sun arcs and colours drift. Opens at golden hour
   // and drifts into dusk as you play (readable first frame, moody payoff). The
@@ -2202,8 +2218,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       heroMeshes[p.kind] = mesh;
     }
   }
-  await Promise.all(modelJobs);
-  scene.add(props);
+  if (visualCapture) {
+    // Golden-image capture: don't block boot on the full GLB stream — procedural
+    // dress + hero shapes are enough for a stable baseline; models continue loading.
+    scene.add(props);
+    Promise.all(modelJobs).catch((err) => console.warn("[render3d] visual capture model stream", err));
+  } else {
+    await Promise.all(modelJobs);
+    scene.add(props);
+  }
   const objectiveGuidance = createObjectiveGuidance(snapshot);
   scene.add(objectiveGuidance.group);
   const pearlRoadCue = createPearlRoadCue(snapshot);
@@ -2218,10 +2241,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // Ambient townsfolk — NPCs reusing the rig, wandering the town to bring the
   // street to life. Non-blocking fallback so a load failure never breaks the scene.
   let townsfolk = { update() {}, getInteractable: () => null, talk: () => null };
-  try {
-    townsfolk = await createTownsfolk(scene, { count: 5 });
-  } catch (err) {
-    console.warn("[render3d] townsfolk failed to load", err);
+  if (!visualCapture) {
+    try {
+      townsfolk = await createTownsfolk(scene, { count: 5 });
+    } catch (err) {
+      console.warn("[render3d] townsfolk failed to load", err);
+    }
   }
   // 6C: greet the nearest townsperson with E. A short "speech" timer holds the
   // line in the prompt; the loop shows the "E — Talk to …" cue when in range.
@@ -2350,19 +2375,24 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // Third-person: a visible rigged character the follow-cam tracks. The
   // controller stands it at the player's feet facing the heading; the loop
   // crossfades its Idle/Walk clips by movement. Falls back to the procedural
-  // placeholder if the glTF fails to load.
+  // placeholder if the glTF fails to load. Golden-image capture skips the
+  // hero glTF await so boot + __spikeReady aren't blocked on network loads.
   let character;
   let playerModelLoaded = false;
-  try {
-    character = await createAnimatedCharacter(PLAYER_MODEL_URL);
-    playerModelLoaded = true;
-  } catch (err) {
-    console.warn("[render3d] hero character failed, trying base character", err);
+  if (visualCapture) {
+    character = createPlaceholderCharacter();
+  } else {
     try {
-      character = await createAnimatedCharacter("/models/character.glb");
-    } catch (fallbackErr) {
-      console.warn("[render3d] animated character failed, using placeholder", fallbackErr);
-      character = createPlaceholderCharacter();
+      character = await createAnimatedCharacter(PLAYER_MODEL_URL);
+      playerModelLoaded = true;
+    } catch (err) {
+      console.warn("[render3d] hero character failed, trying base character", err);
+      try {
+        character = await createAnimatedCharacter("/models/character.glb");
+      } catch (fallbackErr) {
+        console.warn("[render3d] animated character failed, using placeholder", fallbackErr);
+        character = createPlaceholderCharacter();
+      }
     }
   }
   character.group.scale.setScalar(playerModelLoaded ? 1.18 : 1.04);

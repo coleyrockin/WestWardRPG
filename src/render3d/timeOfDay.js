@@ -25,42 +25,49 @@ export const PALETTES = Object.freeze({
     // brightened the sky/ground COLORS (cool dusk sky bounce + warm ground bounce)
     // and lifted intensity to 0.66 so unlit faces read. Pairs with the camera-side
     // warm fill light in atmosphere.js.
-    hemi: { sky: "#7c8cae", ground: "#5e4836", intensity: 0.66 },
+    hemi: { sky: "#8c9cc0", ground: "#6a5848", intensity: 0.72 },
     rim: { color: "#8ea9d5", intensity: 0.8, dir: { x: 8, y: 4.8, z: 6 } },
     exposure: 1.0,
     stars: 0.18,
     bloom: 0.32,
-    // Cinematic golden-hour, balanced: warm amber key reads as the dominant source,
-    // lamps/windows bloom (threshold catches emissives but not the lit ground),
-    // gentle cool-shadow/warm-highlight split + soft vignette + faint god-rays.
-    // Tuned back from a too-hot first pass that crushed the frame to red-black.
     grade: {
-      tint: "#f3a85e", amount: 0.04, contrast: 1.12, saturation: 1.12,
-      shadowTint: "#2a3a56", highlightTint: "#f4bb72",
-      splitStrength: 0.1, godrayStrength: 0.16, vignetteStrength: 0.08, bloomThreshold: 0.86,
+      tint: "#f3a85e", amount: 0.04, contrast: 1.14, saturation: 1.14,
+      shadowTint: "#1a2848", highlightTint: "#f4bb72",
+      splitStrength: 0.28, godrayStrength: 0.16, vignetteStrength: 0.08, bloomThreshold: 0.86,
     },
     bodyBg: "#17131d",
   },
   goldenHour: {
     key: "goldenHour",
     label: "Golden Hour",
-    sky: { top: "#2a3a6b", mid: "#c4825a", horizon: "#ffd27a" },
-    fog: { color: "#bfae98", density: 0.006 },
-    sun: { color: "#ffe2b4", intensity: 3.1, dir: { x: -9, y: 8.5, z: -4 }, disc: 0.034, glow: 0.22 },
-    // Hemisphere is the SHADOW FILL — at 0.34 (ported from dusk) it crushed every
-    // shadow to black. Lifted hard so unlit faces stay readable in the demo.
-    hemi: { sky: "#aac4ec", ground: "#41475c", intensity: 1.1 },
-    rim: { color: "#6a8fff", intensity: 0.85, dir: { x: 9, y: 5, z: 6 } },
-    exposure: 1.4,
+    // Real vertical range: clear blue up high → dusty rose mid → gold at the
+    // horizon. The old pure-orange mid washed the whole sky one hue; the blue top
+    // now reads, so the frame has cool-vs-warm range instead of a sepia field.
+    sky: { top: "#3a5aa0", mid: "#c0917e", horizon: "#ffcf86" },
+    // Neutral dusty haze (was warm tan #bfae98, which tinted every distant building
+    // orange) — neutral, not cold-grey, so distance reads hazy not washed-out.
+    fog: { color: "#a8a29c", density: 0.007 },
+    // Key pulled back from 3.1 — at that strength ACES rolled every lit surface to
+    // orange-white. 2.5 still dominates as the warm source without nuking the frame.
+    sun: { color: "#ffdca6", intensity: 2.5, dir: { x: -9, y: 8.5, z: -4 }, disc: 0.034, glow: 0.2 },
+    // Hemisphere is the SHADOW FILL. Pushed cooler + brighter so unlit faces read
+    // BLUE (sky bounce) against the warm key — this is what breaks the monochrome.
+    hemi: { sky: "#9ec2f2", ground: "#454a60", intensity: 1.28 },
+    rim: { color: "#6a8fff", intensity: 1.05, dir: { x: 9, y: 5, z: 6 } },
+    // Camera-side fill: cool-neutral (was a static warm #ffd0a6) so the shadow-side
+    // faces crowding the near/left of frame read cool instead of crushed warm-red.
+    fill: { color: "#c6ccd8", intensity: 0.5 },
+    exposure: 1.27,
     stars: 0,
-    bloom: 0.55,
+    bloom: 0.44,
     // Cinematic grade: a strong cool-shadow / warm-highlight split so the golden key
     // reads as warm light against cool shadow rather than a single-hue orange wash.
-    // contrast + vignette eased from the dusk values so the brighter fill stays readable.
+    // Deeper/cooler shadow tint + harder split is the decisive anti-orange knob;
+    // saturation + warm finishing-tint eased so the orange stops screaming.
     grade: {
-      tint: "#ffb060", amount: 0.03, contrast: 1.1, saturation: 1.14,
-      shadowTint: "#1f3568", highlightTint: "#ffc880",
-      splitStrength: 0.34, godrayStrength: 0.16, vignetteStrength: 0.05, bloomThreshold: 0.86,
+      tint: "#ffb060", amount: 0.02, contrast: 1.15, saturation: 1.12,
+      shadowTint: "#15264f", highlightTint: "#ffc880",
+      splitStrength: 0.4, godrayStrength: 0.16, vignetteStrength: 0.06, bloomThreshold: 0.86,
     },
     bodyBg: "#2a1f2e",
   },
@@ -112,6 +119,10 @@ export function sunArc(dayTime01) {
 
 const lerp = (a, b, t) => a + (b - a) * t;
 
+// The camera-side fill light's constructed default (atmosphere.js). Palettes that
+// don't override `fill` blend against THIS, so they render exactly as before.
+const DEFAULT_FILL = Object.freeze({ color: "#ffd0a6", intensity: 0.55 });
+
 function hexToRgb(h) {
   const n = parseInt(String(h).slice(1), 16);
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
@@ -159,6 +170,15 @@ export function lerpPalette(p1, p2, t) {
       intensity: lerp(p1.rim.intensity, p2.rim.intensity, t),
       dir: lerpVec(p1.rim.dir, p2.rim.dir, t),
     },
+    // Camera-side fill. Palettes that omit `fill` fall back to DEFAULT_FILL, which
+    // is the EXACT static default the light is constructed with — so any palette
+    // without an explicit fill (dusk, night) renders bit-identically to before and
+    // the dusk golden-image baseline is unaffected. Only goldenHour overrides it.
+    fill: (() => {
+      const f1 = p1.fill ?? DEFAULT_FILL;
+      const f2 = p2.fill ?? DEFAULT_FILL;
+      return { color: lerpColor(f1.color, f2.color, t), intensity: lerp(f1.intensity, f2.intensity, t) };
+    })(),
     exposure: lerp(p1.exposure, p2.exposure, t),
     stars: lerp(p1.stars, p2.stars, t),
     bloom: lerp(p1.bloom, p2.bloom, t),

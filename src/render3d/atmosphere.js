@@ -195,6 +195,15 @@ export function createAtmosphere(scene, renderer, opts = {}) {
     rim.intensity = p.rim.intensity;
     rim.position.set(anchor.x + p.rim.dir.x, p.rim.dir.y, anchor.y + p.rim.dir.z);
 
+    // Camera-side fill is palette-driven (optional). When a palette omits `fill`
+    // the light keeps its constructed default, so dusk/night — and the dusk
+    // golden-image baseline — are untouched. goldenHour cools it so shadow-side
+    // (camera-facing) faces read cool-neutral instead of warm-red.
+    if (p.fill) {
+      fill.color.set(p.fill.color);
+      fill.intensity = p.fill.intensity;
+    }
+
     renderer.toneMappingExposure = p.exposure;
 
     // tint the cloud streaks toward the sky mid color (reuse scratch colours)

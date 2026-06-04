@@ -57,7 +57,7 @@ async function capture() {
     page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
     await page.goto(`${BASE}/spikes/render3d.html?visual=1`, { waitUntil: "load" });
-    const ready = await waitForPagePredicate(page, () => window.__spikeReady === true, "render3d ready signal", 45000)
+    const ready = await waitForPagePredicate(page, () => window.__spikeReady === true, "render3d ready signal", 120000)
       .then(() => true)
       .catch(() => false);
     if (!ready) throw new Error("render3d never signalled __spikeReady");

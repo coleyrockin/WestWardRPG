@@ -40,8 +40,8 @@ export const FIRST_FIVE_ROUTE = Object.freeze([
   { kind: "spawn", label: "Dustward Spawn", x: PLAYER_SPAWN.x, y: PLAYER_SPAWN.y },
   { kind: "jobBoard", label: "Boone's Job Board", x: 13.0, y: 5.65 },
   { kind: "roadSign", label: "Marshal Road Sign", x: 24.0, y: 6.3 },
-  { kind: "townBark", label: "Town Edge Warning", x: 31.5, y: 8.8 },
-  { kind: "smokeCache", label: "Smoke Cache", x: 40.5, y: 12.9 },
+  { kind: "townBark", label: "Town Edge Warning", x: 32.0, y: 9.2 },
+  { kind: "smokeCache", label: "Smoke Cache", x: 41.0, y: 13.2 },
   { kind: "slimeTell", label: "Slime Trail", x: 48.2, y: 16.4 },
   { kind: "roadSlime", label: "Road Slime", x: 53.5, y: 15.0 },
   { kind: "brokenWagon", label: "Broken Wagon", x: 60.5, y: 12.2 },
@@ -114,6 +114,8 @@ function routeRuts() {
 
 function routeNaturalClusters() {
   const clusters = [];
+  // Per-leg density: dense town opening, sparse frontier legs, marsh shoulder only.
+  const legDensity = [1.0, 0.85, 0.72, 0.62, 0.55, 0.58, 0.5, 0.48];
   for (let seg = 1; seg < OUTBOUND_ROUTE.length; seg++) {
     const from = OUTBOUND_ROUTE[seg - 1];
     const to = OUTBOUND_ROUTE[seg];
@@ -123,10 +125,13 @@ function routeNaturalClusters() {
     if (len < 0.1) continue;
     const nx = -dy / len;
     const ny = dx / len;
-    const count = Math.max(2, Math.floor(len / 4.4));
+    const density = legDensity[Math.min(seg - 1, legDensity.length - 1)] ?? 0.5;
+    const minPerSeg = seg <= 3 ? 2 : 1;
+    const count = Math.max(minPerSeg, Math.floor(len / 4.4 * density));
+    const oneSided = seg >= 4; // negative space: sparse legs dress one shoulder only
     for (let i = 0; i < count; i++) {
       const t = (i + 0.45 + hash01(seg * 37 + i) * 0.25) / count;
-      const sideSign = hash01(seg * 101 + i * 17) > 0.5 ? 1 : -1;
+      const sideSign = oneSided ? 1 : (hash01(seg * 101 + i * 17) > 0.5 ? 1 : -1);
       const shoulder = sideSign * (5.3 + hash01(seg * 59 + i * 23) * 2.6);
       const alongJitter = (hash01(seg * 71 + i * 29) - 0.5) * 0.7;
       const kind = i % 3 === 0 ? "sageCluster" : "roadGrass";
@@ -202,8 +207,8 @@ const LANDMARK = { kind: "landmark", label: "North Watchtower Beacon", dx: 5.16,
 const HERO_OBJECTS = [
   { kind: "jobBoard",    label: "Boone's Job Board", x: 13.0, y: 5.65, color: "#d8a84f", size: 1.0 },
   { kind: "roadSign",    label: "Marshal Road Sign", x: 24.0, y: 6.3,  color: "#ffd77b", size: 1.0 },
-  { kind: "townBark",    label: "Town Edge Warning", x: 31.5, y: 8.8,  color: "#ffe0a0", size: 0.8 },
-  { kind: "smokeCache",  label: "Smoke Cache",       x: 40.5, y: 12.9, color: "#caa15a", size: 0.9 },
+  { kind: "townBark",    label: "Town Edge Warning", x: 32.0, y: 9.2,  color: "#ffe0a0", size: 0.8 },
+  { kind: "smokeCache",  label: "Smoke Cache",       x: 41.0, y: 13.2, color: "#caa15a", size: 0.9 },
   { kind: "slimeTell",   label: "Slime Trail",       x: 48.2, y: 16.4, color: "#75d06b", size: 1.0 },
   { kind: "roadSlime",   label: "Road Slime",        x: 53.5, y: 15.0, color: "#7fd06a", size: 0.9 },
   { kind: "brokenWagon", label: "Broken Wagon",      x: 60.5, y: 12.2, color: "#b9824d", size: 1.2 },
@@ -223,9 +228,9 @@ const HERO_OBJECTS = [
 // buildings don't overlap (each saloon/store is ~2.8 units wide at scale 1.0-1.35,
 // so min 3.5 units clear between centres; larger buildings need 4+).
 const TOWN_EDGE = [
-  { kind: "heroTownSaloon", label: "Dustward Saloon",  x: -6.0, y: -0.25, color: "#7a5a36", size: 0.78 },
-  { kind: "heroTownStore", label: "Dry Goods Store",  x: 0.5,  y: -0.3, color: "#8a6a3e", size: 0.68 },
-  { kind: "heroTownAssay", label: "Assay Office", x: 6.2, y: -0.25, color: "#6a4a30", size: 0.6 },
+  { kind: "heroTownSaloon", label: "Dustward Saloon",  x: -6.0, y: -0.25, color: "#a87848", size: 0.92 },
+  { kind: "heroTownStore", label: "Dry Goods Store",  x: 0.5,  y: -0.3, color: "#9a7840", size: 0.78 },
+  { kind: "heroTownAssay", label: "Assay Office", x: 6.2, y: -0.25, color: "#886038", size: 0.68 },
   { kind: "porch",        label: "Saloon Porch",     x: -5.2, y: 1.75, color: "#5a4327", size: 0.62 },
   { kind: "porch",        label: "Store Porch",      x: 0.8,  y: 1.75, color: "#5a4327", size: 0.58 },
   { kind: "lamp",         label: "Saloon Lamp",      x: -1.9, y: 2.25, color: "#ffe0a0", size: 0.44, depthLane: "foreground" },
@@ -237,9 +242,9 @@ const TOWN_EDGE = [
 const PRODUCTION_MAIN_STREET = [
   // North boardwalk/storefront edge. Facades sit just outside the first-frame
   // blocker audit band while their windows/signs still read in the opening shot.
-  { kind: "productionSaloon", label: "Drifter Saloon", x: 6.4, y: 1.75, color: "#7a5230", size: 0.82, yaw: 0 },
-  { kind: "productionStore", label: "Lamp Dry Goods", x: 11.4, y: 1.55, color: "#9a7144", size: 0.78, yaw: 0 },
-  { kind: "productionAssay", label: "Boone Assay", x: 16.2, y: 1.62, color: "#6a4630", size: 0.72, yaw: 0 },
+  { kind: "productionSaloon", label: "Drifter Saloon", x: 6.4, y: 1.75, color: "#a87848", size: 0.88, yaw: 0 },
+  { kind: "productionStore", label: "Lamp Dry Goods", x: 11.4, y: 1.55, color: "#9a7840", size: 0.84, yaw: 0 },
+  { kind: "productionAssay", label: "Boone Assay", x: 16.2, y: 1.62, color: "#886038", size: 0.78, yaw: 0 },
   { kind: "productionBoardwalk", label: "North Boardwalk", x: 6.7, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
   { kind: "productionBoardwalk", label: "North Boardwalk", x: 10.1, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
   { kind: "productionBoardwalk", label: "North Boardwalk", x: 13.5, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
@@ -301,6 +306,16 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "dustSmokePlume", label: "Street Dust", x: 17.6, y: 7.35, color: "#b88551", size: 0.74, yaw: -0.3 },
   { kind: "dustSmokePlume", label: "Far Street Dust", x: 23.2, y: 8.25, color: "#b88551", size: 0.56, yaw: -0.18 },
   { kind: "bountyEmblem", label: "Boone Bounty Emblem", x: 13.0, y: 4.6, color: "#ffd77b", size: 0.75, yaw: Math.PI / 2 },
+];
+
+// Cross-street spur — north-south pocket off the main road so the town reads as
+// a place with depth, not a corridor. Low boardwalk + a storefront facing east.
+const CROSS_STREET = [
+  { kind: "productionBoardwalk", label: "Cross Street Plank", x: 15.0, y: 6.2, color: "#5d3f24", size: 0.72, yaw: Math.PI / 2 },
+  { kind: "productionBoardwalk", label: "Cross Street Plank", x: 15.0, y: 7.4, color: "#5d3f24", size: 0.72, yaw: Math.PI / 2 },
+  { kind: "productionStore", label: "Cross Street Mercantile", x: 14.2, y: 6.8, color: "#9a7840", size: 0.62, yaw: Math.PI / 2 },
+  { kind: "lampLow", label: "Cross Street Lamp", x: 15.6, y: 6.8, color: "#ffe6a8", size: 0.52 },
+  { kind: "brokenFence", label: "Cross Street Rail", x: 15.0, y: 5.5, color: "#8d6540", size: 0.55, yaw: Math.PI / 2 },
 ];
 
 // Set-back SECOND building rank behind the north storefront strip. The town used
@@ -441,8 +456,10 @@ const SOUTH_BACK_ROW = [
 // low cart lower-right. Deliberately off-centre so they frame without blocking the
 // road's leading line to the board. (If they read as clutter, delete this array.)
 const FOREGROUND_FRAME = [
-  { kind: "deadTree", label: "Spawn Frame Snag", x: 7.9, y: 5.4, color: "#3e3224", size: 1.15 },
-  { kind: "cart", label: "Spawn Frame Cart", x: 8.3, y: 11.7, color: "#a87542", size: 0.68, yaw: 0.6 },
+  { kind: "deadTree", label: "Spawn Frame Snag", x: 7.4, y: 5.1, color: "#3e3224", size: 1.35 },
+  { kind: "brokenFence", label: "Spawn Frame Rail", x: 7.6, y: 6.2, color: "#8d6540", size: 0.72, yaw: 0.35 },
+  { kind: "cart", label: "Spawn Frame Cart", x: 8.1, y: 12.1, color: "#a87542", size: 0.82, yaw: 0.55 },
+  { kind: "rock", label: "Spawn Frame Stone", x: 7.8, y: 11.2, color: "#5a5048", size: 0.65 },
 ];
 
 // Board plaza life — Boone's board (13, 5.65) is the opening focal point + first
@@ -453,13 +470,18 @@ const BOARD_PLAZA = [
   { kind: "npcSilhouette", label: "Bounty Reader", x: 12.3, y: 6.7, color: "#17100c", size: 0.74, yaw: -0.7 },
   { kind: "npcSilhouette", label: "Board Onlooker", x: 14.4, y: 6.8, color: "#120c09", size: 0.7, yaw: -2.3 },
   { kind: "barrelCrateCluster", label: "Board Supplies", x: 15.2, y: 5.0, color: "#7a5230", size: 0.66, yaw: 0.2 },
+  // Civic pocket — low fence rails enclose the plaza without slab blockers.
+  { kind: "brokenFence", label: "Plaza Rail North", x: 12.8, y: 5.2, color: "#8d6540", size: 0.58, yaw: 0.08 },
+  { kind: "brokenFence", label: "Plaza Rail East", x: 15.8, y: 6.2, color: "#8d6540", size: 0.55, yaw: 1.52 },
+  { kind: "hitchingRail", label: "Plaza Hitching Rail", x: 11.8, y: 5.5, color: "#4a3526", size: 0.68, yaw: 0.12 },
+  { kind: "lampLow", label: "Plaza Lantern", x: 13.6, y: 5.15, color: "#ffe6a8", size: 0.58 },
 ];
 
 // The walk-in saloon — one building you can physically enter (door faces south toward
 // the road at the town edge, x>21 so it's outside the production-count box). Geometry
 // + collision walls share SALOON_DIMS (spike.js buildWalkInSaloon / worldProxies).
 const WALKIN_SALOON = [
-  { kind: "walkInSaloon", label: "The Lucky Lantern Saloon", x: 24.0, y: 1.5, color: "#6b4a2c", size: 1 },
+  { kind: "walkInSaloon", label: "The Lucky Lantern Saloon", x: 22.5, y: 1.25, color: "#6b4a2c", size: 1.08 },
 ];
 
 // Landmark skyline — five distinctive procedural buildings set on the open north
@@ -468,42 +490,42 @@ const WALKIN_SALOON = [
 // a blacksmith chimney, and a prairie windmill. Each has a real collision footprint
 // (worldProxies). North of the first-frame wedge; none are slab-blocker kinds.
 const LANDMARK_BUILDINGS = [
-  { kind: "church",     label: "Dustward Chapel",     x: 16.0, y: -3.0, color: "#cdb89a", size: 1.0 },
-  { kind: "hotel",      label: "The Frontier Hotel",  x: 9.8,  y: -3.6, color: "#8a5a3a", size: 1.0 },
-  { kind: "waterTower", label: "Town Water Tower",    x: 25.0, y: -1.6, color: "#6e5236", size: 1.0 },
-  { kind: "blacksmith", label: "Dustward Forge",      x: 31.2, y: -2.5, color: "#463528", size: 1.0 },
-  { kind: "windmill",   label: "Prairie Windmill",    x: 39.0, y: 0.4,  color: "#7a5c3a", size: 1.05 },
+  { kind: "church",     label: "Dustward Chapel",     x: 13.5, y: -2.2, color: "#cdb89a", size: 1.15 },
+  { kind: "hotel",      label: "The Frontier Hotel",  x: 20.5, y: -2.8, color: "#8a5a3a", size: 1.12 },
+  { kind: "waterTower", label: "Town Water Tower",    x: 28.0, y: -1.2, color: "#6e5236", size: 1.2 },
+  { kind: "blacksmith", label: "Dustward Forge",      x: 34.0, y: -2.0, color: "#463528", size: 1.05 },
+  { kind: "windmill",   label: "Prairie Windmill",    x: 42.0, y: 0.2,  color: "#7a5c3a", size: 1.1 },
 ];
 
 // Soft world boundary — mesas/cliffs/boulders ring the playable rectangle. Mesa
 // footprints are square (3.2*size); spacing 5 with size ~1.8 (half-width 2.88)
 // overlaps by ~0.76, so there is no gap wide enough to slip through.
 const BOUNDARY_RING = [
-  // north wall (behind town), pushed back so it reads as horizon, not a first-frame slab
-  { kind: "heroMesaSkyline", label: "North Mesa", x: 1.0, y: -6.2, color: "#5a4636", size: 1.08 },
-  { kind: "heroMesaSkyline", label: "North Mesa", x: 9.5, y: -6.6, color: "#63503c", size: 1.18 },
-  { kind: "heroMesaSkyline", label: "North Mesa", x: 18.0, y: -6.4, color: "#5a4636", size: 1.14 },
-  { kind: "heroMesaSkyline", label: "North Cliff", x: 28.0, y: -6.3, color: "#544234", size: 1.18 },
-  { kind: "heroMesaSkyline", label: "North Mesa", x: 39.0, y: -6.3, color: "#63503c", size: 1.12 },
-  { kind: "mesaSkyline", label: "North Mesa", x: 42.0, y: -5.4, color: "#5a4636", size: 1.08 },
-  { kind: "mesaSkyline", label: "Northeast Mesa", x: 62.0, y: -5.3, color: "#5a4636", size: 1.12 },
-  // east wall (the eastern horizon backdrop), x ≈ 70
-  { kind: "mesa", label: "East Mesa", x: 70.0, y: 4.0, color: "#5e4a38", size: 2.0 },
-  { kind: "cliff", label: "East Cliff", x: 70.0, y: 10.5, color: "#564434", size: 2.1 },
-  { kind: "mesaSkyline", label: "East Mesa", x: 70.0, y: 17.5, color: "#5e4a38", size: 1.45 },
-  { kind: "mesa", label: "Southeast Mesa", x: 68.0, y: 26.5, color: "#5a4636", size: 1.9 },
+  // north wall — hero peak + saddle notch frames the vista; asymmetric heights
+  { kind: "heroMesaSkyline", label: "North Mesa West", x: 1.0, y: -6.2, color: "#4a5568", size: 0.95, heightMul: 0.85 },
+  { kind: "heroMesaSkyline", label: "North Saddle Low", x: 6.5, y: -6.0, color: "#525a6a", size: 0.72, heightMul: 0.55 },
+  { kind: "heroMesaSkyline", label: "North Hero Peak", x: 13.5, y: -6.8, color: "#5a6070", size: 1.35, heightMul: 1.45, heroPeak: true },
+  { kind: "heroMesaSkyline", label: "North Saddle Low", x: 20.0, y: -6.1, color: "#525a6a", size: 0.78, heightMul: 0.6 },
+  { kind: "heroMesaSkyline", label: "North Mesa East", x: 28.0, y: -6.3, color: "#4e5868", size: 1.05, heightMul: 0.95 },
+  { kind: "heroMesaSkyline", label: "North Mesa Far", x: 39.0, y: -6.3, color: "#485268", size: 1.0, heightMul: 0.9 },
+  { kind: "mesaSkyline", label: "Northeast Mesa", x: 52.0, y: -5.6, color: "#424c60", size: 0.95, heightMul: 0.82 },
+  { kind: "mesaSkyline", label: "Northeast Mesa Far", x: 62.0, y: -5.3, color: "#3c4658", size: 0.9, heightMul: 0.78 },
+  // east wall (the eastern horizon backdrop), x ≈ 70 — cool aerial fade
+  { kind: "mesa", label: "East Mesa", x: 70.0, y: 4.0, color: "#424c5c", size: 2.0, heightMul: 1.1 },
+  { kind: "cliff", label: "East Cliff", x: 70.0, y: 10.5, color: "#3c4654", size: 2.1, heightMul: 1.15 },
+  { kind: "mesaSkyline", label: "East Mesa", x: 70.0, y: 17.5, color: "#404858", size: 1.45, heightMul: 0.9 },
+  { kind: "mesa", label: "Southeast Mesa", x: 68.0, y: 26.5, color: "#3e4850", size: 1.9, heightMul: 0.95 },
   // south wall, y ≈ 27
-  { kind: "mesa", label: "South Mesa", x: 58.0, y: 27.0, color: "#544234", size: 1.9 },
-  { kind: "mesa", label: "South Mesa", x: 48.0, y: 27.3, color: "#5a4636", size: 1.8 },
-  { kind: "cliff", label: "South Cliff", x: 36.0, y: 27.0, color: "#564434", size: 2.0 },
-  { kind: "mesa", label: "South Mesa", x: 24.0, y: 26.8, color: "#63503c", size: 1.8 },
-  { kind: "mesa", label: "South Mesa", x: 12.0, y: 26.8, color: "#63503c", size: 1.8 },
-  { kind: "mesa", label: "Southwest Mesa", x: 3.0, y: 26.4, color: "#5a4636", size: 1.9 },
-  // west wall, pushed back from the spawn camera so it contains play without
-  // becoming an opaque first-frame foreground slab.
-  { kind: "mesa", label: "West Mesa", x: -8.0, y: 13.5, color: "#5e4a38", size: 1.9 },
-  { kind: "mesa", label: "West Mesa", x: -8.0, y: 8.5, color: "#5a4636", size: 1.9 },
-  { kind: "mesa", label: "West Mesa", x: -8.0, y: 3.5, color: "#63503c", size: 1.9 },
+  { kind: "mesa", label: "South Mesa", x: 58.0, y: 27.0, color: "#444c58", size: 1.9 },
+  { kind: "mesa", label: "South Mesa", x: 48.0, y: 27.3, color: "#464e5a", size: 1.8 },
+  { kind: "cliff", label: "South Cliff", x: 36.0, y: 27.0, color: "#424850", size: 2.0 },
+  { kind: "mesa", label: "South Mesa", x: 24.0, y: 26.8, color: "#4a5260", size: 1.8 },
+  { kind: "mesa", label: "South Mesa", x: 12.0, y: 26.8, color: "#4e5664", size: 1.8 },
+  { kind: "mesa", label: "Southwest Mesa", x: 3.0, y: 26.4, color: "#505868", size: 1.9 },
+  // west wall
+  { kind: "mesa", label: "West Mesa", x: -8.0, y: 13.5, color: "#4e5664", size: 1.9 },
+  { kind: "mesa", label: "West Mesa", x: -8.0, y: 8.5, color: "#525a68", size: 1.9 },
+  { kind: "mesa", label: "West Mesa", x: -8.0, y: 3.5, color: "#565e6c", size: 1.9 },
 ];
 
 // Depth lanes spread along the offset direction so background vistas read as
@@ -521,6 +543,7 @@ function world(anchor, dx, dy, depthLane) {
 const ABSOLUTE_ZONES = [
   ...TOWN_EDGE,
   ...PRODUCTION_MAIN_STREET,
+  ...CROSS_STREET,
   ...BACK_ROW,
   ...ROAD_CORRIDOR,
   ...ROUTE_LIGHTS,

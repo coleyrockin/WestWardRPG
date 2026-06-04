@@ -133,7 +133,7 @@ export function createGroundMaterial(opts = {}) {
   // More scrub variation + a fine grain break so the ground reads as worn earth, not a flat wash.
   const tinted = mix(base, v3(scrub), big.mul(fine).mul(0.82)).mul(mix(float(0.94), float(1.06), fine));
   const fbmC = tslFbm(pc);
-  mat.colorNode = tinted.mul(mix(float(0.62), float(1.24), fbmC)); // valley shade → crest light (floor 0.62 keeps the near-field readable; brighter crest adds dimension)
+  mat.colorNode = tinted.mul(mix(float(0.68), float(1.24), fbmC)); // valley shade → crest light (floor lifted 0.62→0.68 so the near-field foreground reads as cool dirt, not crushed red murk; brighter crest adds dimension)
 
   // Relief: displace local +z (plane is rotated flat → local +z is world up).
   // Height input uses positionLocal mapped to world XZ to avoid positionWorld
