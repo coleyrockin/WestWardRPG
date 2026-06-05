@@ -238,6 +238,7 @@ export function createAtmosphere(scene, renderer, opts = {}) {
     sun,
     rim,
     hemi,
+    fill,
     clouds,
   };
 }

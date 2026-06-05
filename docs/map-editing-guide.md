@@ -131,6 +131,31 @@ auto-signboard; for `.glb` models the model's own colours win (per-instance tint
 
 - HMR is broken in this setup → always hard-reload.
 - The dev teleport hook `window.__spike` lives in `spike.js` (spike route only; harmless in prod).
+  It also carries a **live visual tuning harness** — no reload needed:
+
+  ```js
+  // Tune palette values (deep-merges into the active palette, applies instantly)
+  __spike.setPalette({ grade: { shadowTint: '#0d1f3c', splitStrength: 0.48 } })
+  __spike.setPalette({ bloom: 0.5 })
+
+  // Tune individual lights
+  __spike.setLight('sun',  { intensity: 2.5, color: '#ffb060' })
+  __spike.setLight('hemi', { sky: '#9fb4d8', ground: '#41475c', intensity: 1.1 })
+  __spike.setLight('fill', { intensity: 0.4, color: '#d0e8ff' })
+
+  // Adjust the follow camera (lerps smoothly)
+  __spike.setCamera({ distance: 9.5, height: 5.0, lookHeight: 1.5 })
+
+  // Print all current values as JSON — copy-paste into timeOfDay.js to persist
+  __spike.dumpLook()
+
+  // Freeze push-in + clock + weather for deterministic screenshots
+  __spike.captureMode()
+  await __spike.settle(200)   // wait for renderer to settle, then screenshot
+  ```
+
+  **Workflow:** tune → `dumpLook()` → paste values into `timeOfDay.js` / `playerController.js` →
+  hard-reload to verify. `captureMode()` + `settle()` before any screenshot tool call.
 - The opening was carefully tuned (lighting, scale, framing) — don't regress it; verify the spawn
   shot after map edits.
 - Lighting/grade live in `src/render3d/timeOfDay.js` (goldenHour palette) — out of scope for *map*

@@ -2349,7 +2349,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // One call per frame: advance the world (or hold it all still under ?visual).
   let waterTime = 0;
   const stepWorld = (dt) => {
-    const fdt = visualCapture ? 0 : dt;
+    const frozen = visualCapture || _devCaptureFrozen;
+    const fdt = frozen ? 0 : dt;
     tickClock(clock, fdt);
     applyDayTime();
     atmosphere.driftClouds(fdt, 1 + weather.wind * 2);
@@ -2357,7 +2358,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     water.uniforms.time.value = waterTime;
     water.uniforms.skyTint.value.set(appliedPalette.sky.horizon);
     const { flash } = weatherSys.update(weather, fdt, {
-      frozen: visualCapture,
+      frozen,
       cx: camera.position.x,
       cz: camera.position.z,
     });
@@ -2428,8 +2429,26 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // Dev inspection hook (spike route only): teleport the player/camera to any world
   // point or named route waypoint so the whole loop can be reviewed without driving.
   // Harmless in prod (the spike is a dev route); no effect unless called.
+
+  // Live-tuning harness state. _devCaptureFrozen freezes the world clock + weather
+  // without touching visualCapture (which also pins the palette to dusk + hero cam).
+  let _devCaptureFrozen = false;
+
+  // Shallow-recursing object merge for palette overrides — used by __spike.setPalette.
+  const _deepMerge = (target, source) => {
+    const out = { ...target };
+    for (const k of Object.keys(source ?? {})) {
+      out[k] =
+        source[k] !== null && typeof source[k] === "object" && !Array.isArray(source[k])
+          ? _deepMerge(target[k] ?? {}, source[k])
+          : source[k];
+    }
+    return out;
+  };
+
   if (typeof window !== "undefined") {
     window.__spike = {
+      // --- Navigation (existing) ---
       setPos: (x, y) => { player.setPosition({ x, z: y }); return player.position; },
       pos: () => player.position,
       goto: (kind) => {
@@ -2438,6 +2457,87 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         return wp || null;
       },
       waypoints: () => FIRST_FIVE_ROUTE.map((p) => p.kind),
+
+      // --- Live visual tuning — apply instantly, no reload ---
+
+      // Deep-merge palette overrides into the active palette and reapply.
+      // Example: __spike.setPalette({ grade: { shadowTint: '#0d1f3c', splitStrength: 0.48 } })
+      // Example: __spike.setPalette({ bloom: 0.5 })
+      setPalette(overrides) {
+        const merged = _deepMerge(appliedPalette, overrides);
+        appliedPalette = merged;
+        atmosphere.applyPalette(merged);
+        applyPostPalette(merged);
+        console.log("[__spike] palette applied", JSON.stringify(merged, null, 2));
+      },
+
+      // Tune individual lights directly.
+      // __spike.setLight('sun',  { intensity: 2.5, color: '#ffb060' })
+      // __spike.setLight('hemi', { sky: '#9fb4d8', ground: '#41475c', intensity: 1.1 })
+      // __spike.setLight('fill', { intensity: 0.4, color: '#d0e8ff' })
+      // __spike.setLight('rim',  { intensity: 0.6, color: '#b0c8ff' })
+      setLight(which, params) {
+        const map = {
+          sun:  atmosphere.sun,
+          hemi: atmosphere.hemi,
+          fill: atmosphere.fill,
+          rim:  atmosphere.rim,
+        };
+        const light = map[which];
+        if (!light) {
+          console.warn("[__spike] unknown light:", which, "— valid:", Object.keys(map).join(", "));
+          return;
+        }
+        if (params.intensity !== undefined) light.intensity = params.intensity;
+        if (params.color)    light.color.set(params.color);
+        if (which === "hemi") {
+          if (params.sky)    light.color.set(params.sky);
+          if (params.ground) light.groundColor.set(params.ground);
+        }
+        console.log("[__spike] light updated", which, params);
+      },
+
+      // Adjust the follow camera (settles smoothly via the existing lerp).
+      // __spike.setCamera({ distance: 9.5, height: 5.0, lookHeight: 1.5 })
+      setCamera(params) {
+        player.setCameraPreset("exploration", params);
+        console.log("[__spike] camera preset updated", params);
+      },
+
+      // Print all current visual params as JSON — copy-paste into timeOfDay.js to persist.
+      dumpLook() {
+        const p = appliedPalette;
+        const out = JSON.stringify(
+          {
+            grade:    p?.grade,
+            bloom:    p?.bloom,
+            exposure: p?.exposure,
+            hemi:     p?.hemi,
+            sun: { color: p?.sun?.color, intensity: p?.sun?.intensity, dir: p?.sun?.dir },
+            fog:      p?.fog,
+          },
+          null,
+          2,
+        );
+        console.log("[__spike] dumpLook:\n" + out);
+        return out;
+      },
+
+      // Freeze the spawn push-in + world clock + weather for deterministic screenshots.
+      // Undo: hard-reload via  location.href = location.href + '?n=' + Date.now()
+      captureMode() {
+        _devCaptureFrozen = true;
+        camIntroSettled = true;          // skip the establishing push-in immediately
+        console.log(
+          "[__spike] captureMode ON — push-in frozen, clock paused, weather frozen. Hard-reload to restore.",
+        );
+      },
+
+      // Resolves after `ms` ms — wait for the renderer to settle before screenshotting.
+      // Usage (async context): await __spike.settle(200)
+      settle(ms = 200) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      },
     };
   }
   // Ironman resume: restore saved player position + heading (best-effort).
