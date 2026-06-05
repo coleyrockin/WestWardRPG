@@ -66,8 +66,8 @@ export const PALETTES = Object.freeze({
     // saturation + warm finishing-tint eased so the orange stops screaming.
     grade: {
       tint: "#ffb060", amount: 0.02, contrast: 1.15, saturation: 1.12,
-      shadowTint: "#15264f", highlightTint: "#ffc880",
-      splitStrength: 0.4, godrayStrength: 0.16, vignetteStrength: 0.06, bloomThreshold: 0.86,
+      shadowTint: "#0f1f48", highlightTint: "#ffc880",  // deeper cool blue shadows (was #15264f)
+      splitStrength: 0.48, godrayStrength: 0.16, vignetteStrength: 0.06, bloomThreshold: 0.86,
     },
     bodyBg: "#2a1f2e",
   },

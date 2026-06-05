@@ -2227,6 +2227,21 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     await Promise.all(modelJobs);
     scene.add(props);
   }
+
+  // Collect scene PointLights for per-lamp flicker. Each entry stores the light,
+  // its nominal (base) intensity, and a position-derived phase seed so adjacent
+  // lamps never pulse in unison. Very-bright arc lights (sun-disc, slime glow) are
+  // excluded by the intensity ceiling; the golden-image capture skips this entirely
+  // so the ?visual baseline stays deterministic.
+  const lampFlickers = [];
+  if (!visualCapture) {
+    scene.traverse((obj) => {
+      if (!obj.isPointLight || obj.intensity > 12) return;
+      const seed = (obj.position.x * 7.31 + obj.position.z * 13.73) % (Math.PI * 2);
+      lampFlickers.push({ light: obj, base: obj.intensity, seed });
+    });
+  }
+
   const objectiveGuidance = createObjectiveGuidance(snapshot);
   scene.add(objectiveGuidance.group);
   const pearlRoadCue = createPearlRoadCue(snapshot);
@@ -2356,6 +2371,13 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     atmosphere.driftClouds(fdt, 1 + weather.wind * 2);
     waterTime += fdt;
     water.uniforms.time.value = waterTime;
+    // Lamp flicker — gentle per-lamp intensity pulse; seeds keep adjacent lamps
+    // out of phase. Skipped when frozen (captureMode / visualCapture sets fdt=0).
+    if (fdt > 0 && lampFlickers.length) {
+      for (const lf of lampFlickers) {
+        lf.light.intensity = lf.base * (0.92 + 0.08 * Math.sin(waterTime * 3.2 + lf.seed));
+      }
+    }
     water.uniforms.skyTint.value.set(appliedPalette.sky.horizon);
     const { flash } = weatherSys.update(weather, fdt, {
       frozen,

@@ -223,7 +223,7 @@ export function createAtmosphere(scene, renderer, opts = {}) {
   function driftClouds(dt, windScale = 1) {
     if (!dt) return;
     for (const m of clouds.meshes) {
-      m.position.x += dt * 0.5 * windScale;
+      m.position.x += dt * 0.65 * windScale; // livelier drift (was 0.5)
       if (m.position.x > anchor.x + 55) m.position.x -= 110;
     }
   }

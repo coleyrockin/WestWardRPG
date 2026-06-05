@@ -32,12 +32,14 @@ const col = (hex) => new THREE.Color(hex);
 // bands (deep shadow → mid → lit). Built lazily so module import stays side-
 // effect-free for node tests.
 //
-// Floor lifted from [55,100,255] to [100,160,255]: the old 55 (≈21%) shadow band,
-// multiplied by the already-dark building/ground albedos (~0.2–0.4), crushed
-// shadowed faces to near-black — the murk no hemi fill could beat. 100/160 keeps
-// three clearly-separated painted bands while letting unlit faces read as surfaces.
+// Shadow step tuning history:
+//   [55,100,255] → 55 (≈21%) shadow band × dark albedos crushed faces to near-black (murk).
+//   [100,160,255] → safe floor; bands separated but shadows felt light / low drama.
+//   [85,145,255] → current: deeper shadow band (≈33%) for more graphic-novel contrast
+//                  while staying above the murk threshold. Mid step 145 tightens the
+//                  lit→shadow transition for a harder inked-panel feel.
 let gradientMap = null;
-export function celGradientMap(steps = [100, 160, 255]) {
+export function celGradientMap(steps = [85, 145, 255]) {
   if (gradientMap) return gradientMap;
   const data = Uint8Array.from(steps);
   const tex = new THREE.DataTexture(data, data.length, 1, THREE.RedFormat);
@@ -84,8 +86,9 @@ export function createNprMaterial(hex, opts = {}) {
     opacity = 1.0,
     flatShading = true,
     rimColor = "#9fb4ff",
-    rimPower = 3.5,
-    rimStrength = 0.9,
+    rimPower = 2.8,     // wider silhouette coverage (was 3.5 — too tight, missed wide-angle edges)
+    rimStrength = 1.0,  // slightly stronger punch (was 0.9)
+
     map = null,
   } = opts;
 

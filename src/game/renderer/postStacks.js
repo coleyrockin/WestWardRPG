@@ -25,10 +25,10 @@ import { godrays } from "three/addons/tsl/display/GodraysNode.js";
 export const REGION_POST = {
   frontier: {
     inkColor: "#0a0408",
-    edgeStrength: 2.65, // readable comic linework without heavy prototype outlines
+    edgeStrength: 2.9,  // crisper comic linework (was 2.65)
     // Sobel response below `edgeLo` is ignored (kills faint ground gradients) and
     // ramps to full ink by `edgeHi`.
-    edgeLo: 0.045,
+    edgeLo: 0.04,       // capture slightly more geometry edges (was 0.045)
     edgeHi: 0.28,
     bloomBase: 0.11, // multiplied by palette.bloom
     bloomRadius: 0.7, // wider painterly glow
