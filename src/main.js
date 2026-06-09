@@ -100,7 +100,6 @@ import { getUnlockedCapstonePerkIds } from "./progressionSystem.js";
 import { generateSideJobs } from "./sideJobGenerator.js";
 import { createCombatSubtitleState, recordCombatEvent, tickCombatSubtitles, drawCombatSubtitles, playCombatAudioCue } from "./combatAccessibility.js";
 import { createInputManager } from "./inputManager.js";
-import { createSaveStateManager } from "./saveStateManager.js";
 import { canAttack, canDodge, resolveNextComboStep, resolveStaminaRegenRate, isInSwingArc, resolveEnemyStagger, BASE_COMBOS, DODGE_STAMINA_COST, DODGE_COOLDOWN, resolveDodgeCooldown } from "./combatProcessor.js";
 import { tickExpiringMessages, tickFloatingTexts, tickPlayerCooldowns, resolveRespawnDelay } from "./loopTick.js";
 import { resolveDiscoveryRewardFeedback } from "./discoveryRewardFeedback.js";
@@ -809,10 +808,7 @@ const canvas = document.getElementById("game");
   const deathMessages = DEATH_MESSAGES;
 
   /* ─── Shop System ─── */
-  let regionEventsEnabled = true;
-
   function getActiveRegionEventModifiers() {
-    if (!regionEventsEnabled) return { priceMult: 1, spawnDensityMult: 1, banner: null };
     return resolveRegionEventModifiers(state.regions?.events);
   }
 
@@ -10233,14 +10229,9 @@ const canvas = document.getElementById("game");
     if (hudNotice) {
       msgY += drawHudNotice(topX + 10, msgY - 2, topW - 20);
     }
-    const shown = [];
     ctx.font = "11px Georgia";
-    if (shown.length === 0 && topH > 80) {
+    if (topH > 80) {
       drawClippedText(t("labels.explore"), topX + 10, msgY, topW - 20, "#f3e8cf");
-    }
-    for (const m of shown) {
-      drawClippedText(m.text, topX + 10, msgY, topW - 20, "#f3e8cf");
-      msgY += 12;
     }
     const liveObjective = objectiveSnapshot.liveObjective;
     const firstSessionNextStep = objectiveSnapshot.firstSessionNextStep;
@@ -10435,7 +10426,6 @@ const canvas = document.getElementById("game");
   let activeReplaySession = null;
   const minimapTileCache = createMinimapCache();
   const combatSubtitles = createCombatSubtitleState();
-  const saveManager = createSaveStateManager({ interval: 90 });
 
   function render() {
     render3D();
