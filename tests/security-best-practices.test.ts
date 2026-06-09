@@ -17,6 +17,8 @@ describe("security best practices", () => {
     expect(configSource).toContain("Referrer-Policy");
     expect(configSource).toContain("Permissions-Policy");
     expect(configSource).toContain("object-src 'none'");
+    // script-src must stay strict — the game uses ES modules, never inline scripts.
+    expect(configSource).not.toContain("script-src 'self' 'unsafe-inline'");
     expect(configSource).toContain("https://fonts.googleapis.com");
     expect(configSource).toContain("https://fonts.gstatic.com");
     expect(configSource).not.toContain("X-XSS-Protection");
@@ -28,6 +30,7 @@ describe("security best practices", () => {
     const byKey = Object.fromEntries(headers.map((entry) => [entry.key, entry.value]));
 
     expect(byKey["Content-Security-Policy"]).toContain("default-src 'self'");
+    expect(byKey["Content-Security-Policy"]).not.toContain("script-src 'self' 'unsafe-inline'");
     expect(byKey["Content-Security-Policy"]).toContain("https://fonts.googleapis.com");
     expect(byKey["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
     expect(byKey["Permissions-Policy"]).toContain("camera=()");
