@@ -48,6 +48,7 @@ import { stagger } from "./animationHelpers.js";
 import { createPlayerCombat, hitboxHitsTarget } from "./combat/playerCombat.js";
 import { createSlimeState, stepSlime } from "./combat/slimeBehavior.js";
 import { createHitStop, createCameraShake, createBurstPool } from "./combat/hitFx.js";
+import { createAudioView } from "./audioView.js";
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
@@ -2395,6 +2396,50 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (e.code === "KeyG") cycleWeather();
   });
 
+  // Procedural audio layer (roadmap T2b). Never constructed under ?visual —
+  // the golden-image capture must stay byte-deterministic and gesture-free.
+  // unlock() must run inside a user gesture (autoplay policy); the first
+  // pointer/key interaction arms it, and unlocking plays the spawn sting.
+  const audioView = visualCapture ? null : createAudioView();
+  if (audioView) {
+    const unlockAudio = () => {
+      audioView.unlock();
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+    window.addEventListener("pointerdown", unlockAudio);
+    window.addEventListener("keydown", unlockAudio);
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "KeyM") audioView.setMuted(!audioView.muted);
+    });
+  }
+
+  // Title screen: Ride dismisses it, which unlocks audio (the click is the
+  // gesture — the harmonica sting lands right on the reveal), grabs pointer
+  // lock, and releases the establishing push-in (held while titleOpen).
+  const titleScreen = document.getElementById("title-screen");
+  let titleOpen = false;
+  if (titleScreen) {
+    if (visualCapture) {
+      titleScreen.remove(); // golden baseline must never see the overlay
+    } else {
+      titleOpen = true;
+      const startButton = titleScreen.querySelector("#title-start");
+      startButton?.addEventListener("click", () => {
+        titleOpen = false;
+        titleScreen.classList.add("dismissed");
+        setTimeout(() => titleScreen.remove(), 1000); // matches the CSS fade
+        const canvasEl = document.getElementById("scene");
+        if (canvasEl?.requestPointerLock) {
+          try {
+            const req = canvasEl.requestPointerLock();
+            if (req && typeof req.catch === "function") req.catch(() => {});
+          } catch { /* pointer lock denied — drag-look fallback still works */ }
+        }
+      });
+    }
+  }
+
   // Third-person: a visible rigged character the follow-cam tracks. The
   // controller stands it at the player's feet facing the heading; the loop
   // crossfades its Idle/Walk clips by movement. Falls back to the procedural
@@ -2608,6 +2653,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   };
 
   const advance = (event) => {
+    audioView?.onLoopEvent(event); // beat sfx ride the same transition funnel
     const state = loopState.transition(event);
     publishLoopDebug(state);
     syncObjectiveDom(objectiveRefs, snapshot, state);
@@ -2688,13 +2734,18 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   }
 
   // Telegraph tell: bulge the slime's footprint as it winds up the lunge.
-  function applySlimeTelegraph(mesh, mode, telegraphT) {
+  function applySlimeTelegraph(mesh, mode, telegraphT, t = 0) {
     if (!mesh?.scale) return;
     if (mesh.userData.slimeBaseXZ == null) mesh.userData.slimeBaseXZ = mesh.scale.x;
+    if (mesh.userData.slimeBaseY == null) mesh.userData.slimeBaseY = mesh.scale.y;
     const base = mesh.userData.slimeBaseXZ || 1;
-    const k = mode === "telegraph" ? 1 + telegraphT * 0.35 : 1;
+    // Gooey breathing while it isn't winding up: spread on XZ with a counter-
+    // squash on Y so the volume reads constant (roadmap first-10-minutes polish).
+    const breath = mode === "telegraph" ? 0 : Math.sin(t * 2.6) * 0.05;
+    const k = (mode === "telegraph" ? 1 + telegraphT * 0.35 : 1) + breath;
     mesh.scale.x = base * k;
     mesh.scale.z = base * k;
+    mesh.scale.y = (mesh.userData.slimeBaseY || 1) * (1 - breath * 0.8);
   }
 
   function applyCameraShakeOffset(off) {
@@ -3213,6 +3264,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
 
   let frames = 0;
   let prevTs = performance.now();
+  let wasDodging = false; // rising-edge detector for the dodge whoosh
   let fieldMapLiveSyncT = 0;
   // Establishing push-in: for the first CAM_INTRO_DUR seconds at spawn the camera
   // eases from a wide/high vantage into the gameplay framing. Gated to spawn (no
@@ -3230,7 +3282,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     const rawDt = Math.min((now - prevTs) / 1000, 0.05);
     prevTs = now;
     const dt = visualCapture ? rawDt : rawDt * hitStop.scale(rawDt);
-    if (!camIntroSettled && !visualCapture && beatFocusTimer === 0 && !boardModalController.isOpen()) {
+    if (!camIntroSettled && !visualCapture && !titleOpen && beatFocusTimer === 0 && !boardModalController.isOpen()) {
       if (camIntroStart === null) camIntroStart = now; // first eligible frame
       const elapsed = (now - camIntroStart) / 1000;
       const k = Math.pow(1 - Math.min(1, elapsed / CAM_INTRO_DUR), 2); // ease-out
@@ -3268,10 +3320,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       slimeAI = stepSlime(slimeAI, { x: player.position.x, z: player.position.z }, dt);
       heroMeshes.roadSlime.position.x = slimeAI.pos.x;
       heroMeshes.roadSlime.position.z = slimeAI.pos.z;
-      applySlimeTelegraph(heroMeshes.roadSlime, slimeAI.mode, slimeAI.telegraphT);
+      applySlimeTelegraph(heroMeshes.roadSlime, slimeAI.mode, slimeAI.telegraphT, now / 1000);
       if (slimeAI.contact) {
         encounter.applyLungeContact();
         camShake.add(0.6);
+        audioView?.play("playerHurt");
       }
     }
     if (!visualCapture) {
@@ -3283,6 +3336,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         const sp = heroMeshes.roadSlime.position;
         if (hitboxHitsTarget(player.position, player.yaw, { x: sp.x, z: sp.z }) && playerCombat.tryRegisterHit()) {
           const res = encounter.registerHit();
+          if (!res.defeated) audioView?.play("splat"); // defeat's bigSplat rides advance("defeat_slime")
           hitStop.punch(res.defeated ? 0.12 : 0.06, res.defeated ? 0.02 : 0.05);
           camShake.add(res.defeated ? 0.9 : 0.5);
           burst.burst({ x: sp.x, y: 0.7, z: sp.z }, res.defeated ? 22 : 12, "#6be873", res.defeated ? 5 : 3);
@@ -3318,6 +3372,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     } else {
       const who = townsfolk.getInteractable();
       if (who && loopState.phase !== "spawn" && !currentPromptText) setPromptText(`E — Talk to ${who.name}`);
+    }
+    if (audioView) {
+      if (player.isDodging && !wasDodging) audioView.play("whoosh");
+      wasDodging = player.isDodging;
+      audioView.update(dt, {
+        moving: player.moving && !boardModalController.isOpen(),
+        running: player.running,
+        paletteKey: dayTimeToKey(clock.dayTime),
+      });
     }
     if (!visualCapture) {
       burst.update(dt);

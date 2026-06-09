@@ -708,6 +708,88 @@
         font: inherit;
         font-size: 16px;
       }
+
+      /* Title screen — the demo's first frame. Dismissed by spike.js on Ride;
+         removed instantly under ?visual so the golden baseline never sees it. */
+      #title-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 70;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+        color: var(--hud-text);
+        background:
+          radial-gradient(ellipse at 50% 62%, rgba(210, 114, 56, 0.16), transparent 58%),
+          radial-gradient(ellipse at 50% 50%, rgba(8, 6, 14, 0.55), rgba(5, 3, 10, 0.94) 78%);
+        backdrop-filter: blur(2px);
+        opacity: 1;
+        transition: opacity 0.9s ease;
+      }
+      #title-screen.dismissed { opacity: 0; pointer-events: none; }
+      #title-screen .title-kicker {
+        display: block;
+        margin-bottom: 14px;
+        font-size: 13px;
+        letter-spacing: 5px;
+        text-transform: uppercase;
+        color: var(--hud-dim);
+      }
+      #title-screen h1 {
+        margin: 0;
+        font-size: clamp(54px, 11vw, 118px);
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        line-height: 1;
+        color: var(--hud-gold);
+        text-shadow:
+          0 0 38px rgba(255, 184, 90, 0.32),
+          0 3px 0 rgba(60, 24, 8, 0.85),
+          0 7px 24px rgba(0, 0, 0, 0.8);
+      }
+      #title-screen .title-rule {
+        display: block;
+        width: 220px;
+        height: 1px;
+        margin: 20px auto 14px;
+        background: linear-gradient(90deg, transparent, var(--hud-line) 18%, var(--hud-gold) 50%, var(--hud-line) 82%, transparent);
+      }
+      #title-screen .title-line {
+        margin: 0 0 30px;
+        font-style: italic;
+        letter-spacing: 1.6px;
+        color: #e7c9a6;
+      }
+      #title-start {
+        cursor: pointer;
+        font: inherit;
+        font-size: 19px;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        padding: 14px 52px;
+        color: var(--hud-text);
+        background: linear-gradient(180deg, rgba(150, 74, 32, 0.92), rgba(96, 42, 18, 0.92));
+        border: 1px solid rgba(255, 198, 110, 0.55);
+        border-radius: 6px;
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35), 0 12px 34px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 230, 180, 0.18);
+        transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+      }
+      #title-start:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.12);
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 26px rgba(255, 184, 90, 0.25);
+      }
+      #title-screen .title-controls {
+        margin: 26px 0 0;
+        font-size: 13px;
+        letter-spacing: 1.4px;
+        color: var(--hud-dim);
+      }
+      #title-screen .title-controls b {
+        color: var(--hud-gold);
+        font-weight: 600;
+      }
     </style>
   </head>
   <body>
@@ -812,6 +894,16 @@
         <p class="run-summary-cause"></p>
         <ul class="run-summary-stats"></ul>
         <button class="run-summary-newrun" type="button">Begin a New Run</button>
+      </div>
+    </div>
+    <div id="title-screen" aria-label="WestWard title screen">
+      <div>
+        <span class="title-kicker">A story-first frontier road</span>
+        <h1>WESTWARD</h1>
+        <span class="title-rule" aria-hidden="true"></span>
+        <p class="title-line">Dustward &middot; The First Road</p>
+        <button id="title-start" type="button">Ride</button>
+        <p class="title-controls"><b>WASD</b> move &middot; <b>Shift</b> run &middot; <b>Space</b> dodge &middot; <b>E</b> use &middot; <b>F</b> draw &middot; <b>M</b> mute</p>
       </div>
     </div>
     <script type="module" src="/src/render3d/spike.js"></script>
