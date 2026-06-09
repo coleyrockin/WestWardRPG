@@ -23,6 +23,11 @@ export function gradientBucket(value, bucketCount = 12) {
 
 // Caches CanvasGradient instances. The cache is opaque to the caller —
 // they pass a builder fn and a key; caching is opt-in per call.
+// Bound the cache so dynamic, position-keyed gradients can't grow it without
+// limit across a long session. FIFO eviction (Map preserves insertion order);
+// an evicted key is simply rebuilt on its next miss — no visual change.
+const MAX_GRADIENT_CACHE = 256;
+
 export function createGradientCache() {
   const store = new Map();
   return {
@@ -35,6 +40,7 @@ export function createGradientCache() {
       if (cached) return cached;
       const created = buildFn();
       store.set(key, created);
+      if (store.size > MAX_GRADIENT_CACHE) store.delete(store.keys().next().value);
       return created;
     },
   };

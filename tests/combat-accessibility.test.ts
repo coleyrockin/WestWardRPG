@@ -30,6 +30,12 @@ describe("combatAccessibility — recordCombatEvent", () => {
     recordCombatEvent(state, "hit");
     expect(state.queue).toHaveLength(0);
   });
+
+  it("caps the backlog so a long fight can't grow the queue unbounded", () => {
+    const state = createCombatSubtitleState();
+    for (let i = 0; i < 30; i++) recordCombatEvent(state, "hit");
+    expect(state.queue).toHaveLength(12);
+  });
 });
 
 describe("combatAccessibility — tickCombatSubtitles", () => {

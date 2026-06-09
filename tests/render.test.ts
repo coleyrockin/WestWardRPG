@@ -75,6 +75,12 @@ describe("render — createGradientCache", () => {
     cache.clear();
     expect(cache.size).toBe(0);
   });
+
+  it("evicts oldest entries past the cap so memory stays bounded", () => {
+    const cache = createGradientCache();
+    for (let i = 0; i < 400; i++) cache.fetch("k" + i, () => ({ i }), true);
+    expect(cache.size).toBe(256);
+  });
 });
 
 describe("render — resolveWallProjection", () => {

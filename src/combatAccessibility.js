@@ -26,10 +26,17 @@ export function createCombatSubtitleState() {
   return { queue: [], ttl: 0, current: null };
 }
 
+// Subtitles are consumed one-at-a-time over their display duration, but events
+// can be recorded every frame during intense combat. Bound the backlog so a long
+// fight can't accumulate an unbounded queue that replays stale events afterward.
+const MAX_SUBTITLE_QUEUE = 12;
+
 export function recordCombatEvent(subtitleState, type) {
   if (!subtitleState || !COMBAT_EVENTS[type]) return;
   // Dedupe: don't re-queue the same event if it's already current
   if (subtitleState.current?.type === type && subtitleState.current.life > 0.3) return;
+  // Drop the oldest pending event when the backlog is full (keep recent events).
+  if (subtitleState.queue.length >= MAX_SUBTITLE_QUEUE) subtitleState.queue.shift();
   subtitleState.queue.push({ type, ...COMBAT_EVENTS[type], life: COMBAT_EVENTS[type].duration });
 }
 
