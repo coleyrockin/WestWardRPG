@@ -168,6 +168,21 @@ export function createAtmosphere(scene, renderer, opts = {}) {
   const _cloudMid = new THREE.Color();
   const _cloudHorizon = new THREE.Color();
 
+  // The shadow frustum is a tight ±18u box for crisp shadows, but the route is
+  // ~95u long — anchored at town, the marsh/wagon half had NO shadows at all.
+  // The focus follows the player (spike calls setShadowFocus per frame), sliding
+  // the sun + target so the high-res shadow box always covers the action.
+  const shadowFocus = { x: playCore.x, y: playCore.y };
+  function setShadowFocus(x, y) {
+    if (Number.isFinite(x)) shadowFocus.x = x;
+    if (Number.isFinite(y)) shadowFocus.y = y;
+    sun.target.position.set(shadowFocus.x, 0, shadowFocus.y);
+    if (current) {
+      const d = current.sun.dir;
+      sun.position.set(shadowFocus.x + d.x, d.y, shadowFocus.y + d.z);
+    }
+  }
+
   function applyPalette(p) {
     current = p;
     const u = sky.uniforms;
@@ -189,7 +204,10 @@ export function createAtmosphere(scene, renderer, opts = {}) {
 
     sun.color.set(p.sun.color);
     sun.intensity = p.sun.intensity;
-    sun.position.set(anchor.x + p.sun.dir.x, p.sun.dir.y, anchor.y + p.sun.dir.z);
+    // Sun rides the shadow focus (player-following), not the static anchor, so
+    // the tight shadow frustum stays centered on the action down the whole route.
+    sun.position.set(shadowFocus.x + p.sun.dir.x, p.sun.dir.y, shadowFocus.y + p.sun.dir.z);
+    sun.target.position.set(shadowFocus.x, 0, shadowFocus.y);
 
     rim.color.set(p.rim.color);
     rim.intensity = p.rim.intensity;
@@ -231,6 +249,7 @@ export function createAtmosphere(scene, renderer, opts = {}) {
   return {
     applyPalette,
     driftClouds,
+    setShadowFocus,
     get palette() {
       return current;
     },

@@ -98,6 +98,35 @@ describe("playerController — camera presets", () => {
     expect(alpha).toBeGreaterThan(0);
     expect(alpha).toBeLessThan(1);
   });
+
+  it("shoulder is the close over-the-shoulder gameplay framing", () => {
+    const s = CAMERA_PRESETS.shoulder;
+    expect(s.distance).toBe(5.6);
+    expect(s.height).toBe(2.9);
+    expect(s.lookHeight).toBe(1.72); // head height — not the old belt-height 1.35
+    expect(s.lookAhead).toBe(4.0);
+    expect(s.shoulder).toBe(0.75);
+    expect(s.fov).toBe(56);
+    expect(s.distance).toBeLessThan(CAMERA_PRESETS.exploration.distance);
+    expect(s.lookHeight).toBeGreaterThan(CAMERA_PRESETS.exploration.lookHeight);
+  });
+
+  it("combat is tighter and snappier than shoulder", () => {
+    const c = CAMERA_PRESETS.combat;
+    expect(c.distance).toBeLessThan(CAMERA_PRESETS.shoulder.distance);
+    expect(c.smoothing).toBeGreaterThan(CAMERA_PRESETS.shoulder.smoothing);
+    expect(c.fov!).toBeGreaterThan(CAMERA_PRESETS.shoulder.fov!);
+  });
+
+  it("shoulder pose keeps the gaze near the hero instead of far down the road", () => {
+    const at = (preset: any) =>
+      computeFollowCameraPose({ position: { x: 9.5, z: 8.5 }, yaw: -Math.PI / 2, pitch: 0, preset });
+    const near = at(CAMERA_PRESETS.shoulder);
+    const wide = at(CAMERA_PRESETS.exploration);
+    const dist = (p: any) => Math.hypot(p.lookAt.x - 9.5, p.lookAt.z - 8.5);
+    expect(dist(near)).toBeLessThan(dist(wide));
+    expect(near.lookAt.y).toBeCloseTo(1.72, 2);
+  });
 });
 
 describe("playerController — camera obstacle avoidance", () => {

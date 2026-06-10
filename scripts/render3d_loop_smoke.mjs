@@ -91,9 +91,13 @@ async function main() {
       document.getElementById("scene")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     const before = await page.evaluate(() => window.__westward3dTest.getPlayerPosition());
-    await page.keyboard.down("w");
+    // In-page key events, NOT page.keyboard: CDP input dispatch stalls behind the
+    // GL backpressure on CI runners (the same starvation as the click above) —
+    // reproduced twice as a hang at keyboard.up. The controller listens on
+    // document keydown/keyup, which synthetic events reach fine.
+    await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW", bubbles: true })));
     await page.waitForTimeout(400);
-    await page.keyboard.up("w");
+    await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW", bubbles: true })));
     const after = await page.evaluate(() => window.__westward3dTest.getPlayerPosition());
     const moved = Math.hypot(after.x - before.x, after.z - before.z);
     if (moved < 0.1) {
@@ -109,9 +113,9 @@ async function main() {
     const modalOpen = await page.evaluate(() => !document.getElementById("board-modal")?.hidden);
     if (!modalOpen) throw new Error("job board modal did not open");
     const beforeModalMove = await page.evaluate(() => window.__westward3dTest.getPlayerPosition());
-    await page.keyboard.down("w");
+    await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW", bubbles: true })));
     await page.waitForTimeout(200);
-    await page.keyboard.up("w");
+    await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW", bubbles: true })));
     const afterModalMove = await page.evaluate(() => window.__westward3dTest.getPlayerPosition());
     if (Math.hypot(afterModalMove.x - beforeModalMove.x, afterModalMove.z - beforeModalMove.z) > 0.05) {
       throw new Error("player moved while job board modal was open");

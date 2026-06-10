@@ -32,6 +32,8 @@ export interface CameraPreset {
   lookAhead: number;
   shoulder: number;
   smoothing: number;
+  /** Target field-of-view in degrees; presets without one keep the camera's current fov. */
+  fov?: number;
 }
 
 export interface CameraPose {

@@ -2632,14 +2632,14 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // Player owns input + camera each frame; proxies block movement; interaction
   // surfaces the nearest prompt and dispatches handlers on E.
   if (!visualCapture) {
-    camera.fov = 54;
+    camera.fov = CAMERA_PRESETS.shoulder.fov; // match the gameplay preset — no first-frame pop
     camera.updateProjectionMatrix();
   }
   const player = createPlayerController(camera, {
     canvas,
     thirdPerson: true,
     character: character.group,
-    cameraPreset: "exploration",
+    cameraPreset: "shoulder",
     resetYaw: -0.9,
   });
   player.resetCameraBehind(-0.9);
@@ -2664,6 +2664,25 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   };
 
   if (typeof window !== "undefined") {
+    // Perf probe for the visual-upgrade stages: draw calls / triangles straight
+    // from renderer.info, plus a scene walk for shadow-caster count.
+    window.__westward3dStats = () => {
+      let casters = 0;
+      let meshes = 0;
+      scene.traverse((o) => {
+        if (o.isMesh) {
+          meshes += 1;
+          if (o.castShadow) casters += 1;
+        }
+      });
+      return {
+        calls: renderer.info.render.calls,
+        triangles: renderer.info.render.triangles,
+        meshes,
+        shadowCasters: casters,
+        backend,
+      };
+    };
     window.__spike = {
       // --- Navigation (existing) ---
       setPos: (x, y) => { player.setPosition({ x, z: y }); return player.position; },
@@ -2715,9 +2734,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       },
 
       // Adjust the follow camera (settles smoothly via the existing lerp).
-      // __spike.setCamera({ distance: 9.5, height: 5.0, lookHeight: 1.5 })
+      // __spike.setCamera({ distance: 6.5, height: 3.2, lookHeight: 1.7, fov: 58 })
       setCamera(params) {
-        player.setCameraPreset("exploration", params);
+        player.setCameraPreset("shoulder", params);
         console.log("[__spike] camera preset updated", params);
       },
 
@@ -3020,6 +3039,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     beatFocusTimer = Math.max(beatFocusTimer, seconds);
     player.setCameraPreset(preset);
   };
+  // The preset the camera rests at when no beat focus is running: tight combat
+  // framing while the slime encounter is live, over-the-shoulder otherwise.
+  const restingPreset = () => (loopState.phase === "slime_fight" ? "combat" : "shoulder");
 
   const handleJobBoard = () => {
     focusBeat(loopState.phase === "return_to_boone" ? "objective" : "inspection", 1.0);
@@ -3507,22 +3529,22 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       if (camIntroStart === null) camIntroStart = now; // first eligible frame
       const elapsed = (now - camIntroStart) / 1000;
       const k = Math.pow(1 - Math.min(1, elapsed / CAM_INTRO_DUR), 2); // ease-out
-      const base = CAMERA_PRESETS.exploration;
+      const base = CAMERA_PRESETS.shoulder;
       if (k > 0.004) {
-        player.setCameraPreset("exploration", {
-          distance: base.distance + k * 6.5,
-          height: base.height + k * 4.0,
-          lookAhead: base.lookAhead + k * 2.0,
+        player.setCameraPreset("shoulder", {
+          distance: base.distance + k * 7.5,
+          height: base.height + k * 4.6,
+          lookAhead: base.lookAhead + k * 2.6,
         });
       } else {
-        player.setCameraPreset("exploration"); // settle to the base preset once
+        player.setCameraPreset("shoulder"); // settle to the gameplay preset once
         camIntroSettled = true;
       }
     }
     if (!boardModalController.isOpen()) player.update(dt, proxies);
     if (beatFocusTimer > 0) {
       beatFocusTimer = Math.max(0, beatFocusTimer - dt);
-      if (beatFocusTimer === 0) player.setCameraPreset("exploration");
+      if (beatFocusTimer === 0) player.setCameraPreset(restingPreset());
     }
     if (visualCapture) applyHeroCamera(); // re-assert hero pose (player.update re-syncs the follow-cam)
     updateOcclusionFades(placementNodes, camera, player.position);

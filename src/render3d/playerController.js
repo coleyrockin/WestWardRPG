@@ -24,6 +24,7 @@ const DEFAULT_SENSITIVITY = 0.0035; // radians per pixel of mouse drag
 const DEFAULT_EYE_HEIGHT = 1.8;
 const MAX_PITCH = Math.PI / 3; // ±60° — generous; avoids gimbal flip near ±π/2
 const CAMERA_COLLISION_RADIUS = 0.58;
+const SPRINT_FOV_BOOST = 6; // degrees added to the preset fov while sprinting
 
 const CAMERA_BLOCKING_KINDS = new Set([
   "town",
@@ -54,6 +55,29 @@ const CAMERA_BLOCKING_KINDS = new Set([
 ]);
 
 export const CAMERA_PRESETS = Object.freeze({
+  // The gameplay default: close over-the-shoulder action framing. The hero
+  // lands at the left third (right-shoulder offset), the gaze sits at head
+  // height (hero ≈ 1.8u, model scaled 1.18), and the short lookAhead keeps the
+  // camera connected to the hero instead of staring past them down the road.
+  shoulder: Object.freeze({
+    distance: 5.6,
+    height: 2.9,
+    lookHeight: 1.72,
+    lookAhead: 4.0,
+    shoulder: 0.75,
+    smoothing: 10.5,
+    fov: 56,
+  }),
+  // Tighter, snappier fight framing — switched in while an encounter is live.
+  combat: Object.freeze({
+    distance: 4.6,
+    height: 2.4,
+    lookHeight: 1.55,
+    lookAhead: 3.0,
+    shoulder: 0.9,
+    smoothing: 13,
+    fov: 58,
+  }),
   exploration: Object.freeze({
     distance: 8.4,
     height: 4.5,
@@ -583,6 +607,19 @@ export function createPlayerController(camera, opts = {}) {
       }
       if (camera.lookAt) {
         camera.lookAt(smoothLookAt.x, smoothLookAt.y, smoothLookAt.z);
+      }
+      // FOV: ease toward the preset's fov (+ a sprint widen) so preset swaps and
+      // sprint starts breathe instead of popping. Skipped for cameras without a
+      // projection (unit-test fakes) and when the preset declares no fov.
+      const baseFov = Number.isFinite(activeCameraPreset.fov) ? activeCameraPreset.fov : null;
+      if (baseFov !== null && Number.isFinite(camera.fov) && typeof camera.updateProjectionMatrix === "function") {
+        const targetFov = baseFov + (running ? SPRINT_FOV_BOOST : 0);
+        const fovAlpha = 1 - Math.exp(-6 * (Number.isFinite(dt) && dt > 0 ? dt : 0));
+        const nextFov = camera.fov + (targetFov - camera.fov) * fovAlpha;
+        if (Math.abs(nextFov - camera.fov) > 0.005) {
+          camera.fov = nextFov;
+          camera.updateProjectionMatrix();
+        }
       }
     } else if (camera) {
       camera.position.x = position.x;
