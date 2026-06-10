@@ -3,9 +3,10 @@ import { describe, it, expect } from "vitest";
 import { CYCLE_KEYS, createWorldClock, tickClock, keyToDayTime, dayTimeToKey, pinClock, cycleClock } from "../src/game/world/worldClock.js";
 
 describe("worldClock", () => {
-  it("defaults to dusk (1/3), unpaused", () => {
+  it("defaults to full daylight (0), unpaused, ~7-minute cycle", () => {
     const c = createWorldClock();
-    expect(c.dayTime).toBeCloseTo(1 / 3, 6);
+    expect(c.dayTime).toBeCloseTo(0, 6);
+    expect(c.speed).toBeCloseTo(1 / 420, 9);
     expect(c.paused).toBe(false);
   });
 
@@ -25,27 +26,30 @@ describe("worldClock", () => {
   });
 
   it("maps keys ↔ dayTime and back", () => {
-    expect(keyToDayTime("goldenHour")).toBeCloseTo(0, 6);
-    expect(keyToDayTime("dusk")).toBeCloseTo(1 / 3, 6);
-    expect(keyToDayTime("night")).toBeCloseTo(2 / 3, 6);
-    expect(dayTimeToKey(0.02)).toBe("goldenHour");
-    expect(dayTimeToKey(0.34)).toBe("dusk");
-    expect(dayTimeToKey(0.66)).toBe("night");
-    expect(dayTimeToKey(0.98)).toBe("goldenHour"); // wraps to nearest
+    expect(keyToDayTime("day")).toBeCloseTo(0, 6);
+    expect(keyToDayTime("goldenHour")).toBeCloseTo(1 / 4, 6);
+    expect(keyToDayTime("dusk")).toBeCloseTo(1 / 2, 6);
+    expect(keyToDayTime("night")).toBeCloseTo(3 / 4, 6);
+    expect(dayTimeToKey(0.02)).toBe("day");
+    expect(dayTimeToKey(0.26)).toBe("goldenHour");
+    expect(dayTimeToKey(0.51)).toBe("dusk");
+    expect(dayTimeToKey(0.74)).toBe("night");
+    expect(dayTimeToKey(0.98)).toBe("day"); // wraps to nearest
   });
 
   it("pinning a key pauses + jumps", () => {
     const c = createWorldClock({ paused: false });
     pinClock(c, "night");
-    expect(c.dayTime).toBeCloseTo(2 / 3, 6);
+    expect(c.dayTime).toBeCloseTo(3 / 4, 6);
     expect(c.paused).toBe(true);
   });
 
   it("cycles through the keys in order", () => {
-    const c = createWorldClock();
-    expect(cycleClock(c)).toBe("night"); // dusk -> night
-    expect(cycleClock(c)).toBe("goldenHour"); // night -> goldenHour
+    const c = createWorldClock(); // boots at day
+    expect(cycleClock(c)).toBe("goldenHour"); // day -> goldenHour
     expect(cycleClock(c)).toBe("dusk"); // goldenHour -> dusk
-    expect([...CYCLE_KEYS]).toEqual(["goldenHour", "dusk", "night"]);
+    expect(cycleClock(c)).toBe("night"); // dusk -> night
+    expect(cycleClock(c)).toBe("day"); // night -> day
+    expect([...CYCLE_KEYS]).toEqual(["day", "goldenHour", "dusk", "night"]);
   });
 });

@@ -10,13 +10,15 @@
 // pausing auto-advance when a key is pinned.
 
 // Same order as sunArc's ARC_KEYS; positions are the segment anchors.
-export const CYCLE_KEYS = Object.freeze(["goldenHour", "dusk", "night"]);
-const KEY_POS = Object.freeze({ goldenHour: 0, dusk: 1 / 3, night: 2 / 3 });
+export const CYCLE_KEYS = Object.freeze(["day", "goldenHour", "dusk", "night"]);
+const KEY_POS = Object.freeze({ day: 0, goldenHour: 1 / 4, dusk: 1 / 2, night: 3 / 4 });
 
 const wrap01 = (t) => (((Number(t) || 0) % 1) + 1) % 1;
 
-// One full day/night cycle every ~3 minutes by default — alive, not frantic.
-export function createWorldClock({ dayTime = 1 / 3, speed = 1 / 180, paused = false } = {}) {
+// Boot at full daylight (first impressions live here), one cycle every ~7
+// minutes — a play session drifts day → golden hour instead of racing through
+// dusk into night murk (the old 3-minute cycle booted AT dusk).
+export function createWorldClock({ dayTime = 0, speed = 1 / 420, paused = false } = {}) {
   return { dayTime: wrap01(dayTime), speed, paused };
 }
 

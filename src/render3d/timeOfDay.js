@@ -8,9 +8,35 @@
 // day. lerpPalette() blends two palettes so the renderer can smoothly drift
 // between states instead of hard-cutting.
 
-export const TIME_KEYS = Object.freeze(["dusk", "goldenHour", "night"]);
+export const TIME_KEYS = Object.freeze(["day", "dusk", "goldenHour", "night"]);
 
 export const PALETTES = Object.freeze({
+  // True daylight — the de-orange anchor. Blue sky + neutral-warm high sun +
+  // COOL sky-bounce shadows give the frame real warm-vs-cool range; the warm
+  // woods/lanterns read as accents against it instead of drowning in amber.
+  // This is the boot palette: first impressions happen here.
+  day: {
+    key: "day",
+    label: "Day",
+    sky: { top: "#3d6fb8", mid: "#8fa8c8", horizon: "#d8c8a8" },
+    fog: { color: "#aeb6c0", density: 0.006 },
+    // High sun (y 12) → short grounded shadows; near-white warm disc.
+    sun: { color: "#fff0d8", intensity: 2.2, dir: { x: -4, y: 12, z: -2 }, disc: 0.03, glow: 0.12 },
+    // Shadow fill is sky bounce: bright cool blue from above, neutral slate from
+    // the ground — unlit faces read cool, never crushed red.
+    hemi: { sky: "#bcd2f0", ground: "#5a6478", intensity: 1.1 },
+    rim: { color: "#8fa8d8", intensity: 0.5, dir: { x: 8, y: 6, z: 6 } },
+    fill: { color: "#d8dce4", intensity: 0.4 },
+    exposure: 1.18,
+    stars: 0,
+    bloom: 0.3,
+    grade: {
+      tint: "#ffd9a0", amount: 0.02, contrast: 1.1, saturation: 1.08,
+      shadowTint: "#2e3c6e", highlightTint: "#fff0c8",
+      splitStrength: 0.22, godrayStrength: 0.06, vignetteStrength: 0.05, bloomThreshold: 0.9,
+    },
+    bodyBg: "#1e2433",
+  },
   // Dusk is the hero showcase moment (the ?visual capture pins here). Keep the
   // lanterns warm, but make the world around them cool and contrasty so the
   // frame reads like a playable RPG street instead of a sun-bleached diorama.
@@ -31,9 +57,11 @@ export const PALETTES = Object.freeze({
     stars: 0.18,
     bloom: 0.32,
     grade: {
-      tint: "#f3a85e", amount: 0.04, contrast: 1.14, saturation: 1.14,
+      // De-orange pass: warm tint eased and split released (0.28 → 0.18) so dusk
+      // reads as cool evening light around warm lanterns, not an amber filter.
+      tint: "#f3a85e", amount: 0.03, contrast: 1.14, saturation: 1.1,
       shadowTint: "#1a2848", highlightTint: "#f4bb72",
-      splitStrength: 0.28, godrayStrength: 0.16, vignetteStrength: 0.08, bloomThreshold: 0.86,
+      splitStrength: 0.18, godrayStrength: 0.16, vignetteStrength: 0.08, bloomThreshold: 0.86,
     },
     bodyBg: "#17131d",
   },
@@ -74,15 +102,18 @@ export const PALETTES = Object.freeze({
   night: {
     key: "night",
     label: "Night",
-    sky: { top: "#05071a", mid: "#121636", horizon: "#2a2350" },
-    fog: { color: "#12162c", density: 0.028 },
-    sun: { color: "#aeb8ff", intensity: 0.5, dir: { x: 8, y: 8, z: -3 }, disc: 0.026, glow: 0.1 },
-    hemi: { sky: "#20284a", ground: "#050507", intensity: 0.24 },
-    rim: { color: "#6a7aff", intensity: 0.5, dir: { x: -7, y: 4, z: 6 } },
-    exposure: 0.85,
+    // Legibility lift: moonlit blue, not black-red murk. The moon key, hemisphere
+    // fill, and exposure all come up so silhouettes, the road, and lamp pools
+    // read while stars/lanterns still own the mood.
+    sky: { top: "#070b22", mid: "#181f44", horizon: "#33305e" },
+    fog: { color: "#161b34", density: 0.024 },
+    sun: { color: "#bcc6ff", intensity: 0.78, dir: { x: 8, y: 9, z: -3 }, disc: 0.026, glow: 0.1 },
+    hemi: { sky: "#32406e", ground: "#101522", intensity: 0.42 },
+    rim: { color: "#7a8aff", intensity: 0.55, dir: { x: -7, y: 4, z: 6 } },
+    exposure: 0.95,
     stars: 1.0,
     bloom: 1.2,
-    grade: { tint: "#5a6bd0", amount: 0.05, contrast: 1.12, saturation: 1.08, shadowTint: "#2a3a6a", highlightTint: "#aac0ff" },
+    grade: { tint: "#5a6bd0", amount: 0.05, contrast: 1.1, saturation: 1.08, shadowTint: "#2a3a6a", highlightTint: "#aac0ff" },
     bodyBg: "#05060f",
   },
 });
@@ -97,12 +128,13 @@ export function nextTimeKey(key) {
 }
 
 // Continuous day/night arc (docs/roadmap.md §3, Bet 4) — the smooth-cycle
-// successor to the 3 discrete keys. `dayTime01` in [0,1) wraps around the clock:
-// 0 = golden hour, ~1/3 = dusk, ~2/3 = night, back to golden. Returns a palette
-// blended across the bracketing keys (smoothstep eased), so the sun colour,
-// direction, fog, exposure, bloom, and grade all drift continuously rather than
-// hard-cutting. Pure — reuses lerpPalette so it's covered by the same tests.
-export const ARC_KEYS = Object.freeze(["goldenHour", "dusk", "night"]);
+// successor to the discrete keys. `dayTime01` in [0,1) wraps around the clock:
+// 0 = day, ~1/4 = golden hour, ~1/2 = dusk, ~3/4 = night, back to day. Returns
+// a palette blended across the bracketing keys (smoothstep eased), so the sun
+// colour, direction, fog, exposure, bloom, and grade all drift continuously
+// rather than hard-cutting. Pure — reuses lerpPalette so it's covered by the
+// same tests.
+export const ARC_KEYS = Object.freeze(["day", "goldenHour", "dusk", "night"]);
 
 export function sunArc(dayTime01) {
   const t = (((Number(dayTime01) || 0) % 1) + 1) % 1;

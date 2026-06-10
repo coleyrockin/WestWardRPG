@@ -2194,7 +2194,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // clouds, water, weather, film grain) for a stable pixelmatch baseline.
   const debugPlayerMarker =
     typeof location !== "undefined" && new URLSearchParams(location.search).has("debugPlayerMarker");
-  const clock = createWorldClock({ dayTime: 0 }); // open at golden hour, drift to dusk
+  const clock = createWorldClock({ dayTime: 0 }); // open at full daylight (de-orange anchor)
   if (visualCapture) pinClock(clock, "dusk");
   else if (resumeRun && Number.isFinite(resumeRun.world?.dayTime)) clock.dayTime = resumeRun.world.dayTime;
 

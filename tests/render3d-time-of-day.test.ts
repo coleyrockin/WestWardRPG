@@ -13,8 +13,8 @@ import {
 } from "../src/render3d/timeOfDay.js";
 
 describe("timeOfDay — keys & palette table", () => {
-  it("exposes the three time keys in cycle order", () => {
-    expect([...TIME_KEYS]).toEqual(["dusk", "goldenHour", "night"]);
+  it("exposes the four time keys in cycle order", () => {
+    expect([...TIME_KEYS]).toEqual(["day", "dusk", "goldenHour", "night"]);
   });
 
   it("freezes the keys and palette table", () => {
@@ -40,11 +40,22 @@ describe("timeOfDay — keys & palette table", () => {
     }
   });
 
-  it("night is the only fully-starred palette and golden hour has none", () => {
+  it("night is the only fully-starred palette; day and golden hour have none", () => {
     expect(PALETTES.night.stars).toBe(1);
     expect(PALETTES.goldenHour.stars).toBe(0);
+    expect(PALETTES.day.stars).toBe(0);
     expect(PALETTES.dusk.stars).toBeGreaterThan(0);
     expect(PALETTES.dusk.stars).toBeLessThan(1);
+  });
+
+  it("day is the de-orange anchor: blue sky top, high sun, cool shadow fill", () => {
+    const d = PALETTES.day;
+    expect(d.sun.dir.y).toBeGreaterThanOrEqual(10); // high noon-ish sun
+    expect(d.stars).toBe(0);
+    // blue-dominant sky top and cool hemisphere sky bounce
+    const blueTop = parseInt(d.sky.top.slice(5, 7), 16);
+    const redTop = parseInt(d.sky.top.slice(1, 3), 16);
+    expect(blueTop).toBeGreaterThan(redTop);
   });
 });
 
@@ -61,14 +72,15 @@ describe("getPalette", () => {
 });
 
 describe("nextTimeKey", () => {
-  it("cycles dusk → goldenHour → night → dusk", () => {
+  it("cycles day → dusk → goldenHour → night → day", () => {
+    expect(nextTimeKey("day")).toBe("dusk");
     expect(nextTimeKey("dusk")).toBe("goldenHour");
     expect(nextTimeKey("goldenHour")).toBe("night");
-    expect(nextTimeKey("night")).toBe("dusk");
+    expect(nextTimeKey("night")).toBe("day");
   });
 
-  it("returns to dusk from an unknown key", () => {
-    expect(nextTimeKey("nope")).toBe("dusk");
+  it("returns to day from an unknown key", () => {
+    expect(nextTimeKey("nope")).toBe("day");
   });
 
   it("visits every key exactly once per full cycle", () => {
@@ -142,12 +154,13 @@ describe("lerpPalette", () => {
 });
 
 describe("sunArc — continuous day/night cycle", () => {
-  it("cycles through goldenHour → dusk → night at the segment anchors", () => {
-    expect([...ARC_KEYS]).toEqual(["goldenHour", "dusk", "night"]);
+  it("cycles through day → goldenHour → dusk → night at the segment anchors", () => {
+    expect([...ARC_KEYS]).toEqual(["day", "goldenHour", "dusk", "night"]);
     // anchors land exactly on a source palette's scalar values
-    expect(sunArc(0).sun.intensity).toBeCloseTo(PALETTES.goldenHour.sun.intensity, 6);
-    expect(sunArc(1 / 3).sun.intensity).toBeCloseTo(PALETTES.dusk.sun.intensity, 6);
-    expect(sunArc(2 / 3).sun.intensity).toBeCloseTo(PALETTES.night.sun.intensity, 6);
+    expect(sunArc(0).sun.intensity).toBeCloseTo(PALETTES.day.sun.intensity, 6);
+    expect(sunArc(1 / 4).sun.intensity).toBeCloseTo(PALETTES.goldenHour.sun.intensity, 6);
+    expect(sunArc(1 / 2).sun.intensity).toBeCloseTo(PALETTES.dusk.sun.intensity, 6);
+    expect(sunArc(3 / 4).sun.intensity).toBeCloseTo(PALETTES.night.sun.intensity, 6);
   });
 
   it("wraps: t and t+1 (and t=1) resolve identically", () => {
@@ -175,7 +188,7 @@ describe("sunArc — continuous day/night cycle", () => {
 
   it("guards bad input", () => {
     expect(sunArc(NaN).key).toBe("arc");
-    // @ts-expect-error — defensive: undefined coerces to 0
-    expect(sunArc(undefined).sun.intensity).toBeCloseTo(PALETTES.goldenHour.sun.intensity, 6);
+    // @ts-expect-error — defensive: undefined coerces to 0 (= the day anchor)
+    expect(sunArc(undefined).sun.intensity).toBeCloseTo(PALETTES.day.sun.intensity, 6);
   });
 });

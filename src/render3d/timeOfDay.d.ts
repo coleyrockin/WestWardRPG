@@ -1,7 +1,7 @@
 // Type declarations for timeOfDay.js — the render3d time-of-day palette module.
 // Pure data + blend helpers (no Three.js); atmosphere.js consumes a Palette.
 
-export type TimeKey = "dusk" | "goldenHour" | "night";
+export type TimeKey = "day" | "dusk" | "goldenHour" | "night";
 // sunArc() emits a continuously-blended palette tagged "arc".
 export type PaletteKey = TimeKey | "arc";
 
