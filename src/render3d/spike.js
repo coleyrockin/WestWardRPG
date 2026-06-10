@@ -3542,6 +3542,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       }
     }
     if (!boardModalController.isOpen()) player.update(dt, proxies);
+    // The tight ±18u shadow frustum rides with the player — without this the
+    // marsh/wagon half of the 95u route renders with NO sun shadows at all.
+    atmosphere.setShadowFocus(player.position.x, player.position.z);
     if (beatFocusTimer > 0) {
       beatFocusTimer = Math.max(0, beatFocusTimer - dt);
       if (beatFocusTimer === 0) player.setCameraPreset(restingPreset());
