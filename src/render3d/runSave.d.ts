@@ -30,6 +30,8 @@ export interface RunPayload {
     victory: boolean;
     phaseReached: string;
   };
+  // v2: RPG state slice (gameState.buildGameSaveSlice); null on fresh/v1 runs.
+  game: Record<string, any> | null;
 }
 
 export interface RunContext {
@@ -41,6 +43,7 @@ export interface RunContext {
   loopState?: Record<string, any>;
   world?: { dayTime?: number; weatherKind?: string };
   runStats?: Record<string, any>;
+  game?: Record<string, any> | null;
 }
 
 export function buildRunPayload(ctx?: RunContext, now?: number): RunPayload;

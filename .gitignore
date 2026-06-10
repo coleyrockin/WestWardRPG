@@ -42,3 +42,6 @@ pnpm-debug.log*
 
 # Claude Code scheduler artifacts
 .claude/scheduled_tasks.lock
+
+# Playwright MCP session debris (console logs can reach 100s of MB and OOM vitest's crawler)
+.playwright-mcp/

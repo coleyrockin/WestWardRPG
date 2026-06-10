@@ -377,7 +377,9 @@ const SCENE_DRESSING = [
   // Smoke Cache (hero at 40.5, 12.9): a warm lantern (so it's a lit focal point like
   // the board + wagon), signal smoke, and a salvage stash
   { kind: "lampLow", label: "Cache Lantern", x: 39.5, y: 12.4, color: "#ffc88d", size: 0.7 },
-  { kind: "dustSmokePlume", label: "Cache Signal Smoke", x: 40.1, y: 11.2, color: "#b88551", size: 0.9, yaw: 0.2 },
+  // Plume sized up + tucked beside the chest so the cache smoke reads from the
+  // road bend (roadmap "first 10 minutes": smoke plume visibility).
+  { kind: "dustSmokePlume", label: "Cache Signal Smoke", x: 40.2, y: 11.9, color: "#c19058", size: 1.45, yaw: 0.2 },
   { kind: "barrelCrateCluster", label: "Cache Stash", x: 42.1, y: 14.0, color: "#7a5230", size: 0.8, yaw: -0.3 },
   { kind: "brokenFence", label: "Cache Rail", x: 38.7, y: 13.8, color: "#8d6540", size: 0.7, yaw: 0.4 },
   { kind: "crate", label: "Cache Crate", x: 42.6, y: 11.4, color: "#b9824d", size: 0.6 },

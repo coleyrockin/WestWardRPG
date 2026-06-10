@@ -18,7 +18,9 @@ import { writeSave, readSave } from "../savePersistence.js";
 
 export const RUN_SLOT = "frontier-ironman";
 export const RUN_SCHEMA = "frontier-run";
-export const RUN_VERSION = 1;
+// v2: adds `game` — the RPG state slice (player gold/xp/level, inventory,
+// progression, job board, loot, npc memory) from render3d/gameState.js.
+export const RUN_VERSION = 2;
 
 // Strip view-layer fields off a loopState snapshot, keeping only what must persist.
 // (createLoopStateMachine().state returns the persistent fields PLUS derived view
@@ -48,6 +50,7 @@ export function buildRunPayload(ctx = {}, now = Date.now()) {
     loopState = {},
     world = {},
     runStats = {},
+    game = null,
   } = ctx;
   const loop = pickLoopState(loopState);
   return {
@@ -65,6 +68,9 @@ export function buildRunPayload(ctx = {}, now = Date.now()) {
       dayTime: Number.isFinite(world.dayTime) ? world.dayTime : 0,
       weatherKind: world.weatherKind ?? "clear",
     },
+    // RPG slice (gameState.buildGameSaveSlice). Stored as-is; the loader runs
+    // it through hydrateGameState (per-module normalize*) on resume.
+    game: game && typeof game === "object" ? game : null,
     runStats: {
       startedAt: runStats.startedAt ?? (Number.isFinite(now) ? now : Date.now()),
       endedAt: runStats.endedAt ?? null,
@@ -75,12 +81,18 @@ export function buildRunPayload(ctx = {}, now = Date.now()) {
   };
 }
 
-// Forward-compat migration shim. v1 is current → identity. Rejects anything that
-// isn't a frontier-run payload (never touches the Canvas saveMigration chain).
+// Forward-compat migration shim. Rejects anything that isn't a frontier-run
+// payload (never touches the Canvas saveMigration chain).
 export function migrateRunPayload(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
   if (payload.schema !== RUN_SCHEMA) return null;
-  // Future: if (payload.version < RUN_VERSION) backfill here.
+  if (!Number.isFinite(payload.version) || payload.version > RUN_VERSION) return null;
+  if (payload.version < 2) {
+    // v1 → v2: no game slice existed. `game: null` makes the loader build a
+    // fresh state and reconcile it against the saved loop phase
+    // (gameState.reconcileWithLoopPhase), so old runs keep their progress.
+    return { ...payload, version: RUN_VERSION, game: null };
+  }
   return payload;
 }
 

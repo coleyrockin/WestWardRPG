@@ -61,7 +61,9 @@ async function main() {
   collectConsole(page, errors);
 
   try {
-    await page.goto(`${BASE}/spikes/render3d.html`, { waitUntil: "load" });
+    // waitUntil "load" can hang indefinitely against the Vite dev server on
+    // macOS; domcontentloaded + the __spikeReady poll covers readiness.
+    await page.goto(`${BASE}/spikes/render3d.html`, { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForSelector("#scene");
     await waitForPagePredicate(page, () => window.__spikeReady === true, "render3d ready signal", 45000);
     await waitForPagePredicate(page, () => Boolean(
@@ -76,6 +78,10 @@ async function main() {
       throw new Error(`encounter beats visible before staging: ${JSON.stringify(openingBeats)}`);
     }
 
+    // Ride past the title screen the way a player would (the overlay covers the
+    // canvas until dismissed; the click is also the audio-unlock gesture).
+    await page.evaluate(() => document.getElementById("title-start")?.click());
+    await page.waitForTimeout(150);
     // force: skip actionability waits — the canvas renders continuously and, under
     // the headless SwiftShader WebGL2 backend, the main thread is busy enough that
     // the stability check can starve. The click only requests pointer lock (a
