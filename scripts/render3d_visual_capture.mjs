@@ -56,7 +56,9 @@ async function capture() {
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
-    await page.goto(`${BASE}/spikes/render3d.html?visual=1`, { waitUntil: "load" });
+    // waitUntil "load" can hang indefinitely against the Vite dev server on
+    // macOS; domcontentloaded + the __spikeReady poll below covers readiness.
+    await page.goto(`${BASE}/spikes/render3d.html?visual=1`, { waitUntil: "domcontentloaded", timeout: 60000 });
     const ready = await waitForPagePredicate(page, () => window.__spikeReady === true, "render3d ready signal", 120000)
       .then(() => true)
       .catch(() => false);
@@ -65,17 +67,24 @@ async function capture() {
     await page.waitForTimeout(800);
     if (errors.length) throw new Error(`console/page errors during capture: ${errors.slice(0, 3).join(" | ")}`);
 
-    // Hide DOM chrome so the gate captures the pure render, then full-viewport
-    // screenshot — page.screenshot skips the element-stability wait that an
-    // always-animating canvas never satisfies under slow SwiftShader.
+    // Hide ALL DOM chrome so the gate captures the pure canvas render. DOM text
+    // rasterizes differently across OSes (macOS vs CI Linux glyphs), which
+    // would make baselines non-portable; the canvas itself is SwiftShader-
+    // deterministic everywhere.
     await page.evaluate(() => {
-      for (const id of ["objective", "tag", "prompt", "board-modal", "field-map"]) {
-        const el = document.getElementById(id);
-        if (el) el.style.display = "none";
+      for (const el of document.body.children) {
+        if (el.tagName !== "CANVAS" && el.tagName !== "SCRIPT") el.style.display = "none";
       }
     });
     mkdirSync(dirname(OUT), { recursive: true });
-    await page.screenshot({ path: OUT });
+    // CDP Page.captureScreenshot instead of page.screenshot: Playwright's
+    // screenshot path (font wait + stability checks) hangs on macOS against
+    // this always-animating WebGL canvas; raw CDP grabs the surface directly
+    // and renders identically under SwiftShader here and in CI.
+    const cdp = await page.context().newCDPSession(page);
+    const { data } = await cdp.send("Page.captureScreenshot", { format: "png" });
+    await cdp.detach();
+    writeFileSync(OUT, Buffer.from(data, "base64"));
     return OUT;
   } finally {
     await browser.close();

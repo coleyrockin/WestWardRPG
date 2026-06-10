@@ -120,6 +120,30 @@
         background: linear-gradient(90deg, #7f201d, #d64c3f);
         box-shadow: 0 0 12px rgba(214, 76, 63, 0.5);
       }
+      #hero-panel .wallet-line {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 5px;
+        font-size: 12px;
+        letter-spacing: 0.4px;
+      }
+      #hero-panel .gold-value { color: var(--hud-gold); font-weight: 600; }
+      #hero-panel .xp-value { color: var(--hud-dim); }
+      #hero-panel .xp-track {
+        display: block;
+        height: 4px;
+        margin-top: 3px;
+        overflow: hidden;
+        background: rgba(12, 14, 24, 0.85);
+        border: 1px solid rgba(125, 160, 255, 0.18);
+      }
+      #hero-panel .xp-fill {
+        display: block;
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #2c4a8f, #7fa8ff);
+        box-shadow: 0 0 10px rgba(127, 168, 255, 0.45);
+      }
 
       #job-toast {
         position: fixed;
@@ -621,6 +645,37 @@
       #board-card .reward {
         color: #ffd77b;
       }
+      #board-card .reward[hidden],
+      #board-card .boone-line[hidden],
+      #board-card .board-listings[hidden] { display: none; }
+      #board-card .boone-line {
+        color: #e7c79a;
+        font-style: italic;
+        border-left: 2px solid rgba(216, 168, 79, 0.55);
+        padding-left: 10px;
+      }
+      #board-card .board-listings {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin: 14px 0 4px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(216, 168, 79, 0.22);
+      }
+      #board-card .board-pin {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 1px 12px;
+        font-size: 13px;
+      }
+      #board-card .board-pin .pin-title { color: #f1ddb6; font-weight: 600; }
+      #board-card .board-pin .pin-reward { color: #ffd77b; text-align: right; }
+      #board-card .board-pin .pin-detail {
+        grid-column: 1 / -1;
+        color: #a9967a;
+        font-size: 11px;
+        letter-spacing: 0.2px;
+      }
       #board-actions {
         display: flex;
         flex-wrap: wrap;
@@ -798,9 +853,11 @@
       <span class="portrait">WW</span>
       <span>
         <span class="hero-name">Rowan Vale</span>
-        <span class="hero-sub">Level 3 Road Bounty Hunter</span>
+        <span class="hero-sub">Level 1 Road Bounty Hunter</span>
         <span class="hp-label"><span>HP</span><span>100 / 100</span></span>
         <span class="hp-track" aria-hidden="true"><span class="hp-fill"></span></span>
+        <span class="wallet-line"><span class="gold-value">0g</span><span class="xp-value">XP 0/80</span></span>
+        <span class="xp-track" aria-hidden="true"><span class="xp-fill"></span></span>
       </span>
     </div>
     <div id="job-toast" class="rpg-panel" role="status" aria-live="polite">
@@ -874,9 +931,10 @@
     <div id="board-modal" hidden>
       <div id="board-card" role="dialog" aria-modal="true" aria-labelledby="board-title">
         <h2 id="board-title">Boone's First Road Job</h2>
-        <p>Smoke Cache is spitting green light again. Boone wants the road checked before more cargo goes missing.</p>
-        <p>Pick how you want to take the job, then follow the marshal road east.</p>
-        <p class="reward">Reward: +38g, +18 XP, Old Road Survey lead</p>
+        <p id="board-boone" class="boone-line">Marshal Boone sizes you up.</p>
+        <p id="board-body">Smoke Cache is spitting green light again. Boone wants the road checked before more cargo goes missing.</p>
+        <p id="board-reward" class="reward">Reward: +38g, +18 XP, Old Road Survey lead</p>
+        <div id="board-listings" class="board-listings"></div>
         <div id="board-actions">
           <button id="board-close" class="secondary" type="button">Not yet</button>
           <button id="board-accept" data-option="accept_bounty" type="button">Accept bounty</button>

@@ -1,0 +1,78 @@
+// Type declarations for gameState.js — the 3D build's RPG state tree
+// (wiring layer over jobBoard / lootSystem / progressionSystem / npcMemory).
+
+export const REGION_ID: "frontier";
+export const PLAYER_NAME: string;
+export const PLAYER_CLASS: string;
+export const XP_START: number;
+export const XP_GROWTH: number;
+export const XP_FLAT: number;
+
+export interface GamePlayer {
+  name: string;
+  className: string;
+  level: number;
+  xp: number;
+  nextXp: number;
+  gold: number;
+}
+
+export interface JobBoardState {
+  activeJobId: string | null;
+  completedJobIds: string[];
+  progressByJobId: Record<string, { status: string; count: number; rewardClaimed: boolean }>;
+}
+
+export interface LootState {
+  recentDrops: Array<{ source: string; regionId: string; summary: string }>;
+  totalDrops: number;
+  gearFinds: number;
+}
+
+export interface NpcMemoryState {
+  byNpc: Record<string, Record<string, unknown> & { greetings: number; recentJobId: string | null }>;
+  recentEvents: Array<Record<string, unknown>>;
+}
+
+export interface GameState {
+  player: GamePlayer;
+  inventory: Record<string, number>;
+  progression: Record<string, unknown> & { identity?: unknown; equipment?: unknown };
+  world: { jobs: JobBoardState; loot: LootState };
+  npcMemory: NpcMemoryState;
+}
+
+export function makeRng(seed?: number): () => number;
+export function createGameState(): GameState;
+export function normalizeGameState(source?: unknown): GameState;
+export function grantXp(state: GameState, amount: number): { levelsGained: number; level: number };
+export function grantGold(state: GameState, amount: number): number;
+export function boardChoices(state: GameState): Array<Record<string, unknown>>;
+export function acceptStarterJob(state: GameState, opts?: { time?: number }): Record<string, unknown> & { ok: boolean };
+export function recordSlimeKill(state: GameState): Record<string, unknown> & { ok: boolean; completed: boolean };
+export function lootBeat(
+  state: GameState,
+  opts?: { source?: "cache" | "wagon" | "slime"; rng?: () => number },
+): { drop: { summary: string; gold: number; items: Record<string, number> }; gold: number; gearFinds: number };
+export function claimBoardReward(
+  state: GameState,
+  opts?: { at?: number },
+): Record<string, unknown> & { ok: boolean; levelsGained: number };
+export function recordNpcGreeting(state: GameState, npcId: string, opts?: { at?: number }): Record<string, unknown>;
+export function activeJobLine(
+  state: GameState,
+): { title: string; progressLabel: string; ready: boolean; hint: string } | null;
+export function playerHudView(state: GameState): {
+  name: string;
+  subtitle: string;
+  gold: number;
+  xp: number;
+  nextXp: number;
+  xpRatio: number;
+};
+export function buildGameSaveSlice(state: GameState): Record<string, unknown>;
+export function hydrateGameState(slice?: unknown): GameState;
+export function reconcileWithLoopPhase(
+  state: GameState,
+  loopState?: { phase?: string; routeBeats?: Record<string, unknown> },
+): { accepted: boolean; kills: number; claimed: boolean };

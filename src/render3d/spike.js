@@ -30,6 +30,8 @@ import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine } from "./phaseState
 import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
 import { buildFieldMapRouteModel, createFieldMapDomRefs, syncFieldMapDom } from "./fieldMapDom.js";
 import { createBoardModalController } from "./boardModal.js";
+import { createBoardDomRefs, syncBoardDom } from "./boardDom.js";
+import { buildBoardView } from "./boardCopy.js";
 import { createEncounterSystem } from "./encounterSystem.js";
 import { createAtmosphere } from "./atmosphere.js";
 import { sunArc } from "./timeOfDay.js";
@@ -49,6 +51,20 @@ import { createPlayerCombat, hitboxHitsTarget } from "./combat/playerCombat.js";
 import { createSlimeState, stepSlime } from "./combat/slimeBehavior.js";
 import { createHitStop, createCameraShake, createBurstPool } from "./combat/hitFx.js";
 import { createAudioView } from "./audioView.js";
+import {
+  createGameState,
+  hydrateGameState,
+  reconcileWithLoopPhase,
+  buildGameSaveSlice,
+  acceptStarterJob,
+  recordSlimeKill,
+  lootBeat,
+  claimBoardReward,
+  recordNpcGreeting,
+  activeJobLine,
+  playerHudView,
+  makeRng,
+} from "./gameState.js";
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
@@ -258,15 +274,74 @@ function buildFence(group, p) {
   }
 }
 
+// Inked sign-board texture: weathered plank + hand-set serif lines. Painted at
+// 2x and dropped onto an unlit-ish emissive plane so the words stay readable in
+// the dusk grade (roadmap "first 10 minutes": road sign text).
+function makeSignTexture(lines) {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 256;
+  const g = c.getContext("2d");
+  g.fillStyle = "#332312";
+  g.fillRect(0, 0, c.width, c.height);
+  // plank seams + weathering streaks
+  g.strokeStyle = "rgba(20, 12, 5, 0.55)";
+  g.lineWidth = 3;
+  for (const yy of [86, 172]) {
+    g.beginPath();
+    g.moveTo(0, yy);
+    g.lineTo(c.width, yy);
+    g.stroke();
+  }
+  g.fillStyle = "rgba(255, 220, 160, 0.05)";
+  for (let i = 0; i < 14; i++) g.fillRect((i * 73) % c.width, 0, 6, c.height);
+  // border
+  g.strokeStyle = "#c9a36a";
+  g.lineWidth = 6;
+  g.strokeRect(10, 10, c.width - 20, c.height - 20);
+  // lettering
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillStyle = "#f3dfae";
+  const step = c.height / (lines.length + 1);
+  lines.forEach((line, i) => {
+    g.font = `${i === 0 ? "bold 58px" : "44px"} Georgia, 'Times New Roman', serif`;
+    g.fillText(line, c.width / 2, step * (i + 1) + 6);
+  });
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
 function buildSign(group, p) {
   addBox(group, 0.1, 1.0, 0.1, standard("#3a2a1c"), toVec(p.x, p.y));
+  const isHeroRoadSign = p.kind === "roadSign";
   const panel = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 0.42, 0.06),
+    new THREE.BoxGeometry(isHeroRoadSign ? 0.92 : 0.7, isHeroRoadSign ? 0.5 : 0.42, 0.06),
     standard(p.color, { emissive: p.color, emissiveIntensity: 0.5 }),
   );
   panel.position.copy(toVec(p.x, p.y, 1.05));
   panel.castShadow = true;
   group.add(panel);
+  if (isHeroRoadSign) {
+    // Readable directions on a plane just proud of the panel (single face, so
+    // the box's other sides stay clean for the ink pass).
+    const face = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.86, 0.44),
+      // near-white tint: the painted texture IS the colour (nprMaterial
+      // multiplies map × tint before the cel ramp)
+      standard("#f5ecd8", {
+        map: makeSignTexture(["CACHE ROAD →", "DUSTWARD ½ MI"]),
+        emissive: "#9a7a4a",
+        emissiveIntensity: 0.22,
+        rimStrength: 0,
+      }),
+    );
+    face.position.copy(toVec(p.x, p.y - 0.034, 1.05));
+    face.rotation.y = Math.PI; // face the approach from town (west side)
+    group.add(face);
+  }
 }
 
 function buildTownBarkMarker(group, p) {
@@ -1543,6 +1618,11 @@ function createProductionHudRefs(rootDocument = globalThis.document) {
   };
 }
 
+// Live job ledger view (set by the main loop's syncPlayerHud once the RPG state
+// tree exists). When present, the tracker shows the REAL bounty progress
+// (kills 0/3 → 3/3) instead of the phase-derived approximation.
+let liveJobView = null;
+
 function syncProductionHud(refs, loopState = {}, encounterState = null) {
   if (!refs) return;
   const phase = loopState.phase || "spawn";
@@ -1555,7 +1635,9 @@ function syncProductionHud(refs, loopState = {}, encounterState = null) {
       : loopState.objectiveText || "Find Boone's lit job board by the road.";
   }
   if (refs.activeJobCount) {
-    refs.activeJobCount.textContent = phase === "survey_teaser" ? "1/1" : `${Math.min(index, total)}/${total}`;
+    refs.activeJobCount.textContent = liveJobView?.progressLabel
+      ? liveJobView.progressLabel
+      : phase === "survey_teaser" ? "1/1" : `${Math.min(index, total)}/${total}`;
   }
   if (refs.surveyJobLine) {
     refs.surveyJobLine.textContent = beats.returnToBoone
@@ -2122,6 +2204,14 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const runSeed = resumeRun && Number.isFinite(resumeRun.seed) ? resumeRun.seed : Date.now();
   let runElapsed = resumeRun && Number.isFinite(resumeRun.time) ? resumeRun.time : 0;
   const runStartedAt = resumeRun?.runStats?.startedAt ?? Date.now();
+
+  // --- The RPG state tree (Tier A port: jobBoard / loot / progression / npcMemory).
+  // One authoritative tree: resumed from the save's game slice when present,
+  // else built fresh and reconciled against the saved loop phase (v1 saves).
+  const game = resumeRun?.game ? hydrateGameState(resumeRun.game) : createGameState();
+  reconcileWithLoopPhase(game, resumeRun?.loopState || {});
+  // Loot rolls ride the run seed so a given run's drops are reproducible.
+  const lootRng = makeRng((runSeed >>> 0) || 1);
   let appliedPalette = sunArc(clock.dayTime);
   atmosphere.applyPalette(appliedPalette);
 
@@ -2132,7 +2222,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   scene.add(openingLightPools.group);
   scene.add(roadDust.group);
   scene.add(routeSageField);
-  createScatter(scene, { center: { x: 35, z: 13 }, area: 78, count: 620 });
+  createScatter(scene, { center: { x: 35, z: 13 }, area: 78, count: 850 });
 
   // Animated marsh water (replaces the flat plane that used to live in buildGround).
   const water = createWater({ width: 29, height: 6.2, skyTint: appliedPalette.sky.horizon });
@@ -2275,6 +2365,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       if (r) {
         npcSpeechMsg = `${r.name}: "${r.line}"`;
         npcSpeechT = 3.5;
+        // Greeting memory rides the RPG tree so townsfolk remember the player
+        // across saves (visit counts feed first-meeting vs returning lines).
+        recordNpcGreeting(game, r.name.toLowerCase(), { at: runElapsed });
+        onRunMutated();
       }
     });
   }
@@ -2364,9 +2458,65 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
 
   // One call per frame: advance the world (or hold it all still under ?visual).
   let waterTime = 0;
+  // Atmosphere motion (art-direction pillar 5): one slow tumbleweed crossing
+  // the road and distant circling birds. Pure dressing — null footprints (no
+  // collision), hidden + held still whenever the world is frozen (?visual /
+  // captureMode) so the golden baseline never sees them.
+  const tumbleweed = (() => {
+    const ball = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.34, 1),
+      standard("#9a7b4f", { transparent: true, opacity: 0.92, rimStrength: 0.4 }),
+    );
+    ball.castShadow = true;
+    const group = new THREE.Group();
+    group.add(ball);
+    scene.add(group);
+    let x = 4;
+    const step = (fdt, t) => {
+      group.visible = fdt > 0;
+      if (fdt <= 0) return;
+      const speed = 1.7 + Math.sin(t * 0.43) * 0.5; // gusty drift
+      x += speed * fdt;
+      if (x > 74) x = 4; // loop the whole first road
+      const z = 12.6 + Math.sin(x * 0.21) * 1.5; // weave across the lane
+      const hop = Math.abs(Math.sin(x * 1.9)) * 0.16; // light bounce
+      group.position.set(x, 0.34 + hop, z);
+      ball.rotation.z -= (speed * fdt) / 0.34; // roll with travel
+      ball.rotation.x = Math.sin(x * 0.7) * 0.3;
+    };
+    return { step };
+  })();
+
+  const circlingBirds = (() => {
+    const group = new THREE.Group();
+    const wings = [];
+    for (let i = 0; i < 3; i++) {
+      const bird = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.62, 0.2),
+        standard("#1d1812", { rimStrength: 0, flatShading: true }),
+      );
+      bird.material.side = THREE.DoubleSide;
+      group.add(bird);
+      wings.push({ mesh: bird, phase: i * 2.1, radius: 6.4 + i * 1.3, alt: 11.4 + i * 0.8 });
+    }
+    scene.add(group);
+    const step = (fdt, t) => {
+      group.visible = fdt > 0;
+      if (fdt <= 0) return;
+      for (const w of wings) {
+        const a = t * 0.14 + w.phase; // slow thermal circle over the mesa line
+        w.mesh.position.set(33 + Math.cos(a) * w.radius, w.alt + Math.sin(t * 0.5 + w.phase) * 0.4, 2.5 + Math.sin(a) * w.radius * 0.55);
+        w.mesh.rotation.set(0, -a, 0.3 + Math.sin(t * 7 + w.phase) * 0.35); // bank + wing-beat
+      }
+    };
+    return { step };
+  })();
+
   const stepWorld = (dt) => {
     const frozen = visualCapture || _devCaptureFrozen;
     const fdt = frozen ? 0 : dt;
+    tumbleweed.step(fdt, waterTime);
+    circlingBirds.step(fdt, waterTime);
     tickClock(clock, fdt);
     applyDayTime();
     atmosphere.driftClouds(fdt, 1 + weather.wind * 2);
@@ -2638,6 +2788,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const boardAccept = document.getElementById("board-accept");
   const boardOptionButtons = Array.from(document.querySelectorAll("[data-option]:not(#board-accept)"));
   const boardClose = document.getElementById("board-close");
+  const boardDomRefs = createBoardDomRefs(document);
+  // Repaint the modal from the live RPG tree every time it opens: real job copy
+  // + pinned listings + Boone's memory-aware line (first-meeting → completed-job
+  // reaction → quiet). Recording the greeting AFTER the paint is deliberate —
+  // the first open still gets the introduction; later opens go quiet.
+  const refreshBoardModal = () => {
+    syncBoardDom(boardDomRefs, buildBoardView(game));
+    recordNpcGreeting(game, "warden", { at: runElapsed });
+  };
   const labelForBoardOption = (optionId) =>
     BOARD_OPTIONS.find((option) => option.id === optionId)?.label || "Accept bounty";
   const syncLiveFieldMap = () => syncFieldMapDom(fieldMapRefs, loopState.state, { playerPosition: player.position });
@@ -2670,14 +2829,22 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     optionButtons: boardOptionButtons,
     closeButton: boardClose,
     setPromptText,
+    onOpen: refreshBoardModal,
     onAccept: () => {
+      const taken = acceptStarterJob(game, { time: runElapsed });
       advance({ type: "choose_board", optionId: "accept_bounty" });
       markJobBoardAccepted(heroMeshes.jobBoard);
-      beatToast.show("Road Job Marked", "Boone chalks the cache road and points you east.");
+      syncPlayerHud();
+      beatToast.show(
+        taken.ok ? `Bounty Taken: ${taken.job?.title || "Marsh Slime Bounty"}` : "Road Job Marked",
+        "Boone chalks the cache road and points you east.",
+      );
     },
     onChoose: (optionId) => {
+      acceptStarterJob(game, { time: runElapsed }); // every board choice takes the starter bounty
       advance({ type: "choose_board", optionId });
       markJobBoardAccepted(heroMeshes.jobBoard);
+      syncPlayerHud();
       beatToast.show("Road Job Marked", `${labelForBoardOption(optionId)} changes Boone's cache note.`);
     },
     onClose: refreshLoopDom,
@@ -2697,12 +2864,22 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       return true;
     },
     onSlimeHit: ({ hp, maxHits, defeated }) => {
-      if (defeated || loopState.phase !== "slime_fight") return;
+      if (loopState.phase !== "slime_fight") return;
+      // One clean strike = one slime of the cluster felled — feeds the real
+      // bounty ledger (3 kills completes Marsh Slime Bounty).
+      recordSlimeKill(game);
+      syncPlayerHud();
+      onRunMutated(); // kills must persist per-strike (quit mid-fight keeps them)
+      if (defeated) return;
       setPromptText(`E — Strike Road Slime · ${maxHits - hp}/${maxHits} hits`);
       syncProductionHud(productionHudRefs, loopState.state, { hp, maxHp: maxHits, hitCount: maxHits - hp, defeated });
     },
     onSlimeDeath: () => {
-      if (loopState.phase === "slime_fight") advance("defeat_slime");
+      if (loopState.phase !== "slime_fight") return;
+      const gib = lootBeat(game, { source: "slime", rng: lootRng });
+      syncPlayerHud();
+      advance("defeat_slime");
+      beatToast.show("Road Slime Down", gib.drop.summary);
     },
   });
   syncProductionHud(productionHudRefs, loopState.state, encounter.getState(player.position));
@@ -2759,6 +2936,22 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // --- Combat HUD ---
   const hpFillEl = document.querySelector("#hero-panel .hp-fill");
   const hpLabelEl = document.querySelector("#hero-panel .hp-label");
+  // Real player HUD: level / gold / xp from the RPG state tree (no more
+  // hardcoded "Level 3"). Also refreshes the live job ledger view that
+  // syncProductionHud prefers over its phase-derived fallback.
+  const heroSubEl = document.querySelector("#hero-panel .hero-sub");
+  const goldValueEl = document.querySelector("#hero-panel .gold-value");
+  const xpValueEl = document.querySelector("#hero-panel .xp-value");
+  const xpFillEl = document.querySelector("#hero-panel .xp-fill");
+  function syncPlayerHud() {
+    const view = playerHudView(game);
+    if (heroSubEl) heroSubEl.textContent = view.subtitle;
+    if (goldValueEl) goldValueEl.textContent = `${view.gold}g`;
+    if (xpValueEl) xpValueEl.textContent = `XP ${view.xp}/${view.nextXp}`;
+    if (xpFillEl) xpFillEl.style.width = `${(view.xpRatio * 100).toFixed(1)}%`;
+    liveJobView = activeJobLine(game);
+  }
+  syncPlayerHud();
   function updateHpHud(st) {
     if (!st || !Number.isFinite(st.playerHp)) return;
     const max = st.playerMaxHp || 40;
@@ -2842,7 +3035,28 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (loopState.phase === "return_to_boone") {
       advance("report_to_boone");
       markJobBoardAccepted(heroMeshes.jobBoard);
-      beatToast.show("Old Road Survey", "Boone pins your Map Scrap beside the next job.");
+      const paid = claimBoardReward(game, { at: runElapsed });
+      syncPlayerHud();
+      onRunMutated(); // payout landed after advance()'s save — persist it
+      if (paid.ok && paid.reward) {
+        const r = paid.reward;
+        // Boone speaks his memory-aware turn-in line (npcMemory completed-job
+        // reaction) + the Old Road Survey hook — the same copy the board modal
+        // builds, so the spoken turn-in can't drift from the board state.
+        const view = buildBoardView(game);
+        const booneSays = view.booneLine ? view.booneLine.replace(/^Marshal Boone:\s*/, "") : "";
+        const survey = view.bodyLines.find((line) => line.includes("Old Road Survey"))
+          || "Boone pins your Map Scrap beside the next job.";
+        const body = paid.levelsGained > 0
+          ? `LEVEL UP — you reached level ${game.player.level}. ${booneSays || survey}`
+          : booneSays
+            ? `${booneSays} ${survey}`
+            : survey;
+        beatToast.show(`Bounty Paid: +${r.gold || 0}g, +${r.xp || 0} XP`, body);
+        if (paid.levelsGained > 0) audioView?.play("chime");
+      } else {
+        beatToast.show("Old Road Survey", "Boone pins your Map Scrap beside the next job.");
+      }
       return;
     }
     if (loopState.phase === "survey_teaser") {
@@ -2872,9 +3086,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const handleSmokeCache = () => {
     if (loopState.phase !== "cache_clue") return;
     focusBeat("inspection", 0.9);
-    const clueLine = loopState.state.objectiveText;
     advance("open_cache");
-    beatToast.show("Cache Clue", clueLine);
+    const found = lootBeat(game, { source: "cache", rng: lootRng });
+    syncPlayerHud();
+    onRunMutated(); // loot landed after advance()'s save — persist it
+    audioView?.play("chime");
+    beatToast.show("Cache Opened", found.drop.summary);
   };
   const handleSlimeTell = () => {
     if (loopState.phase !== "slime_tell") return;
@@ -2888,9 +3105,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (encounter.strike(player.position)) {
       const state = encounter.getState(player.position);
       focusBeat(state.defeated ? "objective" : "inspection", state.defeated ? 0.8 : 0.45);
-      if (state.defeated) {
-        beatToast.show("Road Slime Down", "The wagon wreck is clear enough to salvage.");
-      } else {
+      if (!state.defeated) {
+        // Death toast (with the gib loot summary) comes from onSlimeDeath.
         beatToast.show("Road Slime Hit", `${state.hitCount}/${state.maxHp} strikes landed. Keep it pinned.`);
       }
       syncLiveFieldMap();
@@ -2901,7 +3117,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (loopState.phase !== "wagon_salvage") return;
     focusBeat("inspection", 0.95);
     advance("inspect_wagon");
-    beatToast.show("Map Scrap Found", "+ Map Scrap. Return it to Boone's board.");
+    const salvage = lootBeat(game, { source: "wagon", rng: lootRng });
+    syncPlayerHud();
+    onRunMutated(); // loot landed after advance()'s save — persist it
+    beatToast.show("Map Scrap Found", `+ Map Scrap. ${salvage.drop.summary}`);
   };
 
   interaction.registerHandler("jobBoard", handleJobBoard);
@@ -3098,6 +3317,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     };
     window.__westward3dTest = {
       getLoopState: () => loopState.state,
+      getGameState: () => JSON.parse(JSON.stringify(buildGameSaveSlice(game))),
       getPlayerPosition: () => player.position,
       movePlayerToKind,
       interact(kind) {
@@ -3173,6 +3393,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       loopState: { ...snap, encounterState },
       world: { dayTime: clock.dayTime, weatherKind: snapshot.weather?.kind || "clear" },
       runStats: { startedAt: runStartedAt, phaseReached: snap.phase },
+      game: buildGameSaveSlice(game),
       ...overrides,
     });
   }

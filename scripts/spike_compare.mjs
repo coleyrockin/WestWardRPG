@@ -197,7 +197,7 @@ async function captureOld(context) {
   const page = await context.newPage();
   collectConsole(page, errors);
   console.log("[capture] old canvas: loading index.html");
-  await page.goto(`${BASE}/index.html`, { waitUntil: "load" });
+  await page.goto(`${BASE}/index.html`, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForSelector("#game");
   // Wait for the smoke probe surface — proves the Canvas build booted.
   await waitForPagePredicate(page,
@@ -253,9 +253,13 @@ async function captureNew(context) {
   const page = await context.newPage();
   collectConsole(page, errors);
   console.log("[capture] new spike: loading spikes/render3d.html");
-  await withTimeout(page.goto(`${BASE}/spikes/render3d.html`, { waitUntil: "load" }), "load spikes/render3d.html", 15000);
+  await withTimeout(page.goto(`${BASE}/spikes/render3d.html`, { waitUntil: "domcontentloaded" }), "load spikes/render3d.html", 15000);
   await page.waitForSelector("#scene");
   await waitForPagePredicate(page, () => window.__spikeReady === true, "new render3d ready signal", 45000);
+  // Ride past the title screen so the camera intro releases and gameplay
+  // framing (composition metrics + screenshots) matches what a player sees.
+  await page.evaluate(() => document.getElementById("title-start")?.click());
+  await page.waitForTimeout(150);
   await waitForPagePredicate(page, () => Boolean(
     window.__westward3dTest?.getHeroVisibility
       && window.__westward3dTest?.getPlayerVisibility

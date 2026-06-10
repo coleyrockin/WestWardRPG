@@ -67,15 +67,34 @@ describe("buildRunPayload", () => {
 });
 
 describe("migrateRunPayload", () => {
-  it("is identity for a current v1 payload", () => {
+  it("is identity for a current v2 payload", () => {
     const p = buildRunPayload(sampleCtx(), 1700000000000);
+    expect(p.version).toBe(RUN_VERSION);
     expect(migrateRunPayload(p)).toBe(p);
   });
 
-  it("rejects non-frontier-run / malformed payloads", () => {
+  it("backfills a v1 payload to v2 with game:null (loader builds + reconciles)", () => {
+    const v1 = { ...buildRunPayload(sampleCtx(), 1700000000000), version: 1 };
+    delete (v1 as Record<string, unknown>).game;
+    const migrated = migrateRunPayload(v1);
+    expect(migrated?.version).toBe(RUN_VERSION);
+    expect(migrated?.game).toBeNull();
+    expect(migrated?.loopState.phase).toBe(v1.loopState.phase); // run progress kept
+  });
+
+  it("rejects non-frontier-run / malformed / future payloads", () => {
     expect(migrateRunPayload(null)).toBeNull();
     expect(migrateRunPayload({ schema: "westward-render-snapshot", version: 1 })).toBeNull();
     expect(migrateRunPayload([])).toBeNull();
+    expect(migrateRunPayload({ schema: RUN_SCHEMA, version: RUN_VERSION + 1 })).toBeNull();
+  });
+
+  it("carries the game slice through buildRunPayload verbatim", () => {
+    const game = { player: { level: 2, gold: 50 }, inventory: { Potion: 1 } };
+    const p = buildRunPayload(sampleCtx({ game }), 1700000000000);
+    expect(p.game).toEqual(game);
+    const bare = buildRunPayload(sampleCtx(), 1700000000000);
+    expect(bare.game).toBeNull();
   });
 });
 
