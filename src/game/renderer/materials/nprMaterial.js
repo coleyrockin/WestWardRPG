@@ -28,27 +28,35 @@ import {
 
 const col = (hex) => new THREE.Color(hex);
 
-// One shared hard-stepped gradient map for every NPR surface — three luminance
-// bands (deep shadow → mid → lit). Built lazily so module import stays side-
-// effect-free for node tests.
+// Shared gradient maps for every NPR surface, cached per ramp (the old cache
+// ignored `steps` after the first call — custom ramps silently got the default).
 //
-// Shadow step tuning history:
+// Ramp history:
 //   [55,100,255] → 55 (≈21%) shadow band × dark albedos crushed faces to near-black (murk).
 //   [100,160,255] → safe floor; bands separated but shadows felt light / low drama.
-//   [85,145,255] → current: deeper shadow band (≈33%) for more graphic-novel contrast
-//                  while staying above the murk threshold. Mid step 145 tightens the
-//                  lit→shadow transition for a harder inked-panel feel.
-let gradientMap = null;
-export function celGradientMap(steps = [85, 145, 255]) {
-  if (gradientMap) return gradientMap;
+//   [85,145,255] → "cel3": hard 3-step inked-panel banding (NearestFilter) — the
+//                  original graphic-novel look, kept for stylized one-offs.
+//   HYBRID_RAMP_STEPS (5 steps + LinearFilter) → current default: "soft-quantized
+//   Lambert". Lighting reads continuous — sun shadows and form shading actually
+//   land instead of being swallowed between three hard bands — while the step
+//   structure keeps a painterly identity. The realistic-leaning hybrid pivot.
+export const HYBRID_RAMP_STEPS = [60, 105, 150, 200, 255];
+const gradientMaps = new Map();
+export function celGradientMap(steps = HYBRID_RAMP_STEPS) {
+  const key = steps.join(",");
+  const cached = gradientMaps.get(key);
+  if (cached) return cached;
   const data = Uint8Array.from(steps);
   const tex = new THREE.DataTexture(data, data.length, 1, THREE.RedFormat);
-  tex.minFilter = THREE.NearestFilter;
-  tex.magFilter = THREE.NearestFilter;
+  // 3-step ramps stay hard-edged (NearestFilter, classic cel); wider ramps blend
+  // between steps (LinearFilter) so shading reads continuous.
+  const filter = steps.length <= 3 ? THREE.NearestFilter : THREE.LinearFilter;
+  tex.minFilter = filter;
+  tex.magFilter = filter;
   tex.generateMipmaps = false;
   tex.colorSpace = THREE.NoColorSpace;
   tex.needsUpdate = true;
-  gradientMap = tex;
+  gradientMaps.set(key, tex);
   return tex;
 }
 
@@ -87,7 +95,8 @@ export function createNprMaterial(hex, opts = {}) {
     flatShading = true,
     rimColor = "#9fb4ff",
     rimPower = 2.8,     // wider silhouette coverage (was 3.5 — too tight, missed wide-angle edges)
-    rimStrength = 1.0,  // slightly stronger punch (was 0.9)
+    rimStrength = 0.45, // eased from 1.0 — real shadows + the 5-step ramp now do
+                        // silhouette separation; full-strength rim read as a glow outline
 
     map = null,
   } = opts;

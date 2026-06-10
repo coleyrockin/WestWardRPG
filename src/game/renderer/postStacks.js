@@ -25,15 +25,18 @@ import { godrays } from "three/addons/tsl/display/GodraysNode.js";
 export const REGION_POST = {
   frontier: {
     inkColor: "#0a0408",
-    edgeStrength: 2.9,  // crisper comic linework (was 2.65)
+    // Realistic-leaning hybrid retune: ink eases from comic linework (2.9) to
+    // silhouette-only accents — form/detail now comes from real shadows + the
+    // 5-step ramp, so heavy interior edges read as noise instead of style.
+    edgeStrength: 1.7,
     // Sobel response below `edgeLo` is ignored (kills faint ground gradients) and
     // ramps to full ink by `edgeHi`.
-    edgeLo: 0.04,       // capture slightly more geometry edges (was 0.045)
-    edgeHi: 0.28,
+    edgeLo: 0.06,
+    edgeHi: 0.32,
     bloomBase: 0.11, // multiplied by palette.bloom
     bloomRadius: 0.7, // wider painterly glow
     bloomThreshold: 0.95, // only true emissives (lamps/beacon/sun disc) bloom — sky/walls stay crisp
-    grainIntensity: 0.08,
+    grainIntensity: 0.05, // grain whisper, not texture (was 0.08)
   },
   // Scaffolded — shipped in Phase 6.
   ashfall: { inkColor: "#1a0d06", edgeStrength: 2.0, edgeLo: 0.06, edgeHi: 0.24, bloomBase: 0.3, bloomRadius: 0.6, bloomThreshold: 0.82, grainIntensity: 0.14 },

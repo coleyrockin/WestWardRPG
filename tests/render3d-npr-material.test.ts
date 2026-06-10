@@ -13,10 +13,19 @@ describe("NPR uber-material", () => {
     const mat = createNprMaterial("#caa66c");
     expect(mat.isMeshToonNodeMaterial).toBe(true);
     expect(mat.flatShading).toBe(true);
-    // hard-stepped cel ramp, sampled without interpolation
+    // hybrid 5-step ramp, blended between steps (soft-quantized Lambert)
     expect(mat.gradientMap).toBeTruthy();
-    expect(mat.gradientMap.minFilter).toBe(1003); // THREE.NearestFilter
-    expect(mat.gradientMap.magFilter).toBe(1003);
+    expect(mat.gradientMap.image.width).toBe(5);
+    expect(mat.gradientMap.minFilter).toBe(1006); // THREE.LinearFilter
+    expect(mat.gradientMap.magFilter).toBe(1006);
+  });
+
+  it("keeps the classic 3-step cel ramp available, hard-edged, per-ramp cached", () => {
+    const cel3 = celGradientMap([85, 145, 255]);
+    expect(cel3.image.width).toBe(3);
+    expect(cel3.minFilter).toBe(1003); // THREE.NearestFilter — classic cel stays crisp
+    expect(cel3).not.toBe(celGradientMap()); // distinct from the hybrid default
+    expect(cel3).toBe(celGradientMap([85, 145, 255])); // cached per steps key
   });
 
   it("carries base color through", () => {
