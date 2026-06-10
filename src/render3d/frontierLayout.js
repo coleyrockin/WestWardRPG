@@ -226,60 +226,76 @@ const HERO_OBJECTS = [
 // Walkable town edge to the NW of spawn — spread along a proper main street so
 // buildings don't overlap (each saloon/store is ~2.8 units wide at scale 1.0-1.35,
 // so min 3.5 units clear between centres; larger buildings need 4+).
+// DUSTWARD v2 — west approach. The hero-model trio now WELCOMES you to town
+// (it used to hide at x≈-6 behind the spawn camera): saloon + assay flank the
+// north side of the road in, the dry-goods store answers from the south, and
+// the DUSTWARD gate arch (procedural, spike.js buildTownGate) spans the road
+// at x 7.6 — posts on the frontage lines, lane clear. All heroTown* centers
+// sit west of x 5.5 so the slab-blocker audit box never sees them.
 const TOWN_EDGE = [
-  { kind: "heroTownSaloon", label: "Dustward Saloon",  x: -6.0, y: -0.25, color: "#a87848", size: 0.92 },
-  { kind: "heroTownStore", label: "Dry Goods Store",  x: 0.5,  y: -0.3, color: "#9a7840", size: 0.78 },
-  { kind: "heroTownAssay", label: "Assay Office", x: 6.2, y: -0.25, color: "#886038", size: 0.68 },
-  { kind: "porch",        label: "Saloon Porch",     x: -5.2, y: 1.75, color: "#5a4327", size: 0.62 },
-  { kind: "porch",        label: "Store Porch",      x: 0.8,  y: 1.75, color: "#5a4327", size: 0.58 },
-  { kind: "lamp",         label: "Saloon Lamp",      x: -1.9, y: 2.25, color: "#ffe0a0", size: 0.44, depthLane: "foreground" },
-  { kind: "sign",         label: "Saloon Shingle",   x: -5.2, y: 0.05, color: "#ffd77b", size: 0.56 },
-  { kind: "fence",        label: "Town Hitching Rail", x: 6.8, y: 2.65, color: "#a47b4c", size: 0.55, depthLane: "foreground" },
-  { kind: "cactus",       label: "Town Cactus",      x: -1.3, y: 6.9,  color: "#5c7a3a", size: 0.64 },
+  { kind: "townGate",       label: "Dustward Gate Arch", x: 7.6, y: 8.9,  color: "#6b4a2c", size: 1.0 },
+  { kind: "heroTownSaloon", label: "Westgate Saloon",    x: 2.6, y: 3.4,  color: "#a87848", size: 0.92 },
+  { kind: "heroTownAssay",  label: "Land & Assay",       x: 5.0, y: 13.2, color: "#886038", size: 0.68, yaw: Math.PI },
+  { kind: "heroTownStore",  label: "Pioneer Dry Goods",  x: 2.4, y: 13.1, color: "#9a7840", size: 0.78, yaw: Math.PI },
+  { kind: "porch",          label: "Westgate Porch",     x: 2.8, y: 4.9,  color: "#5a4327", size: 0.62 },
+  { kind: "lamp",           label: "Westgate Lamp",      x: 5.4, y: 4.8,  color: "#ffe0a0", size: 0.44 },
+  { kind: "sign",           label: "Westgate Shingle",   x: 1.6, y: 4.75, color: "#ffd77b", size: 0.56 },
+  { kind: "fence",          label: "Approach Rail",      x: 5.2, y: 11.9, color: "#a47b4c", size: 0.55 },
 ];
 
 const PRODUCTION_MAIN_STREET = [
-  // North boardwalk/storefront edge. Facades sit just outside the first-frame
-  // blocker audit band while their windows/signs still read in the opening shot.
-  { kind: "productionSaloon", label: "Drifter Saloon", x: 6.4, y: 1.75, color: "#a87848", size: 0.88, yaw: 0 },
-  { kind: "productionStore", label: "Lamp Dry Goods", x: 11.4, y: 1.55, color: "#9a7840", size: 0.84, yaw: 0 },
-  { kind: "productionAssay", label: "Boone Assay", x: 16.2, y: 1.62, color: "#886038", size: 0.78, yaw: 0 },
-  { kind: "productionBoardwalk", label: "North Boardwalk", x: 6.7, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
-  { kind: "productionBoardwalk", label: "North Boardwalk", x: 10.1, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
-  { kind: "productionBoardwalk", label: "North Boardwalk", x: 13.5, y: 3.28, color: "#5d3f24", size: 0.92, yaw: 0 },
-  { kind: "productionBoardwalk", label: "North Boardwalk", x: 16.9, y: 3.28, color: "#5d3f24", size: 0.88, yaw: 0 },
-  { kind: "hangingSign", label: "Drifter Sign", x: 7.05, y: 3.55, color: "#ffd77b", size: 0.9, yaw: 0.08 },
-  { kind: "hangingSign", label: "Dry Goods Sign", x: 12.0, y: 3.5, color: "#ffd77b", size: 0.82, yaw: -0.06 },
-  { kind: "windowGlowPanel", label: "Saloon Window Glow", x: 5.35, y: 3.18, color: "#ffad63", size: 1.0, yaw: 0 },
-  { kind: "windowGlowPanel", label: "Saloon Window Glow", x: 7.4, y: 3.18, color: "#ffad63", size: 1.0, yaw: 0 },
-  { kind: "windowGlowPanel", label: "Store Window Glow", x: 10.65, y: 3.12, color: "#ffbf72", size: 0.9, yaw: 0 },
-  { kind: "windowGlowPanel", label: "Store Window Glow", x: 12.15, y: 3.12, color: "#ffbf72", size: 0.9, yaw: 0 },
-  { kind: "windowGlowPanel", label: "Marshal Hall Window Glow", x: 21.92, y: 3.42, color: "#ff9f5d", size: 0.74, yaw: -0.04 },
-  { kind: "lanternString", label: "North Lantern String", x: 11.0, y: 4.15, color: "#ffb866", size: 0.9, yaw: 0 },
+  // DUSTWARD v2 — NORTH frontage. One dense street wall: centers on y≈3.6 so
+  // fronts land at y≈4.1, shoulder-to-shoulder from the gate to the church bend.
+  // The frontage BREAKS at x 12.8–15.6 for the board plaza (the town square the
+  // first mission starts in). production* kinds are slab-audit-exempt, so this
+  // density inside the first-frame box is legal; the y3.6 line keeps every
+  // building outside the spawn→board camera wedge (y ≥ 6.5).
+  { kind: "productionStore", label: "Lamp Dry Goods", x: 9.2, y: 3.6, color: "#9a7840", size: 0.84, yaw: 0 },
+  { kind: "productionAssay", label: "Boone Assay", x: 12.0, y: 3.7, color: "#886038", size: 0.78, yaw: 0 },
+  { kind: "productionStore", label: "Dustward Mercantile", x: 16.4, y: 3.7, color: "#8a6a3c", size: 0.84, yaw: 0 },
+  { kind: "productionSaloon", label: "Drifter Saloon", x: 22.4, y: 3.6, color: "#a87848", size: 0.8, yaw: 0 },
+  // Continuous north boardwalk, gate to bend.
+  { kind: "productionBoardwalk", label: "North Boardwalk", x: 8.6, y: 4.5, color: "#5d3f24", size: 0.92, yaw: 0 },
+  { kind: "productionBoardwalk", label: "North Boardwalk", x: 11.8, y: 4.5, color: "#5d3f24", size: 0.92, yaw: 0 },
+  { kind: "productionBoardwalk", label: "North Boardwalk", x: 16.2, y: 4.5, color: "#5d3f24", size: 0.92, yaw: 0 },
+  { kind: "productionBoardwalk", label: "North Boardwalk", x: 19.5, y: 4.5, color: "#5d3f24", size: 0.92, yaw: 0 },
+  { kind: "productionBoardwalk", label: "North Boardwalk", x: 22.8, y: 4.5, color: "#5d3f24", size: 0.88, yaw: 0 },
+  { kind: "hangingSign", label: "Mercantile Sign", x: 16.9, y: 4.35, color: "#ffd77b", size: 0.82, yaw: -0.06 },
+  { kind: "hangingSign", label: "Lucky Lantern Sign", x: 19.9, y: 4.3, color: "#ffd77b", size: 0.9, yaw: 0.08 },
+  { kind: "windowGlowPanel", label: "Dry Goods Glow", x: 8.6, y: 4.18, color: "#ffbf72", size: 0.9, yaw: 0 },
+  { kind: "windowGlowPanel", label: "Dry Goods Glow", x: 9.9, y: 4.18, color: "#ffbf72", size: 0.9, yaw: 0 },
+  { kind: "windowGlowPanel", label: "Assay Glow", x: 11.5, y: 4.25, color: "#ffad63", size: 0.9, yaw: 0 },
+  { kind: "windowGlowPanel", label: "Assay Glow", x: 12.6, y: 4.25, color: "#ffad63", size: 0.9, yaw: 0 },
+  { kind: "windowGlowPanel", label: "Mercantile Glow", x: 15.8, y: 4.25, color: "#ffbf72", size: 0.9, yaw: 0 },
+  { kind: "windowGlowPanel", label: "Mercantile Glow", x: 17.1, y: 4.25, color: "#ffbf72", size: 0.9, yaw: 0 },
+  { kind: "windowGlowPanel", label: "Drifter Glow", x: 21.9, y: 4.15, color: "#ff9f5d", size: 0.8, yaw: 0 },
+  { kind: "lanternString", label: "North Lantern String", x: 10.4, y: 4.4, color: "#ffb866", size: 0.9, yaw: 0 },
 
-  // South boardwalk/storefront edge, mirrored to frame the road without
-  // swallowing the third-person camera or blocking the spawn-to-board lane.
-  { kind: "productionStore", label: "Dustward Hotel", x: 7.2, y: 15.25, color: "#9a7144", size: 0.74, yaw: Math.PI },
-  { kind: "productionSaloon", label: "South Porch Saloon", x: 12.2, y: 15.48, color: "#7a5230", size: 0.76, yaw: Math.PI },
-  { kind: "productionAssay", label: "Marshal Office", x: 17.0, y: 15.3, color: "#6a4630", size: 0.7, yaw: Math.PI },
-  { kind: "productionStore", label: "Roadside Undertaker", x: 20.6, y: 13.7, color: "#70452f", size: 0.82, yaw: Math.PI - 0.08 },
-  { kind: "productionSaloon", label: "Far South Hotel", x: 24.4, y: 13.0, color: "#583626", size: 0.68, yaw: Math.PI - 0.12 },
-  { kind: "productionBoardwalk", label: "South Boardwalk", x: 6.7, y: 13.42, color: "#5d3f24", size: 0.88, yaw: Math.PI },
-  { kind: "productionBoardwalk", label: "South Boardwalk", x: 10.1, y: 13.42, color: "#5d3f24", size: 0.9, yaw: Math.PI },
-  { kind: "productionBoardwalk", label: "South Boardwalk", x: 13.5, y: 13.42, color: "#5d3f24", size: 0.9, yaw: Math.PI },
-  { kind: "productionBoardwalk", label: "South Boardwalk", x: 16.9, y: 13.42, color: "#5d3f24", size: 0.86, yaw: Math.PI },
-  { kind: "productionBoardwalk", label: "Undertaker Boardwalk", x: 20.5, y: 12.08, color: "#4a3423", size: 0.78, yaw: Math.PI - 0.08 },
-  { kind: "windowGlowPanel", label: "Hotel Window Glow", x: 6.52, y: 13.72, color: "#ffbf72", size: 0.9, yaw: Math.PI },
-  { kind: "windowGlowPanel", label: "Hotel Window Glow", x: 7.92, y: 13.72, color: "#ffbf72", size: 0.9, yaw: Math.PI },
-  { kind: "windowGlowPanel", label: "South Saloon Glow", x: 11.35, y: 13.76, color: "#ffad63", size: 1.0, yaw: Math.PI },
-  { kind: "windowGlowPanel", label: "South Saloon Glow", x: 12.9, y: 13.76, color: "#ffad63", size: 1.0, yaw: Math.PI },
-  { kind: "lanternString", label: "South Lantern String", x: 12.0, y: 12.84, color: "#ffb866", size: 0.86, yaw: Math.PI },
-  { kind: "windowGlowPanel", label: "Undertaker Window Glow", x: 20.2, y: 12.32, color: "#ff9b58", size: 0.82, yaw: Math.PI - 0.08 },
-  { kind: "windowGlowPanel", label: "Far Hotel Window Glow", x: 23.96, y: 11.96, color: "#ff9b58", size: 0.72, yaw: Math.PI - 0.12 },
-  { kind: "hangingSign", label: "Undertaker Hanging Sign", x: 19.65, y: 12.28, color: "#ffc66e", size: 0.72, yaw: Math.PI - 0.08 },
-  // ONE crossing wire, crowning the board approach — the old three crossing
-  // wires (over spawn, mid-street, far street) read as overhead clutter.
+  // DUSTWARD v2 — SOUTH frontage, mirrored (yaw π), centers on y≈12.9 so fronts
+  // land at y≈12.4 — face-to-face street width ≈ 8.3u instead of the old ~13.5u
+  // plain. The grand Frontier Hotel (procedural landmark) anchors x 18.4 facing
+  // the Lucky Lantern saloon across the street.
+  { kind: "productionSaloon", label: "South Porch Saloon", x: 10.0, y: 12.9, color: "#7a5230", size: 0.8, yaw: Math.PI },
+  { kind: "productionStore", label: "Dustward Hotel Annex", x: 11.8, y: 13.0, color: "#9a7144", size: 0.86, yaw: Math.PI },
+  { kind: "productionAssay", label: "Marshal Office", x: 15.0, y: 12.9, color: "#6a4630", size: 0.74, yaw: Math.PI },
+  { kind: "productionStore", label: "Roadside Undertaker", x: 21.8, y: 12.9, color: "#70452f", size: 0.78, yaw: Math.PI },
+  { kind: "productionBoardwalk", label: "South Boardwalk", x: 7.4, y: 11.9, color: "#5d3f24", size: 0.88, yaw: Math.PI },
+  { kind: "productionBoardwalk", label: "South Boardwalk", x: 10.7, y: 11.9, color: "#5d3f24", size: 0.9, yaw: Math.PI },
+  { kind: "productionBoardwalk", label: "South Boardwalk", x: 14.0, y: 11.9, color: "#5d3f24", size: 0.9, yaw: Math.PI },
+  { kind: "productionBoardwalk", label: "South Boardwalk", x: 17.3, y: 11.9, color: "#5d3f24", size: 0.86, yaw: Math.PI },
+  { kind: "productionBoardwalk", label: "South Boardwalk", x: 20.6, y: 11.9, color: "#5d3f24", size: 0.86, yaw: Math.PI },
+  { kind: "windowGlowPanel", label: "South Saloon Glow", x: 8.0, y: 12.35, color: "#ffad63", size: 0.9, yaw: Math.PI },
+  { kind: "windowGlowPanel", label: "South Saloon Glow", x: 9.3, y: 12.35, color: "#ffad63", size: 0.9, yaw: Math.PI },
+  { kind: "windowGlowPanel", label: "Annex Glow", x: 11.2, y: 12.45, color: "#ffbf72", size: 0.9, yaw: Math.PI },
+  { kind: "windowGlowPanel", label: "Annex Glow", x: 12.5, y: 12.45, color: "#ffbf72", size: 0.9, yaw: Math.PI },
+  { kind: "windowGlowPanel", label: "Marshal Glow", x: 14.5, y: 12.4, color: "#ff9f5d", size: 0.85, yaw: Math.PI },
+  { kind: "windowGlowPanel", label: "Undertaker Glow", x: 21.3, y: 12.4, color: "#ff9b58", size: 0.82, yaw: Math.PI },
+  { kind: "lanternString", label: "South Lantern String", x: 11.4, y: 12.15, color: "#ffb866", size: 0.86, yaw: Math.PI },
+  { kind: "hangingSign", label: "Undertaker Hanging Sign", x: 21.2, y: 12.2, color: "#ffc66e", size: 0.72, yaw: Math.PI },
+  // TWO crossing wires only, each marking a destination: one crowning the board
+  // plaza, one between the Lucky Lantern saloon and the Frontier Hotel.
   { kind: "lanternString", label: "Board Crossing Lanterns", x: 13.6, y: 8.75, color: "#ffb866", size: 0.8, yaw: Math.PI / 2 },
+  { kind: "lanternString", label: "Saloon-Hotel Lanterns", x: 18.9, y: 8.6, color: "#ffb866", size: 0.82, yaw: Math.PI / 2 },
 
   // Bounty street life: silhouettes and props read as inhabited without
   // becoming gameplay blockers in the main road lane.
@@ -295,7 +311,7 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "hitchingRail", label: "North Hitching Rail", x: 5.2, y: 4.55, color: "#4a3526", size: 0.82, yaw: 0.04 },
   { kind: "hitchingRail", label: "South Hitching Rail", x: 15.6, y: 12.55, color: "#4a3526", size: 0.78, yaw: Math.PI - 0.08 },
   { kind: "barrelCrateCluster", label: "Saloon Cargo", x: 4.8, y: 4.25, color: "#7a5230", size: 0.88, yaw: 0.28 },
-  { kind: "barrelCrateCluster", label: "Dry Goods Cargo", x: 13.8, y: 4.1, color: "#7a5230", size: 0.82, yaw: -0.18 },
+  { kind: "barrelCrateCluster", label: "Mercantile Cargo", x: 17.6, y: 4.3, color: "#7a5230", size: 0.82, yaw: -0.18 },
   { kind: "barrelCrateCluster", label: "South Porch Cargo", x: 10.0, y: 12.55, color: "#7a5230", size: 0.84, yaw: 0.12 },
   // Wheel ruts now run ALONG the road (small yaw following its easterly drift)
   // — the old random diagonals read as smears, not wagon tracks.
@@ -310,14 +326,14 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "bountyEmblem", label: "Boone Bounty Emblem", x: 13.0, y: 4.6, color: "#ffd77b", size: 0.75, yaw: Math.PI / 2 },
 ];
 
-// Cross-street spur — north-south pocket off the main road so the town reads as
-// a place with depth, not a corridor. Low boardwalk + a storefront facing east.
+// Cross-street spur — DUSTWARD v2: a north alley out of the board plaza between
+// the Assay and the Mercantile, leading back to the water-tower yard. Gives the
+// plaza an exit and the second row a reason to exist.
 const CROSS_STREET = [
-  { kind: "productionBoardwalk", label: "Cross Street Plank", x: 15.0, y: 6.2, color: "#5d3f24", size: 0.72, yaw: Math.PI / 2 },
-  { kind: "productionBoardwalk", label: "Cross Street Plank", x: 15.0, y: 7.4, color: "#5d3f24", size: 0.72, yaw: Math.PI / 2 },
-  { kind: "productionStore", label: "Cross Street Mercantile", x: 14.2, y: 6.8, color: "#9a7840", size: 0.62, yaw: Math.PI / 2 },
-  { kind: "lampLow", label: "Cross Street Lamp", x: 15.6, y: 6.8, color: "#ffe6a8", size: 0.52 },
-  { kind: "brokenFence", label: "Cross Street Rail", x: 15.0, y: 5.5, color: "#8d6540", size: 0.55, yaw: Math.PI / 2 },
+  { kind: "productionBoardwalk", label: "Alley Plank", x: 14.3, y: 2.6, color: "#5d3f24", size: 0.7, yaw: Math.PI / 2 },
+  { kind: "productionBoardwalk", label: "Alley Plank", x: 14.3, y: 1.2, color: "#5d3f24", size: 0.7, yaw: Math.PI / 2 },
+  { kind: "lampLow", label: "Alley Lamp", x: 14.9, y: 2.0, color: "#ffe6a8", size: 0.52 },
+  { kind: "brokenFence", label: "Alley Rail", x: 13.7, y: 1.6, color: "#8d6540", size: 0.55, yaw: Math.PI / 2 },
 ];
 
 // Set-back SECOND building rank behind the north storefront strip. The town used
@@ -334,7 +350,7 @@ const BACK_ROW = [
   { kind: "productionAssay",  label: "Back Row Land Office", x: 3.9,  y: -0.1,  color: "#54382a", size: 0.6,  yaw: 0.06 },
   { kind: "productionStore",  label: "Back Row Granary",     x: 8.9,  y: -0.9,  color: "#634330", size: 0.66, yaw: 0.04 },
   { kind: "productionSaloon", label: "Back Row Saloon",      x: 13.8, y: -1.1,  color: "#583828", size: 0.7,  yaw: -0.05 },
-  { kind: "productionStore",  label: "Back Row Mercantile",  x: 19.0, y: -0.5,  color: "#6a4a32", size: 0.64, yaw: -0.07 },
+  { kind: "productionStore",  label: "Back Row Mercantile",  x: 17.2, y: -0.8,  color: "#6a4a32", size: 0.64, yaw: -0.07 },
   { kind: "productionSaloon", label: "Back Row Livery",      x: 29.0, y: 0.55,  color: "#4f3326", size: 0.68, yaw: -0.11 },
 ];
 
@@ -343,8 +359,9 @@ const ROAD_FLORA = [
   { kind: "sageCluster", label: "Roadside Sage", x: 10.9, y: 6.1, color: "#687a42", size: 1.1 },
   { kind: "sageCluster", label: "Board Sage", x: 13.2, y: 6.3, color: "#74864a", size: 0.95 },
   { kind: "roadGrass", label: "South Road Grass", x: 12.2, y: 11.6, color: "#8f8a56", size: 0.98 },
-  { kind: "cactus", label: "Tall Cactus", x: 16.6, y: 7.9, color: "#577538", size: 1.0 },
-  { kind: "deadTree", label: "Lone Dead Tree", x: 18.2, y: 6.9, color: "#4a3a28", size: 1.1 },
+  // v2: pulled out of the now-dense street lane onto the bend shoulders.
+  { kind: "cactus", label: "Tall Cactus", x: 24.6, y: 10.4, color: "#577538", size: 1.0 },
+  { kind: "deadTree", label: "Lone Dead Tree", x: 28.6, y: 7.4, color: "#4a3a28", size: 1.1 },
   { kind: "sageCluster", label: "Road Scrub", x: 23.4, y: 9.6, color: "#657744", size: 0.85 },
   { kind: "rock", label: "Road Rock", x: 27.8, y: 5.3, color: "#6a5f55", size: 0.9 },
   { kind: "cactus", label: "Twin Cactus", x: 34.0, y: 10.8, color: "#5c7a3a", size: 0.85 },
@@ -485,7 +502,10 @@ const BOARD_PLAZA = [
 // the road at the town edge, x>21 so it's outside the production-count box). Geometry
 // + collision walls share SALOON_DIMS (spike.js buildWalkInSaloon / worldProxies).
 const WALKIN_SALOON = [
-  { kind: "walkInSaloon", label: "The Lucky Lantern Saloon", x: 22.5, y: 1.25, color: "#6b4a2c", size: 1.08 },
+  // DUSTWARD v2: the one enterable building moves from its old orphan lot into
+  // the north frontage as the mid-street anchor — door meets the boardwalk,
+  // facing the Frontier Hotel across the street.
+  { kind: "walkInSaloon", label: "The Lucky Lantern Saloon", x: 19.3, y: 2.7, color: "#6b4a2c", size: 1.0 },
 ];
 
 // Landmark skyline — five distinctive procedural buildings set on the open north
@@ -493,11 +513,16 @@ const WALKIN_SALOON = [
 // the rooftops as a varied silhouette: a church spire, a grand hotel, a water tower,
 // a blacksmith chimney, and a prairie windmill. Each has a real collision footprint
 // (worldProxies). North of the first-frame wedge; none are slab-blocker kinds.
+// DUSTWARD v2 — landmarks join the street instead of hiding behind it:
+// the church CLOSES the main-street vista at the eastern bend (visible from the
+// gate), the grand hotel faces the walk-in saloon, the forge takes the SE
+// corner lot with its coal glow facing the street, the water tower rises
+// behind the north row, and the windmill keeps the far-east skyline.
 const LANDMARK_BUILDINGS = [
-  { kind: "church",     label: "Dustward Chapel",     x: 13.5, y: -2.2, color: "#cdb89a", size: 1.15 },
-  { kind: "hotel",      label: "The Frontier Hotel",  x: 20.5, y: -2.8, color: "#8a5a3a", size: 1.12 },
-  { kind: "waterTower", label: "Town Water Tower",    x: 28.0, y: -1.2, color: "#6e5236", size: 1.2 },
-  { kind: "blacksmith", label: "Dustward Forge",      x: 34.0, y: -2.0, color: "#463528", size: 1.05 },
+  { kind: "church",     label: "Dustward Chapel",     x: 26.2, y: 3.4,  color: "#cdb89a", size: 1.1 },
+  { kind: "hotel",      label: "The Frontier Hotel",  x: 18.4, y: 13.6, color: "#8a5a3a", size: 1.0, yaw: Math.PI },
+  { kind: "waterTower", label: "Town Water Tower",    x: 20.8, y: 0.6,  color: "#6e5236", size: 1.2 },
+  { kind: "blacksmith", label: "Dustward Forge",      x: 24.8, y: 13.8, color: "#463528", size: 1.0 },
   { kind: "windmill",   label: "Prairie Windmill",    x: 42.0, y: 0.2,  color: "#7a5c3a", size: 1.1 },
 ];
 

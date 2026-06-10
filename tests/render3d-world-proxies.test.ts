@@ -30,13 +30,17 @@ describe("worldProxies — buildProxies", () => {
   const proxies = buildProxies(placements);
 
   // Most physical kinds emit exactly one AABB; the walk-in saloon emits a 5-wall
-  // ring (back + 2 sides + 2 front segments flanking the doorway gap).
+  // ring (back + 2 sides + 2 front segments flanking the doorway gap) and the
+  // town gate emits its two posts (the road lane under the beam stays open).
   const SALOON_WALLS = 5;
+  const GATE_POSTS = 2;
 
-  it("emits one proxy per physical placement (saloon emits its wall ring)", () => {
+  it("emits one proxy per physical placement (multi-AABB kinds counted by part)", () => {
     const singles = placements.filter((p) => KINDS_THAT_BLOCK.has(p.kind)).length;
     const saloons = placements.filter((p) => p.kind === "walkInSaloon").length;
-    expect(proxies.length).toBe(singles + saloons * SALOON_WALLS);
+    const gates = placements.filter((p) => p.kind === "townGate").length;
+    expect(gates).toBeGreaterThan(0); // Dustward v2 has a gateway arch
+    expect(proxies.length).toBe(singles + saloons * SALOON_WALLS + gates * GATE_POSTS);
   });
 
   it("emits zero proxies for roads and the road slime", () => {
@@ -49,9 +53,10 @@ describe("worldProxies — buildProxies", () => {
 
   it("each single-box proxy's AABB contains its placement's (x, y)", () => {
     for (const p of proxies) {
-      // The saloon's wall AABBs are intentionally offset from the placement centre
-      // (they sit at the building's edges, not its middle) — checked separately below.
-      if (p.source.kind === "walkInSaloon") continue;
+      // Multi-AABB kinds (saloon wall ring, gate posts) are intentionally offset
+      // from the placement centre — the saloon is checked separately below; the
+      // gate's posts straddle the road with the lane open between them.
+      if (p.source.kind === "walkInSaloon" || p.source.kind === "townGate") continue;
       const { x, y } = p.source;
       expect(x).toBeGreaterThanOrEqual(p.minX);
       expect(x).toBeLessThanOrEqual(p.maxX);

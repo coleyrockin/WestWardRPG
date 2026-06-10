@@ -44,6 +44,14 @@ const CAMERA_BLOCKING_KINDS = new Set([
   "productionStore",
   "productionAssay",
   "storefront",
+  // Landmark buildings sit ON the rebuilt main street — without these the
+  // shoulder cam clips straight through their walls.
+  "walkInSaloon",
+  "church",
+  "hotel",
+  "blacksmith",
+  "waterTower",
+  "windmill",
   "mesa",
   "mesaSilhouette",
   "mesaSkyline",

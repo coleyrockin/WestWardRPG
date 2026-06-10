@@ -784,6 +784,47 @@ function buildWesternBuilding(group, p, spec = {}) {
 // Each anchors at (p.x, p.y) via toVec and adds to the shared props group, matching
 // the existing builders. Footprints live in worldProxies.
 
+// Town gateway — two timber posts spanning the road with a crossbeam and a
+// hanging DUSTWARD board. (p.x, p.y) is the gate center ON the road; posts sit
+// ±halfSpan along world y so the lane stays clear (footprint = posts only).
+function buildTownGate(group, p) {
+  const s = p.size || 1;
+  const halfSpan = 4.0 * s;
+  // Tall enough that the spawn camera (height ~2.9, which starts just west of
+  // the arch) passes cleanly under the beam + sign instead of eating the board.
+  const postH = 5.4 * s;
+  const mPost = standard("#5a4026", { roughness: 0.97 });
+  const mBeam = standard("#6b4a2c", { roughness: 0.95 });
+  const mBrace = standard("#4a3520", { roughness: 0.96 });
+  for (const side of [-1, 1]) {
+    const py = p.y + side * halfSpan;
+    addBox(group, 0.34 * s, postH, 0.34 * s, mPost, toVec(p.x, py, 0));
+    // knee braces from post into the beam
+    const brace = new THREE.Mesh(new THREE.BoxGeometry(0.12 * s, 1.1 * s, 0.12 * s), mBrace);
+    brace.position.copy(toVec(p.x, py - side * 0.55 * s, postH - 0.62 * s));
+    brace.rotation.x = side * 0.7;
+    brace.castShadow = true;
+    group.add(brace);
+  }
+  // crossbeam — slight sag-free span with end caps proud of the posts
+  addBox(group, 0.26 * s, 0.3 * s, halfSpan * 2 + 0.9 * s, mBeam, toVec(p.x, p.y, postH - 0.3 * s));
+  // hanging town board, lettered via the shared canvas sign painter; faces east
+  // (back toward town) so it reads over the shoulder and in the wide push-in.
+  const signTex = makeSignTexture(["DUSTWARD"]);
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(0.09 * s, 0.62 * s, 2.1 * s),
+    standard("#6e4f2e", { roughness: 0.9, map: signTex }),
+  );
+  sign.position.copy(toVec(p.x, p.y, postH - 0.78 * s));
+  sign.castShadow = true;
+  group.add(sign);
+  for (const side of [-1, 1]) {
+    const chain = new THREE.Mesh(new THREE.BoxGeometry(0.05 * s, 0.32 * s, 0.05 * s), mBrace);
+    chain.position.copy(toVec(p.x, p.y + side * 1.1 * s, postH - 0.62 * s));
+    group.add(chain);
+  }
+}
+
 function buildChurch(group, p) {
   const s = p.size || 1;
   const mWall = standard("#cdb89a", { roughness: 0.92 });
@@ -1017,6 +1058,7 @@ function buildPlacement(group, p) {
     case "wagonSalvage": return buildWagon(group, p);
     case "roadSlime": return buildSlime(group, p);
     case "walkInSaloon": return buildWalkInSaloon(group, p);
+    case "townGate": return buildTownGate(group, p);
     case "church": return buildChurch(group, p);
     case "windmill": return buildWindmill(group, p);
     case "waterTower": return buildWaterTower(group, p);
@@ -2390,11 +2432,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // third-person follow is untouched — this only applies under capture.
   function applyHeroCamera() {
     camera.fov = 53;
-    // Third-person production frame: low enough to feel playable, close enough
-    // for a strong back silhouette, and aimed past Boone's board so the street
-    // reads as a destination instead of a tabletop.
-    camera.position.set(5.08, 3.36, 13.42);
-    camera.lookAt(15.55, 1.34, 5.08);
+    // DUSTWARD v2 frame: on the road just inside the gate arch, aimed east down
+    // the dense main street — board plaza, lantern wires, and the church bend
+    // read in one vista. (The old pose at (5.1, 13.4) ended up inside the
+    // relocated south-west hero buildings after the town rebuild.)
+    camera.position.set(6.6, 3.5, 10.2);
+    camera.lookAt(16.5, 1.5, 7.2);
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
   }

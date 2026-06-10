@@ -115,6 +115,16 @@ const FOOTPRINTS = {
   bountyEmblem: null,
   storefront:  (p) => box(p, 1.3 * p.size, 1.3 * p.size),
   walkInSaloon: saloonWalls,                     // returns an ARRAY of wall AABBs (door gap open)
+  // Gateway arch: collide on the two posts only — the road lane under the beam
+  // stays walkable. Posts sit at ±4.0*size along y from the placement center.
+  townGate: (p) => {
+    const s = p.size || 1;
+    const post = 0.5 * s;
+    return [
+      { minX: p.x - post, maxX: p.x + post, minZ: p.y - 4.0 * s - post, maxZ: p.y - 4.0 * s + post, source: p },
+      { minX: p.x - post, maxX: p.x + post, minZ: p.y + 4.0 * s - post, maxZ: p.y + 4.0 * s + post, source: p },
+    ];
+  },
   church:      (p) => box(p, 2.8 * p.size, 4.2 * p.size),
   windmill:    (p) => box(p, 1.5 * p.size, 1.5 * p.size),   // tower base; blades clear head height
   waterTower:  (p) => box(p, 3.0 * p.size, 3.0 * p.size),   // leg spread
