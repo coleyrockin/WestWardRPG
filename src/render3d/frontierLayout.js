@@ -179,16 +179,16 @@ const PROPS = [
 // the road's first stretch into a readable street: a pair of lanterns flanking the
 // path right out of spawn, a directional signpost, and a hitching rail edge. These
 // lead the eye east toward Boone's board without crowding the walking lane.
+// Opening corridor — REDESIGNED for composition (the old version sprinkled
+// fences/crates/grass through the middle of the player's first thirty steps).
+// Rules: the road lane stays EMPTY; the two gate lanterns frame the first
+// frame like theater wings; everything else hugs the shoulders.
 const ROAD_CORRIDOR = [
   { kind: "lampLow",  label: "Spawn Lantern Left",  x: 10.4, y: 4.7,  color: "#ffe6a8", size: 0.62 },
   { kind: "lampLow",  label: "Spawn Lantern Right", x: 10.4, y: 13.2, color: "#ffe6a8", size: 0.62 },
   { kind: "sign",  label: "Road Sign — Board",   x: 11.2, y: 5.35, color: "#ffd77b", size: 0.8 },
-  { kind: "roadGrass", label: "Opening Grass Left", x: 8.6, y: 5.65, color: "#8f8a56", size: 1.18, yaw: -0.4 },
-  { kind: "sageCluster", label: "Opening Sage Right", x: 8.7, y: 11.65, color: "#70814b", size: 1.08, yaw: 0.35 },
-  { kind: "roadGrass", label: "Board Shoulder Grass", x: 12.4, y: 10.95, color: "#8f8a56", size: 0.92, yaw: 0.18 },
-  { kind: "brokenFence", label: "Corridor Rail North",  x: 11.6, y: 4.9, color: "#a47b4c", size: 0.62, yaw: 0.12 },
-  { kind: "brokenFence", label: "Corridor Rail South",  x: 11.8, y: 13.1, color: "#a47b4c", size: 0.6, yaw: -0.16 },
-  { kind: "crate", label: "Roadside Crates",      x: 14.2, y: 5.2,  color: "#b9824d", size: 0.6 },
+  { kind: "roadGrass", label: "Opening Grass Left", x: 8.5, y: 5.2, color: "#8f8a56", size: 1.05, yaw: -0.4 },
+  { kind: "sageCluster", label: "Opening Sage Right", x: 8.6, y: 12.3, color: "#70814b", size: 0.95, yaw: 0.35 },
 ];
 
 const ROUTE_LIGHTS = [
@@ -277,16 +277,18 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "windowGlowPanel", label: "Undertaker Window Glow", x: 20.2, y: 12.32, color: "#ff9b58", size: 0.82, yaw: Math.PI - 0.08 },
   { kind: "windowGlowPanel", label: "Far Hotel Window Glow", x: 23.96, y: 11.96, color: "#ff9b58", size: 0.72, yaw: Math.PI - 0.12 },
   { kind: "hangingSign", label: "Undertaker Hanging Sign", x: 19.65, y: 12.28, color: "#ffc66e", size: 0.72, yaw: Math.PI - 0.08 },
-  { kind: "lanternString", label: "Street Crossing Lanterns", x: 15.0, y: 8.75, color: "#ffb866", size: 0.74, yaw: Math.PI / 2 },
-  { kind: "lanternString", label: "High Street Wire", x: 10.1, y: 8.7, color: "#d88946", size: 1.18, yaw: Math.PI / 2 },
-  { kind: "lanternString", label: "Far Bounty Wire", x: 18.4, y: 8.35, color: "#d88946", size: 1.02, yaw: Math.PI / 2 },
+  // ONE crossing wire, crowning the board approach — the old three crossing
+  // wires (over spawn, mid-street, far street) read as overhead clutter.
+  { kind: "lanternString", label: "Board Crossing Lanterns", x: 13.6, y: 8.75, color: "#ffb866", size: 0.8, yaw: Math.PI / 2 },
 
   // Bounty street life: silhouettes and props read as inhabited without
   // becoming gameplay blockers in the main road lane.
   { kind: "npcSilhouette", label: "Porch Bounty Hunter", x: 7.9, y: 4.55, color: "#17100c", size: 0.88, yaw: 2.85 },
   { kind: "npcSilhouette", label: "Boardwalk Lookout", x: 11.4, y: 4.4, color: "#17100c", size: 0.78, yaw: 2.95 },
-  { kind: "npcSilhouette", label: "Road Deputy", x: 15.4, y: 7.15, color: "#17100c", size: 0.72, yaw: -1.5 },
-  { kind: "npcSilhouette", label: "Street Traveler", x: 19.1, y: 7.85, color: "#17100c", size: 0.64, yaw: -1.45 },
+  // Off the road, onto the boardwalk edges — silhouettes standing mid-lane read
+  // as bugs, not life.
+  { kind: "npcSilhouette", label: "Road Deputy", x: 15.6, y: 4.6, color: "#17100c", size: 0.72, yaw: 2.9 },
+  { kind: "npcSilhouette", label: "Street Traveler", x: 18.9, y: 12.2, color: "#17100c", size: 0.64, yaw: -0.2 },
   { kind: "npcSilhouette", label: "South Porch Watcher", x: 8.8, y: 12.52, color: "#17100c", size: 0.78, yaw: 0.25 },
   { kind: "npcSilhouette", label: "Lantern Bystander", x: 14.4, y: 12.35, color: "#17100c", size: 0.72, yaw: -0.15 },
   { kind: "npcSilhouette", label: "Undertaker Door Guard", x: 19.35, y: 11.82, color: "#120c09", size: 0.7, yaw: -0.25 },
@@ -295,10 +297,11 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "barrelCrateCluster", label: "Saloon Cargo", x: 4.8, y: 4.25, color: "#7a5230", size: 0.88, yaw: 0.28 },
   { kind: "barrelCrateCluster", label: "Dry Goods Cargo", x: 13.8, y: 4.1, color: "#7a5230", size: 0.82, yaw: -0.18 },
   { kind: "barrelCrateCluster", label: "South Porch Cargo", x: 10.0, y: 12.55, color: "#7a5230", size: 0.84, yaw: 0.12 },
-  { kind: "mudRutDecal", label: "Opening Mud Rut", x: 10.8, y: 8.0, color: "#5a3923", size: 1.1, yaw: -0.7 },
-  { kind: "mudRutDecal", label: "Board Road Mud Rut", x: 14.2, y: 7.1, color: "#5a3923", size: 1.0, yaw: -0.65 },
-  { kind: "mudRutDecal", label: "Saloon Wheel Rut", x: 8.6, y: 9.4, color: "#5a3923", size: 0.82, yaw: -0.55 },
-  { kind: "mudRutDecal", label: "Boardwalk Wheel Rut", x: 16.9, y: 8.45, color: "#5a3923", size: 0.9, yaw: -0.62 },
+  // Wheel ruts now run ALONG the road (small yaw following its easterly drift)
+  // — the old random diagonals read as smears, not wagon tracks.
+  { kind: "mudRutDecal", label: "Opening Mud Rut", x: 10.8, y: 8.2, color: "#5a3923", size: 1.1, yaw: 0.06 },
+  { kind: "mudRutDecal", label: "Board Road Mud Rut", x: 14.6, y: 8.6, color: "#5a3923", size: 1.0, yaw: 0.1 },
+  { kind: "mudRutDecal", label: "Boardwalk Wheel Rut", x: 18.2, y: 9.0, color: "#5a3923", size: 0.9, yaw: 0.12 },
   { kind: "mudRutDecal", label: "Far Street Wheel Rut", x: 21.8, y: 8.7, color: "#5a3923", size: 0.78, yaw: -0.58 },
   { kind: "mudRutDecal", label: "Marshal Road Wheel Rut", x: 25.6, y: 9.65, color: "#5a3923", size: 0.8, yaw: -0.42 },
   { kind: "dustSmokePlume", label: "Boardwalk Dust", x: 8.0, y: 4.85, color: "#b88551", size: 0.9, yaw: 0.2 },
@@ -456,11 +459,11 @@ const SOUTH_BACK_ROW = [
 // a depth layer to the establishing shot: a thin dead-tree silhouette upper-left, a
 // low cart lower-right. Deliberately off-centre so they frame without blocking the
 // road's leading line to the board. (If they read as clutter, delete this array.)
+// Two frame elements only — snag left, cart right — a classic theater frame.
+// (The extra rail + stone at the player's feet were clutter, not composition.)
 const FOREGROUND_FRAME = [
   { kind: "deadTree", label: "Spawn Frame Snag", x: 7.4, y: 5.1, color: "#3e3224", size: 1.35 },
-  { kind: "brokenFence", label: "Spawn Frame Rail", x: 7.6, y: 6.2, color: "#8d6540", size: 0.72, yaw: 0.35 },
   { kind: "cart", label: "Spawn Frame Cart", x: 8.1, y: 12.1, color: "#a87542", size: 0.82, yaw: 0.55 },
-  { kind: "rock", label: "Spawn Frame Stone", x: 7.8, y: 11.2, color: "#5a5048", size: 0.65 },
 ];
 
 // Board plaza life — Boone's board (13, 5.65) is the opening focal point + first
