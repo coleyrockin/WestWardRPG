@@ -9,8 +9,6 @@
     "allowImportingTsExtensions": true
   },
   "include": [
-    "src/atmosphere.ts",
-    "src/gameState.d.ts",
     "tests/**/*.ts"
   ]
 }

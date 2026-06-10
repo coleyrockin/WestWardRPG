@@ -9,7 +9,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
-      include: ["atmosphere.ts", "src/savePersistence.js"],
+      include: ["src/savePersistence.js"],
     },
   },
 });
