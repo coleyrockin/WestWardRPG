@@ -1,52 +1,21 @@
-// WestWard service worker — cache-first for assets, network-first for navigation.
-// Version bumps clear old caches and trigger an update toast in the game.
+// Kill-switch service worker. The retired Canvas game registered a cache-first SW
+// on this scope; this replacement takes over immediately, wipes every cache, and
+// unregisters itself so returning visitors get the live 3D game from the network.
+// The 3D game does not register a service worker. Keep this file deployed so
+// installed clients can pick up the update; it self-destructs on activation.
 
-const CACHE = "westward-v2";
-const PRECACHE = ["/", "/index.html"];
-
-self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting())
-  );
+self.addEventListener("install", () => {
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+      await self.registration.unregister();
+      const clients = await self.clients.matchAll({ type: "window" });
+      for (const client of clients) client.navigate(client.url);
+    })()
   );
-});
-
-self.addEventListener("fetch", (e) => {
-  const url = new URL(e.request.url);
-  // Only intercept same-origin requests
-  if (url.origin !== self.location.origin) return;
-
-  // Navigation: network-first, fall back to cached index.html
-  if (e.request.mode === "navigate") {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match("/index.html"))
-    );
-    return;
-  }
-
-  // Assets: cache-first, update cache in background
-  e.respondWith(
-    caches.match(e.request).then((cached) => {
-      const network = fetch(e.request).then((res) => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, clone));
-        }
-        return res;
-      });
-      return cached || network;
-    })
-  );
-});
-
-// Notify clients when a new SW version is waiting
-self.addEventListener("message", (e) => {
-  if (e.data === "skipWaiting") self.skipWaiting();
 });

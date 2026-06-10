@@ -12,8 +12,7 @@ export default defineConfig({
       // instanceof, "Multiple instances" warning). Alias bare `three` to the
       // webgpu build — a superset of core — so there is exactly one instance.
       // The regex is anchored (^three$) so subpaths like `three/tsl` and
-      // `three/webgpu` are NOT rewritten. The Canvas game (index.html) is 2D
-      // and imports no Three, so it's unaffected.
+      // `three/webgpu` are NOT rewritten.
       { find: /^three$/, replacement: 'three/webgpu' },
     ],
   },
@@ -34,14 +33,6 @@ export default defineConfig({
     sourcemap: true,
     target: 'es2020',
     cssCodeSplit: true,
-    rollupOptions: {
-      input: {
-        main: 'index.html',
-        // Engine-rewrite spike dev route (Milestone 1). Keeps build coverage of
-        // the Three.js page; the Canvas game entry (main) is unchanged. The
-        // spike HTML lives under spikes/ to keep the repo root quiet.
-        render3d: 'spikes/render3d.html',
-      },
-    },
+    // Single entry: index.html IS the 3D game (the Canvas raycaster was retired).
   },
 });
