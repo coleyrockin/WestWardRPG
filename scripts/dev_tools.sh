@@ -59,18 +59,12 @@ lint_code() {
     
     cd "$PROJECT_ROOT"
     
-    # Check browser JavaScript syntax
-    if ! node --check src/main.js; then
+    # Check browser JavaScript syntax (the 3D game entry)
+    if ! node --check src/render3d/spike.js; then
         log_error "Game JavaScript syntax check failed"
         exit 1
     fi
     log_success "Game JavaScript syntax check passed"
-
-    if ! node --check tools/playwright-client.mjs; then
-        log_error "Playwright client syntax check failed"
-        exit 1
-    fi
-    log_success "Playwright client syntax check passed"
     
     # Check TypeScript if available
     if command -v tsc &> /dev/null; then

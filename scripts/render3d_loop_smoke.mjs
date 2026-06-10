@@ -63,7 +63,7 @@ async function main() {
   try {
     // waitUntil "load" can hang indefinitely against the Vite dev server on
     // macOS; domcontentloaded + the __spikeReady poll covers readiness.
-    await page.goto(`${BASE}/spikes/render3d.html`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForSelector("#scene");
     await waitForPagePredicate(page, () => window.__spikeReady === true, "render3d ready signal", 45000);
     await waitForPagePredicate(page, () => Boolean(
@@ -82,11 +82,14 @@ async function main() {
     // canvas until dismissed; the click is also the audio-unlock gesture).
     await page.evaluate(() => document.getElementById("title-start")?.click());
     await page.waitForTimeout(150);
-    // force: skip actionability waits — the canvas renders continuously and, under
-    // the headless SwiftShader WebGL2 backend, the main thread is busy enough that
-    // the stability check can starve. The click only requests pointer lock (a
+    // Dispatch the canvas click via evaluate, NOT page.click: Playwright's input
+    // pipeline (locator resolve + scroll-into-view) rides on rAF ticks, and under
+    // the headless SwiftShader backend the dense scene starves them — even with
+    // force:true the call times out. The click only requests pointer lock (a
     // headless no-op); movement is proven below via keys + a deterministic fallback.
-    await page.click("#scene", { force: true });
+    await page.evaluate(() => {
+      document.getElementById("scene")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
     const before = await page.evaluate(() => window.__westward3dTest.getPlayerPosition());
     await page.keyboard.down("w");
     await page.waitForTimeout(400);

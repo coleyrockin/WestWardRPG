@@ -1,13 +1,29 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+
+// Recursively collect every .js source under src/ so the parser-sink guard
+// covers the whole 3D game, not a single entry file.
+function collectJsFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) out.push(...collectJsFiles(full));
+    else if (name.endsWith(".js")) out.push(full);
+  }
+  return out;
+}
 
 describe("security best practices", () => {
   it("keeps runtime UI construction out of HTML parser sinks", () => {
-    const mainSource = readFileSync(new URL("../src/main.js", import.meta.url), "utf8");
-
-    expect(mainSource).not.toContain(".innerHTML");
-    expect(mainSource).not.toContain("insertAdjacentHTML");
-    expect(mainSource).not.toContain("document.write");
+    const srcRoot = fileURLToPath(new URL("../src", import.meta.url));
+    for (const file of collectJsFiles(srcRoot)) {
+      const source = readFileSync(file, "utf8");
+      expect(source, file).not.toContain(".innerHTML");
+      expect(source, file).not.toContain("insertAdjacentHTML");
+      expect(source, file).not.toContain("document.write");
+    }
   });
 
   it("keeps generated static-server configs on modern browser hardening headers", () => {
