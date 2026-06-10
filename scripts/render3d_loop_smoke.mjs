@@ -63,7 +63,7 @@ async function main() {
   try {
     // waitUntil "load" can hang indefinitely against the Vite dev server on
     // macOS; domcontentloaded + the __spikeReady poll covers readiness.
-    await page.goto(`${BASE}/spikes/render3d.html`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForSelector("#scene");
     await waitForPagePredicate(page, () => window.__spikeReady === true, "render3d ready signal", 45000);
     await waitForPagePredicate(page, () => Boolean(

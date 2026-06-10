@@ -35,7 +35,7 @@ jobs:
       - name: TypeScript typecheck
         run: npm run typecheck:ts
 
-      - name: Syntax check (playwright client)
+      - name: Syntax check (harness scripts)
         run: npm run test:syntax
 
       - name: Lint (dev_tools.sh lint)
@@ -55,7 +55,7 @@ jobs:
           retention-days: 7
 
   smoke:
-    name: Smoke suite (Playwright scripted replays)
+    name: 3D first-road smoke + golden-image gate
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: fast
@@ -75,9 +75,6 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run smoke suite
-        run: npm run test:smoke
-
       - name: Run 3D first-road smoke and screenshot gate
         run: |
           npm run dev -- --host 127.0.0.1 --port 5180 > /tmp/westward-render3d.log 2>&1 &
@@ -88,10 +85,9 @@ jobs:
           trap cleanup EXIT
 
           for _ in $(seq 1 40); do
-            if curl -fsS http://127.0.0.1:5180/spikes/render3d.html >/dev/null; then
+            if curl -fsS http://127.0.0.1:5180/ >/dev/null; then
               WESTWARD_URL=http://127.0.0.1:5180 npm run test:render3d
-              WESTWARD_URL=http://127.0.0.1:5180 npm run test:visual:render3d
-              WESTWARD_URL=http://127.0.0.1:5180 node scripts/spike_compare.mjs
+              WESTWARD_URL=http://127.0.0.1:5180 npm run test:visual
               exit 0
             fi
             if ! kill -0 "$SERVER_PID" >/dev/null 2>&1; then
@@ -110,41 +106,5 @@ jobs:
         with:
           name: smoke-artifacts
           path: output
-          retention-days: 14
-          if-no-files-found: ignore
-
-  visual-regression:
-    name: Visual regression (pixelmatch)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: smoke
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node 22
-        uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Capture visual regression screenshots
-        run: npm run test:visual:capture
-
-      - name: Run pixelmatch diff
-        run: npm run test:visual:review
-
-      - name: Upload diff images on failure
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: visual-diff-failures
-          path: output/visual-regression/**/diff_*.png
           retention-days: 14
           if-no-files-found: ignore

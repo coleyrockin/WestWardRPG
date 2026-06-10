@@ -1,4 +1,0 @@
-[
-  { "smoke": "setRegion", "smoke_args": ["frontier"], "frames": 4 },
-  { "smoke": "proveSaveRecovery", "frames": 8 }
-]

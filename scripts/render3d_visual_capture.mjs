@@ -58,7 +58,7 @@ async function capture() {
 
     // waitUntil "load" can hang indefinitely against the Vite dev server on
     // macOS; domcontentloaded + the __spikeReady poll below covers readiness.
-    await page.goto(`${BASE}/spikes/render3d.html?visual=1`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.goto(`${BASE}/?visual=1`, { waitUntil: "domcontentloaded", timeout: 60000 });
     const ready = await waitForPagePredicate(page, () => window.__spikeReady === true, "render3d ready signal", 120000)
       .then(() => true)
       .catch(() => false);
