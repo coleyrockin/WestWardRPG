@@ -1,9 +1,8 @@
 // Data-driven placement records for the Dustward (frontier) opening scene.
 //
-// This mirrors the Canvas scene so the Three.js spike is an honest comparison.
 // Source of truth for the dressing offsets is REGION_PRESENTATION.frontier in
 // src/regionVisualIdentity.js; hero-object world positions come from
-// src/poiSystem.js and the opening-scene anchors in src/main.js / src/gameFeel.js.
+// src/poiSystem.js and the opening-scene anchors in src/gameFeel.js.
 //
 // World coordinate system (matches render_game_to_text):
 //   +x = east, +y = south. Origin top-left of the world map.

@@ -1,8 +1,8 @@
 {
   "name": "westward",
   "version": "1.0.0",
-  "description": "Story-first open-world frontier RPG with raycast combat, regional identity, gear progression, housing, and deterministic job-board systems.",
-  "main": "src/main.js",
+  "description": "Story-first western RPG rendered as a low-poly graphic novel — Three.js + Blender models + a cel/ink NPR pipeline.",
+  "main": "src/render3d/spike.js",
   "homepage": "https://westward-rpg.vercel.app",
   "engines": {
     "node": ">=22 <23"
