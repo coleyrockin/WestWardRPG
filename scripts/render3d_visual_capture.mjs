@@ -76,6 +76,13 @@ async function capture() {
         if (el.tagName !== "CANVAS" && el.tagName !== "SCRIPT") el.style.display = "none";
       }
     });
+    // The hide must actually PAINT before CDP grabs the surface — under CPU
+    // load the compositor lags the evaluate and the stale frame still shows
+    // the HUD (seen as a 30% phantom diff). Wait for two rAF paints.
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+    await page.waitForTimeout(150);
     mkdirSync(dirname(OUT), { recursive: true });
     // CDP Page.captureScreenshot instead of page.screenshot: Playwright's
     // screenshot path (font wait + stability checks) hangs on macOS against

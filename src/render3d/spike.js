@@ -44,6 +44,7 @@ import { createPlaceholderCharacter } from "../game/world/character.js";
 import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
 import { createTownsfolk } from "../game/world/townsfolk.js";
 import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
+import { gustAt } from "../game/world/windGusts.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
 import { createSaveStateManager } from "../saveStateManager.js";
 import { buildRunPayload, loadRun, writeRun, sealRun } from "./runSave.js";
@@ -2546,36 +2547,73 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
 
   // One call per frame: advance the world (or hold it all still under ?visual).
   let waterTime = 0;
-  // Atmosphere motion (art-direction pillar 5): one slow tumbleweed crossing
-  // the road and distant circling birds. Pure dressing — null footprints (no
+  // Atmosphere motion (art-direction pillar 5 / R1.2): tumbleweeds drifting the
+  // roads and distant circling birds. Pure dressing — null footprints (no
   // collision), hidden + held still whenever the world is frozen (?visual /
   // captureMode) so the golden baseline never sees them.
-  const tumbleweed = (() => {
+  // Each weed rides one road segment; its speed bursts on the seeded gust
+  // schedule (windGusts.js) that the R1.4 audio layer reads off the same clock.
+  const createTumbleweed = (from, to, seed, weaveAmp = 1.5) => {
     const ball = new THREE.Mesh(
       new THREE.IcosahedronGeometry(0.34, 1),
       standard("#9a7b4f", { transparent: true, opacity: 0.92, rimStrength: 0.4 }),
     );
     ball.castShadow = true;
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const len = Math.hypot(dx, dy);
+    const ux = dx / len, uy = dy / len; // travel direction (world xy, y = south)
+    // The roll axis must follow the run: yaw an inner pivot so the ball's local
+    // Z stays perpendicular to travel (rotation.y maps local +X to (cosθ,−sinθ)
+    // in world XZ — θ = atan2(−uy, ux) points local +X down the run).
+    const pivot = new THREE.Group();
+    pivot.rotation.y = Math.atan2(-uy, ux);
+    pivot.add(ball);
     const group = new THREE.Group();
-    group.add(ball);
+    group.add(pivot);
     scene.add(group);
-    let x = 4;
-    const step = (fdt, t) => {
+    let dist = (hashYaw(seed, seed * 1.3) / (Math.PI * 2)) * len; // desynced start along the run
+    const step = (fdt, t, windSpeed) => {
       group.visible = fdt > 0;
       if (fdt <= 0) return;
-      const speed = 1.7 + Math.sin(t * 0.43) * 0.5; // gusty drift
-      x += speed * fdt;
-      if (x > 74) x = 4; // loop the whole first road
-      const z = 12.6 + Math.sin(x * 0.21) * 1.5; // weave across the lane
-      const hop = Math.abs(Math.sin(x * 1.9)) * 0.16; // light bounce
-      group.position.set(x, 0.34 + hop, z);
+      const gust = 1 + gustAt(t, seed) * 1.4; // ×2.4 at gust peak (R1.2)
+      const speed = (1.7 + Math.sin(t * 0.43 + seed) * 0.5) * gust * (0.7 + 0.3 * windSpeed);
+      dist += speed * fdt;
+      if (dist > len) dist = 0; // loop the run
+      const weave = Math.sin(dist * 0.21 + seed) * weaveAmp; // perpendicular wander
+      const x = from.x + ux * dist - uy * weave;
+      const y = from.y + uy * dist + ux * weave;
+      const hop = Math.abs(Math.sin(dist * 1.9)) * 0.16; // light bounce
+      group.position.set(x, 0.34 + hop, y);
       ball.rotation.z -= (speed * fdt) / 0.34; // roll with travel
-      ball.rotation.x = Math.sin(x * 0.7) * 0.3;
+      ball.rotation.x = Math.sin(dist * 0.7) * 0.3;
     };
     return { step };
-  })();
+  };
+  // Paths are deterministic (seeded weave), so each run was checked against the
+  // layout: keep them clear of buildings, NPCs, and set-piece props.
+  const tumbleweeds = [
+    // First road — seed 0.84 reproduces the pre-refactor weave sin(x·0.21)
+    // exactly, the curve that already threads the main-street dressing.
+    createTumbleweed({ x: 4, y: 12.6 }, { x: 74, y: 12.6 }, 0.84),
+    // Ranch road — stops short of the Eastwater gate cluster (supply cart at
+    // x≈124.4 + gate lamp) so the weed never rolls through the arrival beat.
+    createTumbleweed({ x: 74, y: 13.4 }, { x: 122, y: 13.8 }, 13.7),
+    // North spur — starts south of the Paddock Wagon (y5) with a tighter weave
+    // that clears Back Row Livery's east wall (x≈31.1) and ends before the
+    // Folly claim sign (y −25.8).
+    createTumbleweed({ x: 32.8, y: 2 }, { x: 33.5, y: -24 }, 23.1, 0.9),
+  ];
 
-  const circlingBirds = (() => {
+  // R1.3 — thermals over the mesa line; a flock scatters when the player walks
+  // in under it (the first reactive-world beat), reforms after a few seconds.
+  // Shortest-arc angle lerp so blended yaw never swings the long way round.
+  const lerpAngle = (a, b, t) => {
+    let d = (b - a) % (Math.PI * 2);
+    if (d > Math.PI) d -= Math.PI * 2;
+    if (d < -Math.PI) d += Math.PI * 2;
+    return a + d * t;
+  };
+  const createBirdFlock = (center, alt) => {
     const group = new THREE.Group();
     const wings = [];
     for (let i = 0; i < 3; i++) {
@@ -2585,29 +2623,63 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       );
       bird.material.side = THREE.DoubleSide;
       group.add(bird);
-      wings.push({ mesh: bird, phase: i * 2.1, radius: 6.4 + i * 1.3, alt: 11.4 + i * 0.8 });
+      wings.push({
+        mesh: bird,
+        phase: i * 2.1,
+        radius: 6.4 + i * 1.3,
+        alt: alt + i * 0.8,
+        wingPhase: i * 2.1, // accumulated beat phase — continuous across speed changes
+        // Diverging escape directions ~120° apart, seeded by flock + slot.
+        scatterAngle: hashYaw(center.x + i * 17.7, center.y - i * 9.1),
+      });
     }
     scene.add(group);
-    const step = (fdt, t) => {
+    let scatterTimer = 0; // remaining scatter seconds; 0 = orbit / reform
+    let blend = 0; // continuous 0 (orbit) → 1 (scattered) — every visual blends on this
+    const step = (fdt, t, playerX, playerZ) => {
       group.visible = fdt > 0;
       if (fdt <= 0) return;
+      const near = Math.hypot(playerX - center.x, playerZ - center.y) < 14;
+      // Re-arm only after the flock has fully reformed (blend back at 0).
+      if (near && scatterTimer <= 0 && blend <= 0) {
+        scatterTimer = 4 + hashYaw(t, center.x) / Math.PI; // 4–6 s flight
+      }
+      if (scatterTimer > 0) {
+        scatterTimer -= fdt;
+        blend = Math.min(1, blend + fdt / 1.2); // burst outward over ~1.2 s
+      } else if (blend > 0) {
+        blend = Math.max(0, blend - fdt / 2.4); // glide back over ~2.4 s
+      }
       for (const w of wings) {
-        const a = t * 0.14 + w.phase; // slow thermal circle over the mesa line
-        w.mesh.position.set(33 + Math.cos(a) * w.radius, w.alt + Math.sin(t * 0.5 + w.phase) * 0.4, 2.5 + Math.sin(a) * w.radius * 0.55);
-        w.mesh.rotation.set(0, -a, 0.3 + Math.sin(t * 7 + w.phase) * 0.35); // bank + wing-beat
+        const a = t * 0.14 + w.phase; // slow thermal circle
+        const ox = center.x + Math.cos(a) * w.radius;
+        const oz = center.y + Math.sin(a) * w.radius * 0.55;
+        const oy = w.alt + Math.sin(t * 0.5 + w.phase) * 0.4;
+        // Scatter pushes each bird out along its own bearing, climbing.
+        const px = ox + Math.cos(w.scatterAngle) * 16 * blend;
+        const pz = oz + Math.sin(w.scatterAngle) * 16 * blend;
+        const py = oy + 4.5 * blend;
+        w.wingPhase += fdt * (7 + 7 * blend); // frantic while fleeing, no phase jump
+        w.mesh.position.set(px, py, pz);
+        w.mesh.rotation.set(0, lerpAngle(-a, -w.scatterAngle, blend), 0.3 + Math.sin(w.wingPhase) * 0.35);
       }
     };
     return { step };
-  })();
+  };
+  const birdFlocks = [
+    createBirdFlock({ x: 33, y: 2.5 }, 11.4), // the original mesa-line thermal
+    createBirdFlock({ x: 2, y: -18 }, 13.2), // northwest rampart
+  ];
 
   const stepWorld = (dt) => {
     const frozen = visualCapture || _devCaptureFrozen;
     const fdt = frozen ? 0 : dt;
-    tumbleweed.step(fdt, waterTime);
-    circlingBirds.step(fdt, waterTime);
-    // R1.1 — windmills turn; per-rotor seed desynchronizes the cadence. fdt=0
-    // under ?visual keeps the golden baseline at the build pose.
-    for (const w of WINDMILL_ROTORS) w.rotor.rotation.z -= fdt * (1.1 + 0.45 * Math.sin(waterTime * 0.31 + w.seed));
+    for (const tw of tumbleweeds) tw.step(fdt, waterTime, weather.windSpeed);
+    for (const bf of birdFlocks) bf.step(fdt, waterTime, player.position.x, player.position.z);
+    // R1.1 — windmills turn; per-rotor seed desynchronizes the cadence, weather
+    // windSpeed scales the rate. fdt=0 under ?visual keeps the golden baseline
+    // at the build pose.
+    for (const w of WINDMILL_ROTORS) w.rotor.rotation.z -= fdt * weather.windSpeed * (1.1 + 0.45 * Math.sin(waterTime * 0.31 + w.seed));
     tickClock(clock, fdt);
     applyDayTime();
     atmosphere.driftClouds(fdt, 1 + weather.wind * 2);

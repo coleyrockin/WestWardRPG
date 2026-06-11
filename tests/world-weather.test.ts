@@ -36,4 +36,13 @@ describe("weather", () => {
     expect(nextWeatherKind("dust")).toBe("storm");
     expect(nextWeatherKind("storm")).toBe("clear");
   });
+
+  it("windSpeed scales up the cycle: clear < dust < storm (R1 motion/audio driver)", () => {
+    const clear = resolveWeather({ kind: "clear" }).windSpeed;
+    const dust = resolveWeather({ kind: "dust" }).windSpeed;
+    const storm = resolveWeather({ kind: "storm" }).windSpeed;
+    expect(clear).toBe(1);
+    expect(dust).toBeGreaterThan(clear);
+    expect(storm).toBeGreaterThan(dust);
+  });
 });
