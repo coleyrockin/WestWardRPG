@@ -100,6 +100,9 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
   if (opts.ao !== false) {
     const aoPass = ao(scenePass.getTextureNode("depth"), scenePass.getTextureNode("normal"), camera);
     aoPass.radius.value = opts.aoRadius ?? region.aoRadius ?? 0.5;
+    // Half-res AO: ~4× cheaper and visually identical for this low-frequency
+    // grounding effect — full-res GTAO was the #1 frame cost on HiDPI.
+    aoPass.resolutionScale = 0.5;
     const aoTex = aoPass.getTextureNode();
     uniforms.aoStrength = uniform(opts.aoStrength ?? region.aoStrength ?? 0.85);
     occluded = color.rgb.mul(mix(float(1), aoTex.r, uniforms.aoStrength));

@@ -69,6 +69,9 @@ import {
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
+// Windmill fan sub-groups registered at build, spun by stepWorld (R1.1).
+// Cleared on every startSpike so reboots don't accumulate stale rotors.
+const WINDMILL_ROTORS = [];
 const col = (hex) => new THREE.Color(hex);
 const HERO_KINDS = Object.freeze(["jobBoard", "roadSign", "townBark", "smokeCache", "slimeTell", "roadSlime", "brokenWagon"]);
 // Building kinds get per-instance height + yaw jitter so the street isn't stamped clones.
@@ -906,13 +909,20 @@ function buildWindmill(group, p) {
   hubMesh.position.copy(toVec(tx, ty - 0.1 * sz, towerH + 0.25 * sz)); hubMesh.rotation.x = Math.PI / 2;
   hubMesh.castShadow = true; group.add(hubMesh);
   const bladeLen = 1.55 * sz, fanZ = towerH + 0.25 * sz, fanOffset = -0.12 * sz;
+  // The 8 blades live in a rotor sub-group centred on the fan axis so the
+  // render loop can spin them (R1.1 — world-realism roadmap). The fan circle
+  // lies in the world XY(height) plane, so the spin axis is rotor.rotation.z.
+  const rotor = new THREE.Group();
+  rotor.position.copy(toVec(tx, ty + fanOffset, fanZ));
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2, midR = bladeLen * 0.5 + 0.2 * sz;
     const m = new THREE.Mesh(new THREE.BoxGeometry(0.19 * sz, bladeLen, 0.055 * sz), bladeMat);
-    m.position.copy(toVec(tx + Math.cos(angle) * midR, ty + fanOffset, fanZ + Math.sin(angle) * midR));
+    m.position.set(Math.cos(angle) * midR, Math.sin(angle) * midR, 0);
     m.rotation.z = -angle; m.rotation.y = i % 2 === 0 ? 0.38 : -0.38;
-    m.castShadow = true; group.add(m);
+    m.castShadow = true; rotor.add(m);
   }
+  group.add(rotor);
+  WINDMILL_ROTORS.push({ rotor, seed: hashYaw(tx * 3.1, ty * 1.7) });
   addBox(group, 0.06 * sz, 1.1 * sz, 0.05 * sz, plankMat, toVec(tx, ty + 0.55 * sz, towerH + 0.04));
   const vane = new THREE.Mesh(new THREE.BoxGeometry(0.04 * sz, 0.8 * sz, 0.62 * sz), bladeMat);
   vane.position.copy(toVec(tx, ty + 0.82 * sz, towerH + 0.6 * sz)); vane.castShadow = true; group.add(vane);
@@ -2209,13 +2219,14 @@ function createSpikeSnapshot() {
 }
 
 export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
+  WINDMILL_ROTORS.length = 0; // module-scope registry — reset per boot
   // Determinism: the golden-image capture (?visual) must always render a fresh
   // fixed scene — never read or write a persisted run.
   const visualCapture =
     typeof location !== "undefined" && new URLSearchParams(location.search).has("visual");
   // Ironman load-on-start: a "playing" run resumes in place; a "sealed" run shows
   // its summary over a fresh scene; no/corrupt save → fresh run.
-  const loadedRun = visualCapture ? null : await loadRun();
+  const loadedRun = visualCapture ? null : await loadRun().catch(() => null); // belt-and-braces: resume can never block boot
   const resumeRun = loadedRun && loadedRun.mode === "playing" ? loadedRun : null;
   const loopState = createLoopStateMachine(resumeRun ? resumeRun.loopState : {});
   const objectiveRefs = createObjectiveDomRefs(document);
@@ -2594,6 +2605,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     const fdt = frozen ? 0 : dt;
     tumbleweed.step(fdt, waterTime);
     circlingBirds.step(fdt, waterTime);
+    // R1.1 — windmills turn; per-rotor seed desynchronizes the cadence. fdt=0
+    // under ?visual keeps the golden baseline at the build pose.
+    for (const w of WINDMILL_ROTORS) w.rotor.rotation.z -= fdt * (1.1 + 0.45 * Math.sin(waterTime * 0.31 + w.seed));
     tickClock(clock, fdt);
     applyDayTime();
     atmosphere.driftClouds(fdt, 1 + weather.wind * 2);

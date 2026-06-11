@@ -128,7 +128,9 @@ export function createAtmosphere(scene, renderer, opts = {}) {
 
   const sun = new THREE.DirectionalLight(col("#ffae6a"), 1.3);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  // 1536: −44% shadow texels vs 2048 — the open range raised caster count ~2.5×,
+  // and the player-following frustum keeps texel density acceptable at this size.
+  sun.shadow.mapSize.set(1536, 1536);
   sun.shadow.camera.near = 0.5;
   sun.shadow.camera.far = 60;
   // Tightened to the play wedge (still covers the ~30-unit world) for higher

@@ -106,7 +106,15 @@ export async function loadRun() {
     return null;
   }
   if (!result || !result.ok) return null;
-  return migrateRunPayload(result.payload);
+  // A stale/corrupt payload (an old build's save shape) must NEVER kill boot —
+  // migrate throwing here took startSpike down with it and the game never
+  // reached the title screen. Fall back to a fresh run instead.
+  try {
+    return migrateRunPayload(result.payload);
+  } catch (err) {
+    console.warn("[runSave] unreadable save payload — starting fresh", err);
+    return null;
+  }
 }
 
 // Persist the run payload to the dedicated slot (inherits backup rotation + quota
