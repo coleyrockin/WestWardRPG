@@ -1,6 +1,6 @@
 // Wave Function Collapse interior generator.
 // Produces deterministic one-room cave/ruin layouts from a seed string.
-// Output matches the tile codes used by regionInteriors.js:
+// Tile-code convention for the generated grid:
 //   0 = floor, 3 = wall, 4 = decor/pillar
 //
 // Anti-goal: world map and POI placement remain handcrafted. This is

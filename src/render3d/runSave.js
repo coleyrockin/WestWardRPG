@@ -6,9 +6,8 @@
 //
 // This module owns ONLY the 3D run's payload schema + slot isolation. It reuses
 // savePersistence's envelope/FNV-1a hash/IndexedDB/backup-rotation/quota recovery
-// verbatim (writeSave/readSave accept an arbitrary slot key). It deliberately does
-// NOT go through the Canvas saveMigration.js (that backfills dozens of Canvas-only
-// fields — wrong shape for this path).
+// verbatim (writeSave/readSave accept an arbitrary slot key). The payload shape is
+// owned here (see migrateRunPayload below) — there is no separate migration module.
 //
 // Determinism note: the run snapshots its state today. The `seed`/`inputLogTail`
 // fields are carried forward so a future step can reconstruct the run purely from
@@ -82,7 +81,7 @@ export function buildRunPayload(ctx = {}, now = Date.now()) {
 }
 
 // Forward-compat migration shim. Rejects anything that isn't a frontier-run
-// payload (never touches the Canvas saveMigration chain).
+// payload; this run's payload schema lives entirely in this module.
 export function migrateRunPayload(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
   if (payload.schema !== RUN_SCHEMA) return null;

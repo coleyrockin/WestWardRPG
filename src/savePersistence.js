@@ -1,8 +1,9 @@
 // IndexedDB-backed save persistence with backup rotation, integrity hashing,
 // corruption detection, export/import, and one-time localStorage migration.
 //
-// The game payload schema (currently v3) is owned by saveMigration.js.
-// This module owns the *storage envelope* (storageVersion 1) which wraps a payload
+// The game payload schema (currently v3) is owned by each run's own save module
+// (e.g. render3d/runSave.js). This module owns the *storage envelope*
+// (storageVersion 1) which wraps a payload
 // with: { storageVersion, payloadVersion, savedAt, hash, payload }.
 //
 // Rule: do not mutate the payload here. We only ferry it to/from storage.

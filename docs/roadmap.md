@@ -73,6 +73,11 @@ The treatment's Act 1 opening, real and playable, replacing the first-road loop 
 - **Calico dressing pass** — Dustward main street starts reading cyberpunk-western: neon
   signage on the existing emissive/lamp systems, antenna/cable dressing, one steel-mustang
   prop. Rule: **nothing is sleek**.
+- **"Westward" town (owner idea, name reserved)** — keep the codename alive in the fiction:
+  the free town the slice opens in (the treatment's **Calico Flats**) carries **WESTWARD** on
+  its gate sign, *or* Westward is a distinct settlement out in the Drift. Placement during
+  this dressing pass; which option is canon is the owner's call (pending confirm — do not
+  alter the treatment until decided).
 - **Smart-link revolver v0** — re-skin playerCombat's draw/attack with a slow-mo hook (the
   GUN tree's Deadeye Protocol seed).
 

@@ -114,8 +114,9 @@ spooked horse — all emergent from systems, not scripted.
 **Dream:** Forage a desert bloom, distill it into a tonic, drink it for night-vision, enchant your
 revolver with a frost hex you learned from a dead witch's grimoire, and sell the surplus when the
 Ironlantern market price spikes.
-**The cheat:** all pure, deterministic, node-testable rule modules (we're porting these from the
-Canvas oracle already — `gearCrafting`, `weaponAffixes`, `economyServices`, `statusEffects`):
+**The cheat:** all pure, deterministic, node-testable rule modules — some already shipping in the
+3D build (`gearCrafting`, `economyServices`), others to be authored fresh (alchemy, hexcraft,
+status effects):
 - Alchemy (combinatorial ingredient→effect discovery), smithing/gunsmithing (tiers + tempering),
   **hexcraft** (our magic system — sigils + reagents), cooking, lockpicking minigame.
 - A **simulated economy**: regional supply/demand, caravans, market crashes (the `market_crash`
