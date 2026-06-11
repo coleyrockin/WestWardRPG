@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { createSeededRandom } from "../src/rng.js";
 import { createRng, nextRng } from "../src/game/rng.js";
 
-// The shipped Canvas game needs a stateful drop-in for Math.random so loop
-// sub-steps can take an injectable `rng` and become deterministically testable.
-// It must produce the SAME mulberry32 stream as the experimental sim core so the
-// two are interchangeable.
+// World systems need a stateful drop-in for Math.random so loop sub-steps can
+// take an injectable `rng` and become deterministically testable. It must
+// produce the SAME mulberry32 stream as the sim core so the two are
+// interchangeable.
 
 describe("rng — createSeededRandom", () => {
   it("returns a function producing floats in [0, 1)", () => {

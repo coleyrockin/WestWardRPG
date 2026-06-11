@@ -113,7 +113,7 @@ A 5-minute demo needs 2–3 beats people remember. Stage them:
 The spike has **no audio**. Even a thin layer transforms it: wind bed, boot footsteps,
 lantern hum, a lonely harmonica/guitar sting on the reveal, a wet *thwack* + splatter on slime
 hits, a chime on the map scrap. Audio is half of "amazing" and it's at zero. *New: a small
-render3d audio module (the Canvas game's `audio.js` is a reference, not a direct port).*
+render3d audio module — shipped as `audioView.js` (synthesized Web Audio, zero asset fetches).*
 
 ## Punch-list (impact × effort)
 

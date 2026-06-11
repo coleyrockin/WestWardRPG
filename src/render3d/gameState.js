@@ -3,8 +3,7 @@
 // One state tree, no bridge: spike.js owns a single gameState and mutates it
 // through these helpers; runSave.js persists it. The renderer-agnostic modules
 // (jobBoard / lootSystem / progressionSystem / npcMemory) are the rules — this
-// module is only the 3D build's wiring layer around them, mirroring the Canvas
-// oracle's call sites (main.js grantXp / job flow) without importing main.js.
+// module is only the game's wiring layer around them.
 //
 // Pure node-environment logic: no Three.js, no DOM — tested in
 // tests/render3d-game-state.test.ts.
@@ -37,7 +36,7 @@ export const REGION_ID = "frontier";
 export const PLAYER_NAME = "Rowan Vale";
 export const PLAYER_CLASS = "Road Bounty Hunter";
 
-// Level curve — the Canvas oracle's exact numbers (main.js grantXp):
+// Level curve — the original tuned numbers, kept exact:
 // start at nextXp 80; each level: nextXp = round(nextXp * 1.34 + 28).
 export const XP_START = 80;
 export const XP_GROWTH = 1.34;

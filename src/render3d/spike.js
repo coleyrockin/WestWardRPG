@@ -1,10 +1,9 @@
-// WestWard engine-rewrite spike — static Dustward opening scene in Three.js.
+// The game's scene assembly + render loop — Dustward and the first-road
+// mission in Three.js (WebGPURenderer + TSL, NPR cel/ink look). Grew from the
+// original render spike; today it owns world building, the loop, and beat
+// wiring. (Future decomposition target — keep new systems in their own modules.)
 //
-// Milestone 1 of docs/roadmap.md. This renders ONE static first-view scene with
-// placeholder low-poly geometry to prove the new visual direction beats the
-// Canvas screenshot. No gameplay is wired; the Canvas game is untouched.
-//
-// Served via the render3d.html dev route. Sets window.__spikeReady after the
+// Sets window.__spikeReady after the
 // first frame so the comparison capture script knows when to screenshot.
 
 import * as THREE from "three";
@@ -3669,8 +3668,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     });
     writeRun(fresh).finally(() => { if (typeof location !== "undefined") location.reload(); });
   }
-  // On-quit best-effort flush (no beforeunload precedent; mirror main.js
-  // fire-and-forget). pagehide + visibilitychange cover tab close/switch.
+  // On-quit best-effort flush, fire-and-forget. pagehide + visibilitychange
+  // cover tab close/switch.
   if (!visualCapture && typeof window !== "undefined") {
     const flush = () => { if (runMode === "playing") persistRun(); };
     window.addEventListener("pagehide", flush);

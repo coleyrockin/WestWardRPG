@@ -1,7 +1,7 @@
-// Kill-switch service worker. The retired Canvas game registered a cache-first SW
+// Kill-switch service worker. An earlier deployment registered a cache-first SW
 // on this scope; this replacement takes over immediately, wipes every cache, and
-// unregisters itself so returning visitors get the live 3D game from the network.
-// The 3D game does not register a service worker. Keep this file deployed so
+// unregisters itself so returning visitors always get the live game from the
+// network. The game does not register a service worker. Keep this file deployed so
 // installed clients can pick up the update; it self-destructs on activation.
 
 self.addEventListener("install", () => {

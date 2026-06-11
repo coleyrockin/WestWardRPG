@@ -33,6 +33,6 @@ export default defineConfig({
     sourcemap: true,
     target: 'es2020',
     cssCodeSplit: true,
-    // Single entry: index.html IS the 3D game (the Canvas raycaster was retired).
+    // Single entry: index.html IS the game.
   },
 });

@@ -1,6 +1,6 @@
 // InputManager — centralizes gameplay key dispatch (non-modal keys).
-// Modal navigation (dialogue, shop, codex, etc.) stays inline in main.js
-// because each modal needs tight coupling to its own selection state.
+// Modal navigation stays with each modal's own controller because it needs
+// tight coupling to that modal's selection state.
 //
 // Usage:
 //   const im = createInputManager();

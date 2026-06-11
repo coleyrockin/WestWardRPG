@@ -23,8 +23,6 @@ The renderer is an **NPR cel-shader** (WebGPU + TSL, WebGL2 fallback): ink edges
 
 The current playable build is the **first-road loop**: spawn into Dustward at golden hour, take the Marsh Slime Bounty from Boone's board, follow the road east past the smoke cache, fight the road slime, salvage the broken wagon, and bring the map scrap back. Wind, footsteps, harmonica sting, and slime SFX are live (Web Audio, no assets).
 
-> A legacy Canvas-raycaster version of WestWard was retired and deleted in June 2026. Its tested, renderer-agnostic engine modules (jobs, loot, progression, NPC memory, saves) live on inside this build.
-
 ---
 
 ## Installation

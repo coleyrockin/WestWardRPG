@@ -1,4 +1,4 @@
-// Seeded RNG for the shipped Canvas game — a stateful drop-in for Math.random.
+// Seeded RNG — a stateful drop-in for Math.random.
 //
 // Loop sub-steps and feature modules take an injectable `rng` (default
 // Math.random, so shipped behavior is unchanged). Inject createSeededRandom(seed)

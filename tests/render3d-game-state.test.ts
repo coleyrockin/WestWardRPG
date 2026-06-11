@@ -39,8 +39,8 @@ describe("gameState — creation", () => {
   });
 });
 
-describe("gameState — XP / level (oracle math: nextXp = round(nextXp*1.34+28))", () => {
-  it("levels at 80 xp and grows the threshold like main.js grantXp", () => {
+describe("gameState — XP / level (nextXp = round(nextXp*1.34+28))", () => {
+  it("levels at 80 xp and grows the threshold on the original tuned curve", () => {
     const s = createGameState();
     const r = grantXp(s, 80);
     expect(r.levelsGained).toBe(1);

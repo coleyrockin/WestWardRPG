@@ -3,8 +3,8 @@
 //   - Dirty-flag tracking (only write when state has changed)
 //   - Structured save/load result types for consumer error handling
 //
-// main.js still owns captureSaveData / applySaveData (too coupled to state),
-// but timing + IDB plumbing lives here.
+// Consumers own their capture/apply serialization (too coupled to their state);
+// timing + IDB plumbing lives here.
 
 const DEFAULT_AUTOSAVE_INTERVAL = 90; // seconds between auto-saves
 

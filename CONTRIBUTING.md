@@ -9,58 +9,38 @@ Thanks for contributing.
    ```bash
    npm ci
    ```
-3. Start local server:
+3. Start the dev server:
    ```bash
    npm run dev
    ```
-4. Open:
-   - http://127.0.0.1:5180/index.html
+   Then open the printed URL — the game boots at `/`. (HMR is broken in the game
+   page; hard-reload with `location.href = '/?n=' + Date.now()`.)
 
 ## Before Opening a PR
 
-- Run the full QA gate (unit tests, lint/type/syntax checks, and functional smoke suite):
+- Run the gate:
   ```bash
-  npm run qa
+  npx vitest run
+  npx tsc --noEmit
+  npx vite build
   ```
-- Or at minimum run the fast local checks:
+- With a dev server running, the browser gates:
   ```bash
-  npm test
-  npm run typecheck:ts
-  npm run test:syntax
+  WESTWARD_URL=http://127.0.0.1:5180 npm run test:render3d   # first-road loop smoke
+  WESTWARD_URL=http://127.0.0.1:5180 npm run test:visual     # golden-image gate
   ```
-- Keep changes focused and small when possible.
-- Avoid unrelated formatting-only edits.
+- Keep changes focused and small when possible; avoid formatting-only edits.
 
 ## Code Guidelines
 
 - Preserve existing gameplay behavior unless your change intentionally modifies it.
-- Keep UI text compatible with the language system (`en`, `es`, `pt`, `fr`, `de`, `it`, `ja`, `tr`).
-- When adding user-facing strings, add translations for all 8 supported languages in the `LANGUAGE_PACKS` object in `src/main.js`.
 - Prefer clear variable names over short abbreviations.
-- Keep deterministic hooks working:
-  - `window.advanceTime(ms)`
-  - `window.render_game_to_text()`
-
-## Testing Gameplay Changes
-
-You can run a scenario with:
-
-```bash
-node ./tools/playwright-client.mjs \
-  --url http://127.0.0.1:5180/index.html \
-  --actions-file ./test-actions/realism_smoke.json \
-  --click-selector "#start-btn" \
-  --iterations 1 \
-  --pause-ms 200 \
-  --screenshot-dir output/web-game-smoke
-```
+- Build DOM UI with `createElement`/`textContent` only — the security test scans
+  for parser sinks (`boardDom.js` is the pattern).
+- Engine modules in `src/` are pure and unit-tested — extend them, don't
+  reimplement. See `CLAUDE.md` for the full guardrail list (layout floors, the
+  golden baseline, HERO_OBJECTS).
 
 ## Reporting Issues
 
-When filing an issue, include:
-
-- Expected behavior
-- Actual behavior
-- Reproduction steps
-- Browser + OS
-- Relevant output JSON from `output/` when available
+Include: expected behavior, actual behavior, reproduction steps, browser + OS.
