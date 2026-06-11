@@ -17,8 +17,14 @@ import {
   buildGameSaveSlice,
   hydrateGameState,
   reconcileWithLoopPhase,
+  tradeWithVendor,
 } from "../src/render3d/gameState.js";
-import { CANONICAL_STARTER_JOB_ID, JOB_DEFINITIONS } from "../src/jobBoard.js";
+import {
+  CANONICAL_STARTER_JOB_ID,
+  JOB_DEFINITIONS,
+  acceptJob,
+  recordJobEvent,
+} from "../src/jobBoard.js";
 
 describe("gameState — creation", () => {
   it("starts at the oracle's level curve origin", () => {
@@ -193,6 +199,79 @@ describe("gameState — save slice round-trip", () => {
   });
 });
 
+// ─── eastwater courier quest — full round trip via claimBoardReward ───────────
+describe("gameState — frontier_eastwater_run full round trip", () => {
+  const EASTWATER_ID = "frontier_eastwater_run";
+  const eastwardDef = JOB_DEFINITIONS[EASTWATER_ID];
+
+  function completedSlimeState() {
+    const s = createGameState();
+    // Fast-path: slime bounty complete by putting completedJobIds directly
+    // on the jobs slice so eastwater's completion gate passes.
+    acceptStarterJob(s, { time: 0 });
+    recordSlimeKill(s);
+    recordSlimeKill(s);
+    recordSlimeKill(s);
+    claimBoardReward(s);
+    expect(s.world.jobs.completedJobIds).toContain(CANONICAL_STARTER_JOB_ID);
+    return s;
+  }
+
+  it("eastwater is not listed before slime bounty completes", () => {
+    const s = createGameState();
+    const choices = boardChoices(s);
+    expect(choices.map((c) => c.id)).not.toContain(EASTWATER_ID);
+  });
+
+  it("eastwater appears in board choices after slime bounty completes", () => {
+    const s = completedSlimeState();
+    const choices = boardChoices(s);
+    expect(choices.map((c) => c.id)).toContain(EASTWATER_ID);
+  });
+
+  it("full round trip: complete slime → accept eastwater → 2 events → claim → correct reward", () => {
+    const s = completedSlimeState();
+    const goldAfterSlime = s.player.gold;
+
+    // Accept eastwater via the jobs slice directly (bypasses acceptStarterJob)
+    const accept = acceptJob(s.world.jobs, EASTWATER_ID);
+    expect(accept.ok).toBe(true);
+
+    // Beat 1: pickup
+    const pickup = recordJobEvent(s.world.jobs, {
+      type: "pickup",
+      targetId: "eastwater_ledger_cache",
+    });
+    expect(pickup.ok).toBe(true);
+    expect(pickup.completed).toBe(false);
+    expect(s.world.jobs.progressByJobId[EASTWATER_ID].count).toBe(1);
+
+    // Beat 2: dropoff → job ready
+    const dropoff = recordJobEvent(s.world.jobs, {
+      type: "dropoff",
+      targetId: "eastwater_trading_post",
+    });
+    expect(dropoff.ok).toBe(true);
+    expect(dropoff.completed).toBe(true);
+    expect(s.world.jobs.progressByJobId[EASTWATER_ID].status).toBe("ready");
+
+    // Claim via gameState's claimBoardReward (banks gold + xp + items)
+    const claim = claimBoardReward(s, { at: 0 });
+    expect(claim.ok).toBe(true);
+    expect(claim.failed).toBeFalsy();
+
+    expect(s.player.gold).toBe(goldAfterSlime + eastwardDef.reward.gold); // +60
+    expect(s.inventory.Potion).toBeGreaterThanOrEqual(1);                  // +1 Potion
+    expect(s.world.jobs.completedJobIds).toContain(EASTWATER_ID);
+    expect(s.world.jobs.activeJobId).toBeNull();
+
+    // XP: we grant 30. Starting xp after slime was 18. 18+30=48 < 80.
+    // (slime gave 18 xp already; eastwater gives 30 more)
+    const expectedXp = 18 + eastwardDef.reward.xp; // 48 < 80 — no level yet
+    expect(s.player.xp).toBe(expectedXp);
+  });
+});
+
 describe("gameState — v1-save reconciliation against loop phase", () => {
   it("backfills an accepted bounty when the loop is past the board", () => {
     const s = createGameState();
@@ -223,5 +302,75 @@ describe("gameState — v1-save reconciliation against loop phase", () => {
     const snapshot = JSON.stringify(mid);
     reconcileWithLoopPhase(mid, { phase: "slime_tell" });
     expect(JSON.stringify(mid)).toBe(snapshot);
+  });
+});
+
+describe("gameState — tradeWithVendor", () => {
+  it("buy decrements gold and increments item in inventory", () => {
+    const s = createGameState();
+    grantGold(s, 14);
+    const r = tradeWithVendor(s, { vendorId: "merchant", item: "Potion", mode: "buy" });
+    expect(r.ok).toBe(true);
+    // gold: 14 - 14 = 0
+    expect(s.player.gold).toBe(0);
+    expect(r.gold).toBe(0);
+    // item incremented
+    expect(s.inventory["Potion"]).toBe(1);
+    expect(r.owned).toBe(1);
+  });
+
+  it("sell increments gold and decrements item in inventory", () => {
+    const s = createGameState();
+    s.inventory["Slime Core"] = 2;
+    const r = tradeWithVendor(s, { vendorId: "merchant", item: "Slime Core", mode: "sell" });
+    expect(r.ok).toBe(true);
+    // sell = 5
+    expect(s.player.gold).toBe(5);
+    expect(r.gold).toBe(5);
+    expect(s.inventory["Slime Core"]).toBe(1);
+    expect(r.owned).toBe(1);
+  });
+
+  it("selling the last of an item removes it from inventory", () => {
+    const s = createGameState();
+    s.inventory["Slime Core"] = 1;
+    tradeWithVendor(s, { vendorId: "merchant", item: "Slime Core", mode: "sell" });
+    expect(s.inventory["Slime Core"]).toBeUndefined();
+  });
+
+  it("gold clamp: selling when already at gold ≥ 0 stays non-negative", () => {
+    const s = createGameState();
+    s.inventory["Crystal Shard"] = 3;
+    tradeWithVendor(s, { vendorId: "merchant", item: "Crystal Shard", mode: "sell" });
+    expect(s.player.gold).toBeGreaterThanOrEqual(0);
+  });
+
+  it("rejected trade leaves state entirely untouched", () => {
+    const s = createGameState();
+    grantGold(s, 5);
+    const snapshot = JSON.stringify(s);
+    // Gold short by 9 (Potion costs 14, have 5)
+    const r = tradeWithVendor(s, { vendorId: "merchant", item: "Potion", mode: "buy" });
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBeTruthy();
+    expect(JSON.stringify(s)).toBe(snapshot);
+  });
+
+  it("unknown vendor rejection leaves state untouched", () => {
+    const s = createGameState();
+    grantGold(s, 100);
+    const snapshot = JSON.stringify(s);
+    const r = tradeWithVendor(s, { vendorId: "ghost", item: "Potion", mode: "buy" });
+    expect(r.ok).toBe(false);
+    expect(JSON.stringify(s)).toBe(snapshot);
+  });
+
+  it("tradingPost buy is accepted when gold is sufficient", () => {
+    const s = createGameState();
+    grantGold(s, 16); // tradingPost Potion buy = 16
+    const r = tradeWithVendor(s, { vendorId: "tradingPost", item: "Potion", mode: "buy" });
+    expect(r.ok).toBe(true);
+    expect(s.player.gold).toBe(0);
+    expect(s.inventory["Potion"]).toBe(1);
   });
 });

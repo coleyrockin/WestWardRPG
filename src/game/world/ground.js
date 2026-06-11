@@ -79,9 +79,15 @@ function smooth01(a, b, x) {
   return t * t * (3 - 2 * t);
 }
 
-// Two-octave FBM in [0,1] over world XZ — the shared height/colour field.
+// Three-octave FBM over world XZ — the shared height/colour field.
+// Two coarse octaves in [0,1]; third micro-relief octave adds ≤0.18 so the
+// theoretical max is ≈1.18 (not renormalised per roadmap R2.3 spec).
 export function groundFbm(x, z) {
-  return valueNoise2(x * 0.045, z * 0.045) * 0.65 + valueNoise2(x * 0.13 + 19, z * 0.13 + 7) * 0.35;
+  return (
+    valueNoise2(x * 0.045, z * 0.045) * 0.65 +
+    valueNoise2(x * 0.13 + 19, z * 0.13 + 7) * 0.35 +
+    valueNoise2(x * 0.28 + 41, z * 0.28 + 23) * 0.18
+  );
 }
 
 // Relief mask in [0,1]: 0 in the road/play corridor AND in the south marsh basin,
@@ -90,6 +96,65 @@ export function reliefMask(z) {
   const corridor = smooth01(MASK_LO, MASK_HI, Math.abs(z - ROAD_Z));
   const marsh = 1 - smooth01(MARSH_LO, MARSH_HI, z); // → 0 in the basin
   return corridor * marsh;
+}
+
+// ---------------------------------------------------------------------------
+// R2.1 — Biome zone masks (pure, mirrors the TSL smoothstep masks in
+// createGroundMaterial exactly — same centres, radii, and smooth01 math).
+//
+// Each zone uses a radial smoothstep falloff from its centre:
+//   inner radius → full weight (1.0); inner+fade → 0.0.
+// The three zones are non-overlapping (min centre distance >> outer radii sum).
+// ---------------------------------------------------------------------------
+
+// Marsh — Sunken Wash lowland, centre (76, 58)
+const MARSH_CX = 76, MARSH_CZ = 58, MARSH_R_IN = 16, MARSH_R_OUT = 26;
+// Bluff — Prospector's Folly north bluffs, centre (33.5, -29)
+const BLUFF_CX = 33.5, BLUFF_CZ = -29, BLUFF_R_IN = 14, BLUFF_R_OUT = 24;
+// Ranch — Eastwater Ranch grassland, centre (125, 12)
+const RANCH_CX = 125, RANCH_CZ = 12, RANCH_R_IN = 18, RANCH_R_OUT = 28;
+
+/** Biome classification at world position (x, z).
+ *  Returns { key: "marsh"|"bluff"|"ranch"|"range", marsh, bluff, ranch }
+ *  where the three numbers are [0,1] mask weights (same values the shader uses).
+ */
+export function biomeAt(x, z) {
+  const marshDist = Math.sqrt((x - MARSH_CX) ** 2 + (z - MARSH_CZ) ** 2);
+  const bluffDist = Math.sqrt((x - BLUFF_CX) ** 2 + (z - BLUFF_CZ) ** 2);
+  const ranchDist = Math.sqrt((x - RANCH_CX) ** 2 + (z - RANCH_CZ) ** 2);
+
+  const marsh = 1 - smooth01(MARSH_R_IN, MARSH_R_OUT, marshDist);
+  const bluff = 1 - smooth01(BLUFF_R_IN, BLUFF_R_OUT, bluffDist);
+  const ranch = 1 - smooth01(RANCH_R_IN, RANCH_R_OUT, ranchDist);
+
+  let key = "range";
+  let best = 0;
+  if (marsh > best) { best = marsh; key = "marsh"; }
+  if (bluff > best) { best = bluff; key = "bluff"; }
+  if (ranch > best) { best = ranch; key = "ranch"; }
+  if (best < 0.5) key = "range";
+
+  return { key, marsh, bluff, ranch };
+}
+
+// ---------------------------------------------------------------------------
+// R2.2 — Per-zone fog density multiplier (pure, for stepWorld to consume).
+//
+// Returns a multiplicative factor scene.fog.density is multiplied by per frame.
+//   marsh  +60% → 1.6   (ground mist you feel before you see water)
+//   bluff  −20% → 0.8   (dry thin air)
+//   ranch  +10% → 1.1
+//   range  ±0%  → 1.0
+// Blend is naturally smooth via the same biome masks (15u blend radius baked
+// into the zone radii above — inner→outer span = 10u ≈ 15u effective read).
+// ---------------------------------------------------------------------------
+
+/** Multiplicative fog density factor at world position (x, z).
+ *  stepWorld multiplies scene.fog.density by this value each frame.
+ */
+export function localFogBoost(x, z) {
+  const { marsh, bluff, ranch } = biomeAt(x, z);
+  return 1.0 + marsh * 0.6 - bluff * 0.2 + ranch * 0.1;
 }
 
 // World-space terrain height at (x,z). Pure + deterministic so props/scatter seat
@@ -110,9 +175,12 @@ const tslNoise = Fn(([p]) => {
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 });
 
-// TSL two-octave FBM — must match groundFbm() numerically.
+// TSL three-octave FBM — must match groundFbm() numerically (same offsets/weights).
 const tslFbm = Fn(([p]) =>
-  tslNoise(p.mul(0.045)).mul(0.65).add(tslNoise(p.mul(0.13).add(vec2(19, 7))).mul(0.35)),
+  tslNoise(p.mul(0.045))
+    .mul(0.65)
+    .add(tslNoise(p.mul(0.13).add(vec2(19, 7))).mul(0.35))
+    .add(tslNoise(p.mul(0.28).add(vec2(41, 23))).mul(0.18)),
 );
 
 // opts: { dirt, sand, scrub, center:{x,z}, amp }. `center` is the ground mesh's
@@ -125,6 +193,11 @@ export function createGroundMaterial(opts = {}) {
   const amp = opts.amp ?? AMP;
   const mat = new MeshToonNodeMaterial({ gradientMap: celGradientMap() });
 
+  // R2.1 biome tint colours — tonal shifts inside warm-key/cool-shadow scheme.
+  const marshTint = v3(col("#7a8a6a")); // desaturated grey-green
+  const bluffTint = v3(col("#b87a45")); // ochre-rust
+  const ranchTint = v3(col("#a0a868")); // dry sage-green
+
   // Colour: dirt/sand patches + scrub pockets, then darkened in valleys (baked-AO).
   const pc = vec2(positionWorld.x, positionWorld.z);
   const big = tslNoise(pc.mul(0.045)); // broad dirt/sand patches
@@ -133,7 +206,27 @@ export function createGroundMaterial(opts = {}) {
   // More scrub variation + a fine grain break so the ground reads as worn earth, not a flat wash.
   const tinted = mix(base, v3(scrub), big.mul(fine).mul(0.82)).mul(mix(float(0.94), float(1.06), fine));
   const fbmC = tslFbm(pc);
-  mat.colorNode = tinted.mul(mix(float(0.68), float(1.24), fbmC)); // valley shade → crest light (floor lifted 0.62→0.68 so the near-field foreground reads as cool dirt, not crushed red murk; brighter crest adds dimension)
+  // Valley shade → crest light.
+  // Marsh deepens valley-AO floor (×1.15) — computed after biome mask.
+  const aoBase = mix(float(0.68), float(1.24), fbmC);
+
+  // R2.1 — Biome zone masks (TSL radial smoothstep, mirrors biomeAt() exactly).
+  // smoothstep(inner, outer, dist) → 0 at centre; 1-smoothstep → 1 at centre.
+  const marshDist = positionWorld.x.sub(MARSH_CX).pow(2).add(positionWorld.z.sub(MARSH_CZ).pow(2)).sqrt();
+  const bluffDist = positionWorld.x.sub(BLUFF_CX).pow(2).add(positionWorld.z.sub(BLUFF_CZ).pow(2)).sqrt();
+  const ranchDist = positionWorld.x.sub(RANCH_CX).pow(2).add(positionWorld.z.sub(RANCH_CZ).pow(2)).sqrt();
+  const marshMask = smoothstep(MARSH_R_IN, MARSH_R_OUT, marshDist).oneMinus();
+  const bluffMask = smoothstep(BLUFF_R_IN, BLUFF_R_OUT, bluffDist).oneMinus();
+  const ranchMask = smoothstep(RANCH_R_IN, RANCH_R_OUT, ranchDist).oneMinus();
+
+  // Blend tints into the base — tonal mix at ~0.55 strength.
+  let biomed = mix(tinted, marshTint, marshMask.mul(0.55));
+  biomed = mix(biomed, bluffTint, bluffMask.mul(0.55));
+  biomed = mix(biomed, ranchTint, ranchMask.mul(0.55));
+
+  // Marsh valley-AO deepens by ×1.15 inside the marsh zone.
+  const aoFactor = aoBase.mul(float(1.0).add(marshMask.mul(0.15)));
+  mat.colorNode = biomed.mul(aoFactor);
 
   // Relief: displace local +z (plane is rotated flat → local +z is world up).
   // Height input uses positionLocal mapped to world XZ to avoid positionWorld

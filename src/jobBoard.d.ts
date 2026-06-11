@@ -11,6 +11,7 @@ export function getJobBoardChoices(options?: any): any[];
 export function resolveLatestCompletedJobBoardLine(completedJobIds?: any[], regionId?: string): string;
 export function acceptJob(jobState: any, jobId: string, options?: { time?: number; inventory?: Record<string, number>; narrative?: any }): any;
 export function passesNarrativeGate(job: any, narrative?: any): boolean;
+export function passesCompletionGate(job: any, completedJobIds?: string[]): boolean;
 export function recordJobEvent(jobState: any, event?: any): any;
 export function claimJobReward(jobState: any, jobId?: string | null): any;
 export function getActiveJobSummary(jobState: any): any;

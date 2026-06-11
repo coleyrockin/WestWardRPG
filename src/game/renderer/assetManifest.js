@@ -82,6 +82,13 @@ export const MODELS = {
   porch: { url: "/models/porch.glb", scale: 0.9 },
   cart: { url: "/models/cart.glb", scale: 1.4 },
   crate: { url: "/models/crate.glb", scale: 1.6 },
+  // R4.6 — Eastwater Ranch animals
+  // Horse: authored 1.5u tall at withers × 1.9u long; scale 1.0 maps 1:1.
+  // Placed at the hitching rail; head-bob ±4° period 3.2 s in stepWorld.
+  horseHitched: { url: "/models/horse_hitched.glb", scale: 1.0, vary: true },
+  // Cattle: authored 1.1u tall × 1.7u long; scale 1.0 maps 1:1.
+  // Scatter 6-8 in the paddock (x 118-128); optional breath-sway 0.04 amp in stepWorld.
+  cattle: { url: "/models/cattle.glb", scale: 1.0, vary: true },
 };
 
 export function modelFor(kind) {

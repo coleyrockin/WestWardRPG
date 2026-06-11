@@ -1,7 +1,7 @@
 // Compact route-map HUD for the Three.js first-road slice.
 // Pure route projection is exported for tests; DOM sync stays thin.
 
-import { FIRST_FIVE_ROUTE } from "./frontierLayout.js";
+import { FIRST_FIVE_ROUTE, OPEN_RANGE_BOUNDS, OPEN_RANGE_ROADS, WORLD_MAP_POIS } from "./frontierLayout.js";
 import { getPhaseProgress } from "./phaseState.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -189,6 +189,131 @@ export function buildFieldMapRouteModel(loopState = {}, options = {}) {
   };
 }
 
+// Per-POI visual styles for the world minimap.
+// Dustward is the player hub — warmer and slightly larger.
+// Others use muted parchment tones that read as distant waypoints.
+const WORLD_POI_STYLES = Object.freeze({
+  dustward:  { color: "#ffd77b", size: 7.2 },
+  eastwater: { color: "#d4b882", size: 5.8 },
+  folly:     { color: "#c9a96e", size: 5.4 },
+  wash:      { color: "#b8c49a", size: 5.4 },
+  westPass:  { color: "#c8b07a", size: 5.6 },
+});
+
+// Build the four corner points of OPEN_RANGE_BOUNDS so createProjector can
+// derive bounds from them — reuses the existing calculateBounds math.
+function boundsCorners(bounds) {
+  return [
+    { x: bounds.minX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY },
+    { x: bounds.minX, y: bounds.maxY },
+  ];
+}
+
+export function buildFieldMapWorldModel(loopState = {}, options = {}) {
+  const size = options.size || DEFAULT_SIZE;
+  const corners = boundsCorners(OPEN_RANGE_BOUNDS);
+  const projector = createProjector(corners, size);
+
+  // Roads: each OPEN_RANGE_ROADS segment as a 2-point path,
+  // plus FIRST_FIVE_ROUTE as a single polyline.
+  const roadPaths = OPEN_RANGE_ROADS.map((seg) => {
+    const a = projector.project(seg.from);
+    const b = projector.project(seg.to);
+    return pathD([a, b]);
+  });
+  const firstFiveProjected = FIRST_FIVE_ROUTE.map((pt) => projector.project({ x: pt.x, y: pt.y }));
+  roadPaths.push(pathD(firstFiveProjected));
+
+  // POIs
+  const pois = WORLD_MAP_POIS.map((poi) => {
+    const { mapX, mapY } = projector.project({ x: poi.x, y: poi.y });
+    const style = WORLD_POI_STYLES[poi.id] || { color: "#c9a96e", size: 5.4 };
+    return {
+      id: poi.id,
+      label: poi.label,
+      x: Number(mapX.toFixed(2)),
+      y: Number(mapY.toFixed(2)),
+      shape: "circle",
+      color: style.color,
+      size: style.size,
+      active: false,
+      completed: false,
+      warning: false,
+      muted: false,
+      choice: false,
+    };
+  });
+
+  // Player position
+  const playerWorld = worldPointFromPosition(
+    options.playerPosition || loopState?.playerPosition || loopState?.player,
+    FIRST_FIVE_ROUTE[0],
+  );
+  const playerMap = projector.project(playerWorld);
+
+  // Yaw rotation — convention (from docs/roadmap.md §6):
+  //   yaw = 0   → player faces world −z (north on map = −y = map UP)
+  //   yaw = −π/2 → player faces world +x (east = map RIGHT)
+  //
+  // In the SVG the cone at yaw=0 points map-up (north), which is rotation 0°.
+  // Each step of yaw clockwise (−) in world = clockwise in SVG (+°).
+  // So SVG rotation degrees = −yaw * 180/π.
+  //   Verify: yaw=0 → 0°  (north, cone up)  ✓
+  //           yaw=−π/2 → +90°  (east, cone right)  ✓
+  const rawYaw = options.playerYaw !== undefined ? options.playerYaw : null;
+  const playerYaw = (rawYaw !== null && Number.isFinite(rawYaw)) ? rawYaw : null;
+  const yawDeg = playerYaw !== null ? -(playerYaw) * (180 / Math.PI) : null;
+
+  // Job target
+  let jobTarget = null;
+  if (options.jobTarget && Number.isFinite(options.jobTarget.x) && Number.isFinite(options.jobTarget.y)) {
+    const jt = projector.project({ x: options.jobTarget.x, y: options.jobTarget.y });
+    jobTarget = {
+      x: Number(jt.mapX.toFixed(2)),
+      y: Number(jt.mapY.toFixed(2)),
+      label: options.jobTarget.label || "Target",
+    };
+  }
+
+  // Find the nearest POI to label as the status location
+  let nearestPoi = null;
+  let nearestDist = Infinity;
+  for (const poi of WORLD_MAP_POIS) {
+    const d = Math.hypot(playerWorld.x - poi.x, playerWorld.y - poi.y);
+    if (d < nearestDist) { nearestDist = d; nearestPoi = poi; }
+  }
+  const statusLabel = "Open Range";
+  const targetLabel = nearestPoi ? nearestPoi.label : "Open Range";
+
+  return {
+    roads: roadPaths,
+    pois,
+    playerPoint: {
+      x: Number(playerMap.mapX.toFixed(2)),
+      y: Number(playerMap.mapY.toFixed(2)),
+      worldX: Number(playerWorld.x.toFixed(2)),
+      worldY: Number(playerWorld.y.toFixed(2)),
+      label: "You",
+    },
+    playerYaw,
+    yawDeg,
+    jobTarget,
+    statusLabel,
+    targetLabel,
+  };
+}
+
+// Pure: determines which map mode to render.
+// override wins if it is "route" or "world".
+// Falls back to "world" at survey_teaser phase, else "route".
+export function resolveFieldMapMode(loopState = {}, override = null) {
+  if (override === "route" || override === "world") return override;
+  if (loopState?.phase === "survey_teaser") return "world";
+  return "route";
+}
+
 export function createFieldMapDomRefs(rootDocument = globalThis.document) {
   const doc = rootDocument && typeof rootDocument.querySelector === "function"
     ? rootDocument
@@ -297,7 +422,117 @@ function appendPlayerMarker(refs, parent, point) {
   if (group) parent?.appendChild?.(group);
 }
 
+// Append a POI name label as SVG <text> under the marker.
+function appendPoiLabel(refs, parent, point) {
+  const text = setAttrs(svgNode(refs, "text"), {
+    class: "map-poi-label",
+    x: point.x,
+    y: point.y + point.size / 2 + 7,
+    "text-anchor": "middle",
+  });
+  if (text) {
+    text.textContent = point.label;
+    parent?.appendChild?.(text);
+  }
+}
+
+// Extended player marker that rotates the cone when yawDeg is a finite number.
+// yawDeg = −yaw * 180/π (see buildFieldMapWorldModel for sign derivation).
+function appendPlayerMarkerWithYaw(refs, parent, point, yawDeg) {
+  if (!point) return;
+  const translatePart = `translate(${point.x.toFixed(2)} ${point.y.toFixed(2)})`;
+  const rotatePart = (yawDeg !== null && Number.isFinite(yawDeg))
+    ? ` rotate(${yawDeg.toFixed(2)})`
+    : "";
+  const group = setAttrs(svgNode(refs, "g"), {
+    class: "map-player",
+    transform: translatePart + rotatePart,
+  });
+  const cone = setAttrs(svgNode(refs, "path"), {
+    class: "map-player-cone",
+    d: "M 0 -8 L 4.4 4.8 L 0 2.4 L -4.4 4.8 Z",
+  });
+  const ring = setAttrs(svgNode(refs, "circle"), {
+    class: "map-player-ring",
+    cx: 0,
+    cy: 0,
+    r: 5.3,
+  });
+  const dot = setAttrs(svgNode(refs, "circle"), {
+    class: "map-player-dot",
+    cx: 0,
+    cy: 0,
+    r: 2.6,
+  });
+  const title = svgNode(refs, "title");
+  if (title) title.textContent = point.label || "You";
+  group?.appendChild?.(cone);
+  group?.appendChild?.(ring);
+  group?.appendChild?.(dot);
+  if (title) group?.appendChild?.(title);
+  if (group) parent?.appendChild?.(group);
+}
+
+// syncFieldMapDom options shape (orchestrator wires spike.js to this):
+//   options.mode          — "route" | "world" | null/undefined (auto-resolved)
+//   options.playerPosition — { x, y } or { x, z } Three.js position
+//   options.playerYaw     — number (radians); world yaw=0 faces −z (north/map-up)
+//   options.jobTarget     — { x, y, label } active quest destination in world coords
+//   options.size          — { width, height, padding } override (rarely needed)
 export function syncFieldMapDom(refs, loopState = {}, options = {}) {
+  const mode = resolveFieldMapMode(loopState, options.mode || null);
+
+  if (mode === "world") {
+    const model = buildFieldMapWorldModel(loopState, options);
+    if (refs?.phaseLabel) refs.phaseLabel.textContent = model.statusLabel;
+    if (refs?.targetLabel) refs.targetLabel.textContent = model.targetLabel;
+    if (refs?.root?.dataset) {
+      refs.root.dataset.phase = "world";
+      refs.root.dataset.activeKind = "";
+      refs.root.dataset.upgraded = "false";
+      refs.root.dataset.boardChoice = "";
+    }
+    if (!refs?.svg || !refs.createElementNS) return model;
+
+    const svg = refs.svg;
+    if (typeof svg.replaceChildren === "function") svg.replaceChildren();
+    while (svg.firstChild && typeof svg.removeChild === "function") svg.removeChild(svg.firstChild);
+
+    setAttrs(svg, { viewBox: "0 0 220 142", role: "img", "aria-label": "Open Range world map" });
+    const layer = svgNode(refs, "g");
+    if (layer) svg.appendChild(layer);
+
+    // Draw roads (no mesa/marsh doodles in world mode)
+    for (const d of model.roads) appendPath(refs, layer, "map-world-road", d);
+
+    // Draw POI markers with labels
+    for (const poi of model.pois) {
+      appendMarker(refs, layer, poi);
+      appendPoiLabel(refs, layer, poi);
+    }
+
+    // Job target as active pulsing marker
+    if (model.jobTarget) {
+      const jt = {
+        ...model.jobTarget,
+        shape: "circle",
+        color: "#ffd77b",
+        size: 6,
+        active: true,
+        completed: false,
+        warning: false,
+        muted: false,
+        choice: false,
+      };
+      appendMarker(refs, layer, jt);
+    }
+
+    // Player marker with optional yaw rotation
+    appendPlayerMarkerWithYaw(refs, layer, model.playerPoint, model.yawDeg);
+    return model;
+  }
+
+  // Route mode — pixel-identical to the original implementation
   const model = buildFieldMapRouteModel(loopState, options);
   if (refs?.phaseLabel) refs.phaseLabel.textContent = model.statusLabel;
   if (refs?.targetLabel) refs.targetLabel.textContent = model.targetLabel;

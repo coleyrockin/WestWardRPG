@@ -35,10 +35,37 @@ export function stepFootstepClock(
 export const WIND_LEVELS: Readonly<Record<string, number>>;
 export function windLevelForPalette(key: string): number;
 
+// R1.4 — wind cutoff + gust schedule
+export function windCutoffFor(windSpeed: number): number;
+
+export const GUST_AUDIO_SEED: number;
+export function gustAt(t: number, seed: number): 0 | 1;
+export function gustWindowOpened(prevT: number, t: number, seed: number): boolean;
+
+// R1.5 — biome pocket levels
+export interface BiomePocketLevels {
+  marsh: number;
+  folly: number;
+  ranch: number;
+  saloon: number;
+}
+export function biomePocketLevels(x: number, y: number): BiomePocketLevels;
+
+export const NIGHT_BED_GAINS: Readonly<Record<string, number>>;
+export function nightBedGainFor(paletteKey: string): number;
+
 export interface AudioViewUpdate {
   moving?: boolean;
   running?: boolean;
   paletteKey?: string;
+  /** R1.4: 1=clear, 1.8=dust, 2.6=storm — drives whistle cutoff + gust gain */
+  windSpeed?: number;
+  /** R1.4: monotonic world seconds — drives seeded gust schedule */
+  worldTime?: number;
+  /** R1.5: world X coord — drives biome pocket cross-fades */
+  playerX?: number;
+  /** R1.5: world Y coord — drives biome pocket cross-fades */
+  playerY?: number;
 }
 
 export interface AudioView {

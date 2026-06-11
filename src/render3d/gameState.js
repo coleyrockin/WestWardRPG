@@ -19,6 +19,7 @@ import {
   recordJobEvent,
   claimJobReward,
 } from "../jobBoard.js";
+import { applyTrade } from "../shopCatalog.js";
 import {
   createInitialLootState,
   normalizeLootState,
@@ -291,4 +292,33 @@ export function buildGameSaveSlice(state) {
 
 export function hydrateGameState(slice) {
   return normalizeGameState(slice || {});
+}
+
+// Vendor trade: validate and apply a single buy/sell transaction against the
+// live state tree. Returns { ok, reason, gold, owned } for toast copy — the
+// caller should surface reason on rejection and gold/owned for confirmation.
+// Delegates validation to applyTrade (pure); applies deltas here via grantGold
+// and the same inventory pattern used in claimBoardReward.
+export function tradeWithVendor(state, { vendorId, item, mode } = {}) {
+  const result = applyTrade({
+    vendorId,
+    item,
+    mode,
+    inventory: state.inventory,
+    gold: state.player.gold,
+  });
+  if (!result.ok) {
+    return { ok: false, reason: result.reason, gold: state.player.gold, owned: state.inventory[item] ?? 0 };
+  }
+  // Apply gold delta (grantGold clamps ≥ 0).
+  grantGold(state, result.goldDelta);
+  // Apply item delta (+1 buy, -1 sell); clamp to 0 floor.
+  const prev = state.inventory[item] ?? 0;
+  const next = Math.max(0, prev + result.itemDelta);
+  if (next === 0) {
+    delete state.inventory[item];
+  } else {
+    state.inventory[item] = next;
+  }
+  return { ok: true, reason: null, gold: state.player.gold, owned: state.inventory[item] ?? 0 };
 }

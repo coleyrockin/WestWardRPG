@@ -29,7 +29,8 @@ import { buildProxies, SALOON_DIMS } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
 import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine } from "./phaseState.js";
 import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
-import { buildFieldMapRouteModel, createFieldMapDomRefs, syncFieldMapDom } from "./fieldMapDom.js";
+import { buildFieldMapRouteModel, createFieldMapDomRefs, syncFieldMapDom, resolveFieldMapMode } from "./fieldMapDom.js";
+import { questMapTarget } from "./questRuntime.js";
 import { createBoardModalController } from "./boardModal.js";
 import { createBoardDomRefs, syncBoardDom } from "./boardDom.js";
 import { buildBoardView } from "./boardCopy.js";
@@ -38,7 +39,7 @@ import { createAtmosphere } from "./atmosphere.js";
 import { sunArc } from "./timeOfDay.js";
 import { createWorldClock, tickClock, pinClock, cycleClock, dayTimeToKey } from "../game/world/worldClock.js";
 import { createWater } from "../game/world/water.js";
-import { createGroundMaterial, groundHeight } from "../game/world/ground.js";
+import { createGroundMaterial, groundHeight, localFogBoost } from "../game/world/ground.js";
 import { createScatter } from "../game/world/scatter.js";
 import { createPlaceholderCharacter } from "../game/world/character.js";
 import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
@@ -87,7 +88,7 @@ const BUILDING_KINDS = new Set([
 const GROUNDABLE_KINDS = new Set([
   "gate", "watchtower", "landmark", "jobBoard", "smokeCache", "brokenWagon",
   "wagonSalvage", "cart", "crate", "barrelCrateCluster", "rock", "boulder",
-  "cactus", "deadTree", "hitchingRail",
+  "cactus", "deadTree", "hitchingRail", "horseHitched", "cattle",
 ]);
 const PLAYER_MODEL_URL = "/models/character_hero.glb";
 const IMPORTANT_MODEL_KINDS = Object.freeze([
@@ -2698,7 +2699,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       cx: camera.position.x,
       cz: camera.position.z,
     });
-    if (scene.fog) scene.fog.density = appliedPalette.fog.density + weather.fogBoost;
+    // R2.2 — biome fog: marsh thickens (ground mist), bluffs thin (dry air),
+    // ranch +10%. Spawn sits in the default zone so the dusk capture frame is
+    // unchanged; the multiplier blends over ~15u as the player crosses zones.
+    if (scene.fog) scene.fog.density = (appliedPalette.fog.density + weather.fogBoost) * localFogBoost(player.position.x, player.position.z);
     // PostProcessing ignores renderer.toneMappingExposure — drive exposure via the
     // post uniform so day/night, weather darkening, and lightning flashes show.
     postUniforms.exposure.value = appliedPalette.exposure * weather.darken * (1 + flash * 0.8);
@@ -2724,6 +2728,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     window.addEventListener("keydown", unlockAudio);
     window.addEventListener("keydown", (e) => {
       if (e.code === "KeyM") audioView.setMuted(!audioView.muted);
+      if (e.code === "Digit3") toggleFieldMapMode();
     });
   }
 
@@ -2981,7 +2986,21 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   };
   const labelForBoardOption = (optionId) =>
     BOARD_OPTIONS.find((option) => option.id === optionId)?.label || "Accept bounty";
-  const syncLiveFieldMap = () => syncFieldMapDom(fieldMapRefs, loopState.state, { playerPosition: player.position });
+  // Field map: route view during the first-road loop, world view in free roam;
+  // Digit3 (the hotbar's "3 = Map") flips the view manually. The active courier
+  // beat (questRuntime) renders as the world view's target marker.
+  let mapModeOverride = null;
+  const syncLiveFieldMap = () => syncFieldMapDom(fieldMapRefs, loopState.state, {
+    playerPosition: player.position,
+    playerYaw: player.yaw,
+    mode: resolveFieldMapMode(loopState.state, mapModeOverride),
+    jobTarget: questMapTarget(game.world.jobs),
+  });
+  const toggleFieldMapMode = () => {
+    const auto = resolveFieldMapMode(loopState.state, null);
+    mapModeOverride = mapModeOverride ? null : auto === "route" ? "world" : "route";
+    syncLiveFieldMap();
+  };
   syncLiveFieldMap();
 
   const refreshLoopDom = () => {
@@ -3789,6 +3808,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         moving: player.moving && !boardModalController.isOpen(),
         running: player.running,
         paletteKey: dayTimeToKey(clock.dayTime),
+        windSpeed: weather.windSpeed,
+        worldTime: waterTime,
+        playerX: player.position.x,
+        playerY: player.position.z,
       });
     }
     if (!visualCapture) {

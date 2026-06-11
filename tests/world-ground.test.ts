@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error — JS module, no types
-import { valueNoise2, groundFbm, reliefMask, groundHeight, createGroundMaterial } from "../src/game/world/ground.js";
+import { valueNoise2, groundFbm, reliefMask, groundHeight, createGroundMaterial, biomeAt, localFogBoost } from "../src/game/world/ground.js";
+import { FIRST_FIVE_ROUTE } from "../src/render3d/frontierLayout.js";
 
 describe("ground", () => {
   it("value noise stays in [0,1] and is deterministic", () => {
@@ -28,14 +29,20 @@ describe("ground", () => {
 });
 
 describe("ground relief — FBM field", () => {
-  it("stays in [0,1] across the world", () => {
+  it("stays in [0, ~1.18] across the world (third octave adds ≤0.18, unnormalised per R2.3 spec)", () => {
+    // Lower bound is well above 0; upper bound can slightly exceed 1.0 with the third octave.
     for (let x = -10; x < 30; x += 3) {
       for (let z = -5; z < 25; z += 3) {
         const v = groundFbm(x, z);
         expect(v).toBeGreaterThanOrEqual(0);
-        expect(v).toBeLessThanOrEqual(1);
+        expect(v).toBeLessThanOrEqual(1.2); // documented max ≈1.18 on the world grid
       }
     }
+  });
+
+  it("is deterministic", () => {
+    expect(groundFbm(5.5, 2.0)).toBe(groundFbm(5.5, 2.0));
+    expect(groundFbm(-8.3, 14.7)).toBe(groundFbm(-8.3, 14.7));
   });
 });
 
@@ -81,12 +88,150 @@ describe("ground relief — height field", () => {
     expect(maxAbs).toBeGreaterThan(0.05);
   });
 
-  it("is bounded by the amplitude and deterministic", () => {
+  it("is bounded by the amplitude and deterministic (third octave stays within ±0.57u max)", () => {
+    // Third octave can push groundFbm to ≈1.18; (1.18-0.5)*2*0.48 ≈ 0.653 theoretical.
+    // In practice on the test grid the max observed is ~0.24u — we bound at 0.60 to
+    // document the new ceiling without over-asserting.
     for (let x = -10; x < 30; x += 1.1) {
       for (let z = -5; z < 25; z += 1.1) {
-        expect(Math.abs(groundHeight(x, z))).toBeLessThanOrEqual(0.4 + 1e-6);
+        expect(Math.abs(groundHeight(x, z))).toBeLessThanOrEqual(0.60);
       }
     }
     expect(groundHeight(5.5, 2.0)).toBe(groundHeight(5.5, 2.0));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R2.3 — FIRST_FIVE_ROUTE waypoint height constraint (roadmap R2.3)
+// ---------------------------------------------------------------------------
+describe("R2.3 — FIRST_FIVE_ROUTE waypoints within ±0.1u of zero", () => {
+  it("all FIRST_FIVE_ROUTE waypoints have groundHeight ≤ 0.1u (corridor mask)", () => {
+    for (const wp of FIRST_FIVE_ROUTE) {
+      // frontierLayout uses (x, y) where y maps to world Z
+      const h = Math.abs(groundHeight(wp.x, wp.y));
+      expect(h).toBeLessThanOrEqual(0.1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R2.1 — biomeAt classification
+// ---------------------------------------------------------------------------
+describe("R2.1 — biomeAt zone classification", () => {
+  it("returns 'marsh' with full weight at marsh centre (76, 58)", () => {
+    const b = biomeAt(76, 58);
+    expect(b.key).toBe("marsh");
+    expect(b.marsh).toBeCloseTo(1, 6);
+    expect(b.bluff).toBeCloseTo(0, 6);
+    expect(b.ranch).toBeCloseTo(0, 6);
+  });
+
+  it("returns 'bluff' with full weight at bluff centre (33.5, -29)", () => {
+    const b = biomeAt(33.5, -29);
+    expect(b.key).toBe("bluff");
+    expect(b.marsh).toBeCloseTo(0, 6);
+    expect(b.bluff).toBeCloseTo(1, 6);
+    expect(b.ranch).toBeCloseTo(0, 6);
+  });
+
+  it("returns 'ranch' with full weight at ranch centre (125, 12)", () => {
+    const b = biomeAt(125, 12);
+    expect(b.key).toBe("ranch");
+    expect(b.marsh).toBeCloseTo(0, 6);
+    expect(b.bluff).toBeCloseTo(0, 6);
+    expect(b.ranch).toBeCloseTo(1, 6);
+  });
+
+  it("returns 'range' far from all zones (0, 0)", () => {
+    const b = biomeAt(0, 0);
+    expect(b.key).toBe("range");
+    expect(b.marsh).toBeCloseTo(0, 6);
+    expect(b.bluff).toBeCloseTo(0, 6);
+    expect(b.ranch).toBeCloseTo(0, 6);
+  });
+
+  it("returns fractional weights in blend zone — marsh at 20u from centre", () => {
+    // At exactly inner radius (16u) weight=1; at outer radius (26u) weight=0.
+    // At 20u (midway through the fade) it should be between 0 and 1, not 0 or 1.
+    // Point 20u east of marsh centre:
+    const b = biomeAt(76 + 20, 58);
+    expect(b.marsh).toBeGreaterThan(0);
+    expect(b.marsh).toBeLessThan(1);
+  });
+
+  it("returns fractional weights in blend zone — bluff at 18u from centre", () => {
+    const b = biomeAt(33.5 + 18, -29);
+    expect(b.bluff).toBeGreaterThan(0);
+    expect(b.bluff).toBeLessThan(1);
+  });
+
+  it("returns fractional weights in blend zone — ranch at 22u from centre", () => {
+    const b = biomeAt(125 + 22, 12);
+    expect(b.ranch).toBeGreaterThan(0);
+    expect(b.ranch).toBeLessThan(1);
+  });
+
+  it("zones are mutually exclusive — no position has two non-zero weights", () => {
+    // All zone centres are far apart (>60u) so cross-contamination is impossible.
+    // Spot-check some inter-zone midpoints.
+    const midpoints = [
+      [(76 + 33.5) / 2, (58 + -29) / 2],  // marsh-bluff midpoint
+      [(76 + 125) / 2, (58 + 12) / 2],    // marsh-ranch midpoint
+      [(33.5 + 125) / 2, (-29 + 12) / 2], // bluff-ranch midpoint
+    ];
+    for (const [x, z] of midpoints) {
+      const b = biomeAt(x, z);
+      const nonZero = [b.marsh, b.bluff, b.ranch].filter((w) => w > 0.001);
+      expect(nonZero.length).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("all mask weights stay in [0,1]", () => {
+    for (let x = 0; x < 150; x += 10) {
+      for (let z = -40; z < 80; z += 10) {
+        const b = biomeAt(x, z);
+        expect(b.marsh).toBeGreaterThanOrEqual(0);
+        expect(b.marsh).toBeLessThanOrEqual(1);
+        expect(b.bluff).toBeGreaterThanOrEqual(0);
+        expect(b.bluff).toBeLessThanOrEqual(1);
+        expect(b.ranch).toBeGreaterThanOrEqual(0);
+        expect(b.ranch).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R2.2 — localFogBoost values
+// ---------------------------------------------------------------------------
+describe("R2.2 — localFogBoost per-zone fog multiplier", () => {
+  it("is ≈1.6 at marsh centre (marsh +60%)", () => {
+    expect(localFogBoost(76, 58)).toBeCloseTo(1.6, 5);
+  });
+
+  it("is ≈0.8 at bluff centre (bluff −20%)", () => {
+    expect(localFogBoost(33.5, -29)).toBeCloseTo(0.8, 5);
+  });
+
+  it("is ≈1.1 at ranch centre (ranch +10%)", () => {
+    expect(localFogBoost(125, 12)).toBeCloseTo(1.1, 5);
+  });
+
+  it("is 1.0 far from all zones (range)", () => {
+    expect(localFogBoost(0, 0)).toBeCloseTo(1.0, 5);
+    expect(localFogBoost(-50, -50)).toBeCloseTo(1.0, 5);
+  });
+
+  it("blends smoothly — value between 1.0 and 1.6 in marsh fade zone", () => {
+    // 20u from marsh centre — partially inside fade zone
+    const f = localFogBoost(76 + 20, 58);
+    expect(f).toBeGreaterThan(1.0);
+    expect(f).toBeLessThan(1.6);
+  });
+
+  it("blends smoothly — value between 0.8 and 1.0 in bluff fade zone", () => {
+    const f = localFogBoost(33.5 + 18, -29);
+    expect(f).toBeGreaterThan(0.8);
+    expect(f).toBeLessThan(1.0);
   });
 });

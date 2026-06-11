@@ -598,6 +598,38 @@ export const JOB_DEFINITIONS = {
       items: { "Cipher Lens": 1 },
     },
   },
+  frontier_eastwater_run: {
+    id: "frontier_eastwater_run",
+    title: "Ranch Ledger Run",
+    kind: "courier",
+    regionId: "frontier",
+    npcId: "warden",
+    npcName: "Marshal Boone",
+    threat: "Low",
+    minLevel: 1,
+    priority: 35,
+    hint: "Boone needs the season's ledger carried out to Eastwater Ranch's trading post — the east road is long and the sun won't wait.",
+    boardNote: "The ranch ledger has to ride with a trusted pair of boots. Boone won't trust the post with it, and the trading post won't open the till without it.",
+    requiresCompletedJobIds: ["frontier_slime_bounty"],
+    objective: {
+      type: "supply_run",
+      count: 2,
+      label: "ranch ledger delivered",
+      pickup: { id: "eastwater_ledger_cache", label: "Ranch Ledger", x: 14.2, y: 5.9 },
+      dropoff: { id: "eastwater_trading_post", label: "Eastwater Trading Post", x: 128.8, y: 18.6 },
+    },
+    // Convenience field for questRuntime to read beat coords without
+    // parsing the objective type — mirrors the pickup/dropoff in objective.
+    delivery: {
+      pickup: { id: "eastwater_ledger_cache", label: "Ranch Ledger", x: 14.2, y: 5.9 },
+      dropoff: { id: "eastwater_trading_post", label: "Eastwater Trading Post", x: 128.8, y: 18.6 },
+    },
+    reward: {
+      gold: 60,
+      xp: 30,
+      items: { Potion: 1 },
+    },
+  },
 };
 
 export function getJobBoardPresentation({ regionId = "frontier" } = {}) {
@@ -673,6 +705,15 @@ function requiredStoryLootLabel(job) {
   const required = job.requiresStoryLoot;
   if (!required) return "";
   return Array.isArray(required) ? required.join(", ") : String(required);
+}
+
+// Completion-prerequisite gating. Hides a job until every listed job id
+// appears in the player's completedJobIds set. Missing field = no gate.
+export function passesCompletionGate(job, completedJobIds = []) {
+  const required = job?.requiresCompletedJobIds;
+  if (!Array.isArray(required) || required.length === 0) return true;
+  const completed = new Set(Array.isArray(completedJobIds) ? completedJobIds : []);
+  return required.every((id) => completed.has(id));
 }
 
 // Quest-outcome and faction-rep gating. Lets a job listing appear (or hide)
@@ -1043,6 +1084,7 @@ export function getJobListings({ regionId = "frontier", playerLevel = 1, jobStat
     .filter((job) => job.minLevel <= safeLevel)
     .filter((job) => hasRequiredStoryLoot(job, inventory))
     .filter((job) => passesNarrativeGate(job, narrative))
+    .filter((job) => passesCompletionGate(job, safeState.completedJobIds))
     .filter((job) => !safeState.completedJobIds.includes(job.id))
     .map((job) => decorateJob(job, safeState.progressByJobId[job.id], {
       inventory,

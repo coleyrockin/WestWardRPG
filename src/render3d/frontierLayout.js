@@ -595,6 +595,16 @@ export const OPEN_RANGE_ROADS = Object.freeze([
   { from: { x: 49, y: 21.5 }, to: { x: 76, y: 58 }, width: 3.6 },
 ]);
 
+// Named points of interest for the world minimap. Coordinates are world-space
+// (same system as OPEN_RANGE_BOUNDS: +x east, +y south).
+export const WORLD_MAP_POIS = Object.freeze([
+  { id: "dustward",   label: "Dustward",           x: 13,    y: 8    },
+  { id: "eastwater",  label: "Eastwater Ranch",    x: 128,   y: 12   },
+  { id: "folly",      label: "Prospector's Folly", x: 33.5,  y: -29.5 },
+  { id: "wash",       label: "Sunken Wash",         x: 76.5,  y: 58.5 },
+  { id: "westPass",   label: "West Pass",           x: -20,   y: 8.6  },
+]);
+
 // Second settlement on the eastern road — a working ranch outpost. Buildings
 // reuse WESTERN_SPECS kinds; fronts auto-face the road (front flips at y 8.9).
 const EASTWATER_RANCH = [
@@ -614,6 +624,19 @@ const EASTWATER_RANCH = [
   { kind: "lampLow",     label: "Ranch House Lamp",       x: 124.8, y: 10.4, color: "#ffd8a0", size: 0.6 },
   { kind: "lampLow",     label: "Trading Post Lamp",      x: 127.4, y: 17.3, color: "#ffe6a8", size: 0.62 },
   { kind: "sign",        label: "Eastwater Sign",         x: 117.5, y: 15.0, color: "#ffd77b", size: 0.8 },
+  // R4.6 — the ranch is inhabited. Horses tether at the Gate Rail south of the
+  // road (clear of the road band y≤16.6 and the ranch tumbleweed's weave
+  // y≤15.4); cattle graze the open paddock north of the buildings. Broadside
+  // yaws — silhouettes read at range.
+  { kind: "horseHitched", label: "Hitched Horse A", x: 120.2, y: 17.2, color: "#7a5a3c", size: 1.0, yaw: 2.9 },
+  { kind: "horseHitched", label: "Hitched Horse B", x: 121.5, y: 17.5, color: "#6b4f34", size: 0.96, yaw: 3.3 },
+  { kind: "cattle", label: "Paddock Cattle 1", x: 121.0, y: 5.2, color: "#8a6a48", size: 1.0,  yaw: 1.1 },
+  { kind: "cattle", label: "Paddock Cattle 2", x: 123.4, y: 4.8, color: "#7d5f40", size: 0.95, yaw: -0.4 },
+  { kind: "cattle", label: "Paddock Cattle 3", x: 125.2, y: 5.6, color: "#90704c", size: 1.05, yaw: 2.3 },
+  { kind: "cattle", label: "Paddock Cattle 4", x: 127.0, y: 5.0, color: "#85664a", size: 0.9,  yaw: 0.7 },
+  { kind: "cattle", label: "Paddock Cattle 5", x: 122.1, y: 4.2, color: "#7a5c3e", size: 1.0,  yaw: -1.2 },
+  { kind: "cattle", label: "Paddock Cattle 6", x: 124.8, y: 4.4, color: "#8d6d4a", size: 0.92, yaw: 1.8 },
+  { kind: "cattle", label: "Paddock Cattle 7", x: 126.5, y: 4.8, color: "#806248", size: 1.02, yaw: 3.0 },
 ];
 
 // Abandoned dig in the north bluffs — a ruin to stumble on, lit so it reads at dusk.

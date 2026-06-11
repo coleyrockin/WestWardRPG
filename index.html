@@ -441,6 +441,21 @@
         50% { opacity: 1; }
       }
 
+      /* World minimap — thin parchment roads, small serif POI labels */
+      #field-map .map-world-road {
+        fill: none;
+        stroke: rgba(196, 160, 96, 0.38);
+        stroke-width: 1.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      #field-map .map-poi-label {
+        font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+        font-size: 6px;
+        fill: rgba(246, 228, 196, 0.62);
+        pointer-events: none;
+      }
+
       #tag {
         position: fixed; top: 104px; left: 16px;
         display: none;

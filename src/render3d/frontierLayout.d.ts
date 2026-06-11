@@ -26,6 +26,9 @@ export const FIRST_ROAD_ART_STYLE: Readonly<{
   minWindowLights: number;
 }>;
 export const FIRST_FIVE_ROUTE: ReadonlyArray<{ kind: string; label: string; x: number; y: number }>;
+export const OPEN_RANGE_BOUNDS: Readonly<{ minX: number; maxX: number; minY: number; maxY: number }>;
+export const OPEN_RANGE_ROADS: ReadonlyArray<{ from: { x: number; y: number }; to: { x: number; y: number }; width: number }>;
+export const WORLD_MAP_POIS: ReadonlyArray<{ id: string; label: string; x: number; y: number }>;
 
 export function buildFrontierPlacements(): Placement[];
 export function getRouteMetrics(placements?: Placement[], options?: {

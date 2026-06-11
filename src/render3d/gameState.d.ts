@@ -76,3 +76,7 @@ export function reconcileWithLoopPhase(
   state: GameState,
   loopState?: { phase?: string; routeBeats?: Record<string, unknown> },
 ): { accepted: boolean; kills: number; claimed: boolean };
+export function tradeWithVendor(
+  state: GameState,
+  opts?: { vendorId?: string; item?: string; mode?: "buy" | "sell" },
+): { ok: boolean; reason: string | null; gold: number; owned: number };
