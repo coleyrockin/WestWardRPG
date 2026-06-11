@@ -12,6 +12,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "play": "vite build && vite preview --port 5191 --strictPort",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
