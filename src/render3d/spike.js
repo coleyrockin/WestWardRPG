@@ -2492,7 +2492,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const { post, applyPalette: applyPostPalette, uniforms: postUniforms } = createPostProcessing(renderer, scene, camera, {
     region: "frontier",
     sunLight: atmosphere.sun,
-    ...(visualCapture ? { grainIntensity: 0 } : {}),
+    // ?visual capture: grain is time-animated and GTAO diverges across
+    // SwiftShader builds (macOS vs CI Linux hit 24% pixel diff) — both off for
+    // a deterministic golden frame; the gate still catches pipeline breaks.
+    ...(visualCapture ? { grainIntensity: 0, ao: false } : {}),
   });
   applyPostPalette(appliedPalette);
 
