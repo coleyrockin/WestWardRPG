@@ -11,8 +11,9 @@
 **Companion guides (tactical how-to, not competing direction):**
 - [`map-editing-guide.md`](map-editing-guide.md) — the world layout: coordinates, the beat route, guardrail tests, the `window.__spike` hooks.
 - [`3d-art-direction.md`](3d-art-direction.md) — the look target, the impact×effort punch-list, the progress log.
+- [`world-realism-roadmap.md`](world-realism-roadmap.md) — the open range from *rendered scene* to *place*: motion/sound (R1), biome ground (R2), travelled roads (R3), occupancy (R4).
 
-Last updated: `2026-06-03` · Branch: `main`
+Last updated: `2026-06-10` · Branch: `main`
 
 ---
 
