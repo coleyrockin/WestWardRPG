@@ -790,8 +790,10 @@ function buildWesternBuilding(group, p, spec = {}) {
 // the existing builders. Footprints live in worldProxies.
 
 // Town gateway — two timber posts spanning the road with a crossbeam and a
-// hanging DUSTWARD board. (p.x, p.y) is the gate center ON the road; posts sit
-// ±halfSpan along world y so the lane stays clear (footprint = posts only).
+// hanging WESTWARD board (the town's name on its gate; RUSTWATER canon: the free
+// town you start in wears WESTWARD, the project's old name). (p.x, p.y) is the
+// gate center ON the road; posts sit ±halfSpan along world y so the lane stays
+// clear (footprint = posts only).
 function buildTownGate(group, p) {
   const s = p.size || 1;
   const halfSpan = 4.0 * s;
@@ -815,7 +817,7 @@ function buildTownGate(group, p) {
   addBox(group, 0.26 * s, 0.3 * s, halfSpan * 2 + 0.9 * s, mBeam, toVec(p.x, p.y, postH - 0.3 * s));
   // hanging town board, lettered via the shared canvas sign painter; faces east
   // (back toward town) so it reads over the shoulder and in the wide push-in.
-  const signTex = makeSignTexture(["DUSTWARD"]);
+  const signTex = makeSignTexture(["WESTWARD"]);
   const sign = new THREE.Mesh(
     new THREE.BoxGeometry(0.09 * s, 0.62 * s, 2.1 * s),
     standard("#6e4f2e", { roughness: 0.9, map: signTex }),
