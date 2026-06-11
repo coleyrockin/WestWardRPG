@@ -63,7 +63,10 @@ function routePlanks() {
     const dy = to.y - from.y;
     const len = Math.hypot(dx, dy);
     if (len < 0.1) continue;
-    const yaw = Math.atan2(dx, dy);
+    // rotation.y maps the box's +X long axis to (cos θ, -sin θ) in world XZ;
+    // layout y IS world z, so along-road alignment is atan2(-dy, dx). The old
+    // atan2(dx, dy) put every plank/rut 90° off — lying ACROSS the road.
+    const yaw = Math.atan2(-dy, dx);
     const count = Math.max(1, Math.floor(len / 2.8));
     const nx = -dy / len;
     const ny = dx / len;
@@ -93,7 +96,7 @@ function routeRuts() {
     const dy = to.y - from.y;
     const len = Math.hypot(dx, dy);
     if (len < 0.1) continue;
-    const yaw = Math.atan2(dx, dy);
+    const yaw = Math.atan2(-dy, dx); // along-road, see routePlanks
     const count = Math.max(1, Math.floor(len / 3.2));
     for (let i = 1; i <= count; i++) {
       const t = i / (count + 1);

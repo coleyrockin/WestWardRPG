@@ -2215,6 +2215,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   if (import.meta.env.DEV && typeof window !== "undefined") {
     window.__westward3dBackend = backend;
   }
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    // Live-tuning aid (roadmap §3.6 T1a): let dev tooling traverse the scene.
+    window.__spikeScene = () => scene;
+  }
 
   const scene = new THREE.Scene();
 

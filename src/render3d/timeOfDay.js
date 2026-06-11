@@ -19,13 +19,16 @@ export const PALETTES = Object.freeze({
     key: "day",
     label: "Day",
     sky: { top: "#3d6fb8", mid: "#8fa8c8", horizon: "#d8c8a8" },
-    fog: { color: "#aeb6c0", density: 0.006 },
+    // Density lifted 0.006 → 0.0095: at street scale 0.006 read as no haze at
+    // all — distant blocks need to soften into the sky for open-world depth.
+    fog: { color: "#aeb6c0", density: 0.0095 },
     // High sun (y 12) → short grounded shadows; near-white warm disc.
     sun: { color: "#fff0d8", intensity: 2.2, dir: { x: -4, y: 12, z: -2 }, disc: 0.03, glow: 0.12 },
-    // Shadow fill is sky bounce: bright cool blue from above, neutral slate from
-    // the ground — unlit faces read cool, never crushed red.
-    hemi: { sky: "#bcd2f0", ground: "#5a6478", intensity: 1.1 },
-    rim: { color: "#8fa8d8", intensity: 0.5, dir: { x: 8, y: 6, z: 6 } },
+    // Shadow fill is sky bounce: cool slate-blue from above, neutral slate from
+    // the ground. Chroma is deliberately LOW — at #bcd2f0 the bounce painted
+    // every shadowed wall violet; shadows should read as cool light, not paint.
+    hemi: { sky: "#b6c4da", ground: "#5a6478", intensity: 1.1 },
+    rim: { color: "#9cacc8", intensity: 0.42, dir: { x: 8, y: 6, z: 6 } },
     fill: { color: "#d8dce4", intensity: 0.4 },
     exposure: 1.18,
     stars: 0,
@@ -74,14 +77,16 @@ export const PALETTES = Object.freeze({
     sky: { top: "#3a5aa0", mid: "#c0917e", horizon: "#ffcf86" },
     // Neutral dusty haze (was warm tan #bfae98, which tinted every distant building
     // orange) — neutral, not cold-grey, so distance reads hazy not washed-out.
-    fog: { color: "#a8a29c", density: 0.007 },
+    fog: { color: "#a8a29c", density: 0.01 }, // aerial perspective — see day
+
     // Key pulled back from 3.1 — at that strength ACES rolled every lit surface to
     // orange-white. 2.5 still dominates as the warm source without nuking the frame.
     sun: { color: "#ffdca6", intensity: 2.5, dir: { x: -9, y: 8.5, z: -4 }, disc: 0.034, glow: 0.2 },
-    // Hemisphere is the SHADOW FILL. Pushed cooler + brighter so unlit faces read
-    // BLUE (sky bounce) against the warm key — this is what breaks the monochrome.
-    hemi: { sky: "#9ec2f2", ground: "#454a60", intensity: 1.28 },
-    rim: { color: "#6a8fff", intensity: 1.05, dir: { x: 9, y: 5, z: 6 } },
+    // Hemisphere is the SHADOW FILL. Cool against the warm key — but desaturated:
+    // #9ec2f2 + the #6a8fff rim at 1.05 turned whole shadow walls violet. Slate
+    // blue keeps the warm-vs-cool break while shadows still read as material.
+    hemi: { sky: "#a6b8d4", ground: "#454a60", intensity: 1.22 },
+    rim: { color: "#8da3d4", intensity: 0.85, dir: { x: 9, y: 5, z: 6 } },
     // Camera-side fill: cool-neutral (was a static warm #ffd0a6) so the shadow-side
     // faces crowding the near/left of frame read cool instead of crushed warm-red.
     fill: { color: "#c6ccd8", intensity: 0.5 },
@@ -93,9 +98,12 @@ export const PALETTES = Object.freeze({
     // Deeper/cooler shadow tint + harder split is the decisive anti-orange knob;
     // saturation + warm finishing-tint eased so the orange stops screaming.
     grade: {
-      tint: "#ffb060", amount: 0.02, contrast: 1.15, saturation: 1.12,
-      shadowTint: "#0f1f48", highlightTint: "#ffc880",  // deeper cool blue shadows (was #15264f)
-      splitStrength: 0.48, godrayStrength: 0.16, vignetteStrength: 0.06, bloomThreshold: 0.86,
+      // splitStrength 0.48 was the "purple shadows vs neon orange" clash — at that
+      // bite the slate roofs/water tower went violet and every lit face went amber.
+      // 0.28 keeps the warm-vs-cool read; saturation eased so wood reads as wood.
+      tint: "#ffb060", amount: 0.02, contrast: 1.15, saturation: 1.04,
+      shadowTint: "#15264f", highlightTint: "#ffc880",
+      splitStrength: 0.28, godrayStrength: 0.16, vignetteStrength: 0.06, bloomThreshold: 0.86,
     },
     bodyBg: "#2a1f2e",
   },

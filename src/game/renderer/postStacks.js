@@ -14,25 +14,31 @@
 
 import * as THREE from "three";
 import { PostProcessing } from "three/webgpu";
-import { pass, uniform, mix, clamp, smoothstep, vec3, vec2, uv, dot, float } from "three/tsl";
+import { pass, uniform, mix, clamp, smoothstep, vec3, vec2, uv, dot, float, mrt, output, normalView } from "three/tsl";
 import { sobel } from "three/addons/tsl/display/SobelOperatorNode.js";
 import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { film } from "three/addons/tsl/display/FilmNode.js";
 import { godrays } from "three/addons/tsl/display/GodraysNode.js";
+import { ao } from "three/addons/tsl/display/GTAONode.js";
 
 // Per-region post constants. Ink + bloom-shape are region identity; bloom
 // strength and grade come live from the palette.
 export const REGION_POST = {
   frontier: {
     inkColor: "#0a0408",
-    // Realistic-leaning hybrid retune: ink eases from comic linework (2.9) to
-    // silhouette-only accents — form/detail now comes from real shadows + the
-    // 5-step ramp, so heavy interior edges read as noise instead of style.
-    edgeStrength: 1.7,
+    // Committed comic linework (art doc: "the look has to be LOUD"). The 1.7
+    // silhouette-only easing read as no style at all — 2.3 keeps interior faces
+    // clean (edgeLo gate) while every silhouette gets a confident line.
+    edgeStrength: 2.3,
     // Sobel response below `edgeLo` is ignored (kills faint ground gradients) and
     // ramps to full ink by `edgeHi`.
     edgeLo: 0.06,
-    edgeHi: 0.32,
+    edgeHi: 0.28,
+    // GTAO: grounds props/buildings where they meet the ground and each other —
+    // the "everything floats" fix (art doc pillar 3). Strength is the mix toward
+    // the occluded frame; radius in world units (hero ≈ 1.8u tall).
+    aoStrength: 0.85,
+    aoRadius: 0.5,
     bloomBase: 0.11, // multiplied by palette.bloom
     bloomRadius: 0.7, // wider painterly glow
     bloomThreshold: 0.95, // only true emissives (lamps/beacon/sun disc) bloom — sky/walls stay crisp
@@ -50,7 +56,9 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
 
   const post = new PostProcessing(renderer);
   const scenePass = pass(scene, camera);
-  const color = scenePass.getTextureNode();
+  // MRT: color + view-space normals, so GTAO has the normal buffer it needs.
+  scenePass.setMRT(mrt({ output, normal: normalView }));
+  const color = scenePass.getTextureNode("output");
   const depth = scenePass.getLinearDepthNode();
 
   const uniforms = {
@@ -84,9 +92,22 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
     exposure: uniform(1),
   };
 
+  // 0. GTAO — screen-space ambient occlusion. Darkens creases, prop/ground
+  //    contacts, and building junctions so the world stops floating. Multiplied
+  //    into the scene color BEFORE bloom so emissives still glow over it.
+  //    Disable with opts.ao === false (headless/unit paths).
+  let occluded = color.rgb;
+  if (opts.ao !== false) {
+    const aoPass = ao(scenePass.getTextureNode("depth"), scenePass.getTextureNode("normal"), camera);
+    aoPass.radius.value = opts.aoRadius ?? region.aoRadius ?? 0.5;
+    const aoTex = aoPass.getTextureNode();
+    uniforms.aoStrength = uniform(opts.aoStrength ?? region.aoStrength ?? 0.85);
+    occluded = color.rgb.mul(mix(float(1), aoTex.r, uniforms.aoStrength));
+  }
+
   // 1. Bloom — soft glow on the brightest emissives (lamps, beacon, slime, sun).
-  const bloomPass = bloom(color.rgb, region.bloomBase, region.bloomRadius, region.bloomThreshold);
-  let lit = color.rgb.add(bloomPass);
+  const bloomPass = bloom(occluded, region.bloomBase, region.bloomRadius, region.bloomThreshold);
+  let lit = occluded.add(bloomPass);
 
   // 1b. Volumetric god-rays from the sun, beaming past the mesa/building
   //     silhouettes (the western's "soul" — docs/roadmap.md §3, Bet 4). Optional:
