@@ -36,7 +36,10 @@ const col = (hex) => new THREE.Color(hex);
 // sun/moon disc + halo glow + a hashed star field, all driven by palette
 // uniforms that applyPalette() mutates in place (.value.set / = number).
 function makeSkyDome() {
-  const geo = new THREE.SphereGeometry(140, 32, 18);
+  // OPEN RANGE: radius covers the full bounds (x −40..150, y −60..90) from the
+  // world centre so the dome surface stays inside the camera far plane anywhere
+  // the player can stand.
+  const geo = new THREE.SphereGeometry(300, 32, 18);
   const uniforms = {
     topColor: uniform(col("#1a0f33")),
     midColor: uniform(col("#472a6b")),
@@ -115,6 +118,7 @@ export function createAtmosphere(scene, renderer, opts = {}) {
   const playCore = opts.playCore || { x: anchor.x + 6, y: anchor.y };
 
   const sky = makeSkyDome();
+  sky.mesh.position.set(55, 0, 15); // open-range world centre
   scene.add(sky.mesh);
 
   scene.fog = new THREE.FogExp2(col("#8a6a9a"), 0.02);

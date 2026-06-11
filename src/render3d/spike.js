@@ -21,6 +21,7 @@ import {
   getArtDirectionLayoutMetrics,
   getProductionFrameLayoutMetrics,
   getRouteMetrics,
+  OPEN_RANGE_ROADS,
   PLAYER_SPAWN,
 } from "./frontierLayout.js";
 import { createPlayerController, CAMERA_PRESETS } from "./playerController.js";
@@ -2038,14 +2039,16 @@ function buildGround(scene, snapshot) {
   // vertices to displace; center passed so the shader's height field lines up
   // with the pure groundHeight() that seats props/scatter.
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(120, 110, 96, 88),
+    // OPEN RANGE: covers OPEN_RANGE_BOUNDS (x −40..150, y −60..90) plus fog
+    // margin. Still one plane — one draw call; segment density ~kept per-unit.
+    new THREE.PlaneGeometry(260, 220, 156, 132),
     // Lighter, less-red desert tones than the defaults — the dark #5a3d22 dirt was
     // crushing to a heavy red in shadow under the warm key. Warmer sand + neutral
     // dirt keep the off-road ground readable instead of a red murk.
-    createGroundMaterial({ center: { x: 35, z: 13 }, dirt: "#5a5048", sand: "#c49a62", scrub: "#5a6848" }),
+    createGroundMaterial({ center: { x: 55, z: 15 }, dirt: "#5a5048", sand: "#c49a62", scrub: "#5a6848" }),
   );
   ground.rotation.x = -Math.PI / 2;
-  ground.position.set(35, 0, 13);
+  ground.position.set(55, 0, 15);
   ground.receiveShadow = true;
   scene.add(ground);
 
@@ -2145,6 +2148,28 @@ function buildGround(scene, snapshot) {
       );
     }
     addRoadPlane(from, to, 0.16, 0.045, centerMat);
+  }
+
+  // OPEN RANGE roads — lighter ribbons (road + wash + edges, no ruts/center)
+  // continuing past the authored slice to the ranch, the passes, and the spurs.
+  for (const seg of OPEN_RANGE_ROADS) {
+    addRoadPlane(seg.from, seg.to, seg.width, 0.02, roadMat);
+    const wash = addRoadPlane(seg.from, seg.to, seg.width * 0.96, 0.034, roadWashMat);
+    if (wash) wash.renderOrder = -1;
+    const dx = seg.to.x - seg.from.x;
+    const dz = seg.to.y - seg.from.y;
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = -dz / len;
+    const nz = dx / len;
+    for (const off of [-(seg.width / 2 + 0.18), seg.width / 2 + 0.18]) {
+      addRoadPlane(
+        { x: seg.from.x + nx * off, y: seg.from.y + nz * off },
+        { x: seg.to.x + nx * off, y: seg.to.y + nz * off },
+        0.38,
+        0.042,
+        edgeMat,
+      );
+    }
   }
 }
 
@@ -2423,7 +2448,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // first-load framing honest for both play and spike_compare screenshots.
   const _vw = (typeof window !== "undefined" && window.innerWidth) || 1280;
   const _vh = (typeof window !== "undefined" && window.innerHeight) || 720;
-  const camera = new THREE.PerspectiveCamera(65, _vw / _vh, 0.1, 200);
+  // Far plane sized for the open range: dome surface (r 300 about world centre)
+  // stays inside it from any reachable corner (~300 + 121 max offset).
+  const camera = new THREE.PerspectiveCamera(65, _vw / _vh, 0.1, 480);
   const openingTarget = snapshot.worldObjects.find((p) => p.kind === "jobBoard") || snapshot.player;
   camera.position.set(snapshot.player.x, 1.8, snapshot.player.y);
   camera.lookAt(openingTarget.x + 0.3, 1.0, openingTarget.y + 0.12);

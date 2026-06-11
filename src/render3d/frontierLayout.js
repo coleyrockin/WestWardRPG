@@ -542,9 +542,10 @@ const BOUNDARY_RING = [
   { kind: "heroMesaSkyline", label: "North Mesa Far", x: 39.0, y: -6.3, color: "#485268", size: 1.0, heightMul: 0.9 },
   { kind: "mesaSkyline", label: "Northeast Mesa", x: 52.0, y: -5.6, color: "#424c60", size: 0.95, heightMul: 0.82 },
   { kind: "mesaSkyline", label: "Northeast Mesa Far", x: 62.0, y: -5.3, color: "#3c4658", size: 0.9, heightMul: 0.78 },
-  // east wall (the eastern horizon backdrop), x ≈ 70 — cool aerial fade
+  // east rim — OPEN RANGE: the wall parts at y 10–15 so the road runs on to
+  // Eastwater Ranch; the cliff slides north to frame the pass instead of block it.
   { kind: "mesa", label: "East Mesa", x: 70.0, y: 4.0, color: "#424c5c", size: 2.0, heightMul: 1.1 },
-  { kind: "cliff", label: "East Cliff", x: 70.0, y: 10.5, color: "#3c4654", size: 2.1, heightMul: 1.15 },
+  { kind: "cliff", label: "East Cliff", x: 70.0, y: 7.2, color: "#3c4654", size: 1.6, heightMul: 1.15 },
   { kind: "mesaSkyline", label: "East Mesa", x: 70.0, y: 17.5, color: "#404858", size: 1.45, heightMul: 0.9 },
   { kind: "mesa", label: "Southeast Mesa", x: 68.0, y: 26.5, color: "#3e4850", size: 1.9, heightMul: 0.95 },
   // south wall, y ≈ 27
@@ -554,10 +555,10 @@ const BOUNDARY_RING = [
   { kind: "mesa", label: "South Mesa", x: 24.0, y: 26.8, color: "#4a5260", size: 1.8 },
   { kind: "mesa", label: "South Mesa", x: 12.0, y: 26.8, color: "#4e5664", size: 1.8 },
   { kind: "mesa", label: "Southwest Mesa", x: 3.0, y: 26.4, color: "#505868", size: 1.9 },
-  // west wall
-  { kind: "mesa", label: "West Mesa", x: -8.0, y: 13.5, color: "#4e5664", size: 1.9 },
-  { kind: "mesa", label: "West Mesa", x: -8.0, y: 8.5, color: "#525a68", size: 1.9 },
-  { kind: "mesa", label: "West Mesa", x: -8.0, y: 3.5, color: "#565e6c", size: 1.9 },
+  // west rim — OPEN RANGE: the middle mesa steps aside so the West Pass road
+  // (Ashfall tease) leaves town between the remaining two.
+  { kind: "mesa", label: "West Mesa", x: -8.0, y: 14.5, color: "#4e5664", size: 1.9 },
+  { kind: "mesa", label: "West Mesa", x: -8.0, y: 2.5, color: "#565e6c", size: 1.9 },
 ];
 
 // Depth lanes spread along the offset direction so background vistas read as
@@ -568,6 +569,195 @@ const DEPTH_SPREAD = { background: 3.4, midground: 2.1, foreground: 1.7 };
 function world(anchor, dx, dy, depthLane) {
   const s = DEPTH_SPREAD[depthLane] ?? 1.5;
   return { x: anchor.x + dx * s, y: anchor.y + dy * s };
+}
+
+// ---------- OPEN RANGE (P4) — the big world beyond the first road ----------
+// The authored Dustward + first-road slice (x −12..74, y −10..31) is untouched;
+// everything below dresses the range AROUND it. All generation is deterministic
+// (hash01) so layouts are stable across boots and testable.
+
+export const OPEN_RANGE_BOUNDS = Object.freeze({ minX: -40, maxX: 150, minY: -60, maxY: 90 });
+
+// Dirt roads continuing past the authored slice — drawn by buildGround with the
+// same ribbon materials as the first road, and used as keep-clear corridors by
+// the wilderness scatter.
+export const OPEN_RANGE_ROADS = Object.freeze([
+  // east: broken wagon → Eastwater Ranch
+  { from: { x: 60.5, y: 12.2 }, to: { x: 88, y: 13.6 }, width: 5.4 },
+  { from: { x: 88, y: 13.6 }, to: { x: 114, y: 13.2 }, width: 5.2 },
+  { from: { x: 114, y: 13.2 }, to: { x: 131, y: 14.0 }, width: 5.6 },
+  // west: Dustward gate → the West Pass (Ashfall tease)
+  { from: { x: 7.6, y: 8.9 }, to: { x: -14, y: 8.6 }, width: 5.6 },
+  { from: { x: -14, y: 8.6 }, to: { x: -34, y: 8.2 }, width: 5.0 },
+  // north spur: main road → Prospector's Folly (threads the old north-rim gap x 30..37)
+  { from: { x: 30.5, y: 6.5 }, to: { x: 33.5, y: -27.5 }, width: 3.4 },
+  // south spur: marsh edge → the Sunken Wash (threads the old south-rim gap x 51..55)
+  { from: { x: 49, y: 21.5 }, to: { x: 76, y: 58 }, width: 3.6 },
+]);
+
+// Second settlement on the eastern road — a working ranch outpost. Buildings
+// reuse WESTERN_SPECS kinds; fronts auto-face the road (front flips at y 8.9).
+const EASTWATER_RANCH = [
+  { kind: "ranch",       label: "Eastwater Ranch House",  x: 126.0, y: 9.4,  color: "#886840", size: 1.05 },
+  { kind: "ranch",       label: "Eastwater Bunkhouse",    x: 133.0, y: 10.8, color: "#806038", size: 0.85 },
+  { kind: "storefront",  label: "Eastwater Trading Post", x: 128.8, y: 18.6, color: "#9a7840", size: 0.92 },
+  { kind: "waterTower",  label: "Eastwater Water Tower",  x: 135.5, y: 16.8, color: "#5a4a38", size: 1.0 },
+  { kind: "windmill",    label: "Eastwater Windmill",     x: 122.5, y: 6.0,  color: "#6b5638", size: 1.15 },
+  { kind: "fence",       label: "Paddock Rail W",         x: 128.5, y: 5.6,  color: "#a47b4c", size: 0.62 },
+  { kind: "fence",       label: "Paddock Rail C",         x: 132.5, y: 5.4,  color: "#a47b4c", size: 0.62, yaw: 0.12 },
+  { kind: "fence",       label: "Paddock Rail E",         x: 136.5, y: 5.8,  color: "#a47b4c", size: 0.6,  yaw: -0.1 },
+  { kind: "brokenFence", label: "Gate Rail",              x: 120.8, y: 16.3, color: "#8d6540", size: 0.46 },
+  { kind: "cart",        label: "Ranch Supply Cart",      x: 124.4, y: 13.0, color: "#b9824d", size: 0.72, yaw: 0.5 },
+  { kind: "crate",       label: "Feed Crates",            x: 127.2, y: 11.9, color: "#b9824d", size: 0.6 },
+  { kind: "crate",       label: "Post Crates",            x: 129.9, y: 17.1, color: "#a87542", size: 0.56 },
+  { kind: "lampLow",     label: "Ranch Gate Lamp",        x: 118.5, y: 12.6, color: "#ffe6a8", size: 0.66 },
+  { kind: "lampLow",     label: "Ranch House Lamp",       x: 124.8, y: 10.4, color: "#ffd8a0", size: 0.6 },
+  { kind: "lampLow",     label: "Trading Post Lamp",      x: 127.4, y: 17.3, color: "#ffe6a8", size: 0.62 },
+  { kind: "sign",        label: "Eastwater Sign",         x: 117.5, y: 15.0, color: "#ffd77b", size: 0.8 },
+];
+
+// Abandoned dig in the north bluffs — a ruin to stumble on, lit so it reads at dusk.
+const PROSPECTORS_FOLLY = [
+  { kind: "watchtower",  label: "Folly Headframe",   x: 33.2, y: -31.5, color: "#4a3a28", size: 0.8 },
+  { kind: "cart",        label: "Abandoned Ore Cart", x: 35.4, y: -28.8, color: "#7a5230", size: 0.66, yaw: 1.1 },
+  { kind: "crate",       label: "Folly Crates",      x: 31.9, y: -29.7, color: "#7a5230", size: 0.54 },
+  { kind: "deadTree",    label: "Folly Snag",        x: 30.2, y: -32.6, color: "#4a3526", size: 1.0 },
+  { kind: "deadTree",    label: "Folly Snag II",     x: 36.8, y: -33.0, color: "#43301f", size: 0.85, yaw: 2.1 },
+  { kind: "boulder",     label: "Folly Boulder",     x: 29.4, y: -28.2, color: "#6a5f55", size: 1.1 },
+  { kind: "boulder",     label: "Folly Boulder II",  x: 37.6, y: -30.4, color: "#5d4f3f", size: 0.9 },
+  { kind: "lampLow",     label: "Folly Lamp",        x: 33.8, y: -29.4, color: "#ffc88d", size: 0.6 },
+  { kind: "sign",        label: "Folly Claim Sign",  x: 32.8, y: -25.8, color: "#caa15a", size: 0.7 },
+];
+
+// Damp pocket at the end of the south spur — reeds and deadfall, a future POI site.
+const SUNKEN_WASH = [
+  { kind: "marshCluster", label: "Wash Reeds",       x: 74.5, y: 57.0, color: "#5f7a4a", size: 1.1 },
+  { kind: "marshCluster", label: "Wash Reeds II",    x: 78.2, y: 59.4, color: "#577038", size: 0.95 },
+  { kind: "marshCluster", label: "Wash Reeds III",   x: 76.4, y: 61.8, color: "#5f7a4a", size: 1.2 },
+  { kind: "reeds",        label: "Wash Edge Reeds",  x: 72.8, y: 59.8, color: "#5f7a4a", size: 0.9 },
+  { kind: "deadTree",     label: "Wash Snag",        x: 73.4, y: 55.0, color: "#4a3526", size: 1.05, yaw: 0.7 },
+  { kind: "deadTree",     label: "Wash Snag II",     x: 79.6, y: 56.6, color: "#43301f", size: 0.8 },
+  { kind: "boulder",      label: "Wash Boulder",     x: 80.4, y: 60.8, color: "#6a5f55", size: 1.0 },
+  { kind: "brokenFence",  label: "Washed-out Rail",  x: 75.6, y: 54.2, color: "#8d6540", size: 0.5, yaw: 1.9 },
+];
+
+// The road west narrows between two cliffs — the doorway to the next region.
+const WEST_PASS = [
+  { kind: "cliff",    label: "Pass Cliff North",  x: -20.0, y: 3.0,  color: "#4a5260", size: 1.7, heightMul: 1.35 },
+  { kind: "cliff",    label: "Pass Cliff South",  x: -20.0, y: 14.2, color: "#444c5a", size: 1.8, heightMul: 1.5 },
+  { kind: "deadTree", label: "Pass Snag",         x: -16.5, y: 6.0,  color: "#4a3526", size: 0.9, yaw: 1.3 },
+  { kind: "boulder",  label: "Pass Boulder",      x: -24.2, y: 11.6, color: "#5d4f3f", size: 1.05 },
+  { kind: "rock",     label: "Pass Scree",        x: -27.0, y: 5.8,  color: "#6a5f55", size: 0.8 },
+  { kind: "sign",     label: "West Pass Sign",    x: -12.8, y: 10.1, color: "#ffd77b", size: 0.78 },
+  { kind: "lampLow",  label: "Pass Lamp",         x: -13.6, y: 7.2,  color: "#ffc88d", size: 0.6 },
+];
+
+// Far navigation landmarks — big verticals that read across the range and give
+// every horizon a destination.
+const RANGE_LANDMARKS = [
+  { kind: "heroMesaSkyline", label: "Sentinel Butte",    x: 105.0, y: -38.0, color: "#4e5870", size: 2.3, heightMul: 1.9, heroPeak: true },
+  { kind: "mesaSkyline",     label: "Northwest Rampart", x: -28.0, y: -40.0, color: "#485266", size: 1.6, heightMul: 1.25 },
+  { kind: "mesa",            label: "Far South Mesa",    x: 20.0,  y: 70.0,  color: "#46505e", size: 2.2, heightMul: 1.1 },
+  { kind: "mesaSkyline",     label: "Southeast Tabletop", x: 118.0, y: 64.0, color: "#424c5e", size: 1.7, heightMul: 1.0 },
+  { kind: "windmill",        label: "Drifter's Windmill", x: 88.0,  y: 40.0,  color: "#6b5638", size: 1.0 },
+];
+
+// Hard rim of the new world — overlapping mesas/cliffs around OPEN_RANGE_BOUNDS.
+// Size floor keeps half-width sums above the 13u spacing so there is no slip gap
+// (footprint 3.2·size; only colliding kinds — skyline kinds are backdrop-only).
+function openRangeBoundaryRing() {
+  const { minX, maxX, minY, maxY } = OPEN_RANGE_BOUNDS;
+  const ring = [];
+  const SPACING = 13;
+  const edges = [
+    { from: { x: minX, y: minY }, to: { x: maxX, y: minY }, name: "North Rim" },
+    { from: { x: maxX, y: minY }, to: { x: maxX, y: maxY }, name: "East Rim" },
+    { from: { x: maxX, y: maxY }, to: { x: minX, y: maxY }, name: "South Rim" },
+    { from: { x: minX, y: maxY }, to: { x: minX, y: minY }, name: "West Rim" },
+  ];
+  let n = 0;
+  for (const edge of edges) {
+    const len = Math.hypot(edge.to.x - edge.from.x, edge.to.y - edge.from.y);
+    const count = Math.ceil(len / SPACING);
+    for (let i = 0; i < count; i++) {
+      const t = i / count;
+      n++;
+      const h = hash01(n * 17.3);
+      ring.push({
+        kind: h > 0.62 ? "cliff" : "mesa",
+        label: `${edge.name} ${i}`,
+        x: edge.from.x + (edge.to.x - edge.from.x) * t,
+        y: edge.from.y + (edge.to.y - edge.from.y) * t,
+        color: ["#3c4658", "#424c5e", "#4a5466", "#525c6e"][n % 4],
+        size: 3.9 + hash01(n * 31.7) * 1.7,
+        heightMul: 0.9 + hash01(n * 47.1) * 0.95,
+        yaw: (hash01(n * 59.3) - 0.5) * 0.6,
+      });
+    }
+  }
+  return ring;
+}
+
+// Deterministic desert scatter across the open range: stratified grid, thinned
+// by hash, kept clear of the authored slice, the roads, and the POI clearings.
+const RANGE_PROTECT_RECT = { minX: -16, maxX: 78, minY: -12, maxY: 33 };
+const RANGE_CLEARINGS = [
+  { x: 127, y: 13, r: 17 },   // Eastwater Ranch
+  { x: 33.5, y: -30, r: 12 }, // Prospector's Folly
+  { x: 76, y: 58, r: 12 },    // Sunken Wash
+  { x: -22, y: 8.6, r: 11 },  // West Pass corridor
+];
+
+function distToSegment(px, py, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy || 1;
+  const t = Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / lenSq));
+  return Math.hypot(px - (a.x + dx * t), py - (a.y + dy * t));
+}
+
+const RANGE_FLORA = [
+  { kind: "sageCluster", color: "#70814b", w: 0.26 },
+  { kind: "roadGrass",   color: "#8f8a56", w: 0.20 },
+  { kind: "cactus",      color: "#577038", w: 0.16 },
+  { kind: "boulder",     color: "#6a5f55", w: 0.12 },
+  { kind: "rock",        color: "#5d4f3f", w: 0.10 },
+  { kind: "brush",       color: "#6b6242", w: 0.08 },
+  { kind: "deadTree",    color: "#4a3526", w: 0.05 },
+  { kind: "sagePatch",   color: "#5f7a4a", w: 0.03 },
+];
+
+function openRangeWilderness() {
+  const { minX, maxX, minY, maxY } = OPEN_RANGE_BOUNDS;
+  const CELL = 11;
+  const out = [];
+  let n = 0;
+  for (let gx = minX + CELL; gx < maxX - CELL * 0.5; gx += CELL) {
+    for (let gy = minY + CELL; gy < maxY - CELL * 0.5; gy += CELL) {
+      n++;
+      // thin the field — deserts are empty; clumps come from the survivors
+      if (hash01(n * 13.7 + gx * 0.31 + gy * 0.17) < 0.42) continue;
+      const x = gx + (hash01(n * 23.9) - 0.5) * CELL * 0.9;
+      const y = gy + (hash01(n * 41.3) - 0.5) * CELL * 0.9;
+      if (x > RANGE_PROTECT_RECT.minX && x < RANGE_PROTECT_RECT.maxX &&
+          y > RANGE_PROTECT_RECT.minY && y < RANGE_PROTECT_RECT.maxY) continue;
+      if (RANGE_CLEARINGS.some((c) => Math.hypot(x - c.x, y - c.y) < c.r)) continue;
+      if (OPEN_RANGE_ROADS.some((r) => distToSegment(x, y, r.from, r.to) < r.width / 2 + 4)) continue;
+      let pick = hash01(n * 7.7);
+      let flora = RANGE_FLORA[0];
+      for (const f of RANGE_FLORA) { pick -= f.w; if (pick <= 0) { flora = f; break; } }
+      const mega = flora.kind === "boulder" && hash01(n * 101.9) > 0.94;
+      out.push({
+        kind: flora.kind,
+        label: `Range ${flora.kind} ${n}`,
+        x, y,
+        yaw: hash01(n * 67.1) * Math.PI * 2,
+        color: flora.color,
+        size: mega ? 2.3 : 0.6 + hash01(n * 89.3) * 1.0,
+      });
+    }
+  }
+  return out;
 }
 
 // Anchor-relative dressing entries carry dx/dy; absolute zone entries already
@@ -594,6 +784,14 @@ const ABSOLUTE_ZONES = [
   ...WALKIN_SALOON,
   ...LANDMARK_BUILDINGS,
   ...BOUNDARY_RING,
+  // OPEN RANGE (P4) — the world beyond the first road
+  ...WEST_PASS,
+  ...EASTWATER_RANCH,
+  ...PROSPECTORS_FOLLY,
+  ...SUNKEN_WASH,
+  ...RANGE_LANDMARKS,
+  ...openRangeBoundaryRing(),
+  ...openRangeWilderness(),
 ];
 
 // Returns all scene placements in absolute world coordinates.
