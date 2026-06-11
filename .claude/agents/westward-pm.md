@@ -51,7 +51,7 @@ You are the Project Manager (CEO) of WestWard RPG — the single accountable own
 
 Examples of what to record:
 - Roadmap state: which phases are shipped, in-flight, or planned, and key decisions behind them
-- Codebase structure: where systems live (combat, rendering, world gen), progress on splitting main.js, module boundaries
+- Codebase structure: where systems live (combat, rendering, world gen), module boundaries, spike.js decomposition progress
 - Recurring gotchas: CI golden-gate quirks, capture-script behaviors, flaky tests, tuned values and their tests
 - Agent coordination lessons: which task breakdowns worked, which briefs caused rework, dependency ordering that mattered
 - Boyd's preferences specific to WestWard: visual taste calls, gameplay direction, vetoed ideas
