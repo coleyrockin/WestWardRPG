@@ -1,84 +1,74 @@
-# WestWard — Roadmap
+# WestWard → RUSTWATER — Roadmap
 
-> **Status: Active development — the 3D game IS the game.**
-> The Blender/3D build ships at the site root; the legacy Canvas raycaster was deleted
-> on 2026-06-10. The playable build is the authored first-road loop (Dustward → slime
-> bounty → wagon salvage → return). The project is early; this document is honest about that.
+> **Status: Active development — adopting the RUSTWATER direction (working codename).**
+> The project is evolving from the WestWard western demo into **RUSTWATER**, a
+> cyberpunk-western open-world RPG (design treatment:
+> [`docs/rustwater-treatment.md`](docs/rustwater-treatment.md)). The shipped engine and
+> the Dustward world are the substrate — re-skinned and extended progressively, playable
+> at every commit. The public title stays WestWard until the cyberpunk-western vertical
+> slice exists. The project is early; this document is honest about that.
 >
-> For the full technical execution plan (phases, port-ledger, architecture constraints),
-> see [`docs/roadmap.md`](docs/roadmap.md). This file is the GitHub-facing summary.
+> Engine execution plan: [`docs/roadmap.md`](docs/roadmap.md). This file is the
+> GitHub-facing summary.
 
 ---
 
 ## Now
 
-Work happening this sprint, in priority order:
-
-- **First 10 minutes polish** — per-beat scene quality review (spawn → board → sign → cache → slime → wagon) in a real browser. Smoke cache plume visibility (`dustSmokePlume.glb`), road sign text, scatter density 620→850.
-- **Model quality audit** — `window.__spike.goto()` screenshot session for every beat; decide what Blender work is actually needed vs what's already good enough.
-- **Blender hero models** — the gunslinger silhouette (idle + walk), a gooier weighted slime, the saloon facade. Authored via `tools/blender/` + the Blender MCP.
-
----
+- **M0 — Performance Reset** (first, non-negotiable): foreground perf measurement →
+  require WebGPU (WebGL2 fallback demoted to reduced fidelity) → batch the world
+  (instancing, merged statics, material pools, shadow culling) → CI perf budget.
+  The game is draw-call-bound today; this is the fix, not an engine switch.
+- **M1 — Meridian Vertical Slice**: the treatment's missions 1.1–1.3 playable (the
+  funeral + the Executor, the holdings reading, the first morality fork), plus Dustward's
+  first Calico Flats dressing pass — neon on clapboard, nothing sleek.
 
 ## Next
 
-Queued for after the first-10-minutes gate passes:
-
-- **ECS / event-sourced sim core** — fixed-timestep `stepSimulation(state, cmds, dt)` from `seed + input-log`; render-command abstraction (sim emits immutable render-state, renderer consumes it)
-- **Ironman save layer** — envelope/payload split, FNV-1a integrity, `sealed` death transition, `autosaveSeq`, v1 format committed
-- **Blender models** — hero character (gunslinger silhouette, idle + walk), slime (gooey, weighted), saloon facade (the dominant architecture the player visits twice). Requires Blender MCP at `localhost:9876`.
-- **Port-ledger Tier A** — wire `jobBoard.js`, `lootSystem.js`, `progressionSystem.js`, `economyServices.js`, `decisionEngine.js`, `npcMemory.js` into the 3D build. All have full test coverage; port = copy, fix relative imports, wire into `spike.js`.
-- **3D combat** — `combatProcessor.js` re-derived for 3D capsule hit-detection, poise/guard-break as first-class symmetric resource, 3 initial enemy archetypes on a steering substrate
-
----
+- **M2 — Systems of Wealth**: Cash / Standing / Legend meters, the Trouble engine v0
+  (the richer and louder you are, the more the world comes for you), businesses v1
+  (saloon + bounty office) on the shipped shop/job engines.
+- **M3 — Act 1 through THE SEIZURE**: missions 1.4–1.8, Providence skeleton, Director
+  Vance, and the five-asset Seizure choice that branches Act 2.
 
 ## Later
 
-Planned but not scheduled — Phase 3+ in [`docs/roadmap.md`](docs/roadmap.md):
-
-- Region streaming / chunking (the spatial partition contract is already specced)
-- Full narrative system: 3 ideology axes fully wired, 8-quest chain, 3 factions, 7 NPCs with memory/schedule, 10+ endings — authored through a validator-backed quest schema
-- Ashfall Basin + Iron Lantern District — regions 2 and 3, each with a distinct post stack (heat-haze/bleach vs scanline/neon-rain)
-- Volumetric god-rays, GPU dust motes, clustered lighting
-- NG+ and run history / graveyard
-- itch.io offline ZIP + Vercel release with glb/ktx2/audio MIME + CSP verified
+- Act 2 faction lines (Helios / Tally Men / Freeholders / Circuit Riders), romance +
+  marriage + family (8 courtable characters), augments ("Iron"), the five skill trees
+  (GUN/IRON/WIRE/TONGUE/TRAIL), Caldera + Drift regions, the Hearing, Act 3 Water War,
+  four endings.
+- Design backlog owned by the owner (treatment §WHAT TO DESIGN NEXT): Act 2 beat-by-beat,
+  full skill trees, romance bios, economy math, the Seizure script.
 
 ---
 
 ## Won't Build
 
-Explicit closed decisions — not revisited without a strong reason:
-
 | What | Why not |
 |---|---|
-| Photoreal graphics (PBR, photoscanned textures) | Fights the committed cel/graphic-novel direction and is unachievable at this scale |
-| Multiplayer / netcode | The event-sourced core makes it architecturally possible later; it's not a near-term goal and would inflate scope before the single-player game is done |
-| React / Vue UI | No framework. The renderer is the framework. DOM shells are thin and tested at the smoke layer. |
-| Reviving the Canvas raycaster | Deleted 2026-06-10 by explicit decision. One renderer, one game. Its engine modules live on inside the 3D build. |
-| A Canvas → 3D "migration wrapper" / shared state bridge | Tried and reverted. One state tree, one renderer. No read-only snapshot bridge. |
-| Procedural story / LLM-generated dialogue | The narrative is authored and deterministic — that's the differentiator. Procedural filler dilutes it. |
-| A "framework" or engine abstraction layer | Build the game, not a framework. Prior art (starred AI game-engine repos) ships zero games. |
+| Engine switch (Unity/Godot/Babylon/…) | Evaluated 2026-06-11 when lag was diagnosed: the bottleneck is unbatched draw calls, not Three.js. M0 fixes the cause; a switch would cost months and land in the same optimization work. |
+| Photoreal graphics | The committed look is stylized — cel/ink with rusted chrome. "Nothing is sleek" ≠ photoreal. |
+| Multiplayer / netcode | Single player by design (treatment line one). |
+| React / Vue UI | No framework. DOM shells stay thin (`createElement`/`textContent`), tested at the smoke layer. |
+| Reviving the Canvas raycaster | Deleted 2026-06-10. One renderer, one game. |
+| Procedural story / LLM-generated dialogue | The narrative is authored and deterministic — that's the differentiator. |
+| A "framework" or engine abstraction layer | Build the game, not a framework. |
 
 ---
 
-## Shipped
+## Shipped (the WestWard era — now the RUSTWATER substrate)
 
 | Milestone | Date | Notes |
 |---|---|---|
-| Canvas raycaster — full game | 2025 | 7 archetypes, 8 quests, 10+ endings, 3 factions, 18 POIs, gear crafting, NG+, save migration |
-| Three.js spike + NPR pipeline | 2026-05 | `WebGPURenderer` + TSL, cel ramp, Fresnel rim, Sobel ink edges, bloom, vignette, grain |
-| Continuous day/night arc | 2026-05 | `sunArc()` + `lerpPalette()` — goldenHour / dusk / night smooth cycle |
-| First-road loop (3D) | 2026-05 | spawn → board → sign → cache → slime fight → wagon → return, all 9 phases |
-| Western building kit | 2026-06 | Procedural false-fronts: board-and-batten siding, parapet variety, shutters, porches, signs |
-| goldenHour de-orange pass | 2026-06 | Deep cool split-tone (shadowTint `#0f1f48`), warm key vs cool shadow genuinely separated |
-| Tier 1+2 visual pass | 2026-06 | Cel ramp `[85,145,255]`, edge strength 2.9, rim tuned, lamp flicker, cloud drift |
-| Live visual tuning harness | 2026-06 | `window.__spike.setPalette/setLight/setCamera/dumpLook/captureMode/settle` |
-| All hero-beat `.glb` models | 2026-06 | Wagon, slime cluster, job board, road sign, buildings — all loaded with contact shadows |
-| Scatter + terrain AO | 2026-06 | 620-mote scatter, valley-AO albedo, FBM ground relief (AMP 0.48), marsh water |
-| World districts | 2026-06 | Town depth + back-rank, outskirts corral, marsh reeds, board plaza, foreground frame |
-| Audio layer + title screen | 2026-06 | `audioView.js` Web Audio (wind/footsteps/harmonica/slime SFX), title screen, slime breathing |
-| RPG state tree + board modal | 2026-06 | `gameState.js` state tree, story-pass job board modal (boardDom/boardCopy) |
-| **Canvas raycaster retired — 3D-only** | **2026-06-10** | Old game deleted (11k-line main.js + 74 modules); the Blender/3D build ships at `/`; SW kill-switch clears old caches |
+| Canvas raycaster — full game | 2025 | The original prototype (since retired) |
+| Three.js + NPR pipeline | 2026-05 | `WebGPURenderer` + TSL, cel ramp, ink edges, bloom, godrays |
+| First-road loop (3D) | 2026-05 | spawn → board → slime bounty → wagon → return |
+| Western building kit + districts | 2026-06 | Procedural false-fronts, landmarks, marsh, outskirts |
+| Canvas retired — 3D-only | 2026-06-10 | Old game deleted; Blender/3D build ships at `/` |
+| Daylight + hybrid look | 2026-06-10 | Day palette (the game had no daytime!), 5-step soft-cel ramp, de-orange grade, player-following shadows |
+| Dustward rebuilt — dense main street | 2026-06-10 | Gate arch, continuous frontage, board plaza, anchor pair, church vista |
+| Wave 1 world expansion | 2026-06-11 | Biome ground, world minimap, ranch animals, tumbleweeds + bird flocks, quest+shop engine layers, ambient audio |
+| **RUSTWATER adopted as direction** | **2026-06-11** | Owner-authored treatment is canon; roadmap rebuilt around it (M0 perf → M1 slice) |
 
 ---
 
