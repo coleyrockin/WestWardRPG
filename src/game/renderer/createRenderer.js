@@ -53,12 +53,6 @@ export async function createRenderer(canvas, opts = {}) {
   const ratio = typeof window !== "undefined" ? window.devicePixelRatio : 1;
   renderer.setPixelRatio(Math.min(ratio || 1, pixelRatioCap));
   renderer.setSize(width, height);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
-
   // init() acquires the GPU device / selects the backend. If BOTH WebGPU and the
   // WebGL2 fallback fail (no GL context, blacklisted driver, lost device), surface
   // a readable message instead of a silent blank canvas, then rethrow so the
@@ -79,7 +73,14 @@ export async function createRenderer(canvas, opts = {}) {
     throw err;
   }
 
-  return { renderer, backend: resolveBackend(renderer) };
+  const backend = resolveBackend(renderer);
+  renderer.shadowMap.enabled = (backend === "webgpu");
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+
+  return { renderer, backend };
 }
 
 // "webgpu" | "webgl" — read after init() resolves the backend.

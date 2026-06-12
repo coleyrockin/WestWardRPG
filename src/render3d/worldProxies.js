@@ -82,6 +82,8 @@ const FOOTPRINTS = {
   roadSlime:   null,                            // soft collision lives in encounterSystem
   cart:        (p) => box(p, 0.6 * p.size, 0.6 * p.size),
   crate:       (p) => box(p, 0.6 * p.size, 0.6 * p.size),
+  gravesite:   (p) => box(p, 2.0 * p.size, 1.0 * p.size),
+  steelMustang: (p) => box(p, 1.6 * p.size, 0.8 * p.size),
   // --- bigger-world expansion (zone props) ---
   mesa:        (p) => box(p, 3.2 * p.size, 3.2 * p.size),
   mesaSilhouette: (p) => box(p, 3.2 * p.size, 3.2 * p.size),

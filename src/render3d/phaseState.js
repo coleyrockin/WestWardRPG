@@ -11,10 +11,11 @@ export const LOOP_PHASES = Object.freeze([
   "survey_teaser",
 ]);
 
-export function getPhaseProgress(phase) {
-  const safePhase = LOOP_PHASES.includes(phase) ? phase : "spawn";
-  const index = LOOP_PHASES.indexOf(safePhase);
-  const total = LOOP_PHASES.length;
+export function getPhaseProgress(phase, activeMission = null) {
+  const phases = getLoopPhases(activeMission);
+  const safePhase = phases.includes(phase) ? phase : phases[0];
+  const index = phases.indexOf(safePhase);
+  const total = phases.length;
   return {
     phase: safePhase,
     index,
@@ -49,7 +50,41 @@ export const BOARD_OPTIONS = Object.freeze([
 const DEFAULT_BOARD_OPTION = BOARD_OPTIONS[0].id;
 const BOARD_OPTION_IDS = new Set(BOARD_OPTIONS.map((option) => option.id));
 
+export function getLoopPhases(activeMission = null) {
+  if (activeMission === "dust_to_dust") {
+    return [
+      "funeral",
+      "implant",
+      "spawn",
+      "board_choice",
+      "road_sign",
+      "road_walk",
+      "cache_clue",
+      "slime_tell",
+      "slime_fight",
+      "wagon_salvage",
+      "return_to_boone",
+      "survey_teaser",
+    ];
+  }
+  return [...LOOP_PHASES];
+}
+
 const PHASE_COPY = {
+  funeral: {
+    label: "Dust to Dust",
+    text: "Attend Abram Cross's burial at the gravesite.",
+    meta: ["Target: Abram's casket", "Action: Attend funeral"],
+    targetKind: "gravesite",
+    prompt: "E — Attend Abram's Funeral",
+  },
+  implant: {
+    label: "Neural Sync",
+    text: "Sync with the neural ghost implant from the casket.",
+    meta: ["Executor implant connection active", "Action: Sync neural interface"],
+    targetKind: "gravesite",
+    prompt: "E — Sync Neural Implant",
+  },
   spawn: {
     label: "Follow the Road",
     text: "Find Boone's lit job board by the road.",
@@ -123,6 +158,12 @@ const PHASE_COPY = {
 };
 
 const TRANSITIONS = {
+  funeral: {
+    attend_funeral: "implant",
+  },
+  implant: {
+    install_implant: "spawn",
+  },
   spawn: {
     board_reached: "board_choice",
     open_board: "board_choice",
@@ -169,6 +210,8 @@ function normalizeEvent(event) {
 
 function createRouteBeats(overrides = {}) {
   return {
+    funeral: false,
+    implant: false,
     boardChoice: false,
     roadSign: false,
     townBark: false,
@@ -205,6 +248,7 @@ function copyFor(phase, state = null) {
 
 function cloneState(state) {
   return {
+    activeMission: state.activeMission || null,
     phase: state.phase,
     boardChoice: state.boardChoice || null,
     routeBeats: createRouteBeats(state.routeBeats),
@@ -216,6 +260,14 @@ function cloneState(state) {
 
 function applySideEffects(next, event) {
   const type = event.type;
+  if (type === "attend_funeral") {
+    next.routeBeats.funeral = true;
+    next.completedInteractions.push("funeral_attended");
+  }
+  if (type === "install_implant") {
+    next.routeBeats.implant = true;
+    next.completedInteractions.push("implant_installed");
+  }
   if (type === "choose_board" || type === "accept_bounty") {
     next.boardChoice = normalizeBoardOption(event.optionId || (type === "accept_bounty" ? "accept_bounty" : null));
     next.routeBeats.boardChoice = true;
@@ -261,7 +313,8 @@ function applySideEffects(next, event) {
 }
 
 export function getPhaseView(phase, state = null) {
-  const safePhase = LOOP_PHASES.includes(phase) ? phase : "spawn";
+  const phases = getLoopPhases(state?.activeMission);
+  const safePhase = phases.includes(phase) ? phase : phases[0];
   const copy = copyFor(safePhase, state);
   return {
     phase: safePhase,
@@ -273,10 +326,12 @@ export function getPhaseView(phase, state = null) {
   };
 }
 
+
 export function transitionLoopPhase(state, rawEvent) {
   const safeState = state || createInitialLoopState();
   const event = normalizeEvent(rawEvent);
-  const current = LOOP_PHASES.includes(safeState.phase) ? safeState.phase : "spawn";
+  const phases = getLoopPhases(safeState.activeMission);
+  const current = phases.includes(safeState.phase) ? safeState.phase : phases[0];
   const nextPhase = TRANSITIONS[current]?.[event.type] || current;
   const next = cloneState({ ...safeState, phase: nextPhase });
   if (nextPhase !== current) applySideEffects(next, event);
@@ -284,8 +339,10 @@ export function transitionLoopPhase(state, rawEvent) {
 }
 
 export function createInitialLoopState(overrides = {}) {
+  const activeMission = overrides.activeMission || null;
   return {
-    phase: overrides.phase || "spawn",
+    activeMission,
+    phase: overrides.phase || (activeMission === "dust_to_dust" ? "funeral" : "spawn"),
     boardChoice: overrides.boardChoice || null,
     routeBeats: createRouteBeats(overrides.routeBeats),
     inventoryPreview: { ...(overrides.inventoryPreview || {}) },

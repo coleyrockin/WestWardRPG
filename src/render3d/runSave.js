@@ -100,8 +100,13 @@ export function migrateRunPayload(payload) {
 export async function loadRun() {
   let result;
   try {
-    result = await readSave(RUN_SLOT);
-  } catch {
+    const readPromise = readSave(RUN_SLOT);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Save load timed out")), 1000)
+    );
+    result = await Promise.race([readPromise, timeoutPromise]);
+  } catch (err) {
+    console.warn("[runSave] readSave failed or timed out", err);
     return null;
   }
   if (!result || !result.ok) return null;

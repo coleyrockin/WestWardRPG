@@ -19,6 +19,7 @@ const KINDS_THAT_BLOCK = new Set([
   "church", "windmill", "waterTower", "blacksmith", "hotel",
   // R4.6 ranch animals — solid: the player shouldn't walk through livestock
   "horseHitched", "cattle",
+  "gravesite", "steelMustang",
 ]);
 const KINDS_THAT_PASS = new Set([
   "road", "roadPlank", "roadRut", "townBark", "slimeTell", "marshCluster", "slimeTrailHero",

@@ -20,7 +20,7 @@ import {
   pow,
   normalize,
   saturate,
-  transformedNormalView,
+  normalView,
   positionViewDirection,
   texture,
   uv,
@@ -62,7 +62,7 @@ export function celGradientMap(steps = HYBRID_RAMP_STEPS) {
 
 // Fresnel edge factor in [0,1]: ~0 facing the camera, ~1 at grazing silhouettes.
 export function fresnelRimNode(power = 3.0) {
-  const ndv = saturate(dot(normalize(transformedNormalView), normalize(positionViewDirection)));
+  const ndv = saturate(dot(normalize(normalView), normalize(positionViewDirection)));
   return ndv.oneMinus().pow(power);
 }
 
@@ -77,6 +77,12 @@ function emissiveNodeFor({ emissive, emissiveIntensity, rimColor, rimPower, rimS
   const rc = col(rimColor);
   const rim = vec3(rc.r, rc.g, rc.b).mul(fresnelRimNode(rimPower)).mul(rimStrength);
   return base.add(rim);
+}
+
+const materialCache = new Map();
+
+export function clearMaterialCache() {
+  materialCache.clear();
 }
 
 // Drop-in replacement for the old `standard(hex, opts)` factory.
@@ -101,6 +107,13 @@ export function createNprMaterial(hex, opts = {}) {
     map = null,
   } = opts;
 
+  const resolvedFlatShading = map ? (opts.flatShading ?? false) : flatShading;
+  const mapKey = map ? (map.uuid || map.id || "texture") : "null";
+  const cacheKey = `${hex}_${emissive}_${emissiveIntensity}_${transparent}_${opacity}_${resolvedFlatShading}_${rimColor}_${rimPower}_${rimStrength}_${mapKey}`;
+
+  const cached = materialCache.get(cacheKey);
+  if (cached) return cached;
+
   const mat = new MeshToonNodeMaterial({
     color: col(hex),
     gradientMap: celGradientMap(),
@@ -108,11 +121,13 @@ export function createNprMaterial(hex, opts = {}) {
     opacity,
   });
   // Textured assets keep their own smooth normals; flat-colour dressing stays faceted.
-  mat.flatShading = map ? (opts.flatShading ?? false) : flatShading;
+  mat.flatShading = resolvedFlatShading;
   if (map) {
     const c = col(hex);
     mat.colorNode = texture(map, uv()).mul(vec3(c.r, c.g, c.b));
   }
   mat.emissiveNode = emissiveNodeFor({ emissive, emissiveIntensity, rimColor, rimPower, rimStrength });
+  
+  materialCache.set(cacheKey, mat);
   return mat;
 }

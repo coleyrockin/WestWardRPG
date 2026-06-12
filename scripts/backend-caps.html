@@ -1,0 +1,114 @@
+<!doctype html>
+<!-- M0 backend-capabilities probe: empirically tests whether the WebGL2-fallback
+     bans (InstancedMesh / shared materials / merged indexed geometry) still hold
+     on the current three.js. Loaded by backend_caps_probe.mjs with ?force=webgl
+     or ?force=webgpu; results land on window.__capsResult. Not part of the game. -->
+<html>
+<head><meta charset="utf-8"><title>backend caps probe</title></head>
+<body style="margin:0;background:#222">
+<canvas id="c" width="640" height="160"></canvas>
+<script type="module">
+import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { MeshToonNodeMaterial } from "three/webgpu";
+
+const params = new URLSearchParams(location.search);
+const forceWebGL = params.get("force") !== "webgpu";
+
+function celRamp() {
+  const tex = new THREE.DataTexture(Uint8Array.from([60, 105, 150, 200, 255]), 5, 1, THREE.RedFormat);
+  tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false; tex.colorSpace = THREE.NoColorSpace; tex.needsUpdate = true;
+  return tex;
+}
+function toon(hex) {
+  return new MeshToonNodeMaterial({ color: new THREE.Color(hex), gradientMap: celRamp() });
+}
+
+const canvas = document.getElementById("c");
+const renderer = new THREE.WebGPURenderer({ canvas, antialias: false, forceWebGL });
+await renderer.init();
+const backend = renderer.backend?.isWebGPUBackend ? "webgpu" : "webgl2";
+
+// Four quadrants on one 640x160 canvas: each case renders one object centered
+// in its 160px-wide viewport slot via camera layers.
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#101010");
+const sun = new THREE.DirectionalLight("#ffffff", 2.5);
+sun.position.set(3, 5, 4);
+scene.add(sun);
+scene.add(new THREE.AmbientLight("#8090a0", 1.2));
+
+const SLOT = 4;
+const cases = [];
+
+// A) control — regular Mesh + toon
+{
+  const m = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 1.4), toon("#cc4422"));
+  m.layers.set(1); scene.add(m); cases.push({ key: "control", layer: 1 });
+}
+// B) InstancedMesh (100) + toon + per-instance color
+{
+  const im = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), toon("#ffffff"), 100);
+  const M = new THREE.Matrix4();
+  for (let i = 0; i < 100; i++) {
+    M.makeTranslation(((i % 10) - 4.5) * 0.26, (Math.floor(i / 10) - 4.5) * 0.26, 0);
+    im.setMatrixAt(i, M);
+    im.setColorAt(i, new THREE.Color().setHSL(i / 100, 0.7, 0.55));
+  }
+  im.instanceMatrix.needsUpdate = true;
+  if (im.instanceColor) im.instanceColor.needsUpdate = true;
+  im.layers.set(2); scene.add(im); cases.push({ key: "instanced", layer: 2 });
+}
+// C) two meshes SHARING one toon material
+{
+  const shared = toon("#22aa66");
+  const m1 = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), shared);
+  const m2 = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), shared);
+  m1.position.x = -0.7; m2.position.x = 0.8;
+  m1.layers.set(3); m2.layers.set(3); scene.add(m1, m2);
+  cases.push({ key: "sharedMaterial", layer: 3 });
+}
+// D) merged indexed geometry (two boxes merged) + toon
+{
+  const g1 = new THREE.BoxGeometry(0.9, 0.9, 0.9).translate(-0.65, 0, 0);
+  const g2 = new THREE.BoxGeometry(0.9, 0.9, 0.9).translate(0.65, 0, 0);
+  const merged = mergeGeometries([g1, g2], false);
+  const m = new THREE.Mesh(merged, toon("#4477dd"));
+  m.layers.set(4); scene.add(m); cases.push({ key: "mergedGeometry", layer: 4 });
+}
+
+const cam = new THREE.PerspectiveCamera(45, 1, 0.1, 50);
+cam.position.set(0, 0, 5); cam.lookAt(0, 0, 0);
+sun.layers.enableAll(); // light all layers
+
+// Render each case into its own viewport slot.
+renderer.setScissorTest(true);
+for (let i = 0; i < cases.length; i++) {
+  cam.layers.set(cases[i].layer);
+  renderer.setViewport(i * 160, 0, 160, 160);
+  renderer.setScissor(i * 160, 0, 160, 160);
+  await renderer.renderAsync(scene, cam);
+}
+
+// Read back and count lit (non-background) pixels per slot.
+await new Promise((r) => requestAnimationFrame(r));
+const read = document.createElement("canvas");
+read.width = 640; read.height = 160;
+const g2d = read.getContext("2d");
+g2d.drawImage(canvas, 0, 0);
+const results = { backend, three: THREE.REVISION, cases: {} };
+for (let i = 0; i < cases.length; i++) {
+  const data = g2d.getImageData(i * 160, 0, 160, 160).data;
+  let lit = 0;
+  for (let p = 0; p < data.length; p += SLOT) {
+    // background is ~#101010; count pixels meaningfully brighter
+    if (data[p] > 40 || data[p + 1] > 40 || data[p + 2] > 40) lit++;
+  }
+  results.cases[cases[i].key] = { litPixels: lit, pass: lit > 200 };
+}
+window.__capsResult = results;
+document.title = "caps:done";
+</script>
+</body>
+</html>

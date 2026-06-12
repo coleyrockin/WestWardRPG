@@ -18,6 +18,7 @@ const PROMPTS = {
   slimeTell:   { radius: 2.2, text: "E — Inspect Slime Trail" },
   brokenWagon: { radius: 2.5, text: "E — Inspect Wagon" },
   roadSlime:   { radius: 2.2, text: "E — Strike Road Slime" },
+  gravesite:   { radius: 2.5, text: "E — Attend Abram's Funeral" },
 };
 
 // All interactable kinds, exported for spike.js / debug overlays.

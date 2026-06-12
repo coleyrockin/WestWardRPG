@@ -51,6 +51,15 @@ describe("NPR uber-material", () => {
     expect(createNprMaterial("#111").gradientMap).toBe(createNprMaterial("#222").gradientMap);
   });
 
+  it("caches and shares identical material instances", () => {
+    const mat1 = createNprMaterial("#caa66c", { opacity: 0.5 });
+    const mat2 = createNprMaterial("#caa66c", { opacity: 0.5 });
+    expect(mat1).toBe(mat2);
+
+    const matDifferent = createNprMaterial("#caa66c", { opacity: 0.8 });
+    expect(mat1).not.toBe(matDifferent);
+  });
+
   it("exposes a Fresnel rim node factory", () => {
     expect(fresnelRimNode(2.5)).toBeTruthy();
   });

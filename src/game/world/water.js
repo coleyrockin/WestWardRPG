@@ -11,7 +11,7 @@ import { MeshBasicNodeMaterial } from "three/webgpu";
 import {
   uniform,
   positionLocal,
-  transformedNormalView,
+  normalView,
   positionViewDirection,
   normalize,
   dot,
@@ -50,7 +50,7 @@ export function createWaterMaterial(opts = {}) {
   const band = sin(px.mul(1.6).add(py.mul(1.2)).add(t.mul(1.5))).mul(0.5).add(0.5);
   const base = mix(uniforms.deep, uniforms.shallow, band.mul(0.4));
   // fresnel sky tint at grazing angles
-  const ndv = clamp(dot(normalize(transformedNormalView), normalize(positionViewDirection)), 0, 1);
+  const ndv = clamp(dot(normalize(normalView), normalize(positionViewDirection)), 0, 1);
   const fres = ndv.oneMinus().pow(3);
   const tinted = mix(base, vec3(uniforms.skyTint), fres.mul(0.72));
   // sun-glint highlight on the ripple crests

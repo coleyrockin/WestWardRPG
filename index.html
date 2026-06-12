@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23131c20'/%3E%3Cstop offset='1' stop-color='%23d27238'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='6' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='20' r='5' fill='%23f5d8a8' opacity='0.9'/%3E%3C/svg%3E" />
-    <title>WestWard — 3D First Road Slice</title>
+    <title>Dustwater — 3D Open World RPG</title>
     <style>
       :root {
         color-scheme: dark;
@@ -627,6 +627,78 @@
         line-height: 1.25;
       }
 
+      #prompt.executor {
+        color: #00ffc8 !important;
+        font-family: ui-monospace, monospace !important;
+        border: 1px solid rgba(0, 255, 200, 0.8) !important;
+        background: rgba(8, 20, 18, 0.9) !important;
+        box-shadow: 0 0 15px rgba(0, 255, 200, 0.4) !important;
+        text-shadow: 0 0 4px rgba(0, 255, 200, 0.6) !important;
+        animation: executor-flicker 0.15s infinite alternate;
+      }
+      @keyframes executor-flicker {
+        0% { opacity: 0.95; }
+        100% { opacity: 1.0; }
+      }
+
+      #executor-modal[hidden] { display: none; }
+      #executor-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: grid;
+        place-items: center;
+        background: rgba(4, 12, 10, 0.68);
+        backdrop-filter: blur(8px);
+        font-family: ui-monospace, monospace;
+      }
+      #executor-card {
+        width: min(520px, 92vw);
+        padding: 22px;
+        color: #00ffc8;
+        background: linear-gradient(180deg, rgba(8, 25, 22, 0.98), rgba(4, 12, 10, 0.98));
+        border: 1px solid rgba(0, 255, 200, 0.8);
+        border-radius: 12px;
+        box-shadow: 0 0 30px rgba(0, 255, 200, 0.3);
+        text-shadow: 0 0 2px rgba(0, 255, 200, 0.4);
+      }
+      #executor-card h2 {
+        margin: 0 0 14px;
+        font-size: 20px;
+        letter-spacing: 2px;
+        text-align: center;
+        border-bottom: 1px solid rgba(0, 255, 200, 0.4);
+        padding-bottom: 8px;
+      }
+      #executor-body {
+        font-size: 14px;
+        line-height: 1.5;
+        margin-bottom: 20px;
+        min-height: 80px;
+      }
+      .executor-choices-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .executor-choices-grid button {
+        padding: 10px 14px;
+        font-family: ui-monospace, monospace;
+        font-size: 13px;
+        color: #00ffc8;
+        background: rgba(0, 255, 200, 0.1);
+        border: 1px solid rgba(0, 255, 200, 0.5);
+        border-radius: 6px;
+        cursor: pointer;
+        text-align: left;
+        transition: all 0.2s ease;
+      }
+      .executor-choices-grid button:hover {
+        background: rgba(0, 255, 200, 0.25);
+        border-color: #00ffc8;
+        box-shadow: 0 0 10px rgba(0, 255, 200, 0.3);
+      }
+
       #board-modal[hidden] { display: none; }
       #board-modal {
         position: fixed;
@@ -863,7 +935,7 @@
     </style>
   </head>
   <body>
-    <canvas id="scene" role="img" aria-label="Playable Three.js preview of WestWard's first road slice"></canvas>
+    <canvas id="scene" role="img" aria-label="Playable Three.js preview of Dustwater's first road slice"></canvas>
     <div id="hero-panel" class="rpg-panel" aria-label="Player status">
       <span class="portrait">WW</span>
       <span>
@@ -891,7 +963,7 @@
       <svg id="field-map-svg"></svg>
       <span class="map-target">Boone's Job Board</span>
     </div>
-    <div id="tag" aria-hidden="true">WestWard · Dustward · 3D first road</div>
+    <div id="tag" aria-hidden="true">Dustwater · Dustward · 3D first road</div>
     <div id="job-tracker" class="rpg-panel" aria-label="Active jobs">
       <span class="jobs-kicker">Jobs</span>
       <div class="job-row active">
@@ -943,6 +1015,13 @@
       <button type="button" title="Journal">JRN</button>
       <button type="button" title="Options">OPT</button>
     </div>
+    <div id="executor-modal" hidden>
+      <div id="executor-card" role="dialog" aria-modal="true" class="rpg-panel">
+        <h2 id="executor-title">THE EXECUTOR</h2>
+        <p id="executor-body">Initializing neural ghost protocol...</p>
+        <div id="executor-choices" class="executor-choices-grid"></div>
+      </div>
+    </div>
     <div id="board-modal" hidden>
       <div id="board-card" role="dialog" aria-modal="true" aria-labelledby="board-title">
         <h2 id="board-title">Boone's First Road Job</h2>
@@ -969,10 +1048,10 @@
         <button class="run-summary-newrun" type="button">Begin a New Run</button>
       </div>
     </div>
-    <div id="title-screen" aria-label="WestWard title screen">
+    <div id="title-screen" aria-label="Dustwater title screen">
       <div>
         <span class="title-kicker">A story-first frontier road</span>
-        <h1>WESTWARD</h1>
+        <h1>DUSTWATER</h1>
         <span class="title-rule" aria-hidden="true"></span>
         <p class="title-line">Dustward &middot; The First Road</p>
         <button id="title-start" type="button">Ride</button>

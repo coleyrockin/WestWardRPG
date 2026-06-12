@@ -8,7 +8,7 @@
 
 import * as THREE from "three";
 import { createRenderer } from "../game/renderer/createRenderer.js";
-import { createNprMaterial } from "../game/renderer/materials/nprMaterial.js";
+import { createNprMaterial, clearMaterialCache } from "../game/renderer/materials/nprMaterial.js";
 import { createPostProcessing } from "../game/renderer/postStacks.js";
 import { instanceModel, hashYaw } from "../game/renderer/assetLoader.js";
 import { modelFor } from "../game/renderer/assetManifest.js";
@@ -773,14 +773,44 @@ function buildWesternBuilding(group, p, spec = {}) {
 
   // sign: a flat false-front board, or (variety) a hanging board on a bracket
   if (spec.sign) {
-    const signMat = standard(spec.sign, { emissive: "#3a2a10", emissiveIntensity: 0.45 });
+    const isNeonSaloon = p.kind && p.kind.includes("Saloon");
+    const isNeonStore = p.kind && p.kind.includes("Store");
+    const isNeonAssay = p.kind && p.kind.includes("Assay");
+
+    let signMat;
+    let neonColor = null;
+
+    if (isNeonSaloon) {
+      neonColor = "#ff00aa"; // pink/magenta
+    } else if (isNeonStore) {
+      neonColor = "#00ffc8"; // cyan
+    } else if (isNeonAssay) {
+      neonColor = "#ffaa00"; // orange
+    }
+
+    if (neonColor) {
+      signMat = createNprMaterial(neonColor, { emissive: neonColor, emissiveIntensity: 2.2 });
+    } else {
+      signMat = standard(spec.sign, { emissive: "#3a2a10", emissiveIntensity: 0.45 });
+    }
+
     if (jit2 > 0.5) {
       const su = -hw * 0.4, sv = storyH + 0.2;
       addBox(group, 0.08, 0.08, 0.62, trim, toVec(p.x + su, fz + front * 0.33, sv + 0.52));   // bracket arm
       addBox(group, 0.1, 0.62, 0.8, signMat, toVec(p.x + su, fz + front * 0.62, sv));         // hanging board
+      if (neonColor) {
+        const light = new THREE.PointLight(col(neonColor), 2.5, 6, 2.0);
+        light.position.copy(toVec(p.x + su, fz + front * 0.62, sv + 0.3));
+        group.add(light);
+      }
     } else {
       addBox(group, w * 0.74, Math.min(0.8, parapetH * 0.7), 0.1, signMat,
         toVec(p.x, fz + front * 0.13, bodyH + parapetH * 0.28));                              // flat board
+      if (neonColor) {
+        const light = new THREE.PointLight(col(neonColor), 2.5, 6, 2.0);
+        light.position.copy(toVec(p.x, fz + front * 0.25, bodyH + parapetH * 0.28));
+        group.add(light);
+      }
     }
   }
 }
@@ -1030,6 +1060,45 @@ function buildHotel(group, p) {
   for (const [cx, cz] of [[bx - W / 2, by - D / 2], [bx + W / 2, by - D / 2], [bx - W / 2, by + D / 2], [bx + W / 2, by + D / 2]]) addBox(group, 0.18 * sz, HT + 0.05, 0.18 * sz, matTrim, toVec(cx, cz, 0));
 }
 
+function buildGravesite(group, p) {
+  const size = p.size || 1.0;
+  const pos = toVec(p.x, p.y, -0.05);
+  addBox(group, 2.0 * size, 0.12, 1.0 * size, standard("#3a281c"), pos);
+
+  const crossGroup = new THREE.Group();
+  crossGroup.position.copy(toVec(p.x - 0.8 * size, p.y));
+  addBox(crossGroup, 0.15 * size, 1.4 * size, 0.15 * size, standard("#735332"), new THREE.Vector3(0, 0, 0));
+  addBox(crossGroup, 0.8 * size, 0.15 * size, 0.15 * size, standard("#735332"), new THREE.Vector3(0, 0.8 * size, 0));
+  group.add(crossGroup);
+}
+
+function buildSteelMustang(group, p) {
+  const size = p.size || 1.1;
+  const mustang = new THREE.Group();
+  mustang.position.copy(toVec(p.x, p.y));
+  if (p.yaw) mustang.rotation.y = p.yaw;
+
+  const chromeMat = standard("#7f8c8d", { rimColor: "#00ffc8", rimStrength: 0.6, rimPower: 2.0 });
+  const copperMat = standard("#d35400");
+  const glowCyan = standard("#00ffc8", { emissive: "#00ffc8", emissiveIntensity: 2.0 });
+
+  addBox(mustang, 1.3 * size, 0.6 * size, 0.5 * size, chromeMat, new THREE.Vector3(0, 0.8 * size, 0));
+
+  const neck = addBox(mustang, 0.4 * size, 0.6 * size, 0.3 * size, chromeMat, new THREE.Vector3(0.5 * size, 1.2 * size, 0));
+  neck.rotation.z = -0.4;
+
+  addBox(mustang, 0.5 * size, 0.3 * size, 0.35 * size, chromeMat, new THREE.Vector3(0.75 * size, 1.4 * size, 0));
+
+  addBox(mustang, 0.15 * size, 0.8 * size, 0.15 * size, copperMat, new THREE.Vector3(0.5 * size, 0, 0.18 * size));
+  addBox(mustang, 0.15 * size, 0.8 * size, 0.15 * size, copperMat, new THREE.Vector3(0.5 * size, 0, -0.18 * size));
+  addBox(mustang, 0.15 * size, 0.8 * size, 0.15 * size, copperMat, new THREE.Vector3(-0.5 * size, 0, 0.18 * size));
+  addBox(mustang, 0.15 * size, 0.8 * size, 0.15 * size, copperMat, new THREE.Vector3(-0.5 * size, 0, -0.18 * size));
+
+  addBox(mustang, 0.1 * size, 0.1 * size, 0.38 * size, glowCyan, new THREE.Vector3(0.82 * size, 1.42 * size, 0));
+
+  group.add(mustang);
+}
+
 function buildPlacement(group, p) {
   // Guard size once here: every per-kind builder multiplies p.size, so an entry
   // missing it (undefined * k = NaN) would silently produce zero-scaled geometry.
@@ -1070,6 +1139,8 @@ function buildPlacement(group, p) {
     case "slimeTrailHero": return buildSlimeTell(group, p);
     case "brokenWagon":
     case "wagonSalvage": return buildWagon(group, p);
+    case "gravesite": return buildGravesite(group, p);
+    case "steelMustang": return buildSteelMustang(group, p);
     case "roadSlime": return buildSlime(group, p);
     case "walkInSaloon": return buildWalkInSaloon(group, p);
     case "townGate": return buildTownGate(group, p);
@@ -2223,6 +2294,7 @@ function createSpikeSnapshot() {
 
 export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   WINDMILL_ROTORS.length = 0; // module-scope registry — reset per boot
+  clearMaterialCache();
   // Determinism: the golden-image capture (?visual) must always render a fresh
   // fixed scene — never read or write a persisted run.
   const visualCapture =
@@ -2307,7 +2379,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   scene.add(openingLightPools.group);
   scene.add(roadDust.group);
   scene.add(routeSageField);
-  createScatter(scene, { center: { x: 35, z: 13 }, area: 78, count: 850 });
+  createScatter(scene, { center: { x: 35, z: 13 }, area: 78, count: 850, backend });
 
   // Animated marsh water (replaces the flat plane that used to live in buildGround).
   const water = createWater({ width: 29, height: 6.2, skyTint: appliedPalette.sky.horizon });
@@ -2320,6 +2392,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const placementNodes = [];
   const modelJobs = [];
   const modelLoadStatus = {};
+  const buildingsList = [];
   const recordModelLoad = (kind, url, loaded) => {
     const current = modelLoadStatus[kind] || { kind, url, loadedCount: 0, fallbackCount: 0, total: 0 };
     current.url = url || current.url;
@@ -2332,7 +2405,14 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     // Composed western buildings bypass the box .glb entirely — straight to the kit.
     if (WESTERN_SPECS[p.kind]) {
       const node = buildPlacement(props, p);
-      if (node) placementNodes.push({ kind: p.kind, node });
+      if (node) {
+        placementNodes.push({ kind: p.kind, node });
+        const size = p.size || 1;
+        const jit = hashYaw(p.x * 1.7 + 2.0, p.y * 1.3 - 1.0) / (Math.PI * 2);
+        const stories = WESTERN_SPECS[p.kind].stories ?? 2;
+        const bodyH = stories * 1.75 * (0.88 + jit * 0.28);
+        buildingsList.push({ x: p.x, y: p.y, h: bodyH });
+      }
       recordModelLoad(p.kind, "procedural:western", true);
       if (HERO_KINDS.includes(p.kind) && node) heroMeshes[p.kind] = node;
       continue;
@@ -2394,6 +2474,37 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       heroMeshes[p.kind] = mesh;
     }
   }
+
+  // Connect buildings with power cables (Calico Flats procedural dressing)
+  for (let i = 1; i < buildingsList.length; i++) {
+    const b1 = buildingsList[i - 1];
+    const b2 = buildingsList[i];
+    const dist = Math.hypot(b2.x - b1.x, b2.y - b1.y);
+    if (dist > 1.0 && dist < 15.0) {
+      const p1 = toVec(b1.x, b1.y, b1.h * 0.95);
+      const p2 = toVec(b2.x, b2.y, b2.h * 0.95);
+      const mid = p1.clone().add(p2).multiplyScalar(0.5);
+      mid.y -= 0.38; // sag
+      
+      const curve = new THREE.CatmullRomCurve3([p1, mid, p2]);
+      const pts = curve.getPoints(10);
+      const cableGeo = new THREE.BufferGeometry().setFromPoints(pts);
+      const cableMat = new THREE.LineBasicMaterial({ color: col("#1a121f"), linewidth: 2 });
+      const cable = new THREE.Line(cableGeo, cableMat);
+      props.add(cable);
+      
+      // Antennas variety
+      const antHash = hashYaw(b1.x + 3.0, b1.y - 1.0);
+      if (antHash > 0.45) {
+        const antGroup = new THREE.Group();
+        antGroup.position.copy(toVec(b1.x, b1.y, b1.h));
+        addBox(antGroup, 0.04, 1.3, 0.04, standard("#333"), new THREE.Vector3(0, 0, 0));
+        addBox(antGroup, 0.5, 0.04, 0.04, standard("#333"), new THREE.Vector3(0, 0.8, 0));
+        props.add(antGroup);
+      }
+    }
+  }
+
   if (visualCapture) {
     // Golden-image capture: don't block boot on the full GLB stream — procedural
     // dress + hero shapes are enough for a stable baseline; models continue loading.
@@ -2538,7 +2649,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // weatherView; fog + exposure are modulated on top of the palette here.
   let weatherKind = snapshot.weather?.kind || "clear";
   let weather = resolveWeather(snapshot.weather);
-  const weatherSys = createWeatherSystem(scene, { x: 14, z: 9 });
+  const weatherSys = createWeatherSystem(scene, { x: 14, z: 9, backend });
   const cycleWeather = () => {
     weatherKind = nextWeatherKind(weatherKind);
     // pass only kind + wind so the preset drives rain/dust (the snapshot's stale
@@ -3830,6 +3941,20 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     frames++;
     if (frames === 2) window.__spikeReady = true; // captured after a settled frame
     requestAnimationFrame(loop);
+  }
+  if (backend === "webgl") {
+    scene.traverse((obj) => {
+      if (obj.isMesh) {
+        let isPlayer = false;
+        obj.traverseAncestors((anc) => {
+          if (anc === character) isPlayer = true;
+        });
+        if (obj === character) isPlayer = true;
+        if (!isPlayer) {
+          obj.castShadow = false;
+        }
+      }
+    });
   }
   loop();
 

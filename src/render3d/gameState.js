@@ -64,6 +64,7 @@ export function createGameState() {
       loot: createInitialLootState(),
     },
     npcMemory: createInitialNpcMemoryState(),
+    executorCompliance: null,
   };
 }
 
@@ -71,6 +72,7 @@ export function createGameState() {
 // so a hand-edited or stale payload can't poison the run.
 export function normalizeGameState(source = {}) {
   const fresh = createGameState();
+  fresh.executorCompliance = source?.executorCompliance || null;
   const player = source?.player || {};
   const num = (v, fallback, min = 0) => (Number.isFinite(v) ? Math.max(min, Math.floor(v)) : fallback);
   fresh.player.level = num(player.level, 1, 1);
@@ -285,6 +287,7 @@ export function buildGameSaveSlice(state) {
       progression: state.progression,
       world: { jobs: state.world.jobs, loot: state.world.loot },
       npcMemory: state.npcMemory,
+      executorCompliance: state.executorCompliance,
     }),
   );
 }
