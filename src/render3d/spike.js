@@ -2475,32 +2475,34 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     }
   }
 
-  // Connect buildings with power cables (Calico Flats procedural dressing)
-  for (let i = 1; i < buildingsList.length; i++) {
-    const b1 = buildingsList[i - 1];
-    const b2 = buildingsList[i];
-    const dist = Math.hypot(b2.x - b1.x, b2.y - b1.y);
-    if (dist > 1.0 && dist < 15.0) {
-      const p1 = toVec(b1.x, b1.y, b1.h * 0.95);
-      const p2 = toVec(b2.x, b2.y, b2.h * 0.95);
-      const mid = p1.clone().add(p2).multiplyScalar(0.5);
-      mid.y -= 0.38; // sag
-      
-      const curve = new THREE.CatmullRomCurve3([p1, mid, p2]);
-      const pts = curve.getPoints(10);
-      const cableGeo = new THREE.BufferGeometry().setFromPoints(pts);
-      const cableMat = new THREE.LineBasicMaterial({ color: col("#1a121f"), linewidth: 2 });
-      const cable = new THREE.Line(cableGeo, cableMat);
-      props.add(cable);
-      
-      // Antennas variety
-      const antHash = hashYaw(b1.x + 3.0, b1.y - 1.0);
-      if (antHash > 0.45) {
-        const antGroup = new THREE.Group();
-        antGroup.position.copy(toVec(b1.x, b1.y, b1.h));
-        addBox(antGroup, 0.04, 1.3, 0.04, standard("#333"), new THREE.Vector3(0, 0, 0));
-        addBox(antGroup, 0.5, 0.04, 0.04, standard("#333"), new THREE.Vector3(0, 0.8, 0));
-        props.add(antGroup);
+  // Connect buildings with power cables (Calico Flats procedural dressing; WebGPU only — WebGL2 bans lines)
+  if (backend === "webgpu") {
+    for (let i = 1; i < buildingsList.length; i++) {
+      const b1 = buildingsList[i - 1];
+      const b2 = buildingsList[i];
+      const dist = Math.hypot(b2.x - b1.x, b2.y - b1.y);
+      if (dist > 1.0 && dist < 15.0) {
+        const p1 = toVec(b1.x, b1.y, b1.h * 0.95);
+        const p2 = toVec(b2.x, b2.y, b2.h * 0.95);
+        const mid = p1.clone().add(p2).multiplyScalar(0.5);
+        mid.y -= 0.38; // sag
+
+        const curve = new THREE.CatmullRomCurve3([p1, mid, p2]);
+        const pts = curve.getPoints(10);
+        const cableGeo = new THREE.BufferGeometry().setFromPoints(pts);
+        const cableMat = new THREE.LineBasicMaterial({ color: col("#1a121f"), linewidth: 2 });
+        const cable = new THREE.Line(cableGeo, cableMat);
+        props.add(cable);
+
+        // Antennas variety
+        const antHash = hashYaw(b1.x + 3.0, b1.y - 1.0);
+        if (antHash > 0.45) {
+          const antGroup = new THREE.Group();
+          antGroup.position.copy(toVec(b1.x, b1.y, b1.h));
+          addBox(antGroup, 0.04, 1.3, 0.04, standard("#333"), new THREE.Vector3(0, 0, 0));
+          addBox(antGroup, 0.5, 0.04, 0.04, standard("#333"), new THREE.Vector3(0, 0.8, 0));
+          props.add(antGroup);
+        }
       }
     }
   }
@@ -3947,9 +3949,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       if (obj.isMesh) {
         let isPlayer = false;
         obj.traverseAncestors((anc) => {
-          if (anc === character) isPlayer = true;
+          if (anc === character.group) isPlayer = true;
         });
-        if (obj === character) isPlayer = true;
+        if (obj === character.group) isPlayer = true;
         if (!isPlayer) {
           obj.castShadow = false;
         }

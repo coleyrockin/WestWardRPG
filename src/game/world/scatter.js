@@ -3,10 +3,8 @@
 // (seeded LCG) so the scene is stable for the golden-image gate. Static: built
 // once, never updated.
 //
-// Each mote is a regular mesh with a BUILT-IN geometry and its OWN material
-// (createNprMaterial makes a fresh one per call) — required by this backend
-// (see memory: shared materials / instancing don't render). Geometry is shared,
-// which is fine.
+// WebGPU batches motes via InstancedMesh (shared geometry + per-instance matrix).
+// WebGL2 fallback uses per-mesh placement at halved count (no lines/instancing).
 
 import * as THREE from "three";
 import { createNprMaterial } from "../renderer/materials/nprMaterial.js";
@@ -62,7 +60,6 @@ export function createScatter(scene, opts = {}) {
     // WebGPU High-Fidelity: Group by geometry & color, batch using InstancedMesh
     const geometries = [tuftGeo, pebbleGeo, spikeGeo, mudGeo];
     const kinds = [TUFT, PEBBLE, DRY, MUD];
-    const baseYs = [0.17, 0.1, 0.25, 0.025];
     const groups = {};
 
     for (let i = 0; i < finalCount; i++) {
@@ -105,6 +102,7 @@ export function createScatter(scene, opts = {}) {
       for (let i = 0; i < matrices.length; i++) {
         instMesh.setMatrixAt(i, matrices[i]);
       }
+      instMesh.instanceMatrix.needsUpdate = true;
       instMesh.castShadow = false;
       instMesh.receiveShadow = true;
       group.add(instMesh);
