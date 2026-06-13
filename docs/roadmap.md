@@ -49,7 +49,38 @@ instancing/shared materials/merged geometry. The engine is not the problem; the 
 
 1. **Measure** — foreground-tab protocol (the throttled preview lies): `perf.now` over 120
    frames + `window.__westward3dStats()` at town / open range / marsh. Record the numbers
-   here. (Probe pattern: `scripts/_boot_probe_tmp.mjs`.)
+   below. Headless CI probe: `npm run test:perf:baseline` (`scripts/perf_baseline_probe.mjs`).
+
+   **Foreground protocol** (authoritative — run in a real, foreground Chrome tab at
+   `http://127.0.0.1:5191/?n=` + timestamp):
+
+   ```javascript
+   async function samplePose(x, z, label) {
+     window.__spike.setPos(x, z);
+     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+     const t0 = performance.now();
+     for (let i = 0; i < 120; i++) await new Promise(r => requestAnimationFrame(r));
+     const ms = performance.now() - t0;
+     const stats = window.__westward3dStats();
+     return { label, ms120: ms, fps: 120000 / ms, ...stats };
+   }
+   const poses = [
+     await samplePose(9.5, 8.5, "town"),
+     await samplePose(60, 12, "open_range"),
+     await samplePose(48, 16, "marsh"),
+   ];
+   console.table(poses);
+   ```
+
+   | Pose | Backend | ms/120f | Draw calls | Shadow casters | Notes |
+   |------|---------|---------|------------|----------------|-------|
+   | town (9.5, 8.5) | _TBD (foreground)_ | _TBD_ | _TBD_ | _TBD_ | Owner: fill from foreground Chrome |
+   | open_range (60, 12) | _TBD (foreground)_ | _TBD_ | _TBD_ | _TBD_ | Owner: fill from foreground Chrome |
+   | marsh (48, 16) | _TBD (foreground)_ | _TBD_ | _TBD_ | _TBD_ | Owner: fill from foreground Chrome |
+
+   _Headless SwiftShader rows (CI sanity only — not comparable to foreground): run
+   `WESTWARD_URL=http://127.0.0.1:5191 npm run test:perf:baseline` and paste below when
+   available._
 2. **The WebGPU decision** — require WebGPU for full fidelity; demote the WebGL2 fallback to
    a reduced mode (halved scatter/weather, no shadow casters) instead of letting it dictate
    the architecture. CI smoke keeps running the fallback path — green by design.

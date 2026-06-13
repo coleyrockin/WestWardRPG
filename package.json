@@ -21,6 +21,7 @@
     "test:render3d": "node scripts/render3d_loop_smoke.mjs",
     "test:visual": "node scripts/render3d_visual_capture.mjs",
     "test:visual:update": "node scripts/render3d_visual_capture.mjs --update",
+    "test:perf:baseline": "node scripts/perf_baseline_probe.mjs",
     "qa": "npm test && npm run dev:lint && npm run test:smoke",
     "report:states": "python3 scripts/state_report.py output",
     "typecheck:ts": "tsc --noEmit",
