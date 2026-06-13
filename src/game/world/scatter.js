@@ -3,8 +3,10 @@
 // (seeded LCG) so the scene is stable for the golden-image gate. Static: built
 // once, never updated.
 //
-// WebGPU batches motes via InstancedMesh (shared geometry + per-instance matrix).
-// WebGL2 fallback uses per-mesh placement at halved count (no lines/instancing).
+// Both backends batch motes via InstancedMesh (shared geometry + per-instance
+// matrix) — the old "no instancing on the WebGL2 fallback" ban was re-probed on
+// three r184 (scripts/backend_caps_probe.mjs) and is stale: InstancedMesh renders
+// fine on both. The fallback keeps a halved count as a reduced-fidelity measure.
 
 import * as THREE from "three";
 import { createNprMaterial } from "../renderer/materials/nprMaterial.js";
@@ -33,80 +35,49 @@ export function createScatter(scene, opts = {}) {
   const mudGeo = new THREE.CylinderGeometry(0.34, 0.36, 0.05, 6);
   const spikeGeo = new THREE.ConeGeometry(0.05, 0.5, 4);
 
-  if (isWebGL) {
-    // WebGL2 Fallback: Create individual meshes, halved count, no instancing
-    for (let i = 0; i < finalCount; i++) {
-      const x = center.x + (rnd() - 0.5) * area;
-      const z = center.z + (rnd() - 0.5) * area;
-      const corridor = 1 - Math.min(1, Math.abs(z - 8.9) / 3.2);
-      if (rnd() < corridor * 0.72) continue;
-      const roll = rnd();
-      let kind, geo, baseY;
-      if (roll < 0.4) { kind = TUFT; geo = tuftGeo; baseY = 0.17; }
-      else if (roll < 0.7) { kind = PEBBLE; geo = pebbleGeo; baseY = 0.1; }
-      else if (roll < 0.86) { kind = DRY; geo = spikeGeo; baseY = 0.25; }
-      else { kind = MUD; geo = mudGeo; baseY = 0.025; }
-      const hex = kind[i % 3];
-      const mesh = new THREE.Mesh(geo, createNprMaterial(hex, { rimStrength: 0 }));
-      const sc = 0.6 + rnd() * 0.9;
-      mesh.scale.setScalar(sc);
-      mesh.position.set(x, groundHeight(x, z) + baseY * sc, z);
-      mesh.rotation.y = rnd() * Math.PI * 2;
-      mesh.castShadow = false;
-      mesh.receiveShadow = true;
-      group.add(mesh);
-    }
-  } else {
-    // WebGPU High-Fidelity: Group by geometry & color, batch using InstancedMesh
-    const geometries = [tuftGeo, pebbleGeo, spikeGeo, mudGeo];
-    const kinds = [TUFT, PEBBLE, DRY, MUD];
-    const groups = {};
+  // Group by geometry & colour, then one InstancedMesh per group (≤12 total) —
+  // hundreds of motes collapse to a handful of draws + materials on BOTH
+  // backends. Deterministic order preserved so the golden frame is unchanged.
+  const geometries = [tuftGeo, pebbleGeo, spikeGeo, mudGeo];
+  const kinds = [TUFT, PEBBLE, DRY, MUD];
+  const groups = {};
 
-    for (let i = 0; i < finalCount; i++) {
-      const x = center.x + (rnd() - 0.5) * area;
-      const z = center.z + (rnd() - 0.5) * area;
-      const corridor = 1 - Math.min(1, Math.abs(z - 8.9) / 3.2);
-      if (rnd() < corridor * 0.72) continue;
+  for (let i = 0; i < finalCount; i++) {
+    const x = center.x + (rnd() - 0.5) * area;
+    const z = center.z + (rnd() - 0.5) * area;
+    const corridor = 1 - Math.min(1, Math.abs(z - 8.9) / 3.2);
+    if (rnd() < corridor * 0.72) continue;
 
-      const roll = rnd();
-      let kindIdx, baseY;
-      if (roll < 0.4) { kindIdx = 0; baseY = 0.17; }      // TUFT
-      else if (roll < 0.7) { kindIdx = 1; baseY = 0.1; }     // PEBBLE
-      else if (roll < 0.86) { kindIdx = 2; baseY = 0.25; }   // DRY
-      else { kindIdx = 3; baseY = 0.025; }                    // MUD
+    const roll = rnd();
+    let kindIdx, baseY;
+    if (roll < 0.4) { kindIdx = 0; baseY = 0.17; }      // TUFT
+    else if (roll < 0.7) { kindIdx = 1; baseY = 0.1; }     // PEBBLE
+    else if (roll < 0.86) { kindIdx = 2; baseY = 0.25; }   // DRY
+    else { kindIdx = 3; baseY = 0.025; }                    // MUD
 
-      const hex = kinds[kindIdx][i % 3];
-      const sc = 0.6 + rnd() * 0.9;
+    const hex = kinds[kindIdx][i % 3];
+    const sc = 0.6 + rnd() * 0.9;
 
-      const matrix = new THREE.Matrix4();
-      const position = new THREE.Vector3(x, groundHeight(x, z) + baseY * sc, z);
-      const rotation = new THREE.Euler(0, rnd() * Math.PI * 2, 0);
-      const scale = new THREE.Vector3(sc, sc, sc);
-      matrix.compose(position, new THREE.Quaternion().setFromEuler(rotation), scale);
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3(x, groundHeight(x, z) + baseY * sc, z);
+    const rotation = new THREE.Euler(0, rnd() * Math.PI * 2, 0);
+    const scale = new THREE.Vector3(sc, sc, sc);
+    matrix.compose(position, new THREE.Quaternion().setFromEuler(rotation), scale);
 
-      const key = `${kindIdx}_${hex}`;
-      if (!groups[key]) {
-        groups[key] = {
-          geo: geometries[kindIdx],
-          hex,
-          matrices: []
-        };
-      }
-      groups[key].matrices.push(matrix);
-    }
+    const key = `${kindIdx}_${hex}`;
+    if (!groups[key]) groups[key] = { geo: geometries[kindIdx], hex, matrices: [] };
+    groups[key].matrices.push(matrix);
+  }
 
-    for (const key of Object.keys(groups)) {
-      const { geo, hex, matrices } = groups[key];
-      const mat = createNprMaterial(hex, { rimStrength: 0 });
-      const instMesh = new THREE.InstancedMesh(geo, mat, matrices.length);
-      for (let i = 0; i < matrices.length; i++) {
-        instMesh.setMatrixAt(i, matrices[i]);
-      }
-      instMesh.instanceMatrix.needsUpdate = true;
-      instMesh.castShadow = false;
-      instMesh.receiveShadow = true;
-      group.add(instMesh);
-    }
+  for (const key of Object.keys(groups)) {
+    const { geo, hex, matrices } = groups[key];
+    const mat = createNprMaterial(hex, { rimStrength: 0 });
+    const instMesh = new THREE.InstancedMesh(geo, mat, matrices.length);
+    for (let i = 0; i < matrices.length; i++) instMesh.setMatrixAt(i, matrices[i]);
+    instMesh.instanceMatrix.needsUpdate = true;
+    instMesh.castShadow = false;
+    instMesh.receiveShadow = true;
+    group.add(instMesh);
   }
 
   scene.add(group);

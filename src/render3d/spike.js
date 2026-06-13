@@ -2957,16 +2957,23 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     window.__westward3dStats = () => {
       let casters = 0;
       let meshes = 0;
+      const mats = new Set();
       scene.traverse((o) => {
         if (o.isMesh) {
           meshes += 1;
           if (o.castShadow) casters += 1;
+          if (o.material) {
+            if (Array.isArray(o.material)) o.material.forEach((m) => mats.add(m));
+            else mats.add(o.material);
+          }
         }
       });
       return {
         calls: renderer.info.render.calls,
         triangles: renderer.info.render.triangles,
         meshes,
+        materials: mats.size, // distinct material objects in the scene
+        programs: renderer.info.programs?.length ?? null, // compiled shader programs (the compile-storm metric)
         shadowCasters: casters,
         backend,
       };
