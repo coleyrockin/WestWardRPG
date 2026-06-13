@@ -1784,6 +1784,19 @@ function syncProductionHud(refs, loopState = {}, encounterState = null) {
   if (refs.jobToast?.dataset) refs.jobToast.dataset.phase = phase;
   if (refs.jobTracker?.dataset) refs.jobTracker.dataset.phase = phase;
   if (refs.hotbar?.dataset) refs.hotbar.dataset.phase = phase;
+
+  // Mission 1.1: hush the road-loop HUD during the burial so Dust to Dust reads
+  // as its own quiet moment (the route map, bounty tracker, and "new bounty"
+  // toast are incongruous over a grave). The objective strip + hero panel stay;
+  // they un-hide automatically when the implant beat advances to the spawn loop.
+  // Inline display (not the `hidden` attribute): these panels carry an id-level
+  // `display: grid` rule that out-specifies `[hidden] { display:none }`, so only
+  // an inline style reliably hides them. Empty string restores the stylesheet value.
+  const funeralBeat = phase === "funeral" || phase === "implant";
+  const hide = (el) => { if (el) el.style.display = funeralBeat ? "none" : ""; };
+  hide(refs.fieldMap);
+  hide(refs.jobTracker);
+  hide(refs.jobToast);
 }
 
 function getHudFantasyMetrics(rootDocument = globalThis.document) {
@@ -3361,7 +3374,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // The preset the camera rests at when no beat focus is running: tight combat
   // framing while the slime encounter is live, over-the-shoulder otherwise.
   const restingPreset = () =>
-    loopState.phase === "funeral" ? "inspection" : loopState.phase === "slime_fight" ? "combat" : "shoulder";
+    loopState.phase === "funeral" ? "graveside" : loopState.phase === "slime_fight" ? "combat" : "shoulder";
 
   const handleJobBoard = () => {
     focusBeat(loopState.phase === "return_to_boone" ? "objective" : "inspection", 1.0);
@@ -3871,11 +3884,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     prevTs = now;
     const dt = visualCapture ? rawDt : rawDt * hitStop.scale(rawDt);
     if (!camIntroSettled && loopState.phase === "funeral") {
-      // The funeral opens tight + intimate on the casket — NOT the wide push-in,
+      // The funeral opens on the composed graveside framing — NOT the wide push-in,
       // which would frame the whole heavy landmark cluster (the chapel/windmill/
       // water-tower beside the grave). That wide first frame is both the wrong,
       // un-quiet tone for a burial and a SwiftShader compile storm. Settle once.
-      player.setCameraPreset("inspection");
+      player.setCameraPreset("graveside");
       camIntroSettled = true;
     } else if (!camIntroSettled && !visualCapture && !titleOpen && beatFocusTimer === 0 && !boardModalController.isOpen()) {
       if (camIntroStart === null) camIntroStart = now; // first eligible frame

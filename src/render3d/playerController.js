@@ -76,6 +76,17 @@ export const CAMERA_PRESETS = Object.freeze({
     smoothing: 10.5,
     fov: 56,
   }),
+  // Funeral (mission 1.1): a formal, nearly-centred graveside framing — pulled
+  // back and lifted a touch, the gaze low on the casket, the over-shoulder offset
+  // dropped so it reads mournful and composed rather than action-ready.
+  graveside: Object.freeze({
+    distance: 6.2,
+    height: 3.4,
+    lookHeight: 1.45,
+    lookAhead: 2.6,
+    shoulder: 0.35,
+    smoothing: 8.5,
+  }),
   // Tighter, snappier fight framing — switched in while an encounter is live.
   combat: Object.freeze({
     distance: 4.6,
