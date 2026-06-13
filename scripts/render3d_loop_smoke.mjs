@@ -92,7 +92,13 @@ async function main() {
     await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
     console.log("[smoke] Waiting for scene and ready signal...");
     await page.waitForSelector("#scene");
-    await waitForPagePredicate(page, () => window.__spikeReady === true, "render3d ready signal", 120000);
+    // 220s: the Dust to Dust funeral opens facing the heavy, still-un-batched
+    // landmark cluster (chapel/windmill/water-tower). Under the headless
+    // SwiftShader software renderer the first frame pays a one-time shader-compile
+    // pass over all those per-mesh materials (~150s observed) — real WebGPU boots
+    // in seconds. M0's static-town batching is the root fix; until it lands, the
+    // CI ready timeout tolerates the slow software-GL boot rather than false-fail.
+    await waitForPagePredicate(page, () => window.__spikeReady === true, "render3d ready signal", 220000);
     await waitForPagePredicate(page, () => Boolean(
       window.__westward3dTest?.getPlayerPosition
         && window.__westward3dTest?.getLoopState
@@ -129,11 +135,20 @@ async function main() {
     const after = await page.evaluate(() => window.__westward3dTest.getPlayerPosition());
     const moved = Math.hypot(after.x - before.x, after.z - before.z);
     if (moved < 0.1) {
-      const recovered = await page.evaluate(() => window.__westward3dTest.movePlayerToKind?.("jobBoard"));
+      const recovered = await page.evaluate(() => window.__westward3dTest.movePlayerToKind?.("gravesite"));
       if (!recovered) throw new Error("Movement probe failed and no fallback nudge was available");
       // Allow one deterministic recovery path for headless environments that swallow
       // key events while still proving the same state machine.
     }
+
+    // Dust to Dust (M1.1) opening: a fresh run starts at Abram's funeral. Attend
+    // the burial, install the Executor, and the first-road loop begins at spawn
+    // (the implant beat auto-walks the player into town).
+    console.log("[smoke] Mission 1.1 — attending the funeral + implant...");
+    await expectPhase(page, "funeral");
+    await interact(page, "gravesite");
+    await expectPhase(page, "implant");
+    await interact(page, "gravesite");
 
     console.log("[smoke] Staged player at spawn. Verifying game loop phases...");
     await expectPhase(page, "spawn");

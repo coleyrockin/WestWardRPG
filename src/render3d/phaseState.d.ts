@@ -41,6 +41,7 @@ export interface RouteBeats {
 
 export interface LoopState {
   phase: LoopPhase;
+  activeMission: string | null;
   boardChoice: string | null;
   routeBeats: RouteBeats;
   inventoryPreview: Record<string, number>;

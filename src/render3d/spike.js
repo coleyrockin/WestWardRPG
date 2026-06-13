@@ -2303,7 +2303,13 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // its summary over a fresh scene; no/corrupt save → fresh run.
   const loadedRun = visualCapture ? null : await loadRun().catch(() => null); // belt-and-braces: resume can never block boot
   const resumeRun = loadedRun && loadedRun.mode === "playing" ? loadedRun : null;
-  const loopState = createLoopStateMachine(resumeRun ? resumeRun.loopState : {});
+  // Fresh runs open at mission 1.1 "Dust to Dust" — the funeral is the new
+  // opening (treatment §Opening). Resumes restore their saved loopState (which
+  // carries activeMission), and a pre-mission save with no activeMission still
+  // opens at the default `spawn` phase. Visual capture pins the default loop.
+  const loopState = createLoopStateMachine(
+    resumeRun ? resumeRun.loopState : visualCapture ? {} : { activeMission: "dust_to_dust" },
+  );
   const objectiveRefs = createObjectiveDomRefs(document);
   const fieldMapRefs = createFieldMapDomRefs(document);
   const productionHudRefs = createProductionHudRefs(document);
@@ -3062,6 +3068,13 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   if (resumeRun && Number.isFinite(resumeRun.player?.x) && Number.isFinite(resumeRun.player?.z)) {
     player.setPosition({ x: resumeRun.player.x, z: resumeRun.player.z });
     if (Number.isFinite(resumeRun.player?.yaw)) player.resetCameraBehind(resumeRun.player.yaw);
+  } else if (loopState.phase === "funeral") {
+    // Dust to Dust opens at the graveside: stand a few paces south of Abram's
+    // casket (15,-4) by the chapel, facing north (yaw 0 = forward (0,-1)) so the
+    // establishing push-in frames the grave. The implant beat then walks you to
+    // town. setPosition reseeds the follow-cam to gameplay framing.
+    player.setPosition({ x: 15, z: 0.5 });
+    player.resetCameraBehind(0);
   }
   const proxies = buildProxies(snapshot.worldObjects);
   const promptEl = document.getElementById("prompt");
@@ -3072,6 +3085,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (!promptEl) return;
     if (promptEl.textContent !== t) promptEl.textContent = t;
     promptEl.hidden = !t;
+    // The Executor (your father's ghost in your skull) speaks in cyan chrome —
+    // distinct from townsfolk speech and interaction prompts.
+    promptEl.classList.toggle("executor", typeof t === "string" && t.startsWith("Executor:"));
   };
   let encounter = null;
   const interaction = createInteractionSystem({
@@ -3337,7 +3353,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   };
   // The preset the camera rests at when no beat focus is running: tight combat
   // framing while the slime encounter is live, over-the-shoulder otherwise.
-  const restingPreset = () => (loopState.phase === "slime_fight" ? "combat" : "shoulder");
+  const restingPreset = () =>
+    loopState.phase === "funeral" ? "inspection" : loopState.phase === "slime_fight" ? "combat" : "shoulder";
 
   const handleJobBoard = () => {
     focusBeat(loopState.phase === "return_to_boone" ? "objective" : "inspection", 1.0);
@@ -3440,7 +3457,31 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     onRunMutated(); // loot landed after advance()'s save — persist it
     beatToast.show("Map Scrap Found", `+ Map Scrap. ${salvage.drop.summary}`);
   };
+  // Mission 1.1 "Dust to Dust" — the funeral + the implant. funeral → implant →
+  // (spawn) hands off to the normal first-road loop with the Executor riding along.
+  const handleGravesite = () => {
+    if (loopState.phase === "funeral") {
+      focusBeat("inspection", 0.9);
+      advance("attend_funeral");
+      audioView?.play("chime");
+      npcSpeechMsg = "Executor: \"So you came. He'd have marked who didn't.\"";
+      npcSpeechT = 6;
+      setPromptText(npcSpeechMsg);
+      beatToast.show("Dust to Dust", "Abram Cross is in the ground. The iron doctor lifts the casket's implant — your inheritance.");
+    } else if (loopState.phase === "implant") {
+      advance("install_implant");
+      npcSpeechMsg = "Executor: \"Better. Now stop sniveling — we've a territory to hold and roads to ride.\"";
+      npcSpeechT = 6;
+      setPromptText(npcSpeechMsg);
+      beatToast.show("Neural Sync", "The Executor is live. Your father is in your skull now.");
+      // Implant done — ride into town; drop to the normal first-road spawn + cam.
+      player.setPosition({ x: PLAYER_SPAWN.x, z: PLAYER_SPAWN.y });
+      player.resetCameraBehind(-0.9);
+      player.setCameraPreset("shoulder");
+    }
+  };
 
+  interaction.registerHandler("gravesite", handleGravesite);
   interaction.registerHandler("jobBoard", handleJobBoard);
   interaction.registerHandler("roadSign", handleRoadSign);
   interaction.registerHandler("townBark", handleTownBark);
@@ -3640,6 +3681,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       movePlayerToKind,
       interact(kind) {
         const handlers = {
+          gravesite: handleGravesite,
           jobBoard: handleJobBoard,
           roadSign: handleRoadSign,
           townBark: handleTownBark,
@@ -3821,7 +3863,14 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     const rawDt = Math.min((now - prevTs) / 1000, 0.05);
     prevTs = now;
     const dt = visualCapture ? rawDt : rawDt * hitStop.scale(rawDt);
-    if (!camIntroSettled && !visualCapture && !titleOpen && beatFocusTimer === 0 && !boardModalController.isOpen()) {
+    if (!camIntroSettled && loopState.phase === "funeral") {
+      // The funeral opens tight + intimate on the casket — NOT the wide push-in,
+      // which would frame the whole heavy landmark cluster (the chapel/windmill/
+      // water-tower beside the grave). That wide first frame is both the wrong,
+      // un-quiet tone for a burial and a SwiftShader compile storm. Settle once.
+      player.setCameraPreset("inspection");
+      camIntroSettled = true;
+    } else if (!camIntroSettled && !visualCapture && !titleOpen && beatFocusTimer === 0 && !boardModalController.isOpen()) {
       if (camIntroStart === null) camIntroStart = now; // first eligible frame
       const elapsed = (now - camIntroStart) / 1000;
       const k = Math.pow(1 - Math.min(1, elapsed / CAM_INTRO_DUR), 2); // ease-out

@@ -150,3 +150,29 @@ describe("render3d phase state", () => {
     expect(end.ratio).toBe(1);
   });
 });
+
+describe("dust_to_dust mission extension (M1.1)", () => {
+  it("opens at the funeral when activeMission is set — default loop untouched", () => {
+    const mission = createInitialLoopState({ activeMission: "dust_to_dust" });
+    expect(mission.phase).toBe("funeral");
+    expect(getPhaseView("funeral", mission).activeTargetKind).toBe("gravesite");
+    // the default fresh loop (no mission) still opens at spawn — sacred tripwire
+    expect(createInitialLoopState().phase).toBe("spawn");
+  });
+
+  it("walks funeral → implant → spawn, then hands off to the first-road loop", () => {
+    let s = createInitialLoopState({ activeMission: "dust_to_dust" });
+    s = transitionLoopPhase(s, "attend_funeral");
+    expect(s.phase).toBe("implant");
+    s = transitionLoopPhase(s, "install_implant");
+    expect(s.phase).toBe("spawn");
+    // hand-off intact: the board is the next target, exactly like a default run
+    expect(getPhaseView("spawn").activeTargetKind).toBe("jobBoard");
+  });
+
+  it("carries activeMission across transitions (ironman resume)", () => {
+    let s = createInitialLoopState({ activeMission: "dust_to_dust" });
+    s = transitionLoopPhase(s, "attend_funeral");
+    expect(s.activeMission).toBe("dust_to_dust");
+  });
+});

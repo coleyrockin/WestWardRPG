@@ -49,6 +49,7 @@ describe("buildRunPayload", () => {
     const p = buildRunPayload(sampleCtx(), 1700000000000);
     expect(p.loopState).toEqual({
       phase: "road_walk",
+      activeMission: null,
       boardChoice: "accept_bounty",
       routeBeats: { boardChoice: true, roadSign: true },
       inventoryPreview: { "Map Scrap": 1 },

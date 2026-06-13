@@ -96,8 +96,15 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
   //    contacts, and building junctions so the world stops floating. Multiplied
   //    into the scene color BEFORE bloom so emissives still glow over it.
   //    Disable with opts.ao === false (headless/unit paths).
+  // GTAO + god-rays both sample the scene depth (and AO also the normal) texture.
+  // three r184's WebGL2 backend does NOT expose those MRT targets —
+  // `scenePass.getTextureNode("depth")` resolves to null and GodraysNode/GTAO
+  // crash on build (boot hangs). They're fidelity extras, so the reduced-fidelity
+  // WebGL2 fallback (CI / software-GL / old GPUs) drops them; real WebGPU keeps
+  // them. opts.backend is threaded from createRenderer; default to the safe path.
+  const depthOK = opts.backend ? opts.backend === "webgpu" : !!renderer?.backend?.isWebGPUBackend;
   let occluded = color.rgb;
-  if (opts.ao !== false) {
+  if (opts.ao !== false && depthOK) {
     const aoPass = ao(scenePass.getTextureNode("depth"), scenePass.getTextureNode("normal"), camera);
     aoPass.radius.value = opts.aoRadius ?? region.aoRadius ?? 0.5;
     // Half-res AO: ~4× cheaper and visually identical for this low-frequency
@@ -115,7 +122,7 @@ export function createPostProcessing(renderer, scene, camera, opts = {}) {
   // 1b. Volumetric god-rays from the sun, beaming past the mesa/building
   //     silhouettes (the western's "soul" — docs/roadmap.md §3, Bet 4). Optional:
   //     only when a sun light is supplied, so headless/unit paths stay simple.
-  if (opts.sunLight) {
+  if (opts.sunLight && depthOK) {
     const rays = godrays(scenePass.getTextureNode("depth"), camera, opts.sunLight);
     lit = lit.add(rays.mul(uniforms.godrayStrength));
   }

@@ -28,6 +28,7 @@ function pickLoopState(loopState) {
   const src = loopState || {};
   return {
     phase: src.phase || "spawn",
+    activeMission: src.activeMission ?? null,
     boardChoice: src.boardChoice ?? null,
     routeBeats: { ...(src.routeBeats || {}) },
     inventoryPreview: { ...(src.inventoryPreview || {}) },
