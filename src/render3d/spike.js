@@ -35,7 +35,8 @@ import { createBoardDomRefs, syncBoardDom } from "./boardDom.js";
 import { buildBoardView } from "./boardCopy.js";
 import { createEncounterSystem } from "./encounterSystem.js";
 import { createAtmosphere } from "./atmosphere.js";
-import { sunArc } from "./timeOfDay.js";
+import { sunArc, calcWindowGlowFactor } from "./timeOfDay.js";
+import { footDustStep } from "./footDust.js";
 import { createWorldClock, tickClock, pinClock, cycleClock, dayTimeToKey } from "../game/world/worldClock.js";
 import { createWater } from "../game/world/water.js";
 import { createGroundMaterial, groundHeight, localFogBoost } from "../game/world/ground.js";
@@ -2649,6 +2650,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   if (visualCapture) {
     // Golden-image capture: don't block boot on the full GLB stream — procedural
     // dress + hero shapes are enough for a stable baseline; models continue loading.
+    // NOTE: the windowGlows collector below therefore runs before the GLB panes are
+    // attached, so it collects none of them and the dusk schedule no-ops for those —
+    // which is fine and INTENTIONAL: panes are born at the dusk value (0.28), the
+    // exact value the schedule would set at dusk (glow=1.0). Don't `await` here: it
+    // delays the screenshot enough to race the HUD-hide and leak chrome into the frame.
     scene.add(props);
     Promise.all(modelJobs).catch((err) => console.warn("[render3d] visual capture model stream", err));
   } else {
@@ -2664,22 +2670,26 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const lampFlickers = [];
   // Window-glow schedule targets (panes + their warmth lights), collected once and
   // ramped by clock.dayTime in stepWorld so buildings read as occupied at night /
-  // quiet by day. Runs even under the freeze (dayTime is pinned), so the dusk
-  // capture holds at the authored 0.28 and the golden baseline is unchanged.
+  // quiet by day. Runs even under the freeze (dayTime is pinned to dusk), so the
+  // capture holds panes at the authored 0.28 and the golden baseline is unchanged.
+  // A building's ~9 panes share ONE paneMat instance, so dedupe via a Set — else
+  // stepWorld rewrites the same material's emissiveIntensity hundreds of times/frame.
   const windowGlows = { panes: [], lights: [] };
+  const paneSet = new Set();
   scene.traverse((obj) => {
     if (obj.isPointLight && obj.userData?.windowGlow) {
       windowGlows.lights.push({ light: obj, base: obj.userData.baseIntensity ?? obj.intensity });
       return; // scheduled, not flickered
     }
     if (obj.isMesh && obj.material && !Array.isArray(obj.material) && obj.material.userData?.windowPaneBase !== undefined) {
-      windowGlows.panes.push(obj.material);
+      paneSet.add(obj.material);
     }
     if (!visualCapture && obj.isPointLight && obj.intensity <= 12) {
       const seed = (obj.position.x * 7.31 + obj.position.z * 13.73) % (Math.PI * 2);
       lampFlickers.push({ light: obj, base: obj.intensity, seed });
     }
   });
+  windowGlows.panes = [...paneSet];
 
   const objectiveGuidance = createObjectiveGuidance(snapshot);
   scene.add(objectiveGuidance.group);
@@ -2962,10 +2972,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     // correct under the freeze too: dusk pins to p=0.5 → glow 1.0 → the authored
     // 0.28 emissive, leaving the golden dusk baseline byte-identical.
     if (windowGlows.panes.length || windowGlows.lights.length) {
-      const p = clock.dayTime;
-      const rise = THREE.MathUtils.smoothstep(p, 0.30, 0.48); // off through golden, full by dusk
-      const fall = 1 - THREE.MathUtils.smoothstep(p, 0.93, 1.0); // ease back down toward dawn
-      const glow = Math.min(rise, fall);
+      const glow = calcWindowGlowFactor(clock.dayTime); // pure, unit-tested in timeOfDay
       for (const mat of windowGlows.panes) {
         mat.emissiveIntensity = mat.userData.windowPaneBase * (0.16 + 0.84 * glow);
       }
@@ -3136,7 +3143,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     return out;
   };
 
-  if (typeof window !== "undefined") {
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    // Dev-only debug API (__westward3dStats perf probe + __spike live-tuning/teleport).
+    // DEV-gated like __westward3dTest below so Vite tree-shakes it — and its console
+    // logging — out of the production bundle.
     // Perf probe for the visual-upgrade stages: draw calls / triangles straight
     // from renderer.info, plus a scene walk for shadow-caster count.
     window.__westward3dStats = () => {
@@ -3458,11 +3468,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       update(pos, moving, running, dt) {
         if (moving) {
           if (lastX === null) { lastX = pos.x; lastZ = pos.z; }
-          sinceEmit += Math.hypot(pos.x - lastX, pos.z - lastZ);
+          const d = Math.hypot(pos.x - lastX, pos.z - lastZ);
           lastX = pos.x; lastZ = pos.z;
-          const stride = running ? 0.8 : 1.1; // emit per ~stride of travel
-          if (sinceEmit >= stride) {
-            sinceEmit = 0;
+          const step = footDustStep(d, sinceEmit, running ? 0.8 : 1.1);
+          sinceEmit = step.sinceEmit;
+          if (step.emit) {
             const sl = slots[cur]; cur = (cur + 1) % N;
             sl.m.position.set(pos.x + (Math.random() - 0.5) * 0.22, 0.05, pos.z + (Math.random() - 0.5) * 0.22);
             sl.m.scale.setScalar(0.6);

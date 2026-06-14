@@ -22,7 +22,18 @@ export interface Palette {
   exposure: number;
   stars: number;
   bloom: number;
-  grade: { tint: string; amount: number };
+  grade: {
+    tint: string;
+    amount: number;
+    contrast?: number;
+    saturation?: number;
+    shadowTint?: string;
+    highlightTint?: string;
+    splitStrength?: number;
+    godrayStrength?: number;
+    vignetteStrength?: number;
+    bloomThreshold?: number;
+  };
   bodyBg: string;
 }
 
@@ -35,3 +46,4 @@ export function nextTimeKey(key: string): TimeKey;
 export function lerpColor(h1: string, h2: string, t: number): string;
 export function lerpPalette(p1: Palette, p2: Palette, t: number): Palette;
 export function sunArc(dayTime01: number): Palette;
+export function calcWindowGlowFactor(dayTime: number): number;

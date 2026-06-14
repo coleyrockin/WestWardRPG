@@ -8,6 +8,7 @@ import {
   lerpColor,
   lerpPalette,
   sunArc,
+  calcWindowGlowFactor,
   type Palette,
   type TimeKey,
 } from "../src/render3d/timeOfDay.js";
@@ -190,5 +191,36 @@ describe("sunArc — continuous day/night cycle", () => {
     expect(sunArc(NaN).key).toBe("arc");
     // @ts-expect-error — defensive: undefined coerces to 0 (= the day anchor)
     expect(sunArc(undefined).sun.intensity).toBeCloseTo(PALETTES.day.sun.intensity, 6);
+  });
+});
+
+describe("calcWindowGlowFactor — window-glow day/night ramp", () => {
+  it("is off through daylight and full from dusk through night, easing at the edges", () => {
+    expect(calcWindowGlowFactor(0.0)).toBe(0); // day — windows dark
+    expect(calcWindowGlowFactor(0.28)).toBeCloseTo(0, 6); // before the rise
+    expect(calcWindowGlowFactor(0.3)).toBe(0); // rise edge
+    expect(calcWindowGlowFactor(0.39)).toBeCloseTo(0.5, 1); // mid-rise
+    expect(calcWindowGlowFactor(0.48)).toBe(1); // full by dusk
+    expect(calcWindowGlowFactor(0.75)).toBe(1); // night
+    expect(calcWindowGlowFactor(0.93)).toBe(1); // hold until dawn fade
+    expect(calcWindowGlowFactor(0.965)).toBeCloseTo(0.5, 1); // mid-fall
+    expect(calcWindowGlowFactor(1.0)).toBe(0); // back to day
+  });
+
+  it("returns EXACTLY 1.0 at dusk (0.5) so the ?visual-pinned dusk frame holds 0.28", () => {
+    // load-bearing: the golden dusk baseline depends on glow==1 → emissive 0.28
+    expect(calcWindowGlowFactor(0.5)).toBe(1);
+  });
+});
+
+describe("day palette tuning is locked (commit 7a88800 — daylight drama + neon)", () => {
+  it("keeps the tuned exposure/contrast/saturation/bloom/split/threshold", () => {
+    const d = PALETTES.day;
+    expect(d.exposure).toBe(1.12);
+    expect(d.bloom).toBe(0.4);
+    expect(d.grade.contrast).toBe(1.18);
+    expect(d.grade.saturation).toBe(1.13);
+    expect(d.grade.splitStrength).toBe(0.3);
+    expect(d.grade.bloomThreshold).toBe(0.85);
   });
 });

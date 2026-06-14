@@ -144,6 +144,22 @@ export function nextTimeKey(key) {
   return TIME_KEYS[(i + 1) % TIME_KEYS.length] || "dusk";
 }
 
+const smoothstep01 = (x, e0, e1) => {
+  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+  return t * t * (3 - 2 * t);
+};
+
+// Window-glow day/night factor [0,1]: panes/warmth-lights are off through the
+// daylit hours, ramp full ON by dusk and hold through night, then ease back
+// toward dawn. `dayTime` in [0,1) (0 day, 1/4 golden, 1/2 dusk, 3/4 night).
+// At dusk (0.5) it returns EXACTLY 1.0 so the ?visual-pinned dusk frame holds the
+// authored emissive (0.28) — keep the rise complete by 0.48 to preserve that.
+export function calcWindowGlowFactor(dayTime) {
+  const rise = smoothstep01(dayTime, 0.30, 0.48); // off through golden, full by dusk
+  const fall = 1 - smoothstep01(dayTime, 0.93, 1.0); // ease back down toward dawn
+  return Math.min(rise, fall);
+}
+
 // Continuous day/night arc (docs/roadmap.md §3, Bet 4) — the smooth-cycle
 // successor to the discrete keys. `dayTime01` in [0,1) wraps around the clock:
 // 0 = day, ~1/4 = golden hour, ~1/2 = dusk, ~3/4 = night, back to day. Returns
