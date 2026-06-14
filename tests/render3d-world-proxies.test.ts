@@ -21,6 +21,8 @@ const KINDS_THAT_BLOCK = new Set([
   "horseHitched", "cattle",
   "gravesite", "steelMustang",
   "gallows",
+  // cyberpunk-western identity props — solid single-AABB blockers
+  "ironDoctor", "antennaMast",
 ]);
 const KINDS_THAT_PASS = new Set([
   "road", "roadPlank", "roadRut", "townBark", "slimeTell", "marshCluster", "slimeTrailHero",

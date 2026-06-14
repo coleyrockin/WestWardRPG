@@ -84,6 +84,8 @@ const FOOTPRINTS = {
   crate:       (p) => box(p, 0.6 * p.size, 0.6 * p.size),
   gravesite:   (p) => box(p, 2.0 * p.size, 1.0 * p.size),
   steelMustang: (p) => box(p, 1.6 * p.size, 0.8 * p.size),
+  ironDoctor:  (p) => box(p, 1.5 * p.size, 0.9 * p.size),   // covered wagon — solid, walk around it
+  antennaMast: (p) => box(p, 0.22 * p.size, 0.22 * p.size), // thin pole — snug collider, not a wall
   // --- bigger-world expansion (zone props) ---
   mesa:        (p) => box(p, 3.2 * p.size, 3.2 * p.size),
   mesaSilhouette: (p) => box(p, 3.2 * p.size, 3.2 * p.size),

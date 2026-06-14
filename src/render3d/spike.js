@@ -1215,6 +1215,115 @@ function buildGallows(group, p) {
   return g;
 }
 
+// The iron doctor's wagon — a frontier surgeon's covered rig, "sun-bleached chrome
+// repaired with baling wire." Reuses buildWagon's bed+wheels read, then adds a
+// canvas tilt, a roof equipment rack (a few thin boxes of salvaged kit), and a warm
+// interior glow with one cyan emissive accent (the mustang's #00ffc8 — the one bit
+// of working chrome). "Nothing is sleek": desaturated metal tints, a wonky rack.
+// One hero object, grounded, M0-safe. p.yaw rotates it.
+function buildIronDoctor(group, p) {
+  const s = p.size || 1;
+  const g = new THREE.Group();
+  g.position.copy(toVec(p.x, p.y));
+  if (p.yaw) g.rotation.y = p.yaw;
+
+  const metal = standard("#8a8f7d", { rimColor: "#00ffc8", rimStrength: 0.45, rimPower: 2.0 }); // sun-bleached chrome
+  const metalDk = standard("#5a5e50", { roughness: 0.9 });
+  const canvasMat = standard("#b9a884", { roughness: 0.98 }); // weathered wagon tilt
+  const wire = standard("#6e5a34", { roughness: 0.92 });       // baling wire / lashing
+  const wheelMat = standard("#261c10");
+  const glowCyan = standard("#00ffc8", { emissive: "#00ffc8", emissiveIntensity: 2.0 });
+  const glowWarm = standard("#ffcf86", { emissive: "#ffcf86", emissiveIntensity: 1.1 }); // interior lamp panel
+
+  // chassis bed — flat, on the wagon's local origin
+  addBox(g, 1.5 * s, 0.42 * s, 0.86 * s, metalDk, new THREE.Vector3(0, 0.36 * s, 0));
+  addBox(g, 1.54 * s, 0.12 * s, 0.9 * s, metal, new THREE.Vector3(0, 0.58 * s, 0)); // chrome rail trim
+
+  // canvas tilt — three hoop ribs + a stretched cover, the classic covered-wagon read
+  for (const rx of [-0.52, 0, 0.52]) {
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(0.44 * s, 0.03 * s, 6, 10, Math.PI), wire);
+    rib.position.copy(new THREE.Vector3(rx * s, 1.04 * s, 0));
+    rib.castShadow = true;
+    g.add(rib);
+  }
+  addBox(g, 1.42 * s, 0.78 * s, 0.72 * s, canvasMat, new THREE.Vector3(0, 1.18 * s, 0));
+  // open rear hoop showing the lit interior (warm panel + the cyan node)
+  addBox(g, 0.06 * s, 0.6 * s, 0.62 * s, glowWarm, new THREE.Vector3(-0.74 * s, 1.12 * s, 0));
+  addBox(g, 0.12 * s, 0.12 * s, 0.12 * s, glowCyan, new THREE.Vector3(-0.66 * s, 1.34 * s, 0.18 * s)); // the one chrome accent
+
+  // roof equipment rack — a few thin boxes of lashed salvage, deliberately uneven
+  addBox(g, 1.2 * s, 0.05 * s, 0.64 * s, metalDk, new THREE.Vector3(0.05 * s, 1.62 * s, 0)); // rack deck
+  addBox(g, 0.5 * s, 0.16 * s, 0.18 * s, metal, new THREE.Vector3(-0.18 * s, 1.72 * s, -0.12 * s));
+  addBox(g, 0.34 * s, 0.12 * s, 0.5 * s, metalDk, new THREE.Vector3(0.28 * s, 1.7 * s, 0.06 * s));
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.12 * s, 0.34 * s, 8), metal);
+  drum.position.copy(new THREE.Vector3(0.42 * s, 1.78 * s, -0.18 * s));
+  drum.rotation.z = Math.PI / 2;
+  drum.castShadow = true;
+  g.add(drum);
+
+  // wheels — one squared to the rig, one splayed (the broken-frontier read)
+  const wheelGeo = new THREE.TorusGeometry(0.4 * s, 0.08 * s, 8, 16);
+  for (const [dx, rx] of [[-0.5, 0], [0.5, 0.34]]) {
+    const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+    wheel.position.copy(new THREE.Vector3(dx * s, 0.4 * s, 0.5 * s));
+    wheel.rotation.x = rx;
+    wheel.castShadow = true;
+    g.add(wheel);
+  }
+  for (const dx of [-0.5, 0.5]) {
+    const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+    wheel.position.copy(new THREE.Vector3(dx * s, 0.4 * s, -0.5 * s));
+    wheel.castShadow = true;
+    g.add(wheel);
+  }
+
+  group.add(g);
+  // small interior light — warm with a cyan bias, low range so it reads as a lit
+  // surgery, not a scene key (kept below the bloom-bait reserved-light tier).
+  const lamp = new THREE.PointLight(col("#ffd0a0"), 4.2, 4.5, 2);
+  lamp.position.copy(toVec(p.x, p.y, 1.2 * s));
+  group.add(lamp);
+  addContactShadow(group, p.x, p.y, 1.25 * s, 0.95 * s);
+  return g;
+}
+
+// Comms / antenna mast — a tall, thin vertical that breaks the skyline with a
+// cyberpunk silhouette ("antennas/cables" over the clapboard). A crisp <0.12u
+// pole with a couple of cross-arms and a tiny emissive beacon at the top.
+// IMPORTANT: regular box Meshes only — NOT THREE.Line (the WebGL2 fallback bans
+// lines; boxes render on both backends, so this is capture-verifiable). p.baseH
+// lifts the mast onto a rooftop; p.beacon picks the beacon hue (default red).
+function buildAntennaMast(group, p) {
+  const s = p.size || 1;
+  const bh = p.baseH || 0; // base height — lifts a rooftop mast onto the building
+  const poleW = 0.09 * s;  // < 0.12u: stays a crisp silhouette under the ink pass
+  const poleH = 3.6 * s;
+  const metal = standard("#7d8270", { roughness: 0.85 });        // weathered, not chrome-bright
+  const metalDk = standard("#4f5346", { roughness: 0.9 });
+  const beaconHex = p.beacon === "cyan" ? "#00ffc8" : "#ff3b30";
+  const beacon = standard(beaconHex, { emissive: beaconHex, emissiveIntensity: 2.4 });
+
+  // main pole
+  addBox(group, poleW, poleH, poleW, metal, toVec(p.x, p.y, bh));
+  // a slight kink near the base sells "field-rigged, not factory" — a short stub
+  // offset strut bracing the pole
+  const strut = addBox(group, poleW * 0.8, 0.8 * s, poleW * 0.8, metalDk, toVec(p.x + 0.18 * s, p.y, bh));
+  strut.rotation.z = 0.32;
+  // cross-arms — two short horizontal boxes at different heights (antenna elements)
+  for (const [hz, len, off] of [[0.62, 0.7, 0.0], [0.8, 0.5, 0.06], [0.92, 0.34, -0.04]]) {
+    addBox(group, len * s, poleW * 0.8, poleW * 0.8, metalDk, toVec(p.x, p.y + off * s, bh + poleH * hz));
+  }
+  // a couple of vertical whip elements off the top cross-arm
+  addBox(group, poleW * 0.7, 0.6 * s, poleW * 0.7, metalDk, toVec(p.x + 0.3 * s, p.y, bh + poleH * 0.92));
+  addBox(group, poleW * 0.7, 0.46 * s, poleW * 0.7, metalDk, toVec(p.x - 0.28 * s, p.y, bh + poleH * 0.92));
+  // tiny emissive beacon at the very top
+  addBox(group, 0.13 * s, 0.13 * s, 0.13 * s, beacon, toVec(p.x, p.y, bh + poleH));
+
+  // ground masts get a contact shadow; rooftop masts (baseH>0) sit on a building
+  // that already grounds itself, so skip the floating disc.
+  if (bh === 0) addContactShadow(group, p.x, p.y, 0.3 * s, 0.3 * s);
+}
+
 function buildPlacement(group, p) {
   // Guard size once here: every per-kind builder multiplies p.size, so an entry
   // missing it (undefined * k = NaN) would silently produce zero-scaled geometry.
@@ -1258,6 +1367,8 @@ function buildPlacement(group, p) {
     case "gravesite": return buildGravesite(group, p);
     case "gallows": return buildGallows(group, p);
     case "steelMustang": return buildSteelMustang(group, p);
+    case "ironDoctor": return buildIronDoctor(group, p);
+    case "antennaMast": return buildAntennaMast(group, p);
     case "roadSlime": return buildSlime(group, p);
     case "walkInSaloon": return buildWalkInSaloon(group, p);
     case "townGate": return buildTownGate(group, p);

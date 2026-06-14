@@ -706,10 +706,13 @@ const CALICO_FLATS = [
   // sun-scoured body+trim+roof (bodyTint/trimTint/roofTint) set Calico apart from
   // Westward's warm amber; the two saloons wear neon-on-clapboard signs (the free
   // town's lawless glow). Drovers' wears a rusty-red roof for accent relief.
-  { kind: "saloonFacade", label: "The Neutral Ground Saloon", x: -48.0, y: 5.4, color: "#a87848", size: 0.95, bodyTint: "#b3a585", trimTint: "#8a7e62", roofTint: "#5b5f60" },
-  { kind: "saloonFacade", label: "Drovers' Rest Saloon",     x: -51.7, y: 5.2,  color: "#9c6f43", size: 0.9, bodyTint: "#a89a78", trimTint: "#807454", roofTint: "#7a3a2e" },
+  // bodyTint/trimTint nudged COOLER/greyer-blue than warm Westward — Calico is the
+  // neon free-town, so its clapboard reads cold-lit, not amber. Subtle (still
+  // readable wood); the rusty-red Drovers' roof stays as warm accent relief.
+  { kind: "saloonFacade", label: "The Neutral Ground Saloon", x: -48.0, y: 5.4, color: "#a87848", size: 0.95, bodyTint: "#a3a896", trimTint: "#7e8478", roofTint: "#586066" },
+  { kind: "saloonFacade", label: "Drovers' Rest Saloon",     x: -51.7, y: 5.2,  color: "#9c6f43", size: 0.9, bodyTint: "#9aa090", trimTint: "#778070", roofTint: "#7a3a2e" },
   { kind: "porch",        label: "Saloon Row Porch",         x: -48.0, y: 6.6,  color: "#5a4327", size: 0.6 },
-  { kind: "storefront",   label: "Flats Mercantile",         x: -55.4, y: 5.8,  color: "#9a7840", size: 0.9, bodyTint: "#ab9d80", trimTint: "#86795c", roofTint: "#586064" },
+  { kind: "storefront",   label: "Flats Mercantile",         x: -55.4, y: 5.8,  color: "#9a7840", size: 0.9, bodyTint: "#9ea596", trimTint: "#7c8472", roofTint: "#566066" },
   // SOUTH shoulder (y > 8.9 → fronts face north). The elected Sheriff's Office is
   // the civic anchor — set across the street FACING the saloon row, up-sized and
   // cool stone-tinted so the law out-masses the bars. The Boarding House wears a
@@ -774,6 +777,29 @@ const CALICO_DRESSING = [
   // Back rank — set-back small buildings break the north skyline (depth).
   { kind: "productionSaloon", label: "Back Lot Saloon",       x: -49.5, y: 2.3,  color: "#7a5230", size: 0.6, yaw: 0.05 },
   { kind: "productionStore",  label: "Back Lot Granary",      x: -54.0, y: 2.1,  color: "#634330", size: 0.62, yaw: -0.06 },
+  // Comms masts on the saloon-row + sheriff rooftops — the free town's pirate-radio
+  // skyline ("antennas/cables on clapboard"). baseH mounts them atop the buildings
+  // so the thin silhouette + beacon rise above the roofline. Far west (x<-44) — OUT
+  // of the dusk capture frame, so they don't touch the golden baseline.
+  { kind: "antennaMast",  label: "Neutral Ground Mast",       x: -48.0, y: 5.7,  color: "#7d8270", size: 0.78, baseH: 3.1, beacon: "cyan" },
+  { kind: "antennaMast",  label: "Sheriff Roof Mast",         x: -51.0, y: 12.4, color: "#7d8270", size: 0.72, baseH: 3.2, beacon: "red" },
+];
+
+// CYBERPUNK-WESTERN IDENTITY DRESSING — the "nothing is sleek" props that mark this
+// as a rusted-chrome frontier, not a clean western: the iron doctor's wagon on the
+// Calico approach and a comms mast on the town watchtower. Absolute coords. Kept to
+// a handful of hero objects (M0-safe) and clear of the spawn wedge + route waypoints.
+const CYBER_DRESSING = [
+  // Iron doctor's wagon — parked off the north shoulder just outside the Calico gate,
+  // flanking the eastern approach beside the Approach Snag. Cyan-accent surgery glow
+  // is the first cyberpunk note you read entering the free town. Far west (x<-39) —
+  // OUT of the dusk capture frame.
+  { kind: "ironDoctor",   label: "Iron Doctor's Wagon",       x: -39.5, y: 5.5,  color: "#8a8f7d", size: 1.0, yaw: 0.7 },
+  // Watchtower comms mast — a thin antenna + red beacon on the town's north watchtower
+  // shoulder, breaking the skyline with a cyberpunk silhouette. NOTE: this sits inside
+  // the dusk hero-capture frame (camera at 6.6,3.5,10.2 looking east) — flagged for a
+  // golden re-bless. Off the spawn wedge (y 4 < 6.5) and ~1.9u off the jobBoard waypoint.
+  { kind: "antennaMast",  label: "Watchtower Comms Mast",     x: 14.0,  y: 4.0,  color: "#7d8270", size: 0.85, beacon: "red" },
 ];
 
 // Far navigation landmarks — big verticals that read across the range and give
@@ -925,6 +951,7 @@ const ABSOLUTE_ZONES = [
   ...WEST_PASS,
   ...CALICO_FLATS,
   ...CALICO_DRESSING,
+  ...CYBER_DRESSING,
   ...EASTWATER_RANCH,
   ...PROSPECTORS_FOLLY,
   ...SUNKEN_WASH,
