@@ -44,6 +44,7 @@ import { createScatter } from "../game/world/scatter.js";
 import { createPlaceholderCharacter } from "../game/world/character.js";
 import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
 import { createTownsfolk } from "../game/world/townsfolk.js";
+import { pickExecutorBark } from "./executorBarks.js";
 import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
 import { gustAt } from "../game/world/windGusts.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
@@ -2906,7 +2907,21 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   let townsfolk = { update() {}, getInteractable: () => null, talk: () => null };
   if (!visualCapture) {
     try {
-      townsfolk = await createTownsfolk(scene, { count: 5 });
+      // Two region casts share one street: the Westward home-ground crowd and the
+      // Calico Flats free-town cast (named characters from the treatment). A facade
+      // fans update/getInteractable/talk across both; a Calico load failure leaves
+      // the Westward cast intact.
+      const groups = [await createTownsfolk(scene, { count: 5 })];
+      try {
+        groups.push(await createTownsfolk(scene, { locale: "calico" }));
+      } catch (e) {
+        console.warn("[render3d] calico townsfolk failed to load", e);
+      }
+      townsfolk = {
+        update(dt2, frozen2, pos) { for (const g of groups) g.update(dt2, frozen2, pos); },
+        getInteractable() { for (const g of groups) { const r = g.getInteractable(); if (r) return r; } return null; },
+        talk() { for (const g of groups) { const r = g.talk?.(); if (r) return r; } return null; },
+      };
     } catch (err) {
       console.warn("[render3d] townsfolk failed to load", err);
     }
@@ -2915,6 +2930,20 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // line in the prompt; the loop shows the "E — Talk to …" cue when in range.
   let npcSpeechT = 0;
   let npcSpeechMsg = "";
+  // The Executor (Abram's ghost) interjects on world events past the funeral:
+  // crossing into a town, clearing the marsh-road bounty. Once-per-session via a
+  // Set, branched by executorApproval (acting like Abram → proud; mercy → distant).
+  const seenExecutorBarks = new Set();
+  let currentRegion = "westward"; // spawn region — don't bark on the opening frame
+  let lastBarkPhase = null;
+  const fireExecutorBark = (trigger) => {
+    if (seenExecutorBarks.has(trigger)) return;
+    const line = pickExecutorBark(trigger, { approval: game?.executorApproval ?? 0 });
+    if (!line) return;
+    seenExecutorBarks.add(trigger);
+    npcSpeechMsg = line; // the loop's npcSpeech block renders it (cyan, 5s)
+    npcSpeechT = 5;
+  };
   if (typeof window !== "undefined") {
     window.addEventListener("keydown", (e) => {
       if (e.code !== "KeyE") return;
@@ -4584,6 +4613,20 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       saveMgr.tick(dt, runMode, { onAutoSave: persistRun });
     }
     townsfolk.update(visualCapture ? 0 : dt, visualCapture, player.position);
+    // Executor place/event barks — Abram's ghost reacts to crossing the territory
+    // and clearing the road. Skipped during capture and the opening funeral/implant
+    // beats (the funeral lines own the channel there). Once each, via seenExecutorBarks.
+    if (!visualCapture && loopState.phase !== "funeral" && loopState.phase !== "implant") {
+      const region = player.position.x < -20 ? "calico" : "westward";
+      if (region !== currentRegion) {
+        currentRegion = region;
+        fireExecutorBark(region === "calico" ? "enter_calico" : "enter_westward");
+      }
+      if (loopState.phase !== lastBarkPhase) {
+        lastBarkPhase = loopState.phase;
+        if (loopState.phase === "return_to_boone") fireExecutorBark("bounty_cleared");
+      }
+    }
     // NPC greeting prompt/speech overrides the kind prompt when near a townsperson
     if (npcSpeechT > 0) {
       npcSpeechT -= dt;
