@@ -320,7 +320,7 @@ export function resolveFirstFiveMinuteLoop(input = {}) {
   const fightDistance = fightCue?.marker ? distanceTo(input.player, fightCue.marker) : Infinity;
   const roadDiscovery = input.roadDiscoveryLead || null;
   const roadDiscoveryDistance = roadDiscovery ? distanceTo(input.player, roadDiscovery) : Infinity;
-  const regionHint = input.regionLabel || "Dustward Frontier";
+  const regionHint = input.regionLabel || "Westward Frontier";
 
   if (firstRoadMemory?.phase === "survey_available" || firstRoadMemory?.phase === "survey_completed" || activeJob?.id === "frontier_map_survey") {
     return firstLoopObjective(input, "survey_followup", "open Old Road Survey on Boone's board", boardDistance <= 3.25 ? "Press E to open jobs" : "Return to Boone's board", "Map Scrap turned the first road into follow-up work.", {

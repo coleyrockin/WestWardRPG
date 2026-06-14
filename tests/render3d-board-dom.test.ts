@@ -50,8 +50,8 @@ const offerView = {
   rewardLine: "Reward: +38g, +18 XP, +1 Potion",
   progressLine: "",
   listings: [
-    { title: "Roadside Salvage", detail: "Dustward Frontier • Low threat", rewardLine: "+24g, +12 XP" },
-    { title: "Sealed Orders Run", detail: "Dustward Frontier • Low threat", rewardLine: "+30g, +16 XP" },
+    { title: "Roadside Salvage", detail: "Westward Frontier • Low threat", rewardLine: "+24g, +12 XP" },
+    { title: "Sealed Orders Run", detail: "Westward Frontier • Low threat", rewardLine: "+30g, +16 XP" },
   ],
 };
 

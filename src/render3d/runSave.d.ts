@@ -4,6 +4,9 @@ export const RUN_VERSION: number;
 
 export interface RunLoopState {
   phase: string;
+  /** Active mission id (e.g. "dust_to_dust"); persisted so a resumed run reopens at
+   *  the right mission beat instead of defaulting to "spawn". */
+  activeMission: string | null;
   boardChoice: string | null;
   routeBeats: Record<string, boolean>;
   inventoryPreview: Record<string, number>;
@@ -22,7 +25,7 @@ export interface RunPayload {
   time: number;
   player: { x: number; z: number; yaw: number };
   loopState: RunLoopState;
-  world: { dayTime: number; weatherKind: string };
+  world: { dayTime: number; weatherKind: string; poisDiscovered: string[] };
   runStats: {
     startedAt: number;
     endedAt: number | null;
@@ -41,7 +44,7 @@ export interface RunContext {
   time?: number;
   player?: { x?: number; z?: number; yaw?: number };
   loopState?: Record<string, any>;
-  world?: { dayTime?: number; weatherKind?: string };
+  world?: { dayTime?: number; weatherKind?: string; poisDiscovered?: string[] };
   runStats?: Record<string, any>;
   game?: Record<string, any> | null;
 }

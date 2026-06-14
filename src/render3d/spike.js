@@ -1,4 +1,4 @@
-// The game's scene assembly + render loop — Dustward and the first-road
+// The game's scene assembly + render loop — Westward and the first-road
 // mission in Three.js (WebGPURenderer + TSL, NPR cel/ink look). Grew from the
 // original render spike; today it owns world building, the loop, and beat
 // wiring. (Future decomposition target — keep new systems in their own modules.)
@@ -26,7 +26,7 @@ import {
 import { createPlayerController, CAMERA_PRESETS } from "./playerController.js";
 import { buildProxies, SALOON_DIMS } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
-import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine } from "./phaseState.js";
+import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine, getPhaseProgress } from "./phaseState.js";
 import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
 import { buildFieldMapRouteModel, createFieldMapDomRefs, syncFieldMapDom, resolveFieldMapMode } from "./fieldMapDom.js";
 import { questMapTarget } from "./questRuntime.js";
@@ -169,8 +169,8 @@ function addContactShadow(group, x, z, rx = 1.0, rz = 0.7) {
     m.renderOrder = -1;
     return m;
   };
-  group.add(make(1.32, 0.22)); // soft penumbra
-  group.add(make(0.92, 0.34)); // darker core
+  group.add(make(1.32, 0.32)); // soft penumbra — lifted from 0.22 so props read grounded, not floating (art doc pillar 3)
+  group.add(make(0.92, 0.46)); // darker core — lifted from 0.34; trimmed under the dusk vignette so it doesn't pool
 }
 
 // Augment an authored building box with western false-front architecture so it
@@ -335,7 +335,7 @@ function buildSign(group, p) {
   // its text via p.signLines (e.g. the Calico Flats town marker — kept kind:"sign"
   // so it doesn't collide with the gameplay-keyed "roadSign" kind). Single-face
   // plane just proud of the panel, so the box's other sides stay clean for the ink.
-  const lines = p.signLines || (isHeroRoadSign ? ["CACHE ROAD →", "DUSTWARD ½ MI"] : null);
+  const lines = p.signLines || (isHeroRoadSign ? ["CACHE ROAD →", "WESTWARD ½ MI"] : null);
   if (lines) {
     // Keep the hero road sign's face EXACTLY 0.86×0.44 (it's in the golden frame);
     // other signs size their face to the smaller panel.
@@ -710,7 +710,7 @@ function buildWesternBuilding(group, p, spec = {}) {
   const fz = p.y + front * depth / 2;        // front-face world z
   const cz = p.y;
   // p.bodyTint overrides the shared WESTERN_SPECS body color per placement (Calico
-  // Flats uses it for its sun-bleached palette; Dustward placements omit it).
+  // Flats uses it for its sun-bleached palette; Westward placements omit it).
   const body = standard(p.bodyTint ?? spec.body ?? "#7a5536", { roughness: 1 });
   const trim = standard(p.trimTint ?? spec.trim ?? "#b08a52", { roughness: 1 });
   const roofMat = standard(p.roofTint ?? spec.roof ?? "#37271a", { roughness: 1 });
@@ -858,7 +858,7 @@ function buildTownGate(group, p) {
   addBox(group, 0.26 * s, 0.3 * s, halfSpan * 2 + 0.9 * s, mBeam, toVec(p.x, p.y, postH - 0.3 * s));
   // hanging town board, lettered via the shared canvas sign painter; faces east
   // (back toward town) so it reads over the shoulder and in the wide push-in.
-  // Each town's gate wears its own name — Dustward keeps "WESTWARD" (the public
+  // Each town's gate wears its own name — Westward keeps "WESTWARD" (the public
   // title), Calico Flats overrides via p.signLines.
   const signTex = makeSignTexture(p.signLines || ["WESTWARD"]);
   const sign = new THREE.Mesh(
@@ -1075,13 +1075,32 @@ function buildHotel(group, p) {
 
 function buildGravesite(group, p) {
   const size = p.size || 1.0;
-  const pos = toVec(p.x, p.y, -0.05);
-  addBox(group, 2.0 * size, 0.12, 1.0 * size, standard("#3a281c"), pos);
+  // Dark recessed pit + raised earth lip reads as a dug grave, not a flat slab.
+  addBox(group, 2.2 * size, 0.1, 1.2 * size, standard("#160f09"), toVec(p.x, p.y, -0.2));
+  addBox(group, 2.6 * size, 0.18, 1.6 * size, standard("#3a281c"), toVec(p.x, p.y, -0.08));
 
+  // The casket — the shot's subject — on a low bier over the grave.
+  const casket = new THREE.Group();
+  casket.position.copy(toVec(p.x, p.y, 0));
+  const woodDark = standard("#2a1d12");
+  const woodTrim = standard("#5b4228");
+  addBox(casket, 2.1 * size, 0.16 * size, 0.9 * size, woodTrim, new THREE.Vector3(0, 0.12 * size, 0)); // bier
+  addBox(casket, 1.9 * size, 0.42 * size, 0.72 * size, woodDark, new THREE.Vector3(0, 0.28 * size, 0)); // body
+  addBox(casket, 1.74 * size, 0.12 * size, 0.58 * size, woodTrim, new THREE.Vector3(0, 0.7 * size, 0)); // lid
+  // The Executor implant — the cyan node the iron doctor lifts from the casket
+  // (the inheritance). A single emissive accent: the one bit of chrome at the grave.
+  addBox(
+    casket, 0.14 * size, 0.14 * size, 0.14 * size,
+    standard("#00ffc8", { emissive: "#00ffc8", emissiveIntensity: 2.2 }),
+    new THREE.Vector3(0.66 * size, 0.95 * size, 0),
+  );
+  group.add(casket);
+
+  // Headstone cross at the head of the grave.
   const crossGroup = new THREE.Group();
-  crossGroup.position.copy(toVec(p.x - 0.8 * size, p.y));
-  addBox(crossGroup, 0.15 * size, 1.4 * size, 0.15 * size, standard("#735332"), new THREE.Vector3(0, 0, 0));
-  addBox(crossGroup, 0.8 * size, 0.15 * size, 0.15 * size, standard("#735332"), new THREE.Vector3(0, 0.8 * size, 0));
+  crossGroup.position.copy(toVec(p.x - 1.3 * size, p.y));
+  addBox(crossGroup, 0.16 * size, 1.5 * size, 0.16 * size, standard("#735332"), new THREE.Vector3(0, 0, 0));
+  addBox(crossGroup, 0.85 * size, 0.16 * size, 0.16 * size, standard("#735332"), new THREE.Vector3(0, 0.85 * size, 0));
   group.add(crossGroup);
 }
 
@@ -1091,7 +1110,7 @@ function buildSteelMustang(group, p) {
   mustang.position.copy(toVec(p.x, p.y));
   if (p.yaw) mustang.rotation.y = p.yaw;
 
-  const chromeMat = standard("#7f8c8d", { rimColor: "#00ffc8", rimStrength: 0.6, rimPower: 2.0 });
+  const chromeMat = standard("#8a8f7d", { rimColor: "#00ffc8", rimStrength: 0.6, rimPower: 2.0 }); // sun-bleached chrome, not factory-grey ("nothing is sleek")
   const copperMat = standard("#d35400");
   const glowCyan = standard("#00ffc8", { emissive: "#00ffc8", emissiveIntensity: 2.0 });
 
@@ -1218,6 +1237,11 @@ function buildPlacement(group, p) {
     case "saloon":
     case "saloonFacade": return buildBuilding(group, p, 1.15);
     case "storefront": return buildBuilding(group, p, 0.95);
+    // production* kinds normally render from authored .glb models; this is the
+    // GLB-load-failure fallback — a composed western false-front, not a clay box.
+    case "productionSaloon": return buildWesternBuilding(group, p, WESTERN_SPECS.saloonFacade);
+    case "productionStore": return buildWesternBuilding(group, p, WESTERN_SPECS.storefront);
+    case "productionAssay": return buildWesternBuilding(group, p, WESTERN_SPECS.townFacadeStore);
     case "porch": return buildPorch(group, p);
     case "mesa":
     case "mesaSilhouette":
@@ -1377,7 +1401,7 @@ function setNodeOpacity(node, opacity) {
   });
 }
 
-function updateOcclusionFades(placementNodes, camera, playerPos) {
+function updateOcclusionFades(placementNodes, camera, playerPos, focusPoint = null) {
   if (!placementNodes?.length || !camera || !playerPos) return;
   const cameraPoint = camera.position.clone();
   // Sample a small cone of rays toward the player — centre mass plus head and
@@ -1389,6 +1413,15 @@ function updateOcclusionFades(placementNodes, camera, playerPos) {
     new THREE.Vector3(playerPos.x + 0.9, 1.4, playerPos.z), // right shoulder
     new THREE.Vector3(playerPos.x - 0.9, 1.4, playerPos.z), // left shoulder
   ];
+  // A scene-focus point BEYOND the player (e.g. the funeral casket, which sits
+  // behind the hero from the graveside camera). The base cone only fades the
+  // camera→player segment, so without this any building between the camera and
+  // the grave hard-occludes the shot's actual subject. A low + raised ray pair
+  // catches both the grave slab and a mourner/marker standing at it.
+  if (focusPoint) {
+    targets.push(new THREE.Vector3(focusPoint.x, 0.6, focusPoint.z));
+    targets.push(new THREE.Vector3(focusPoint.x, 1.6, focusPoint.z));
+  }
   const rays = targets.map((t) => {
     const dir = t.clone().sub(cameraPoint);
     return { ray: new THREE.Ray(cameraPoint, dir.clone().normalize()), dist: dir.length() };
@@ -1819,8 +1852,12 @@ let liveJobView = null;
 function syncProductionHud(refs, loopState = {}, encounterState = null) {
   if (!refs) return;
   const phase = loopState.phase || "spawn";
-  const index = Math.max(0, LOOP_PHASES.indexOf(phase));
-  const total = Math.max(1, LOOP_PHASES.length - 1);
+  // Mission-aware beat count: during mission 1.1 (funeral/implant) the active
+  // phase isn't in the default LOOP_PHASES, so derive index/total from the
+  // mission's own phase list instead of clamping to 0.
+  const phaseProgress = getPhaseProgress(phase, loopState.activeMission);
+  const index = phaseProgress.index;
+  const total = Math.max(1, phaseProgress.total - 1);
   const beats = loopState.routeBeats || {};
   if (refs.activeJobLine) {
     refs.activeJobLine.textContent = phase === "slime_fight" && encounterState
@@ -2342,7 +2379,7 @@ function createSpikeSnapshot() {
     mode: "playing",
     time: 8,
     player: { x: PLAYER_SPAWN.x, y: PLAYER_SPAWN.y, angle: 0, inHouse: false },
-    regions: { activeRegion: "frontier", activeRegionLabel: "Dustward Frontier", poisDiscovered: [] },
+    regions: { activeRegion: "frontier", activeRegionLabel: "Westward Frontier", poisDiscovered: [] },
     inventory: {},
     quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
     weather: { kind: "clear", rain: 0, fog: 0.18, wind: 0.15, lightning: 0, quality: "high" },
@@ -2382,6 +2419,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // its summary over a fresh scene; no/corrupt save → fresh run.
   const loadedRun = visualCapture ? null : await loadRun().catch(() => null); // belt-and-braces: resume can never block boot
   const resumeRun = loadedRun && loadedRun.mode === "playing" ? loadedRun : null;
+  // Restore persisted region/POI discovery into the live snapshot (symmetric with
+  // the world.poisDiscovered we write in currentRunPayload).
+  if (resumeRun && Array.isArray(resumeRun.world?.poisDiscovered) && snapshot.regions) {
+    snapshot.regions.poisDiscovered = [...resumeRun.world.poisDiscovered];
+  }
   // Fresh runs open at mission 1.1 "Dust to Dust" — the funeral is the new
   // opening (treatment §Opening). Resumes restore their saved loopState (which
   // carries activeMission), and a pre-mission save with no activeMission still
@@ -2436,7 +2478,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // clouds, water, weather, film grain) for a stable pixelmatch baseline.
   const debugPlayerMarker =
     typeof location !== "undefined" && new URLSearchParams(location.search).has("debugPlayerMarker");
-  const clock = createWorldClock({ dayTime: 0 }); // open at full daylight (de-orange anchor)
+  const clock = createWorldClock({ dayTime: 0.25 }); // golden-hour boot — warm key/cool shadow, drifts to dusk over ~105s of play
   if (visualCapture) pinClock(clock, "dusk");
   else if (resumeRun && Number.isFinite(resumeRun.world?.dayTime)) clock.dayTime = resumeRun.world.dayTime;
 
@@ -2478,6 +2520,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const modelJobs = [];
   const modelLoadStatus = {};
   const buildingsList = [];
+  // The casket world point (placement y → world z), used by the funeral occlusion
+  // pass so foreground town buildings fade and the grave reads.
+  const graveProp = snapshot.worldObjects.find((p) => p.kind === "gravesite");
+  const graveFocusPoint = graveProp ? { x: graveProp.x, z: graveProp.y } : null;
   const recordModelLoad = (kind, url, loaded) => {
     const current = modelLoadStatus[kind] || { kind, url, loadedCount: 0, fallbackCount: 0, total: 0 };
     current.url = url || current.url;
@@ -2560,7 +2606,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     }
   }
 
-  // Connect buildings with power cables (Dustward procedural dressing; WebGPU only — WebGL2 bans lines)
+  // Connect buildings with power cables (Westward procedural dressing; WebGPU only — WebGL2 bans lines)
   if (backend === "webgpu") {
     for (let i = 1; i < buildingsList.length; i++) {
       const b1 = buildingsList[i - 1];
@@ -2675,7 +2721,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // third-person follow is untouched — this only applies under capture.
   function applyHeroCamera() {
     camera.fov = 53;
-    // DUSTWARD v2 frame: on the road just inside the gate arch, aimed east down
+    // WESTWARD v2 frame: on the road just inside the gate arch, aimed east down
     // the dense main street — board plaza, lantern wires, and the church bend
     // read in one vista. (The old pose at (5.1, 13.4) ended up inside the
     // relocated south-west hero buildings after the town rebuild.)
@@ -2931,6 +2977,26 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     });
   }
 
+  // The six HUD panels boot with .hud-hidden (declared in index.html). On Ride we
+  // arm the transition (.hud-reveal) and lift the hidden class in a stagger so the
+  // HUD blooms in as the establishing push-in plays — the first look is the world,
+  // not a wall of UI. Ordered: objective+map first (where am I / what to do), then
+  // identity, then controls, then the jobs list as the push-in settles.
+  const HUD_PANEL_IDS = ["hero-panel", "field-map", "job-tracker", "objective", "hotbar", "command-dock"];
+  function revealHudPanels() {
+    HUD_PANEL_IDS.forEach((id) => document.getElementById(id)?.classList.add("hud-reveal"));
+    const show = (id, delay) => {
+      const el = document.getElementById(id);
+      if (el) setTimeout(() => el.classList.remove("hud-hidden"), delay);
+    };
+    show("objective", 700);
+    show("field-map", 700);
+    show("hero-panel", 1100);
+    show("hotbar", 1500);
+    show("command-dock", 1500);
+    show("job-tracker", 1900);
+  }
+
   // Title screen: Ride dismisses it, which unlocks audio (the click is the
   // gesture — the harmonica sting lands right on the reveal), grabs pointer
   // lock, and releases the establishing push-in (held while titleOpen).
@@ -2939,6 +3005,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   if (titleScreen) {
     if (visualCapture) {
       titleScreen.remove(); // golden baseline must never see the overlay
+      // No staggered reveal under capture — show the HUD immediately so a manual
+      // ?visual load isn't stuck behind .hud-hidden (the capture script also
+      // display:none's the panels, so the golden frame is unaffected either way).
+      HUD_PANEL_IDS.forEach((id) => document.getElementById(id)?.classList.remove("hud-hidden"));
     } else {
       titleOpen = true;
       const startButton = titleScreen.querySelector("#title-start");
@@ -2946,6 +3016,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         titleOpen = false;
         titleScreen.classList.add("dismissed");
         setTimeout(() => titleScreen.remove(), 1000); // matches the CSS fade
+        revealHudPanels();
         const canvasEl = document.getElementById("scene");
         if (canvasEl?.requestPointerLock) {
           try {
@@ -3067,6 +3138,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         return wp || null;
       },
       waypoints: () => FIRST_FIVE_ROUTE.map((p) => p.kind),
+      // Snap the follow-cam to sit behind a given heading (radians; 0 = facing
+      // forward (0,-1) = north, +PI/2 = east). For establishing captures.
+      setHeading: (yaw = 0) => { player.resetCameraBehind(yaw); return yaw; },
 
       // --- Live visual tuning — apply instantly, no reload ---
 
@@ -3112,6 +3186,22 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       setCamera(params) {
         player.setCameraPreset("shoulder", params);
         console.log("[__spike] camera preset updated", params);
+      },
+
+      // Dial the funeral graveside camera live (only visible during the funeral cold-
+      // open). Offsets are from the grave; settled = grave+(dx,dy,dz), wide adds
+      // (wdx,wdy,wdz), gaze aims at lookY. Example, pull the camera further east + up:
+      //   __spike.setFuneralCam({ dx: 8, dy: 3.4 })   then  __spike.dumpFuneralCam()
+      setFuneralCam(params = {}) {
+        Object.assign(funeralCam, params);
+        console.log("[__spike] funeralCam", JSON.stringify(funeralCam));
+        return { ...funeralCam };
+      },
+      // Print the current funeral-camera offsets — paste into the funeralCam default.
+      dumpFuneralCam() {
+        const out = JSON.stringify(funeralCam, null, 2);
+        console.log("[__spike] dumpFuneralCam:\n" + out);
+        return out;
       },
 
       // Print all current visual params as JSON — copy-paste into timeOfDay.js to persist.
@@ -3440,7 +3530,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // The preset the camera rests at when no beat focus is running: tight combat
   // framing while the slime encounter is live, over-the-shoulder otherwise.
   const restingPreset = () =>
-    loopState.phase === "funeral" ? "graveside" : loopState.phase === "slime_fight" ? "combat" : "shoulder";
+    loopState.phase === "funeral" || loopState.phase === "implant"
+      ? "graveside"
+      : loopState.phase === "slime_fight" ? "combat" : "shoulder";
 
   const handleJobBoard = () => {
     focusBeat(loopState.phase === "return_to_boone" ? "objective" : "inspection", 1.0);
@@ -3521,19 +3613,13 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (loopState.phase === "slime_tell") advance("spot_slime_tell");
     beatToast.show("Ambush", "The marsh trail shivers. Strike the Road Slime.");
   };
-  const handleRoadSlime = () => {
-    if (loopState.phase !== "slime_fight") return;
-    if (encounter.strike(player.position)) {
-      const state = encounter.getState(player.position);
-      focusBeat(state.defeated ? "objective" : "inspection", state.defeated ? 0.8 : 0.45);
-      if (!state.defeated) {
-        // Death toast (with the gib loot summary) comes from onSlimeDeath.
-        beatToast.show("Road Slime Hit", `${state.hitCount}/${state.maxHp} strikes landed. Keep it pinned.`);
-      }
-      syncLiveFieldMap();
-      interaction.update(player.position);
-    }
-  };
+  // Real-time combat owns the slime fight: trySwing() → playerCombat hitbox →
+  // encounter.registerHit() in the update loop is the SOLE live damage path.
+  // This interaction handler used to also call encounter.strike() on the same E
+  // press, landing a second hit ~0.12s later (the 3-HP slime died in ~2 taps).
+  // It now defers entirely to the swing. (encounter.strike() is retained for the
+  // driveToPhase debug helper and the unit tests.)
+  const handleRoadSlime = () => {};
   const handleBrokenWagon = () => {
     if (loopState.phase !== "wagon_salvage") return;
     focusBeat("inspection", 0.95);
@@ -3560,7 +3646,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       npcSpeechT = 6;
       setPromptText(npcSpeechMsg);
       beatToast.show("Neural Sync", "The Executor is live. Your father is in your skull now.");
-      // Implant done — ride into town; drop to the normal first-road spawn + cam.
+      // Implant done — ride into town; release the casket gaze and drop to the
+      // normal first-road spawn + cam.
+      player.setLookTarget(null);
       player.setPosition({ x: PLAYER_SPAWN.x, z: PLAYER_SPAWN.y });
       player.resetCameraBehind(-0.9);
       player.setCameraPreset("shoulder");
@@ -3837,7 +3925,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       time: runElapsed,
       player: { x: pos.x, z: pos.z, yaw: Number.isFinite(player?.yaw) ? player.yaw : 0 },
       loopState: { ...snap, encounterState },
-      world: { dayTime: clock.dayTime, weatherKind: snapshot.weather?.kind || "clear" },
+      world: {
+        dayTime: clock.dayTime,
+        weatherKind: snapshot.weather?.kind || "clear",
+        poisDiscovered: snapshot.regions?.poisDiscovered || [],
+      },
       runStats: { startedAt: runStartedAt, phaseReached: snap.phase },
       game: buildGameSaveSlice(game),
       ...overrides,
@@ -3905,8 +3997,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       seed: Date.now(),
       time: 0,
       player: { x: snapshot.player.x, z: snapshot.player.y, yaw: 0 },
-      loopState: createLoopStateMachine().state,
-      world: { dayTime: 1 / 3, weatherKind: snapshot.weather?.kind || "clear" },
+      // Match the fresh-boot path (line ~2432): a new run must carry the dust_to_dust
+      // mission so the respawn replays the funeral cold-open instead of booting at "spawn".
+      loopState: createLoopStateMachine({ activeMission: "dust_to_dust" }).state,
+      world: { dayTime: 0.25, weatherKind: snapshot.weather?.kind || "clear" }, // golden-hour opening, same as a fresh boot
       runStats: { startedAt: Date.now() },
     });
     writeRun(fresh).finally(() => { if (typeof location !== "undefined") location.reload(); });
@@ -3940,8 +4034,26 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // settles correctly even if rAF is throttled (e.g. a backgrounded tab renders only
   // sparse frames — each still computes true elapsed time and lands settled).
   let camIntroStart = null;
-  const CAM_INTRO_DUR = 2.4;
+  const CAM_INTRO_DUR = 3.2; // a touch longer so the board reveal breathes (wall-clock driven, throttle-safe)
   let camIntroSettled = false;
+  // The opening reveal aims the gaze at Boone's lit job board (the first objective)
+  // as the camera eases in — instead of staring down the empty road past it. Only on
+  // a genuine fresh spawn; a resumed run that repositions the player skips the reveal.
+  const introRevealEligible = !(resumeRun && Number.isFinite(resumeRun.player?.x) && Number.isFinite(resumeRun.player?.z));
+  const introLookTarget = { x: openingTarget.x + 0.3, y: 1.5, z: openingTarget.y + 0.1 };
+  // Funeral cold-open: a bespoke, fixed graveside camera (NOT the follow-cam, whose
+  // behind-the-player vantage sits inside the town and jams against a storefront
+  // wall). It looks DOWN at the casket from above the rooftops, so ground + grave +
+  // mourner + long golden-hour shadows fill the frame — no wall — and eases in once
+  // the player Rides past the title. graveLookTarget is the casket aim point.
+  const FUNERAL_INTRO_DUR = 4.0;
+  const graveLookTarget = graveFocusPoint ? { x: graveFocusPoint.x, y: 0.85, z: graveFocusPoint.z } : null;
+  let funeralCamStart = null; // wall-clock start of the graveside ease (set on first post-Ride frame)
+  // Tunable graveside-camera offsets from the grave (live-dial via __spike.setFuneralCam,
+  // then dumpFuneralCam to persist). Settled = grave + (dx,dy,dz); wide establishing
+  // adds (wdx,wdy,wdz); the gaze aims at (grave.x, lookY, grave.z). Default: an east-
+  // side profile that clears the Back Row buildings between the player and the grave.
+  const funeralCam = { dx: 6.5, dy: 2.8, dz: 1.5, wdx: 2.0, wdy: 1.4, wdz: 1.0, lookY: 0.85 };
   function loop(now = performance.now()) {
     // dt in seconds, clamped to keep big tab-resume jumps from teleporting.
     // Hit-stop scales the loop dt on a connecting strike (freeze-frame punch); the
@@ -3949,12 +4061,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     const rawDt = Math.min((now - prevTs) / 1000, 0.05);
     prevTs = now;
     const dt = visualCapture ? rawDt : rawDt * hitStop.scale(rawDt);
-    if (!camIntroSettled && loopState.phase === "funeral") {
-      // The funeral opens on the composed graveside framing — NOT the wide push-in,
-      // which would frame the whole heavy landmark cluster (the chapel/windmill/
-      // water-tower beside the grave). That wide first frame is both the wrong,
-      // un-quiet tone for a burial and a SwiftShader compile storm. Settle once.
-      player.setCameraPreset("graveside");
+    if (!camIntroSettled && (loopState.phase === "funeral" || loopState.phase === "implant")) {
+      // The funeral framing is owned by the bespoke graveside camera applied after
+      // player.update (below) — the follow-cam's behind-the-player vantage sits in
+      // the town and jams against a storefront wall. Just mark the establishing
+      // intro handled so the road push-in doesn't fire when the funeral ends.
       camIntroSettled = true;
     } else if (!camIntroSettled && !visualCapture && !titleOpen && beatFocusTimer === 0 && !boardModalController.isOpen()) {
       if (camIntroStart === null) camIntroStart = now; // first eligible frame
@@ -3962,17 +4073,47 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       const k = Math.pow(1 - Math.min(1, elapsed / CAM_INTRO_DUR), 2); // ease-out
       const base = CAMERA_PRESETS.shoulder;
       if (k > 0.004) {
+        // Lock the gaze on the board so the push-in REVEALS it. The lookAhead
+        // override is gone — the gaze target now composes the frame, so the eye
+        // is led to the objective rather than overshooting down the road.
+        if (introRevealEligible) player.setLookTarget(introLookTarget);
         player.setCameraPreset("shoulder", {
-          distance: base.distance + k * 7.5,
-          height: base.height + k * 4.6,
-          lookAhead: base.lookAhead + k * 2.6,
+          distance: base.distance + k * 6.0,
+          height: base.height + k * 3.2,
         });
       } else {
         player.setCameraPreset("shoulder"); // settle to the gameplay preset once
+        if (introRevealEligible) player.setLookTarget(null); // release gaze to normal follow
         camIntroSettled = true;
       }
     }
     if (!boardModalController.isOpen()) player.update(dt, proxies);
+    // Bespoke graveside camera for the funeral cold-open — overrides the follow-cam
+    // (whose behind-the-player vantage jams against a town wall). The grave (15,-4)
+    // is boxed in: the Back Row buildings sit between the player and the grave to the
+    // SOUTH, mesas to the north — so the only clean sightline is from the EAST, at
+    // the grave's own latitude (open ground; the line clears the back row). A low
+    // profile look down the casket toward the headstone cross, mourner in frame,
+    // long golden-hour shadows. Held wide behind the title, eases in once the player
+    // Rides. visualCapture boots at the road (not funeral), so the baseline is safe.
+    if (graveLookTarget && !visualCapture && (loopState.phase === "funeral" || loopState.phase === "implant")) {
+      let e; // 0 = wide establishing, 1 = settled
+      if (titleOpen) {
+        e = 0; // hold the wide establishing frame behind the title
+      } else {
+        if (funeralCamStart === null) funeralCamStart = now; // first frame after Ride
+        const t = Math.min(1, (now - funeralCamStart) / FUNERAL_INTRO_DUR);
+        e = 1 - Math.pow(1 - t, 2); // ease-out
+      }
+      const g = graveLookTarget;
+      const w = 1 - e; // wide-establishing weight
+      camera.position.set(
+        g.x + funeralCam.dx + w * funeralCam.wdx, // east of the grave, drifting in
+        funeralCam.dy + w * funeralCam.wdy,       // low profile, settling lower
+        g.z + funeralCam.dz + w * funeralCam.wdz, // just north of the back row → clear sightline
+      );
+      if (camera.lookAt) camera.lookAt(g.x, funeralCam.lookY, g.z);
+    }
     // The tight ±18u shadow frustum rides with the player — without this the
     // marsh/wagon half of the 95u route renders with NO sun shadows at all.
     atmosphere.setShadowFocus(player.position.x, player.position.z);
@@ -3981,7 +4122,14 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       if (beatFocusTimer === 0) player.setCameraPreset(restingPreset());
     }
     if (visualCapture) applyHeroCamera(); // re-assert hero pose (player.update re-syncs the follow-cam)
-    updateOcclusionFades(placementNodes, camera, player.position);
+    // During the burial the camera sits in the town and the casket is behind the
+    // hero — fade anything between the camera and the grave so the shot's subject
+    // (the casket) reads instead of the general store's back wall.
+    const funeralFocus =
+      (loopState.phase === "funeral" || loopState.phase === "implant") && graveFocusPoint
+        ? graveFocusPoint
+        : null;
+    updateOcclusionFades(placementNodes, camera, player.position, funeralFocus);
     interaction.update(player.position);
     fieldMapLiveSyncT -= dt;
     if (fieldMapLiveSyncT <= 0) {

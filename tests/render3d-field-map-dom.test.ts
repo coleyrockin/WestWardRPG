@@ -88,26 +88,26 @@ describe("world minimap model", () => {
   it("POI ids and labels match the WORLD_MAP_POIS spec", () => {
     const model = buildFieldMapWorldModel({}, {});
     const byId = new Map(model.pois.map((p: any) => [p.id, p]));
-    expect(byId.has("dustward")).toBe(true);
+    expect(byId.has("westward")).toBe(true);
     expect(byId.has("eastwater")).toBe(true);
     expect(byId.has("folly")).toBe(true);
     expect(byId.has("wash")).toBe(true);
     expect(byId.has("westPass")).toBe(true);
     expect(byId.has("calico")).toBe(true);
-    expect(byId.get("dustward")?.label).toBe("Dustward");
+    expect(byId.get("westward")?.label).toBe("Westward");
     expect(byId.get("calico")?.label).toBe("Calico Flats");
     expect(byId.get("eastwater")?.label).toBe("Eastwater Ranch");
     expect(byId.get("folly")?.label).toBe("Prospector's Folly");
   });
 
-  it("Dustward is warmer (#ffd77b) and larger than other POIs", () => {
+  it("Westward is warmer (#ffd77b) and larger than other POIs", () => {
     const model = buildFieldMapWorldModel({}, {});
     const byId = new Map(model.pois.map((p: any) => [p.id, p]));
-    const dustward = byId.get("dustward");
-    const others = model.pois.filter((p: any) => p.id !== "dustward");
-    expect(dustward?.color).toBe("#ffd77b");
+    const westward = byId.get("westward");
+    const others = model.pois.filter((p: any) => p.id !== "westward");
+    expect(westward?.color).toBe("#ffd77b");
     for (const other of others) {
-      expect(dustward!.size).toBeGreaterThan(other.size);
+      expect(westward!.size).toBeGreaterThan(other.size);
     }
   });
 

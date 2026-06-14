@@ -53,7 +53,7 @@ describe("render3d objective DOM helpers", () => {
 
     syncObjectiveDom(
       refs,
-      { region: { label: "Dustward Frontier" } },
+      { region: { label: "Westward Frontier" } },
       {
         phase: "road_walk",
         objectiveLabel: "Follow The Marshal Road",
@@ -70,7 +70,20 @@ describe("render3d objective DOM helpers", () => {
     ]);
     expect(refs.progressLabel?.textContent).toBe("Road beat 4/10");
     expect(refs.progressFill?.style.width).toBe("33%");
-    expect(refs.tag?.textContent).toBe("WestWard · Dustward Frontier · road_walk");
+    expect(refs.tag?.textContent).toBe("Dustwater · Westward Frontier · road_walk");
+  });
+
+  it("reads mission-aware progress during the Dust to Dust funeral/implant beats", () => {
+    const doc = makeDocument();
+    const refs = createObjectiveDomRefs(doc);
+
+    // funeral is beat 1 of the 12-phase dust_to_dust chain — not a default-loop phase
+    syncObjectiveDom(refs, {}, { phase: "funeral", activeMission: "dust_to_dust" });
+    expect(refs.progressLabel?.textContent).toBe("Road beat 1/12");
+    expect(refs.progressFill?.style.width).toBe("0%");
+
+    syncObjectiveDom(refs, {}, { phase: "implant", activeMission: "dust_to_dust" });
+    expect(refs.progressLabel?.textContent).toBe("Road beat 2/12");
   });
 
   it("falls back to snapshot objective copy when no loop state is supplied", () => {
@@ -78,7 +91,7 @@ describe("render3d objective DOM helpers", () => {
     const refs = createObjectiveDomRefs(doc);
 
     syncObjectiveDom(refs, {
-      region: { label: "Dustward Frontier" },
+      region: { label: "Westward Frontier" },
       objective: { title: "Mission", currentTarget: "Boone", nextAction: "Open board" },
     });
 

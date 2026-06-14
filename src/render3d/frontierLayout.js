@@ -1,4 +1,4 @@
-// Data-driven placement records for the Dustward (frontier) opening scene.
+// Data-driven placement records for the Westward (frontier) opening scene.
 //
 // Source of truth for the dressing offsets is REGION_PRESENTATION.frontier in
 // src/regionVisualIdentity.js; hero-object world positions come from
@@ -36,7 +36,7 @@ export const FIRST_ROAD_ART_STYLE = Object.freeze({
 });
 
 export const FIRST_FIVE_ROUTE = Object.freeze([
-  { kind: "spawn", label: "Dustward Spawn", x: PLAYER_SPAWN.x, y: PLAYER_SPAWN.y },
+  { kind: "spawn", label: "Westward Spawn", x: PLAYER_SPAWN.x, y: PLAYER_SPAWN.y },
   { kind: "jobBoard", label: "Boone's Job Board", x: 13.0, y: 5.65 },
   { kind: "roadSign", label: "Marshal Road Sign", x: 24.0, y: 6.3 },
   { kind: "townBark", label: "Town Edge Warning", x: 32.0, y: 9.2 },
@@ -215,7 +215,7 @@ const HERO_OBJECTS = [
   { kind: "roadSlime",   label: "Road Slime",        x: 53.5, y: 15.0, color: "#7fd06a", size: 0.9 },
   { kind: "brokenWagon", label: "Broken Wagon",      x: 60.5, y: 12.2, color: "#b9824d", size: 1.2 },
   { kind: "gravesite",   label: "Abram's Casket",    x: 15.0, y: -4.0, color: "#4f3a2c", size: 1.0 },
-  { kind: "steelMustang", label: "Steel Mustang Mount", x: 16.2, y: 12.0, color: "#7f8c8d", size: 1.1, yaw: -1.2 },
+  { kind: "steelMustang", label: "Steel Mustang Mount", x: 16.2, y: 12.0, color: "#8a8f7d", size: 1.1, yaw: -1.2 },
 ];
 
 // --- Bigger-world expansion -------------------------------------------------
@@ -231,14 +231,14 @@ const HERO_OBJECTS = [
 // Walkable town edge to the NW of spawn — spread along a proper main street so
 // buildings don't overlap (each saloon/store is ~2.8 units wide at scale 1.0-1.35,
 // so min 3.5 units clear between centres; larger buildings need 4+).
-// DUSTWARD v2 — west approach. The hero-model trio now WELCOMES you to town
+// WESTWARD v2 — west approach. The hero-model trio now WELCOMES you to town
 // (it used to hide at x≈-6 behind the spawn camera): saloon + assay flank the
 // north side of the road in, the dry-goods store answers from the south, and
-// the DUSTWARD gate arch (procedural, spike.js buildTownGate) spans the road
+// the WESTWARD gate arch (procedural, spike.js buildTownGate) spans the road
 // at x 7.6 — posts on the frontage lines, lane clear. All heroTown* centers
 // sit west of x 5.5 so the slab-blocker audit box never sees them.
 const TOWN_EDGE = [
-  { kind: "townGate",       label: "Dustward Gate Arch", x: 7.6, y: 8.9,  color: "#6b4a2c", size: 1.0 },
+  { kind: "townGate",       label: "Westward Gate Arch", x: 7.6, y: 8.9,  color: "#6b4a2c", size: 1.0 },
   { kind: "heroTownSaloon", label: "Westgate Saloon",    x: 2.6, y: 3.4,  color: "#a87848", size: 0.92 },
   { kind: "heroTownAssay",  label: "Land & Assay",       x: 5.0, y: 13.2, color: "#886038", size: 0.68, yaw: Math.PI },
   { kind: "heroTownStore",  label: "Pioneer Dry Goods",  x: 2.4, y: 13.1, color: "#9a7840", size: 0.78, yaw: Math.PI },
@@ -249,7 +249,7 @@ const TOWN_EDGE = [
 ];
 
 const PRODUCTION_MAIN_STREET = [
-  // DUSTWARD v2 — NORTH frontage. One dense street wall: centers on y≈3.6 so
+  // WESTWARD v2 — NORTH frontage. One dense street wall: centers on y≈3.6 so
   // fronts land at y≈4.1, shoulder-to-shoulder from the gate to the church bend.
   // The frontage BREAKS at x 12.8–15.6 for the board plaza (the town square the
   // first mission starts in). production* kinds are slab-audit-exempt, so this
@@ -257,7 +257,7 @@ const PRODUCTION_MAIN_STREET = [
   // building outside the spawn→board camera wedge (y ≥ 6.5).
   { kind: "productionStore", label: "Lamp Dry Goods", x: 9.2, y: 3.6, color: "#9a7840", size: 0.84, yaw: 0 },
   { kind: "productionAssay", label: "Boone Assay", x: 12.0, y: 3.7, color: "#886038", size: 0.78, yaw: 0 },
-  { kind: "productionStore", label: "Dustward Mercantile", x: 16.4, y: 3.7, color: "#8a6a3c", size: 0.84, yaw: 0 },
+  { kind: "productionStore", label: "Westward Mercantile", x: 16.4, y: 3.7, color: "#8a6a3c", size: 0.84, yaw: 0 },
   { kind: "productionSaloon", label: "Drifter Saloon", x: 22.4, y: 3.6, color: "#a87848", size: 0.8, yaw: 0 },
   // Continuous north boardwalk, gate to bend.
   { kind: "productionBoardwalk", label: "North Boardwalk", x: 8.6, y: 4.5, color: "#5d3f24", size: 0.92, yaw: 0 },
@@ -276,12 +276,12 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "windowGlowPanel", label: "Drifter Glow", x: 21.9, y: 4.15, color: "#ff9f5d", size: 0.8, yaw: 0 },
   { kind: "lanternString", label: "North Lantern String", x: 10.4, y: 4.4, color: "#ffb866", size: 0.9, yaw: 0 },
 
-  // DUSTWARD v2 — SOUTH frontage, mirrored (yaw π), centers on y≈12.9 so fronts
+  // WESTWARD v2 — SOUTH frontage, mirrored (yaw π), centers on y≈12.9 so fronts
   // land at y≈12.4 — face-to-face street width ≈ 8.3u instead of the old ~13.5u
   // plain. The grand Frontier Hotel (procedural landmark) anchors x 18.4 facing
   // the Lucky Lantern saloon across the street.
   { kind: "productionSaloon", label: "South Porch Saloon", x: 10.0, y: 12.9, color: "#7a5230", size: 0.8, yaw: Math.PI },
-  { kind: "productionStore", label: "Dustward Hotel Annex", x: 11.8, y: 13.0, color: "#9a7144", size: 0.86, yaw: Math.PI },
+  { kind: "productionStore", label: "Westward Hotel Annex", x: 11.8, y: 13.0, color: "#9a7144", size: 0.86, yaw: Math.PI },
   { kind: "productionAssay", label: "Marshal Office", x: 15.0, y: 12.9, color: "#6a4630", size: 0.74, yaw: Math.PI },
   { kind: "productionStore", label: "Roadside Undertaker", x: 21.8, y: 12.9, color: "#70452f", size: 0.78, yaw: Math.PI },
   { kind: "productionBoardwalk", label: "South Boardwalk", x: 7.4, y: 11.9, color: "#5d3f24", size: 0.88, yaw: Math.PI },
@@ -331,7 +331,7 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "bountyEmblem", label: "Boone Bounty Emblem", x: 13.0, y: 4.6, color: "#ffd77b", size: 0.75, yaw: Math.PI / 2 },
 ];
 
-// Cross-street spur — DUSTWARD v2: a north alley out of the board plaza between
+// Cross-street spur — WESTWARD v2: a north alley out of the board plaza between
 // the Assay and the Mercantile, leading back to the water-tower yard. Gives the
 // plaza an exit and the second row a reason to exist.
 const CROSS_STREET = [
@@ -507,7 +507,7 @@ const BOARD_PLAZA = [
 // the road at the town edge, x>21 so it's outside the production-count box). Geometry
 // + collision walls share SALOON_DIMS (spike.js buildWalkInSaloon / worldProxies).
 const WALKIN_SALOON = [
-  // DUSTWARD v2: the one enterable building moves from its old orphan lot into
+  // WESTWARD v2: the one enterable building moves from its old orphan lot into
   // the north frontage as the mid-street anchor — door meets the boardwalk,
   // facing the Frontier Hotel across the street.
   { kind: "walkInSaloon", label: "The Lucky Lantern Saloon", x: 19.3, y: 2.7, color: "#6b4a2c", size: 1.0 },
@@ -518,16 +518,16 @@ const WALKIN_SALOON = [
 // the rooftops as a varied silhouette: a church spire, a grand hotel, a water tower,
 // a blacksmith chimney, and a prairie windmill. Each has a real collision footprint
 // (worldProxies). North of the first-frame wedge; none are slab-blocker kinds.
-// DUSTWARD v2 — landmarks join the street instead of hiding behind it:
+// WESTWARD v2 — landmarks join the street instead of hiding behind it:
 // the church CLOSES the main-street vista at the eastern bend (visible from the
 // gate), the grand hotel faces the walk-in saloon, the forge takes the SE
 // corner lot with its coal glow facing the street, the water tower rises
 // behind the north row, and the windmill keeps the far-east skyline.
 const LANDMARK_BUILDINGS = [
-  { kind: "church",     label: "Dustward Chapel",     x: 26.2, y: 3.4,  color: "#cdb89a", size: 1.1 },
+  { kind: "church",     label: "Westward Chapel",     x: 26.2, y: 3.4,  color: "#cdb89a", size: 1.1 },
   { kind: "hotel",      label: "The Frontier Hotel",  x: 18.4, y: 13.6, color: "#8a5a3a", size: 1.0, yaw: Math.PI },
   { kind: "waterTower", label: "Town Water Tower",    x: 20.8, y: 0.6,  color: "#6e5236", size: 1.2 },
-  { kind: "blacksmith", label: "Dustward Forge",      x: 24.8, y: 13.8, color: "#463528", size: 1.0 },
+  { kind: "blacksmith", label: "Westward Forge",      x: 24.8, y: 13.8, color: "#463528", size: 1.0 },
   { kind: "windmill",   label: "Prairie Windmill",    x: 42.0, y: 0.2,  color: "#7a5c3a", size: 1.1 },
 ];
 
@@ -574,7 +574,7 @@ function world(anchor, dx, dy, depthLane) {
 }
 
 // ---------- OPEN RANGE (P4) — the big world beyond the first road ----------
-// The authored Dustward + first-road slice (x −12..74, y −10..31) is untouched;
+// The authored Westward + first-road slice (x −12..74, y −10..31) is untouched;
 // everything below dresses the range AROUND it. All generation is deterministic
 // (hash01) so layouts are stable across boots and testable.
 
@@ -588,7 +588,7 @@ export const OPEN_RANGE_ROADS = Object.freeze([
   { from: { x: 60.5, y: 12.2 }, to: { x: 88, y: 13.6 }, width: 5.4 },
   { from: { x: 88, y: 13.6 }, to: { x: 114, y: 13.2 }, width: 5.2 },
   { from: { x: 114, y: 13.2 }, to: { x: 131, y: 14.0 }, width: 5.6 },
-  // west: Dustward gate → the West Pass → Calico Flats (the free town, town 2)
+  // west: Westward gate → the West Pass → Calico Flats (the free town, town 2)
   { from: { x: 7.6, y: 8.9 }, to: { x: -14, y: 8.6 }, width: 5.6 },
   { from: { x: -14, y: 8.6 }, to: { x: -34, y: 8.2 }, width: 5.0 },
   { from: { x: -34, y: 8.2 }, to: { x: -44, y: 9.0 }, width: 5.0 },
@@ -604,7 +604,7 @@ export const OPEN_RANGE_ROADS = Object.freeze([
 // Named points of interest for the world minimap. Coordinates are world-space
 // (same system as OPEN_RANGE_BOUNDS: +x east, +y south).
 export const WORLD_MAP_POIS = Object.freeze([
-  { id: "dustward",   label: "Dustward",           x: 13,    y: 8    },
+  { id: "westward",   label: "Westward",           x: 13,    y: 8    },
   { id: "eastwater",  label: "Eastwater Ranch",    x: 128,   y: 12   },
   { id: "folly",      label: "Prospector's Folly", x: 33.5,  y: -29.5 },
   { id: "wash",       label: "Sunken Wash",         x: 76.5,  y: 58.5 },
@@ -696,7 +696,7 @@ const CALICO_FLATS = [
   // own name, not town 1's.
   { kind: "townGate",     label: "Calico Flats Gate",       x: -44.0, y: 9.0,  color: "#6b4a2c", size: 0.95, signLines: ["CALICO FLATS"] },
   // Foreground frame — a snag + cart flank the eastern approach like theater wings,
-  // adding depth to the flat frontal view (mirrors Dustward's FOREGROUND_FRAME). Off
+  // adding depth to the flat frontal view (mirrors Westward's FOREGROUND_FRAME). Off
   // the road lane (band y≈6.4–11.6 at width 5.2); east of the gate posts.
   { kind: "deadTree",     label: "Calico Approach Snag",     x: -41.0, y: 5.0,  color: "#3e3224", size: 1.2 },
   { kind: "cart",         label: "Calico Approach Cart",     x: -41.0, y: 12.2, color: "#a87542", size: 0.78, yaw: 0.5 },
@@ -704,7 +704,7 @@ const CALICO_FLATS = [
   // Centers pulled to ~3.7u so the three masses read as one contiguous row (the
   // town's identity-defining "neutral saloon row"), not detached boxes. Bleached,
   // sun-scoured body+trim+roof (bodyTint/trimTint/roofTint) set Calico apart from
-  // Dustward's warm amber; the two saloons wear neon-on-clapboard signs (the free
+  // Westward's warm amber; the two saloons wear neon-on-clapboard signs (the free
   // town's lawless glow). Drovers' wears a rusty-red roof for accent relief.
   { kind: "saloonFacade", label: "The Neutral Ground Saloon", x: -48.0, y: 5.4, color: "#a87848", size: 0.95, bodyTint: "#b3a585", trimTint: "#8a7e62", roofTint: "#5b5f60" },
   { kind: "saloonFacade", label: "Drovers' Rest Saloon",     x: -51.7, y: 5.2,  color: "#9c6f43", size: 0.9, bodyTint: "#a89a78", trimTint: "#807454", roofTint: "#7a3a2e" },
@@ -729,7 +729,7 @@ const CALICO_FLATS = [
   { kind: "hitchingRail", label: "Saloon Hitching Rail",      x: -51.6, y: 7.0,  color: "#4a3526", size: 0.7,  yaw: 0.04 },
 ];
 
-// CALICO FLATS — composition dressing (M0-safe authored props, Dustward's proven
+// CALICO FLATS — composition dressing (M0-safe authored props, Westward's proven
 // vocabulary; NOT a scatter swarm). Turns the skeleton into a composed free town:
 // boardwalks + warm window-glow + signage give the street life, the gallows is the
 // grim civic landmark the eye lands on ("where bodies get found"), the Sheriff's

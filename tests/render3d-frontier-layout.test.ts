@@ -133,7 +133,7 @@ describe("render3d frontier layout", () => {
     }
   });
 
-  it("keeps the Dustward spawn anchored to the road start", () => {
+  it("keeps the Westward spawn anchored to the road start", () => {
     expect(PLAYER_SPAWN).toEqual({ x: 9.5, y: 8.5 });
   });
 

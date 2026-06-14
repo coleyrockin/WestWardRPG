@@ -43,7 +43,7 @@ describe("worldProxies — buildProxies", () => {
     const singles = placements.filter((p) => KINDS_THAT_BLOCK.has(p.kind)).length;
     const saloons = placements.filter((p) => p.kind === "walkInSaloon").length;
     const gates = placements.filter((p) => p.kind === "townGate").length;
-    expect(gates).toBeGreaterThan(0); // Dustward v2 has a gateway arch
+    expect(gates).toBeGreaterThan(0); // Westward v2 has a gateway arch
     expect(proxies.length).toBe(singles + saloons * SALOON_WALLS + gates * GATE_POSTS);
   });
 

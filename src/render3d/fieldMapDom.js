@@ -190,10 +190,10 @@ export function buildFieldMapRouteModel(loopState = {}, options = {}) {
 }
 
 // Per-POI visual styles for the world minimap.
-// Dustward is the player hub — warmer and slightly larger.
+// Westward is the player hub — warmer and slightly larger.
 // Others use muted parchment tones that read as distant waypoints.
 const WORLD_POI_STYLES = Object.freeze({
-  dustward:  { color: "#ffd77b", size: 7.2 },
+  westward:  { color: "#ffd77b", size: 7.2 },
   eastwater: { color: "#d4b882", size: 5.8 },
   folly:     { color: "#c9a96e", size: 5.4 },
   wash:      { color: "#b8c49a", size: 5.4 },
@@ -550,7 +550,7 @@ export function syncFieldMapDom(refs, loopState = {}, options = {}) {
   if (typeof svg.replaceChildren === "function") svg.replaceChildren();
   while (svg.firstChild && typeof svg.removeChild === "function") svg.removeChild(svg.firstChild);
 
-  setAttrs(svg, { viewBox: "0 0 220 142", role: "img", "aria-label": "Dustward field map" });
+  setAttrs(svg, { viewBox: "0 0 220 142", role: "img", "aria-label": "Westward field map" });
   const layer = svgNode(refs, "g");
   svg.appendChild(layer);
 

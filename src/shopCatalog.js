@@ -11,8 +11,8 @@
 
 const SELL_RATIO = 0.4; // sell ≈ 40% of buy — deficit-biased baseline
 
-// Dustward Frontier shops:
-//   "merchant"    → Reverend Quill's general store (Dustward Frontier)
+// Westward Frontier shops:
+//   "merchant"    → Reverend Quill's general store (Westward Frontier)
 //   "tradingPost" → Eastwater Ranch trading post (slightly better salvage prices)
 export const SHOP_CATALOGS = Object.freeze({
   merchant: Object.freeze([

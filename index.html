@@ -863,6 +863,7 @@
         font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
         color: var(--hud-text);
         background:
+          linear-gradient(0deg, rgba(255, 180, 100, 0.06), transparent 30%),
           radial-gradient(ellipse at 50% 62%, rgba(210, 114, 56, 0.16), transparent 58%),
           radial-gradient(ellipse at 50% 50%, rgba(8, 6, 14, 0.55), rgba(5, 3, 10, 0.94) 78%);
         backdrop-filter: blur(2px);
@@ -882,11 +883,14 @@
         margin: 0;
         font-size: clamp(54px, 11vw, 118px);
         font-weight: 600;
-        letter-spacing: 0.14em;
+        letter-spacing: 0.2em;
         line-height: 1;
         color: var(--hud-gold);
+        /* Warm gold core + a cool cyan halo — the game's warm-key/cool-shadow
+           palette stated in the logo itself ("neon on clapboard"). */
         text-shadow:
           0 0 38px rgba(255, 184, 90, 0.32),
+          0 0 22px rgba(90, 200, 230, 0.22),
           0 3px 0 rgba(60, 24, 8, 0.85),
           0 7px 24px rgba(0, 0, 0, 0.8);
       }
@@ -911,16 +915,17 @@
         text-transform: uppercase;
         padding: 14px 52px;
         color: var(--hud-text);
+        /* Warm clapboard fill, cool cyan edge — "neon on clapboard." */
         background: linear-gradient(180deg, rgba(150, 74, 32, 0.92), rgba(96, 42, 18, 0.92));
-        border: 1px solid rgba(255, 198, 110, 0.55);
+        border: 1px solid rgba(120, 210, 230, 0.5);
         border-radius: 6px;
-        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35), 0 12px 34px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 230, 180, 0.18);
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35), 0 12px 34px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 230, 180, 0.18), inset 0 0 0 1px rgba(120, 210, 230, 0.18);
         transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
       }
       #title-start:hover {
         transform: translateY(-1px);
         filter: brightness(1.12);
-        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 26px rgba(255, 184, 90, 0.25);
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 26px rgba(255, 184, 90, 0.2), 0 0 14px rgba(120, 210, 230, 0.18);
       }
       #title-screen .title-controls {
         margin: 26px 0 0;
@@ -932,11 +937,26 @@
         color: var(--hud-gold);
         font-weight: 600;
       }
+      /* HUD reveal — the panels start hidden under the title and bloom in, staggered,
+         as the opening push-in plays, so the first look is the world, not a wall of
+         UI. .hud-reveal is added on Ride to arm the transition before .hud-hidden is
+         lifted. #hotbar keeps its translateX(-50%) centering through the rise. */
+      .hud-hidden {
+        opacity: 0;
+        transform: translateY(8px);
+        pointer-events: none;
+      }
+      #hotbar.hud-hidden {
+        transform: translateX(-50%) translateY(8px);
+      }
+      .hud-reveal {
+        transition: opacity 0.5s ease, transform 0.5s ease;
+      }
     </style>
   </head>
   <body>
     <canvas id="scene" role="img" aria-label="Playable Three.js preview of Dustwater's first road slice"></canvas>
-    <div id="hero-panel" class="rpg-panel" aria-label="Player status">
+    <div id="hero-panel" class="rpg-panel hud-hidden" aria-label="Player status">
       <span class="portrait">EC</span>
       <span>
         <span class="hero-name">Ezra Cross</span>
@@ -955,16 +975,16 @@
       </span>
       <span class="job-view">View</span>
     </div>
-    <div id="field-map" aria-label="Dustward field map">
+    <div id="field-map" class="hud-hidden" aria-label="Westward field map">
       <div class="map-topline">
-        <span class="map-title">Dustward Road</span>
+        <span class="map-title">Westward Road</span>
         <span class="map-phase">Road beat 1/10</span>
       </div>
       <svg id="field-map-svg"></svg>
       <span class="map-target">Boone's Job Board</span>
     </div>
-    <div id="tag" aria-hidden="true">Rustwater · Dustward · 3D first road</div>
-    <div id="job-tracker" class="rpg-panel" aria-label="Active jobs">
+    <div id="tag" aria-hidden="true">Dustwater · Westward · 3D first road</div>
+    <div id="job-tracker" class="rpg-panel hud-hidden" aria-label="Active jobs">
       <span class="jobs-kicker">Jobs</span>
       <div class="job-row active">
         <span class="job-dot"></span>
@@ -988,7 +1008,7 @@
       <span class="toast-title"></span>
       <span class="toast-line"></span>
     </div>
-    <div id="objective">
+    <div id="objective" class="hud-hidden">
       <span class="pip"></span>
       <span>
         <span class="label">Follow the Road</span><br />
@@ -1000,7 +1020,7 @@
         </div>
       </span>
     </div>
-    <div id="hotbar" class="rpg-panel" aria-label="Action bar">
+    <div id="hotbar" class="rpg-panel hud-hidden" aria-label="Action bar">
       <span class="slot active">E<small>Use</small></span>
       <span class="slot">F<small>Draw</small></span>
       <span class="slot">R<small>Cam</small></span>
@@ -1008,7 +1028,7 @@
       <span class="slot">2<small>Kit</small></span>
       <span class="slot">3<small>Map</small></span>
     </div>
-    <div id="command-dock" class="rpg-panel" aria-label="Game menus">
+    <div id="command-dock" class="rpg-panel hud-hidden" aria-label="Game menus">
       <button type="button" title="Character">CHR</button>
       <button type="button" title="Inventory">INV</button>
       <button type="button" title="Skills">SKL</button>
@@ -1048,12 +1068,12 @@
         <button class="run-summary-newrun" type="button">Begin a New Run</button>
       </div>
     </div>
-    <div id="title-screen" aria-label="WestWard title screen">
+    <div id="title-screen" aria-label="Dustwater title screen">
       <div>
-        <span class="title-kicker">A story-first frontier road</span>
-        <h1>WESTWARD</h1>
+        <span class="title-kicker">Inherit the water empire &mdash; and what it costs</span>
+        <h1>DUSTWATER</h1>
         <span class="title-rule" aria-hidden="true"></span>
-        <p class="title-line">Dustward &middot; The First Road</p>
+        <p class="title-line">Westward &middot; The First Road</p>
         <button id="title-start" type="button">Ride</button>
         <p class="title-controls"><b>WASD</b> move &middot; <b>Shift</b> run &middot; <b>Space</b> dodge &middot; <b>E</b> use &middot; <b>F</b> draw &middot; <b>M</b> mute</p>
       </div>

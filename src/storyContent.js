@@ -84,8 +84,8 @@ export const DEATH_MESSAGES = [
 export const JOB_BOARD_PRESENTATION = {
   frontier: {
     title: "Marshal Boone's Job Board",
-    subtitle: "Dustward Frontier work: road law, town defense, rescue, and escort pay.",
-    emptyLine: "No posted work in Dustward Frontier.",
+    subtitle: "Westward Frontier work: road law, town defense, rescue, and escort pay.",
+    emptyLine: "No posted work in Westward Frontier.",
     openLine: "Marshal Boone opens the job board.",
   },
   ashfall: {

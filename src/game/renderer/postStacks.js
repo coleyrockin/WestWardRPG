@@ -29,17 +29,18 @@ export const REGION_POST = {
     // Committed comic linework (art doc: "the look has to be LOUD"). The 1.7
     // silhouette-only easing read as no style at all — 2.3 keeps interior faces
     // clean (edgeLo gate) while every silhouette gets a confident line.
-    edgeStrength: 2.3,
+    edgeStrength: 2.5,
     // Sobel response below `edgeLo` is ignored (kills faint ground gradients) and
-    // ramps to full ink by `edgeHi`.
-    edgeLo: 0.06,
-    edgeHi: 0.28,
+    // ramps to full ink by `edgeHi`. Tighter gate (0.06→0.08) culls more faint
+    // gradient lines; narrower ramp (0.28→0.25) makes the ink commit harder.
+    edgeLo: 0.08,
+    edgeHi: 0.25,
     // GTAO: grounds props/buildings where they meet the ground and each other —
     // the "everything floats" fix (art doc pillar 3). Strength is the mix toward
     // the occluded frame; radius in world units (hero ≈ 1.8u tall).
     aoStrength: 0.85,
     aoRadius: 0.5,
-    bloomBase: 0.11, // multiplied by palette.bloom
+    bloomBase: 0.16, // multiplied by palette.bloom — lifted from 0.11 so lamps/slime/beacon/neon read radiant (threshold 0.95 keeps walls/sky crisp)
     bloomRadius: 0.7, // wider painterly glow
     bloomThreshold: 0.95, // only true emissives (lamps/beacon/sun disc) bloom — sky/walls stay crisp
     grainIntensity: 0.05, // grain whisper, not texture (was 0.08)

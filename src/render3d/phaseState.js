@@ -108,7 +108,7 @@ const PHASE_COPY = {
   },
   road_walk: {
     label: "Town Edge",
-    text: "Hear the warning before leaving Dustward's lamp line.",
+    text: "Hear the warning before leaving Westward's lamp line.",
     meta: ["Target: Town edge", "Beat: Local warning"],
     targetKind: "townBark",
     prompt: "E — Hear Pearl's Warning",

@@ -4,7 +4,7 @@ import { getRegionArtKit, resolveWorldDressingForView } from "./regionArtKits.js
 export const REGION_VISUAL_IDENTITIES = {
   frontier: {
     id: "frontier",
-    label: "Dustward Frontier",
+    label: "Westward Frontier",
     mood: "wide, survivable, half-wild",
     dangerIdentity: "Coyotes of commerce, marsh slimes, and civic trouble at sundown.",
     skyTint: "#d8bc6a",
@@ -95,7 +95,7 @@ const REGION_PRESENTATION = {
     readability: {
       roadPull: "wide wagon ruts, bright edge dust, paired lamps, and repeated mileposts point out of town",
       landmarkCue: "North Watchtower beacon should be the tallest first-view shape",
-      wallCue: "Dustward walls need dark contact trim, sunlit upper bands, and fence-shadow decals near the player",
+      wallCue: "Westward walls need dark contact trim, sunlit upper bands, and fence-shadow decals near the player",
       interactableCue: "job board, road signs, and roadside discoveries share warm gold marker language",
     },
     landmark: { kind: "landmark", variant: "watchtower", label: "North Watchtower Beacon", dx: 5.16, dy: -1.66, color: "#ffd77b", size: 1.84, depthLane: "background" },

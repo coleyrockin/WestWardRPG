@@ -104,6 +104,8 @@ export interface PlayerController {
   update(dt: number, proxies?: any[] | null): void;
   setPosition(position: Vec2): void;
   setCameraPreset(name: string, overrides?: Partial<CameraPreset>): void;
+  /** Lock the camera gaze onto a world point (y defaults to head height), or null to restore the follow gaze. */
+  setLookTarget(target: { x: number; y?: number; z: number } | null): void;
   resetCameraBehind(yaw?: number | null): void;
   releasePointerFocus(): void;
   dispose(): void;

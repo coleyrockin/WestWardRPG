@@ -27,7 +27,7 @@ export const POI_DEFINITIONS = {
       label: "Broken Wagon",
       loot: { gold: 8, items: { Wood: 1, "Map Scrap": 1 } },
       rollLoot: false,
-      regionHint: "Dustward Frontier marshal road",
+      regionHint: "Westward Frontier marshal road",
       roadHook: "a slime-scarred wagon with cut cargo straps in the wheel ruts east of Boone",
       dangerHint: "Low danger: close to town, but green slime burns mark the road edge.",
       mysteryLine: "The cargo straps were cut from the inside.",
@@ -43,7 +43,7 @@ export const POI_DEFINITIONS = {
       buff: { stamina: 10 },
       loot: { gold: 5 },
       rollLoot: false,
-      regionHint: "Dustward Frontier south fork",
+      regionHint: "Westward Frontier south fork",
       roadHook: "a thumb-high lantern shrine tucked under a fence rail",
       dangerHint: "Low danger: a safe breath before the south road opens up.",
       mysteryLine: "The candle is fresh, but the wax runs uphill.",
@@ -58,7 +58,7 @@ export const POI_DEFINITIONS = {
       label: "Abandoned Lunchfire",
       loot: { gold: 4, items: { Potion: 1, Wood: 1 } },
       rollLoot: false,
-      regionHint: "Dustward Frontier ranch road",
+      regionHint: "Westward Frontier ranch road",
       roadHook: "a lunchfire still smoking beside a ranch-side trail",
       dangerHint: "Medium danger: whoever left ran before finishing supper.",
       mysteryLine: "Three cups sit out. One is still warm.",
@@ -71,7 +71,7 @@ export const POI_DEFINITIONS = {
       y: 22.5,
       label: "Old Well",
       loot: { gold: 35, items: { Potion: 1 } },
-      regionHint: "Dustward Frontier road",
+      regionHint: "Westward Frontier road",
       roadHook: "a cracked well sign leaning past Boone's south road",
       dangerHint: "Low danger: old boards, thirsty slimes, and one useful cache.",
       mysteryLine: "The bucket rope is wet even when the desert wind is dry.",
@@ -84,7 +84,7 @@ export const POI_DEFINITIONS = {
       y: 14.5,
       label: "Drifter Camp",
       loot: { gold: 18, items: { Wood: 2, Stone: 1 } },
-      regionHint: "Dustward Frontier north road",
+      regionHint: "Westward Frontier north road",
       roadHook: "thin camp smoke behind a crooked fence line",
       dangerHint: "Medium danger: camp noise can pull scavengers off the road.",
       mysteryLine: "The bedrolls are warm, but no one answers Boone's name.",
@@ -98,7 +98,7 @@ export const POI_DEFINITIONS = {
       label: "Frontier Chapel",
       buff: { hp: 8, stamina: 12 },
       loot: { gold: 6 },
-      regionHint: "Dustward Frontier chapel road",
+      regionHint: "Westward Frontier chapel road",
       roadHook: "a broken chapel bell catching the sun beyond the south fork",
       dangerHint: "Low danger: quiet ruins, useful rest, and open sight lines.",
       mysteryLine: "Someone keeps sweeping dust away from the altar.",
@@ -111,7 +111,7 @@ export const POI_DEFINITIONS = {
       y: 20.5,
       label: "Sunken Coach Ruins",
       loot: { gold: 22, items: { "Map Scrap": 1, Wood: 1 } },
-      regionHint: "Dustward Frontier stage road",
+      regionHint: "Westward Frontier stage road",
       roadHook: "wagon ribs half-buried beside the old stage road",
       dangerHint: "Medium danger: broken cover, open angles, and scavenger tracks.",
       mysteryLine: "A marshal seal is carved into the coach door from the inside.",
@@ -124,7 +124,7 @@ export const POI_DEFINITIONS = {
       y: 31.5,
       label: "Dry Gulch Hideout",
       loot: { gold: 44, items: { "Worn Badge": 1, Potion: 1 } },
-      regionHint: "Dustward Frontier ridge road",
+      regionHint: "Westward Frontier ridge road",
       roadHook: "fresh boot prints cutting away from the ridge road",
       dangerHint: "High danger: outlaw cover and poor retreat lanes.",
       mysteryLine: "The badge is Boone's style, but the scratches are newer.",
@@ -137,7 +137,7 @@ export const POI_DEFINITIONS = {
       y: 18.5,
       label: "Saltback Stranger",
       loot: { gold: 12, items: { "Sealed Note": 1 } },
-      regionHint: "Dustward Frontier east road",
+      regionHint: "Westward Frontier east road",
       roadHook: "a lone figure waving beside a salt-white milepost",
       dangerHint: "Unknown danger: no weapon drawn, no tracks leading in.",
       mysteryLine: "The stranger knows which job you almost accepted.",
@@ -394,7 +394,7 @@ export function findNearbyRoadsideDiscoveries(regions, regionId, x, y, maxDistan
 function fallbackRegionHint(regionId) {
   if (regionId === "ashfall") return "Ashfall Basin road";
   if (regionId === "ironlantern") return "Iron Lantern road";
-  return "Dustward Frontier road";
+  return "Westward Frontier road";
 }
 
 function fallbackRoadHook(poi, kind) {

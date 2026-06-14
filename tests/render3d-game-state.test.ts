@@ -63,6 +63,28 @@ describe("gameState — XP / level (nextXp = round(nextXp*1.34+28))", () => {
     grantGold(s, -10);
     expect(s.player.gold).toBe(0);
   });
+
+  it("grants one upgrade point per level so the skill tree is reachable", () => {
+    const s = createGameState();
+    expect(s.progression.upgradePoints).toBe(0);
+    const r = grantXp(s, 80);
+    expect(r.levelsGained).toBe(1);
+    expect(r.upgradePointsGained).toBe(1);
+    expect(s.progression.upgradePoints).toBe(1);
+  });
+
+  it("accrues an upgrade point for each level in a multi-level grant", () => {
+    const s = createGameState();
+    const r = grantXp(s, 80 + 135); // two thresholds
+    expect(r.levelsGained).toBe(2);
+    expect(s.progression.upgradePoints).toBe(2);
+  });
+
+  it("grants no upgrade point when no level is gained", () => {
+    const s = createGameState();
+    grantXp(s, 10);
+    expect(s.progression.upgradePoints).toBe(0);
+  });
 });
 
 describe("gameState — first-road bounty flow (accept → 3 kills → claim)", () => {

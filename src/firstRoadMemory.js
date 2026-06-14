@@ -54,12 +54,12 @@ export function resolveFirstRoadMemoryStatus({
 
   const copy = {
     unseen: {
-      objectiveLine: "Return to Dustward to start Boone's first road loop.",
+      objectiveLine: "Return to Westward to start Boone's first road loop.",
       booneLine: "",
-      boardLine: "Dustward work starts with Boone's marsh road.",
+      boardLine: "Westward work starts with Boone's marsh road.",
       houseLine: house?.unlocked ? "No first-road proof has reached the house yet." : "Unlock the house to display first-road proof.",
       runSummaryLine: "First road memory not started.",
-      nextStep: "Travel back to Dustward and look for Boone's board.",
+      nextStep: "Travel back to Westward and look for Boone's board.",
     },
     visible: {
       objectiveLine: "Inspect the Broken Wagon on Boone's marshal road before the slime trail goes cold.",

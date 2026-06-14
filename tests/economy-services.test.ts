@@ -17,7 +17,7 @@ describe("economyServices", () => {
       id: "merchant",
       role: "merchant",
       title: "Frontier Provisioner",
-      regionHint: "Dustward Frontier",
+      regionHint: "Westward Frontier",
     });
     expect(merchant.serviceLine).toContain("regional staples");
     expect(smith.title).toBe("Smith Varo's Forge");
@@ -33,7 +33,7 @@ describe("economyServices", () => {
       activeJob: { title: "Town Watch Patrol", rewardLine: "+28g, +14 XP, +1 Tonic" },
     });
 
-    expect(snapshot.regionPriceNote).toContain("Dustward Frontier");
+    expect(snapshot.regionPriceNote).toContain("Westward Frontier");
     expect(snapshot.regionPriceNote).toContain("Speech 2");
     expect(snapshot.regionPriceNote).toContain("Craft 3");
     expect(snapshot.activeGoldSinkLine).toContain("repair");

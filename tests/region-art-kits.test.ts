@@ -8,7 +8,7 @@ import {
 } from "../src/regionArtKits.js";
 
 describe("regionArtKits", () => {
-  it("defines a full Dustward art kit with sky, terrain, road, walls, vegetation, props, and landmark identity", () => {
+  it("defines a full Westward art kit with sky, terrain, road, walls, vegetation, props, and landmark identity", () => {
     const kit = getRegionArtKit("frontier");
 
     expect(kit.quality).toBe("full");
@@ -23,7 +23,7 @@ describe("regionArtKits", () => {
     expect(kit.landmark.hero).toContain("Watchtower");
   });
 
-  it("falls back to Dustward for unknown art kits", () => {
+  it("falls back to Westward for unknown art kits", () => {
     expect(getRegionArtKit("unknown").id).toBe("frontier");
   });
 
@@ -36,7 +36,7 @@ describe("regionArtKits", () => {
     expect(composition.mustShow).toEqual(expect.arrayContaining(["sky", "road", "landmark", "job-board", "interactable"]));
   });
 
-  it("scales world dressing density by preset without removing key Dustward vegetation", () => {
+  it("scales world dressing density by preset without removing key Westward vegetation", () => {
     const low = resolveWorldDressingForView({ regionId: "frontier", preset: "low" });
     const cinematic = resolveWorldDressingForView({ regionId: "frontier", preset: "cinematic" });
 

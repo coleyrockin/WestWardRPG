@@ -45,7 +45,7 @@ export interface GameState {
 export function makeRng(seed?: number): () => number;
 export function createGameState(): GameState;
 export function normalizeGameState(source?: unknown): GameState;
-export function grantXp(state: GameState, amount: number): { levelsGained: number; level: number };
+export function grantXp(state: GameState, amount: number): { levelsGained: number; level: number; upgradePointsGained: number };
 export function grantGold(state: GameState, amount: number): number;
 export function boardChoices(state: GameState): Array<Record<string, unknown>>;
 export function acceptStarterJob(state: GameState, opts?: { time?: number }): Record<string, unknown> & { ok: boolean };

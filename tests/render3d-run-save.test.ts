@@ -10,6 +10,7 @@ import {
   sealRun,
 } from "../src/render3d/runSave.js";
 import { readSave } from "../src/savePersistence.js";
+import { createLoopStateMachine } from "../src/render3d/phaseState.js";
 
 function sampleCtx(overrides: Record<string, any> = {}) {
   return {
@@ -26,7 +27,7 @@ function sampleCtx(overrides: Record<string, any> = {}) {
       encounterState: { slime: "idle", slimeHp: 3, slimeHits: 0, slimeDefeated: false, playerHp: 28 },
       // view-layer fields that must be stripped on persist:
       activePrompt: "E — Hear Pearl's Warning",
-      objectiveText: "Hear the warning before leaving Dustward's lamp line.",
+      objectiveText: "Hear the warning before leaving Westward's lamp line.",
     },
     world: { dayTime: 0.333, weatherKind: "clear" },
     ...overrides,
@@ -58,6 +59,17 @@ describe("buildRunPayload", () => {
     });
     expect(p.loopState).not.toHaveProperty("activePrompt");
     expect(p.loopState).not.toHaveProperty("objectiveText");
+  });
+
+  it("persists region/POI discovery, defaulting to [] for saves without it", () => {
+    const withDiscovery = buildRunPayload(
+      sampleCtx({ world: { dayTime: 0.5, weatherKind: "clear", poisDiscovered: ["frontier_broken_wagon", "smoke_cache"] } }),
+      1700000000000,
+    );
+    expect(withDiscovery.world.poisDiscovered).toEqual(["frontier_broken_wagon", "smoke_cache"]);
+    // backward-compatible: a context without the field still produces a []
+    const bare = buildRunPayload(sampleCtx(), 1700000000000);
+    expect(bare.world.poisDiscovered).toEqual([]);
   });
 
   it("carries seed + inputLogTail forward for staged determinism", () => {
@@ -141,5 +153,33 @@ describe("sealRun (death = sealed, not deleted)", () => {
     expect(loaded?.mode).toBe("sealed");
     expect(loaded?.runStats.cause).toBe("slain by the roadside slime");
     expect(loaded?.schema).toBe(RUN_SCHEMA);
+  });
+});
+
+describe("new-run payload carries the funeral mission (regression: startNewRun)", () => {
+  it("a fresh run built like startNewRun resumes at the funeral cold-open, not spawn", () => {
+    // startNewRun (spike.js) seeds loopState from createLoopStateMachine({ activeMission })
+    // and writes the run; the page then reloads and boot feeds the saved loopState back
+    // through createLoopStateMachine (the resume path). Without activeMission, that path
+    // defaults phase to "spawn" and the funeral cold-open is skipped.
+    const fresh = buildRunPayload(
+      {
+        mode: "playing",
+        seed: 1,
+        time: 0,
+        player: { x: 15, z: 0.5, yaw: 0 },
+        loopState: createLoopStateMachine({ activeMission: "dust_to_dust" }).state,
+        world: { dayTime: 0.25, weatherKind: "clear" },
+      },
+      1700000000000,
+    );
+    expect(fresh.loopState.activeMission).toBe("dust_to_dust");
+    expect(fresh.loopState.phase).toBe("funeral");
+    // The resume path must reconstruct the funeral phase, not fall back to "spawn".
+    // (Cast mirrors the runtime boundary: boot feeds the persisted RunLoopState — a
+    // string-phase snapshot — straight back into createLoopStateMachine.)
+    const resumed = createLoopStateMachine(fresh.loopState as any).state;
+    expect(resumed.activeMission).toBe("dust_to_dust");
+    expect(resumed.phase).toBe("funeral");
   });
 });

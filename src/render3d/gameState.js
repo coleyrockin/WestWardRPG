@@ -112,7 +112,9 @@ export function normalizeGameState(source = {}) {
 
 // XP grant with the oracle's level-up loop. HP lives in the encounter system,
 // so level-ups here only move level / xp / nextXp; the caller reads
-// `levelsGained` to fire toasts/sfx and any encounter heal it wants.
+// `levelsGained` to fire toasts/sfx and any encounter heal it wants. Each level
+// also banks one progression upgrade point — without this the skill tree
+// (canUnlockSkill gates on upgradePoints > 0) is permanently unreachable.
 export function grantXp(state, amount) {
   const safe = Math.max(0, Math.floor(amount || 0));
   state.player.xp += safe;
@@ -123,7 +125,10 @@ export function grantXp(state, amount) {
     state.player.nextXp = Math.round(state.player.nextXp * XP_GROWTH + XP_FLAT);
     levelsGained += 1;
   }
-  return { levelsGained, level: state.player.level };
+  if (levelsGained > 0 && state.progression) {
+    state.progression.upgradePoints = (state.progression.upgradePoints || 0) + levelsGained;
+  }
+  return { levelsGained, level: state.player.level, upgradePointsGained: levelsGained };
 }
 
 export function grantGold(state, amount) {

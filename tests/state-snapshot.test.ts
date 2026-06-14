@@ -37,7 +37,7 @@ function baseState(overrides: any = {}) {
     mode: "playing",
     time: 8,
     player: { x: 9.5, y: 8.5, angle: 0, inHouse: false },
-    regions: { activeRegion: "frontier", activeRegionLabel: "Dustward Frontier", poisDiscovered: [] },
+    regions: { activeRegion: "frontier", activeRegionLabel: "Westward Frontier", poisDiscovered: [] },
     inventory: {},
     quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
     weather: { kind: "clear", rain: 0, fog: 0.18, wind: 0.15, lightning: 0, quality: "high" },
@@ -105,7 +105,7 @@ describe("render3d state snapshot", () => {
 
   it("derives first-road survey availability from existing save-safe state", () => {
     const snapshot = createRenderSnapshot(baseState({
-      regions: { activeRegion: "frontier", activeRegionLabel: "Dustward Frontier", poisDiscovered: ["frontier_broken_wagon"] },
+      regions: { activeRegion: "frontier", activeRegionLabel: "Westward Frontier", poisDiscovered: ["frontier_broken_wagon"] },
       inventory: { "Map Scrap": 1 },
       world: {
         timeOfDay: 0.7,

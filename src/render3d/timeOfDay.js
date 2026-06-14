@@ -27,7 +27,7 @@ export const PALETTES = Object.freeze({
     // Shadow fill is sky bounce: cool slate-blue from above, neutral slate from
     // the ground. Chroma is deliberately LOW — at #bcd2f0 the bounce painted
     // every shadowed wall violet; shadows should read as cool light, not paint.
-    hemi: { sky: "#b6c4da", ground: "#5a6478", intensity: 1.1 },
+    hemi: { sky: "#b6c4da", ground: "#6b6d5f", intensity: 1.1 }, // ground warmed from #5a6478 — ground-bounce warms unlit faces; sky stays cool to block violet creep
     rim: { color: "#9cacc8", intensity: 0.42, dir: { x: 8, y: 6, z: 6 } },
     fill: { color: "#d8dce4", intensity: 0.4 },
     exposure: 1.18,
@@ -82,14 +82,16 @@ export const PALETTES = Object.freeze({
     // Key pulled back from 3.1 — at that strength ACES rolled every lit surface to
     // orange-white. 2.5 still dominates as the warm source without nuking the frame.
     sun: { color: "#ffdca6", intensity: 2.5, dir: { x: -9, y: 8.5, z: -4 }, disc: 0.034, glow: 0.2 },
-    // Hemisphere is the SHADOW FILL. Cool against the warm key — but desaturated:
-    // #9ec2f2 + the #6a8fff rim at 1.05 turned whole shadow walls violet. Slate
-    // blue keeps the warm-vs-cool break while shadows still read as material.
-    hemi: { sky: "#a6b8d4", ground: "#454a60", intensity: 1.22 },
+    // Hemisphere is the SHADOW FILL. Slate-blue sky term keeps the warm-vs-cool
+    // break; the GROUND term is the up-bounce — warmed from cool slate (#454a60) to
+    // a dim earth tone so golden-hour shadows catch a little ground warmth from
+    // below and unlit faces read as lit material, not black silhouette.
+    hemi: { sky: "#a6b8d4", ground: "#4e4a40", intensity: 1.28 },
     rim: { color: "#8da3d4", intensity: 0.85, dir: { x: 9, y: 5, z: 6 } },
     // Camera-side fill: cool-neutral (was a static warm #ffd0a6) so the shadow-side
     // faces crowding the near/left of frame read cool instead of crushed warm-red.
-    fill: { color: "#c6ccd8", intensity: 0.5 },
+    // Eased slightly cooler/dimmer so those near faces stay graphic, not muddy.
+    fill: { color: "#bcc6dc", intensity: 0.46 },
     exposure: 1.27,
     stars: 0,
     bloom: 0.44,
@@ -100,10 +102,12 @@ export const PALETTES = Object.freeze({
     grade: {
       // splitStrength 0.48 was the "purple shadows vs neon orange" clash — at that
       // bite the slate roofs/water tower went violet and every lit face went amber.
-      // 0.28 keeps the warm-vs-cool read; saturation eased so wood reads as wood.
-      tint: "#ffb060", amount: 0.02, contrast: 1.15, saturation: 1.04,
-      shadowTint: "#15264f", highlightTint: "#ffc880",
-      splitStrength: 0.28, godrayStrength: 0.16, vignetteStrength: 0.06, bloomThreshold: 0.86,
+      // 0.32 + the deeper/cooler shadowTint pushes the graphic-novel warm-vs-cool
+      // bite harder without re-entering the violet clash; saturation eased so wood
+      // reads as wood. contrast lifted 1.15→1.2 for darker, more committed shadows.
+      tint: "#ffb060", amount: 0.02, contrast: 1.2, saturation: 1.04,
+      shadowTint: "#0f1f4a", highlightTint: "#ffc880",
+      splitStrength: 0.32, godrayStrength: 0.2, vignetteStrength: 0.06, bloomThreshold: 0.86,
     },
     bodyBg: "#2a1f2e",
   },
@@ -116,7 +120,7 @@ export const PALETTES = Object.freeze({
     sky: { top: "#070b22", mid: "#181f44", horizon: "#33305e" },
     fog: { color: "#161b34", density: 0.024 },
     sun: { color: "#bcc6ff", intensity: 0.78, dir: { x: 8, y: 9, z: -3 }, disc: 0.026, glow: 0.1 },
-    hemi: { sky: "#32406e", ground: "#101522", intensity: 0.42 },
+    hemi: { sky: "#32406e", ground: "#1a1f3a", intensity: 0.42 }, // ground lifted from #101522 so unlit night faces read as material, not black murk
     rim: { color: "#7a8aff", intensity: 0.55, dir: { x: -7, y: 4, z: 6 } },
     exposure: 0.95,
     stars: 1.0,

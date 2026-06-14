@@ -174,7 +174,7 @@ export function createRenderSnapshot(state = {}, options = {}) {
     mode,
     inHouse,
     regionId,
-    regionLabel: text(options.regionLabel || regions.activeRegionLabel, "Dustward Frontier"),
+    regionLabel: text(options.regionLabel || regions.activeRegionLabel, "Westward Frontier"),
     player,
     inventory,
     activeJob,
@@ -213,7 +213,7 @@ export function createRenderSnapshot(state = {}, options = {}) {
     player,
     region: {
       id: regionId,
-      label: text(options.regionLabel || regions.activeRegionLabel, "Dustward Frontier"),
+      label: text(options.regionLabel || regions.activeRegionLabel, "Westward Frontier"),
     },
     time: {
       elapsed: round(timeValue, 2),

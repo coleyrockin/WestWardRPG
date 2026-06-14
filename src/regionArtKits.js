@@ -3,7 +3,7 @@ const DEFAULT_REGION_ID = "frontier";
 export const REGION_ART_KITS = {
   frontier: {
     id: "frontier",
-    label: "Dustward Frontier art kit",
+    label: "Westward Frontier art kit",
     quality: "full",
     sky: {
       style: "haunted-western-dusk",

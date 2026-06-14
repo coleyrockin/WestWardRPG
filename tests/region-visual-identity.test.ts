@@ -60,7 +60,7 @@ describe("regionVisualIdentity", () => {
     expect(new Set([...presentation.props, ...presentation.vegetation, ...presentation.vistas].map((item: any) => item.depthLane).filter(Boolean)).size).toBeGreaterThanOrEqual(3);
   });
 
-  it("surfaces explicit readability cues for the Dustward visual pass", () => {
+  it("surfaces explicit readability cues for the Westward visual pass", () => {
     const cues = resolveRegionReadabilityCues("frontier");
 
     expect(cues.regionId).toBe("frontier");

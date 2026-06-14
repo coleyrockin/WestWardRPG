@@ -67,13 +67,16 @@ export function syncObjectiveDom(refs, snapshot, loopState = null) {
   setMetaChildren(refs, items);
 
   if (refs?.progress) {
-    const progress = getPhaseProgress(view.phase || "spawn");
+    // Thread the mission through so mission-1.1 beats (funeral/implant), which
+    // are NOT in the default loop, resolve against the dust_to_dust phase list
+    // instead of falling back to phase[0].
+    const progress = getPhaseProgress(view.phase || "spawn", view.activeMission);
     if (refs.progressLabel) refs.progressLabel.textContent = `Road beat ${progress.label}`;
     if (refs.progressFill?.style) refs.progressFill.style.width = `${Math.round(progress.ratio * 100)}%`;
   }
 
   if (refs?.tag) {
-    const region = snapshot?.region?.label || "Dustward Frontier";
-    refs.tag.textContent = `WestWard · ${region} · ${view.phase || "Dusk"}`;
+    const region = snapshot?.region?.label || "Westward Frontier";
+    refs.tag.textContent = `Dustwater · ${region} · ${view.phase || "Dusk"}`;
   }
 }

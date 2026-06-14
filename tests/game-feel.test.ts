@@ -171,7 +171,7 @@ describe("gameFeel", () => {
       quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
       pressure,
       boardProp: { label: "Boone Job Board", x: 10.5, y: 8.5 },
-      regionLabel: "Dustward Frontier",
+      regionLabel: "Westward Frontier",
     });
 
     expect(guide).toMatchObject({
@@ -184,7 +184,7 @@ describe("gameFeel", () => {
     expect(guide?.objectiveLine).toContain("+12g");
     expect(guide?.secondaryLine).toContain("Boone Job Board");
     expect(guide?.secondaryLine).toContain("Threat");
-    expect(guide?.regionHint).toBe("Dustward Frontier");
+    expect(guide?.regionHint).toBe("Westward Frontier");
   });
 
   it("uses active job route markers in the opening route guide", () => {
@@ -289,7 +289,7 @@ describe("gameFeel", () => {
       },
       goldenPath: { phase: "available", rewardUseLine: "Use Slime Core at home." },
       activeJob: null,
-      regionLabel: "Dustward Frontier",
+      regionLabel: "Westward Frontier",
     });
 
     expect(nextStep).toMatchObject({
@@ -297,7 +297,7 @@ describe("gameFeel", () => {
       source: "opening-route-guide",
       actionLine: "Mission: follow the marshal road to Smoke Cache • 3m. Press E to open it • +12g",
       urgency: "high",
-      regionHint: "Dustward Frontier",
+      regionHint: "Westward Frontier",
     });
     expect(nextStep?.secondaryLine).toContain("Boone Job Board");
     expect(nextStep?.secondaryLine).toContain("Boone road loop");
@@ -310,7 +310,7 @@ describe("gameFeel", () => {
       time: 20,
       inHouse: false,
       regionId: "frontier",
-      regionLabel: "Dustward Frontier",
+      regionLabel: "Westward Frontier",
       player: { x: 9.5, y: 8.5 },
       inventory: { "Slime Core": 0 },
       quests: { slime: { progress: 0 }, crystal: { progress: 0 } },
@@ -383,7 +383,7 @@ describe("gameFeel", () => {
       inHouse: false,
       house: { unlocked: true },
       inventory: { "Slime Core": 1, Wood: 0, Stone: 0 },
-      regionLabel: "Dustward Frontier",
+      regionLabel: "Westward Frontier",
     });
 
     expect(nextStep?.source).toBe("house-workbench");

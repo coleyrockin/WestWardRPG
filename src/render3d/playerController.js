@@ -387,6 +387,11 @@ export function createPlayerController(camera, opts = {}) {
   // The look-at target is lerped (not just the camera body) so fast turns and
   // preset changes don't snap the gaze — removes the swimmy-rotation jitter.
   let smoothLookAt = null;
+  // Optional world-space gaze override (setLookTarget). When set, the camera body
+  // still rides the preset but the gaze lerps to this point instead of the
+  // ahead-of-heading default — used for the opening reveal (aim at Boone's board)
+  // and any future scripted "look at that" beat. null = normal follow gaze.
+  let lookTargetWorld = null;
 
   // Seed yaw + pitch from the camera's current heading so the spike's hero
   // pose is preserved on the first frame. We project the forward vector onto
@@ -616,13 +621,16 @@ export function createPlayerController(camera, opts = {}) {
       );
       // Lerp the gaze target at the same rate as the body. On the first frame (or
       // after a teleport) snap it; otherwise it trails smoothly so sharp turns and
-      // preset changes don't whip the camera around.
+      // preset changes don't whip the camera around. A setLookTarget override
+      // (e.g. the opening reveal) swaps in a fixed world point — still lerped, so
+      // the gaze eases onto it rather than snapping.
+      const gaze = lookTargetWorld || pose.lookAt;
       if (!smoothLookAt) {
-        smoothLookAt = { x: pose.lookAt.x, y: pose.lookAt.y, z: pose.lookAt.z };
+        smoothLookAt = { x: gaze.x, y: gaze.y, z: gaze.z };
       } else {
-        smoothLookAt.x += (pose.lookAt.x - smoothLookAt.x) * alpha;
-        smoothLookAt.y += (pose.lookAt.y - smoothLookAt.y) * alpha;
-        smoothLookAt.z += (pose.lookAt.z - smoothLookAt.z) * alpha;
+        smoothLookAt.x += (gaze.x - smoothLookAt.x) * alpha;
+        smoothLookAt.y += (gaze.y - smoothLookAt.y) * alpha;
+        smoothLookAt.z += (gaze.z - smoothLookAt.z) * alpha;
       }
       if (camera.lookAt) {
         camera.lookAt(smoothLookAt.x, smoothLookAt.y, smoothLookAt.z);
@@ -676,6 +684,16 @@ export function createPlayerController(camera, opts = {}) {
     // framing, not teleport it. The position + smoothLookAt lerps handle the move.
   }
 
+  // Lock the camera gaze onto a fixed world point (e.g. the opening reveal target),
+  // or pass null/undefined to restore the normal ahead-of-heading follow gaze. The
+  // y defaults to a head-height look-at so callers can pass a ground placement.
+  function setLookTarget(target) {
+    lookTargetWorld =
+      target && Number.isFinite(target.x) && Number.isFinite(target.z)
+        ? { x: target.x, y: Number.isFinite(target.y) ? target.y : 1.4, z: target.z }
+        : null;
+  }
+
   function dispose() {
     if (doc?.removeEventListener) {
       doc.removeEventListener("keydown", onKeyDown);
@@ -696,6 +714,7 @@ export function createPlayerController(camera, opts = {}) {
     update,
     setPosition,
     setCameraPreset,
+    setLookTarget,
     resetCameraBehind,
     releasePointerFocus,
     dispose,

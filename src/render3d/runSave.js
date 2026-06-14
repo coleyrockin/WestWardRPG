@@ -67,6 +67,10 @@ export function buildRunPayload(ctx = {}, now = Date.now()) {
     world: {
       dayTime: Number.isFinite(world.dayTime) ? world.dayTime : 0,
       weatherKind: world.weatherKind ?? "clear",
+      // Region/POI discovery. Additive + backward-compatible: pre-existing saves
+      // (no field) restore as []. Persisted here so discovery survives resume the
+      // moment markPOIDiscovered is wired (today the source array is still empty).
+      poisDiscovered: Array.isArray(world.poisDiscovered) ? [...world.poisDiscovered] : [],
     },
     // RPG slice (gameState.buildGameSaveSlice). Stored as-is; the loader runs
     // it through hydrateGameState (per-module normalize*) on resume.

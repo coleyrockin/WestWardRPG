@@ -39,7 +39,6 @@ export const LEGACY_LOCAL_STORAGE_KEYS = [
   "westward-save-v3",
   "westward-save-v2",
   "westward-save-v1",
-  "dustward-save-v1",
 ];
 
 // FNV-1a 32-bit on a JSON serialization. Cheap, deterministic, and good enough
