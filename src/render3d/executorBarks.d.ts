@@ -19,3 +19,7 @@ export function pickExecutorBark(
   trigger: string,
   opts?: { approval?: number },
 ): string | null;
+export function approvalCrossingTrigger(
+  prevApproval: number,
+  nextApproval: number,
+): "approval_high" | "approval_low" | null;

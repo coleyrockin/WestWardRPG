@@ -39,6 +39,20 @@ export const EXECUTOR_BARKS = Object.freeze({
     neutral: 'Executor: "Road\'s clear. A small thing. The territory is a thousand small things held by the throat."',
     low: 'Executor: "You did the work and felt bad about it. Mercy is a luxury a debtor cannot afford."',
   },
+  // The moral instrument becomes audible. Fired ONCE when approval first crosses
+  // into a band — the ghost remarking on what you're becoming. The band the
+  // selector resolves to IS the band you just entered, so the matching key carries
+  // the meaningful line.
+  approval_high: {
+    high: 'Executor: "There — feel that settle in? That\'s me, taking root. We want the same things now, you and I."',
+    neutral: 'Executor: "You\'re leaning my way, boy. Good. The territory rewards a hard hand."',
+    low: 'Executor: "You\'re leaning my way, boy. Good. The territory rewards a hard hand."',
+  },
+  approval_low: {
+    low: 'Executor: "You\'re slipping me. All this mercy, this giving. A weaker man would call it a conscience."',
+    neutral: 'Executor: "Careful. Every kindness loosens my grip — and the things out here only respect the grip."',
+    high: 'Executor: "Careful. Every kindness loosens my grip — and the things out here only respect the grip."',
+  },
 });
 
 // Choose the Executor's line for a trigger at the player's current approval.
@@ -55,4 +69,16 @@ export function pickExecutorBark(trigger, { approval = 0 } = {}) {
   if (!set) return null;
   const band = bandForApproval(approval);
   return set[band] || set.neutral || null;
+}
+
+// When approval moves and the band changes INTO high or low, return the matching
+// crossing trigger (the ghost remarks on it); otherwise null. Crossings back to
+// "neutral" are silent — the ghost only speaks at the extremes.
+export function approvalCrossingTrigger(prevApproval, nextApproval) {
+  const prev = bandForApproval(prevApproval);
+  const next = bandForApproval(nextApproval);
+  if (prev === next) return null;
+  if (next === "high") return "approval_high";
+  if (next === "low") return "approval_low";
+  return null;
 }

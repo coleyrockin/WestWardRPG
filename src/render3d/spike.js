@@ -44,7 +44,7 @@ import { createScatter } from "../game/world/scatter.js";
 import { createPlaceholderCharacter } from "../game/world/character.js";
 import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
 import { createTownsfolk } from "../game/world/townsfolk.js";
-import { pickExecutorBark } from "./executorBarks.js";
+import { pickExecutorBark, approvalCrossingTrigger } from "./executorBarks.js";
 import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
 import { gustAt } from "../game/world/windGusts.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
@@ -2938,6 +2938,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const seenExecutorBarks = new Set();
   let currentRegion = "westward"; // spawn region — don't bark on the opening frame
   let lastBarkPhase = null;
+  let lastApproval = game?.executorApproval ?? 0; // band-crossing tracker for approval barks
   const fireExecutorBark = (trigger) => {
     if (seenExecutorBarks.has(trigger)) return;
     const line = pickExecutorBark(trigger, { approval: game?.executorApproval ?? 0 });
@@ -4640,6 +4641,13 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       if (loopState.phase !== lastBarkPhase) {
         lastBarkPhase = loopState.phase;
         if (loopState.phase === "return_to_boone") fireExecutorBark("bounty_cleared");
+      }
+      // The moral instrument speaks once when approval first crosses into an extreme.
+      const nowApproval = game?.executorApproval ?? 0;
+      if (nowApproval !== lastApproval) {
+        const crossing = approvalCrossingTrigger(lastApproval, nowApproval);
+        lastApproval = nowApproval;
+        if (crossing) fireExecutorBark(crossing);
       }
     }
     // NPC greeting prompt/speech overrides the kind prompt when near a townsperson
