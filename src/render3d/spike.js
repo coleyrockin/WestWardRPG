@@ -90,6 +90,31 @@ const GROUNDABLE_KINDS = new Set([
   "wagonSalvage", "cart", "crate", "barrelCrateCluster", "rock", "boulder",
   "cactus", "deadTree", "hitchingRail", "horseHitched", "cattle",
 ]);
+// M0 perf — shadow-caster culling (roadmap §M0). Boundary/distant silhouettes and
+// flora read fine without casting onto the playable area; dropping their castShadow
+// shrinks the WebGPU shadow pass with no visible loss. Foreground/midground hero
+// buildings + props near the route keep their shadows. Provable via
+// __westward3dStats().shadowCasters (counts castShadow=true meshes). The golden dusk
+// capture runs the WebGL2 backend with shadowMap.enabled=false, so this is
+// golden-safe — it changes nothing in that frame.
+const SHADOW_CULL_KINDS = new Set([
+  // boundary / distant skyline
+  "mesa", "mesaSilhouette", "mesaSkyline", "heroMesaSkyline", "cliff", "boulder", "rock",
+  // flora ground cover
+  "sageCluster", "roadGrass", "brush", "sagePatch", "reeds", "cactus", "deadTree",
+]);
+// Decide a placement is shadow-cull eligible: anything in a background depth lane,
+// or any boundary/distant/flora kind regardless of lane.
+function shouldCullShadow(p) {
+  return p.depthLane === "background" || SHADOW_CULL_KINDS.has(p.kind);
+}
+// Turn off castShadow on every mesh under a node (it may be a Group of meshes).
+function cullShadow(node) {
+  if (!node) return;
+  node.traverse((o) => {
+    if (o.isMesh) o.castShadow = false;
+  });
+}
 const PLAYER_MODEL_URL = "/models/character_hero.glb";
 const IMPORTANT_MODEL_KINDS = Object.freeze([
   "jobBoard",
@@ -2458,7 +2483,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // otherwise — see createRenderer). await init() before the loop renders
   // anything. No preserveDrawingBuffer: under the WebGL2 backend it forces a
   // per-frame ReadPixels stall; spike-compare screenshots the element directly.
-  const { renderer, backend } = await createRenderer(canvas);
+  // `reducedFidelity` (M0): true on the WebGL2 fallback. Scatter/weather already
+  // self-halve on `backend === "webgl"`; the flag is threaded into their opts so
+  // future demotion paths key on intent without re-deriving the backend string. It
+  // does NOT change current counts — the halving still keys on `backend`.
+  const { renderer, backend, reducedFidelity } = await createRenderer(canvas);
   if (import.meta.env.DEV && typeof window !== "undefined") {
     window.__westward3dBackend = backend;
   }
@@ -2515,7 +2544,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   scene.add(openingLightPools.group);
   scene.add(roadDust.group);
   scene.add(routeSageField);
-  createScatter(scene, { center: { x: 35, z: 13 }, area: 78, count: 850, backend });
+  createScatter(scene, { center: { x: 35, z: 13 }, area: 78, count: 850, backend, reducedFidelity });
 
   // Animated marsh water (replaces the flat plane that used to live in buildGround).
   const water = createWater({ width: 29, height: 6.2, skyTint: appliedPalette.sky.horizon });
@@ -2555,6 +2584,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       }
       recordModelLoad(p.kind, "procedural:western", true);
       if (HERO_KINDS.includes(p.kind) && node) heroMeshes[p.kind] = node;
+      // M0: distant/background/flora placements don't need to cast shadows.
+      if (shouldCullShadow(p)) cullShadow(node);
       continue;
     }
     const entry = modelFor(p.kind);
@@ -2595,6 +2626,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
             if (HERO_KINDS.includes(p.kind)) {
               heroMeshes[p.kind] = node;
             }
+            // M0: distant/background/flora placements don't need to cast shadows.
+            if (shouldCullShadow(p)) cullShadow(node);
           })
           .catch((err) => {
             console.warn(`[render3d] model load failed for ${p.kind}, using fallback`, err);
@@ -2604,6 +2637,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
             if (HERO_KINDS.includes(p.kind) && mesh) {
               heroMeshes[p.kind] = mesh;
             }
+            // M0: distant/background/flora placements don't need to cast shadows.
+            if (mesh && shouldCullShadow(p)) cullShadow(mesh);
           }),
       );
       continue;
@@ -2613,6 +2648,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (HERO_KINDS.includes(p.kind) && mesh) {
       heroMeshes[p.kind] = mesh;
     }
+    // M0: distant/background/flora placements don't need to cast shadows.
+    if (mesh && shouldCullShadow(p)) cullShadow(mesh);
   }
 
   // Connect buildings with power cables (Westward procedural dressing; WebGPU only — WebGL2 bans lines)
@@ -2811,7 +2848,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // weatherView; fog + exposure are modulated on top of the palette here.
   let weatherKind = snapshot.weather?.kind || "clear";
   let weather = resolveWeather(snapshot.weather);
-  const weatherSys = createWeatherSystem(scene, { x: 14, z: 9, backend });
+  const weatherSys = createWeatherSystem(scene, { x: 14, z: 9, backend, reducedFidelity });
   const cycleWeather = () => {
     weatherKind = nextWeatherKind(weatherKind);
     // pass only kind + wind so the preset drives rain/dust (the snapshot's stale

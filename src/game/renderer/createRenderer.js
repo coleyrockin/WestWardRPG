@@ -80,7 +80,13 @@ export async function createRenderer(canvas, opts = {}) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
 
-  return { renderer, backend };
+  // M0 (roadmap §M0): the WebGL2 fallback runs the world at reduced fidelity —
+  // shadows off (above), and scatter/weather already self-halve on `backend === "webgl"`.
+  // Expose that as a single named flag so future demotions key on intent
+  // (`reducedFidelity`) instead of re-deriving the backend string at each call site.
+  const reducedFidelity = backend !== "webgpu";
+
+  return { renderer, backend, reducedFidelity };
 }
 
 // "webgpu" | "webgl" — read after init() resolves the backend.
