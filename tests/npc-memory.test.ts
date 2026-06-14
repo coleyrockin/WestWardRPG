@@ -307,4 +307,57 @@ describe("npcMemory", () => {
       expect(line).not.toMatch(/marshal boone.*trust/i);
     });
   });
+
+  describe("faction-warmth fallback", () => {
+    it("warden reads strong positive civic standing as a warm line", () => {
+      const memory = createInitialNpcMemoryState();
+      // Past first meeting and with no affinity so the warmth fallback is reached.
+      recordNpcMemoryEvent(memory, "warden", { type: "greeting", regionId: "frontier" });
+      const line = resolveNpcReactiveLine("warden", memory, {
+        factionRep: { civic: 40 },
+      });
+      expect(line).toContain("Marshal Boone");
+      expect(line).toMatch(/speak well of you/i);
+    });
+
+    it("warden reads strong negative civic standing as a hostile line", () => {
+      const memory = createInitialNpcMemoryState();
+      recordNpcMemoryEvent(memory, "warden", { type: "greeting", regionId: "frontier" });
+      const line = resolveNpcReactiveLine("warden", memory, {
+        factionRep: { civic: -40 },
+      });
+      expect(line).toContain("Marshal Boone");
+      expect(line).toMatch(/made enemies/i);
+    });
+
+    it("does not fire below the |rep| >= 40 threshold (existing behavior preserved)", () => {
+      const memory = createInitialNpcMemoryState();
+      recordNpcMemoryEvent(memory, "warden", { type: "greeting", regionId: "frontier" });
+      const below = resolveNpcReactiveLine("warden", memory, {
+        factionRep: { civic: 39 },
+      });
+      expect(below).toBeNull();
+      const belowNeg = resolveNpcReactiveLine("warden", memory, {
+        factionRep: { civic: -39 },
+      });
+      expect(belowNeg).toBeNull();
+    });
+
+    it("first-meeting and high-affinity lines still take precedence over faction warmth", () => {
+      const memory = createInitialNpcMemoryState();
+      // First meeting (no greeting recorded) — warmth must NOT override.
+      const firstMeeting = resolveNpcReactiveLine("warden", memory, {
+        factionRep: { civic: 80 },
+      });
+      expect(firstMeeting).toMatch(/marshal boone\. you're not from here/i);
+
+      // After a greeting, high affinity still wins over faction warmth.
+      recordNpcMemoryEvent(memory, "warden", { type: "greeting", regionId: "frontier" });
+      const highAffinity = resolveNpcReactiveLine("warden", memory, {
+        npcAffinity: { warden: 60 },
+        factionRep: { civic: 80 },
+      });
+      expect(highAffinity).toMatch(/earned some trust/i);
+    });
+  });
 });

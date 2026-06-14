@@ -8,6 +8,11 @@ export const XP_START: number;
 export const XP_GROWTH: number;
 export const XP_FLAT: number;
 
+export type FactionId = "helios" | "tally" | "freeholder" | "circuit" | "civic";
+export const FACTION_IDS: FactionId[];
+
+export type FactionRep = Record<FactionId, number>;
+
 export interface GamePlayer {
   name: string;
   className: string;
@@ -40,6 +45,9 @@ export interface GameState {
   progression: Record<string, unknown> & { identity?: unknown; equipment?: unknown };
   world: { jobs: JobBoardState; loot: LootState };
   npcMemory: NpcMemoryState;
+  executorCompliance: unknown;
+  factionRep: FactionRep;
+  executorApproval: number;
 }
 
 export function makeRng(seed?: number): () => number;
@@ -70,7 +78,11 @@ export function playerHudView(state: GameState): {
   nextXp: number;
   xpRatio: number;
 };
-export function buildGameSaveSlice(state: GameState): Record<string, unknown>;
+export function adjustFactionRep(state: GameState, faction: string, delta: number): number;
+export function adjustExecutorApproval(state: GameState, delta: number): number;
+export function buildGameSaveSlice(
+  state: GameState,
+): Record<string, unknown> & { factionRep: FactionRep; executorApproval: number };
 export function hydrateGameState(slice?: unknown): GameState;
 export function reconcileWithLoopPhase(
   state: GameState,

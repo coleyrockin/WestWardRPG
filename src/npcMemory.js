@@ -221,6 +221,22 @@ const HIGH_AFFINITY_LINES = {
   innkeeper: (name) => `${name}: Always glad to see a face that isn't trouble. Your usual corner's open if you want it.`,
 };
 
+// Which territory faction each NPC reads the player's standing through
+// (treatment §32-39). Town authority (warden/elder/innkeeper) speaks for
+// Providence Civic; the Reverend-merchant fronts Helios-Pacific's ledger; the
+// tinkerer-smith rides with the Circuit; the bard carries Freeholder rumor.
+// The cat answers to no faction.
+const NPC_FACTION = {
+  warden: "civic",
+  elder: "civic",
+  innkeeper: "civic",
+  merchant: "helios",
+  smith: "circuit",
+  bard: "freeholder",
+  cat: null,
+};
+const FACTION_WARMTH_THRESHOLD = 40;
+
 export function resolveNpcReactiveLine(npcId, memory, context = {}) {
   const safe = normalizeNpcMemoryState(memory);
   const entry = normalizeEntry(safe.byNpc[npcId]);
@@ -279,6 +295,17 @@ export function resolveNpcReactiveLine(npcId, memory, context = {}) {
   // High affinity fallback: player has invested meaningfully in this relationship
   if (affinity >= HIGH_AFFINITY_THRESHOLD && HIGH_AFFINITY_LINES[npcId]) {
     return HIGH_AFFINITY_LINES[npcId](name);
+  }
+
+  // Faction-warmth fallback: when this NPC's controlling faction reads the
+  // player as a strong ally or a strong enemy, the standing colors their tone.
+  // Conservative — only the five canonical faction meters, only at |rep| >= 40.
+  const faction = NPC_FACTION[npcId];
+  if (faction && Number.isFinite(rep[faction]) && Math.abs(rep[faction]) >= FACTION_WARMTH_THRESHOLD) {
+    if (rep[faction] >= FACTION_WARMTH_THRESHOLD) {
+      return `${name}: Folks here speak well of you. That kind of standing opens doors — and watches them.`;
+    }
+    return `${name}: You've made enemies in this county. I'd keep my hand off my holster and my mouth shut.`;
   }
 
   return null;

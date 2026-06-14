@@ -18,6 +18,9 @@ import {
   hydrateGameState,
   reconcileWithLoopPhase,
   tradeWithVendor,
+  adjustFactionRep,
+  adjustExecutorApproval,
+  FACTION_IDS,
 } from "../src/render3d/gameState.js";
 import {
   CANONICAL_STARTER_JOB_ID,
@@ -36,6 +39,87 @@ describe("gameState — creation", () => {
     expect(s.inventory).toEqual({});
     expect(s.world.jobs.activeJobId).toBeNull();
     expect(s.npcMemory.byNpc).toEqual({});
+  });
+
+  it("seeds the five faction standing meters at zero and Executor approval at zero", () => {
+    const s = createGameState();
+    expect(s.factionRep).toEqual({ helios: 0, tally: 0, freeholder: 0, circuit: 0, civic: 0 });
+    expect(FACTION_IDS).toEqual(["helios", "tally", "freeholder", "circuit", "civic"]);
+    expect(s.executorApproval).toBe(0);
+  });
+});
+
+describe("gameState — faction standing meters", () => {
+  it("adjustFactionRep moves the named meter and returns the new value", () => {
+    const s = createGameState();
+    expect(adjustFactionRep(s, "civic", 25)).toBe(25);
+    expect(s.factionRep.civic).toBe(25);
+    expect(adjustFactionRep(s, "civic", -10)).toBe(15);
+    expect(s.factionRep.civic).toBe(15);
+  });
+
+  it("adjustFactionRep clamps to [-100, 100] and floors deltas to integers", () => {
+    const s = createGameState();
+    expect(adjustFactionRep(s, "helios", 9999)).toBe(100);
+    expect(s.factionRep.helios).toBe(100);
+    expect(adjustFactionRep(s, "tally", -9999)).toBe(-100);
+    expect(s.factionRep.tally).toBe(-100);
+    const s2 = createGameState();
+    expect(adjustFactionRep(s2, "circuit", 12.9)).toBe(13);
+  });
+
+  it("adjustFactionRep no-ops on an unknown faction and leaves the meters untouched", () => {
+    const s = createGameState();
+    const before = JSON.stringify(s.factionRep);
+    expect(adjustFactionRep(s, "workersGuild", 50)).toBe(0);
+    expect(JSON.stringify(s.factionRep)).toBe(before);
+  });
+});
+
+describe("gameState — Executor approval track", () => {
+  it("adjustExecutorApproval moves the meter, clamps [-100, 100], and integer-rounds", () => {
+    const s = createGameState();
+    expect(adjustExecutorApproval(s, 30)).toBe(30);
+    expect(s.executorApproval).toBe(30);
+    expect(adjustExecutorApproval(s, 9999)).toBe(100);
+    expect(adjustExecutorApproval(s, -9999)).toBe(-100);
+    const s2 = createGameState();
+    expect(adjustExecutorApproval(s2, 4.6)).toBe(5);
+  });
+
+  it("recordSlimeKill feeds the Executor +10 per kill — three kills clear the high band", () => {
+    const s = createGameState();
+    acceptStarterJob(s);
+    expect(s.executorApproval).toBe(0);
+    recordSlimeKill(s);
+    expect(s.executorApproval).toBe(10);
+    recordSlimeKill(s);
+    recordSlimeKill(s);
+    expect(s.executorApproval).toBe(30);
+  });
+});
+
+describe("gameState — faction/Executor normalization hardening", () => {
+  it("clamps out-of-range and garbage factionRep, ignores unknown keys, defaults missing to 0", () => {
+    const restored = hydrateGameState({
+      factionRep: { helios: 9999, tally: -9999, freeholder: "lots", civic: 17.8, ghostFaction: 50 },
+    });
+    expect(restored.factionRep).toEqual({
+      helios: 100,
+      tally: -100,
+      freeholder: 0, // garbage → 0
+      circuit: 0, // missing → 0
+      civic: 18, // rounded
+    });
+    expect((restored.factionRep as Record<string, unknown>).ghostFaction).toBeUndefined();
+  });
+
+  it("clamps garbage / out-of-range executorApproval to an integer in [-100, 100]", () => {
+    expect(hydrateGameState({ executorApproval: 9999 }).executorApproval).toBe(100);
+    expect(hydrateGameState({ executorApproval: -9999 }).executorApproval).toBe(-100);
+    expect(hydrateGameState({ executorApproval: "evil" }).executorApproval).toBe(0);
+    expect(hydrateGameState({ executorApproval: 22.4 }).executorApproval).toBe(22);
+    expect(hydrateGameState({}).executorApproval).toBe(0);
   });
 });
 
@@ -197,7 +281,13 @@ describe("gameState — save slice round-trip", () => {
     lootBeat(s, { source: "cache", rng: makeRng(11) });
     recordNpcGreeting(s, "warden");
 
+    adjustFactionRep(s, "civic", 35);
+    adjustFactionRep(s, "helios", -22);
+
     const slice = buildGameSaveSlice(s);
+    expect(slice.factionRep).toEqual(s.factionRep);
+    expect(slice.executorApproval).toBe(s.executorApproval);
+
     const restored = hydrateGameState(JSON.parse(JSON.stringify(slice)));
     expect(restored.player.gold).toBe(s.player.gold);
     expect(restored.world.jobs.activeJobId).toBe(CANONICAL_STARTER_JOB_ID);
@@ -205,6 +295,10 @@ describe("gameState — save slice round-trip", () => {
     expect(restored.world.loot.totalDrops).toBe(1);
     expect(restored.npcMemory.byNpc.warden.greetings).toBe(1);
     expect(restored.inventory).toEqual(s.inventory);
+    // Faction meters + Executor approval (recordSlimeKill fed +10) round-trip.
+    expect(restored.factionRep).toEqual({ helios: -22, tally: 0, freeholder: 0, circuit: 0, civic: 35 });
+    expect(restored.executorApproval).toBe(s.executorApproval);
+    expect(restored.executorApproval).toBe(10);
   });
 
   it("hydrate rejects garbage into a fresh state", () => {

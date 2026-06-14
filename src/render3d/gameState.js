@@ -36,6 +36,19 @@ export const REGION_ID = "frontier";
 export const PLAYER_NAME = "Ezra Cross";
 export const PLAYER_CLASS = "Cross Heir";
 
+// The five canonical territory powers (treatment §32-39). Faction standing is a
+// signed meter in [-100, 100]; positive = patron/ally, negative = enemy of the
+// ledger. Wealth costs access — high standing with one can close doors with
+// another, but that political math is content-layer, not state-layer.
+export const FACTION_IDS = ["helios", "tally", "freeholder", "circuit", "civic"];
+
+// The Executor track (treatment §119-120): your father's ghost levels by you
+// feeding it decisions. Acting like Abram (ruthless, acquisitive) pushes
+// approval positive; mercy/divestment starves it negative. Clamped [-100, 100].
+const REP_MIN = -100;
+const REP_MAX = 100;
+const clampRep = (v) => Math.max(REP_MIN, Math.min(REP_MAX, Math.round(v)));
+
 // Level curve — the original tuned numbers, kept exact:
 // start at nextXp 80; each level: nextXp = round(nextXp * 1.34 + 28).
 export const XP_START = 80;
@@ -65,7 +78,30 @@ export function createGameState() {
     },
     npcMemory: createInitialNpcMemoryState(),
     executorCompliance: null,
+    factionRep: { helios: 0, tally: 0, freeholder: 0, circuit: 0, civic: 0 },
+    executorApproval: 0,
   };
+}
+
+// Faction standing adjustment. No-ops on an unknown faction key; clamps the
+// result to [-100, 100] (integer) and returns the new value (or the unchanged
+// current value when the faction is unknown).
+export function adjustFactionRep(state, faction, delta) {
+  if (!state || !state.factionRep || !FACTION_IDS.includes(faction)) {
+    return state?.factionRep?.[faction] ?? 0;
+  }
+  const next = clampRep((state.factionRep[faction] || 0) + (Number.isFinite(delta) ? delta : 0));
+  state.factionRep[faction] = next;
+  return next;
+}
+
+// Executor approval adjustment (the moral instrument). Clamps to [-100, 100]
+// integer and returns the new value.
+export function adjustExecutorApproval(state, delta) {
+  if (!state) return 0;
+  const next = clampRep((state.executorApproval || 0) + (Number.isFinite(delta) ? delta : 0));
+  state.executorApproval = next;
+  return next;
 }
 
 // Save-load normalization: every module slice goes through its own normalize*
@@ -107,6 +143,14 @@ export function normalizeGameState(source = {}) {
   fresh.world.jobs = normalizeJobBoardState(source?.world?.jobs);
   fresh.world.loot = normalizeLootState(source?.world?.loot);
   fresh.npcMemory = normalizeNpcMemoryState(source?.npcMemory);
+  // Faction standing: rebuild from source, clamping each known key to an
+  // integer in [-100, 100]. Unknown keys are ignored; missing default to 0.
+  const srcRep = source?.factionRep && typeof source.factionRep === "object" ? source.factionRep : {};
+  for (const faction of FACTION_IDS) {
+    fresh.factionRep[faction] = Number.isFinite(srcRep[faction]) ? clampRep(srcRep[faction]) : 0;
+  }
+  // Executor approval: clamp to integer [-100, 100], default 0.
+  fresh.executorApproval = Number.isFinite(source?.executorApproval) ? clampRep(source.executorApproval) : 0;
   return fresh;
 }
 
@@ -160,12 +204,16 @@ export function acceptStarterJob(state, { time = 0 } = {}) {
 // One road-slime strike = one slime of the cluster felled (the encounter's 3
 // clean hits map onto the bounty's 3 kills).
 export function recordSlimeKill(state) {
-  return recordJobEvent(state.world.jobs, {
+  const result = recordJobEvent(state.world.jobs, {
     type: "kill",
     enemyType: "slime",
     behavior: "balanced",
     regionId: REGION_ID,
   });
+  // Killing for the territory is acting like Abram — feed the Executor. Three
+  // marsh-road slime kills push approval to +30, past the "high" band.
+  adjustExecutorApproval(state, 10);
+  return result;
 }
 
 // Loot beat: cache pry / wagon salvage / slime gib. Applies items + gear to the
@@ -293,6 +341,8 @@ export function buildGameSaveSlice(state) {
       world: { jobs: state.world.jobs, loot: state.world.loot },
       npcMemory: state.npcMemory,
       executorCompliance: state.executorCompliance,
+      factionRep: state.factionRep,
+      executorApproval: state.executorApproval,
     }),
   );
 }
