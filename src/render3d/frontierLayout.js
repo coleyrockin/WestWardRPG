@@ -799,11 +799,13 @@ function openRangeBoundaryRing() {
     { from: { x: maxX, y: maxY }, to: { x: minX, y: maxY }, name: "South Rim" },
     { from: { x: minX, y: maxY }, to: { x: minX, y: minY }, name: "West Rim" },
   ];
-  // Cool blue-grey reads as distant haze on the far rims, but directly behind Calico
-  // (West Rim) it rendered as a row of cold monoliths against the warm desert. The
-  // West Rim gets a warm sandstone palette instead — buildMesa still cool-shifts it
-  // ~38% with distance, landing on a warm taupe rather than blue-grey.
-  const COOL_RIM = ["#3c4658", "#424c5e", "#4a5466", "#525c6e"];
+  // The far rims read as distant cool haze, but the OLD palette was 4 near-identical
+  // blue-greys at near-uniform height — a flat monolith WALL, not a horizon. Widen the
+  // cool palette across value + a hint of hue (one desaturated taupe ridge breaks the
+  // blue monotony), and dramatize heightMul below, so the skyline reads as a broken
+  // line of buttes. The West Rim (directly behind Calico) keeps the warm sandstone set
+  // — buildMesa still cool-shifts it ~38% with distance, landing on warm taupe.
+  const COOL_RIM = ["#3a4250", "#46506a", "#525a6e", "#3e4658", "#5c5e68", "#4a4e5c", "#62604f"];
   const WARM_RIM = ["#7a5e40", "#6e5238", "#82664a", "#765a42"];
   let n = 0;
   for (const edge of edges) {
@@ -819,9 +821,12 @@ function openRangeBoundaryRing() {
         label: `${edge.name} ${i}`,
         x: edge.from.x + (edge.to.x - edge.from.x) * t,
         y: edge.from.y + (edge.to.y - edge.from.y) * t,
-        color: palette[n % 4],
-        size: 3.9 + hash01(n * 31.7) * 1.7,
-        heightMul: 0.9 + hash01(n * 47.1) * 0.95,
+        color: palette[n % palette.length],
+        // size floor stays 3.9 (no slip gaps); only the max widens for silhouette
+        // variety. heightMul swings 0.6–2.1 for a jagged skyline (vertical only —
+        // doesn't touch the footprint, so the wall stays sealed).
+        size: 3.9 + hash01(n * 31.7) * 2.2,
+        heightMul: 0.6 + hash01(n * 47.1) * 1.5,
         yaw: (hash01(n * 59.3) - 0.5) * 0.6,
       });
     }
