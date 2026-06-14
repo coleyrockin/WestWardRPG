@@ -702,19 +702,20 @@ const CALICO_FLATS = [
   { kind: "cart",         label: "Calico Approach Cart",     x: -41.0, y: 12.2, color: "#a87542", size: 0.78, yaw: 0.5 },
   // Neutral saloon row — NORTH shoulder (y < 8.9 → fronts face south to the street).
   // Centers pulled to ~3.7u so the three masses read as one contiguous row (the
-  // town's identity-defining "neutral saloon row"), not detached boxes.
-  // NORTH shoulder (y < 8.9 → fronts face south to the street). Bleached, sun-
-  // scoured bodies (bodyTint) set Calico apart from Dustward's warm amber; the two
-  // saloons wear neon-on-clapboard signs (the free town's lawless glow).
-  { kind: "saloonFacade", label: "The Neutral Ground Saloon", x: -48.0, y: 5.4, color: "#a87848", size: 0.95, bodyTint: "#b3a585" },
-  { kind: "saloonFacade", label: "Drovers' Rest Saloon",     x: -51.7, y: 5.2,  color: "#9c6f43", size: 0.9, bodyTint: "#a89a78" },
+  // town's identity-defining "neutral saloon row"), not detached boxes. Bleached,
+  // sun-scoured body+trim+roof (bodyTint/trimTint/roofTint) set Calico apart from
+  // Dustward's warm amber; the two saloons wear neon-on-clapboard signs (the free
+  // town's lawless glow). Drovers' wears a rusty-red roof for accent relief.
+  { kind: "saloonFacade", label: "The Neutral Ground Saloon", x: -48.0, y: 5.4, color: "#a87848", size: 0.95, bodyTint: "#b3a585", trimTint: "#8a7e62", roofTint: "#5b5f60" },
+  { kind: "saloonFacade", label: "Drovers' Rest Saloon",     x: -51.7, y: 5.2,  color: "#9c6f43", size: 0.9, bodyTint: "#a89a78", trimTint: "#807454", roofTint: "#7a3a2e" },
   { kind: "porch",        label: "Saloon Row Porch",         x: -48.0, y: 6.6,  color: "#5a4327", size: 0.6 },
-  { kind: "storefront",   label: "Flats Mercantile",         x: -55.4, y: 5.8,  color: "#9a7840", size: 0.9, bodyTint: "#ab9d80" },
+  { kind: "storefront",   label: "Flats Mercantile",         x: -55.4, y: 5.8,  color: "#9a7840", size: 0.9, bodyTint: "#ab9d80", trimTint: "#86795c", roofTint: "#586064" },
   // SOUTH shoulder (y > 8.9 → fronts face north). The elected Sheriff's Office is
   // the civic anchor — set across the street FACING the saloon row, up-sized and
-  // cool stone-tinted so the law out-masses the bars.
-  { kind: "storefront",   label: "Calico Sheriff's Office",  x: -51.0, y: 12.6, color: "#8a6a3c", size: 1.0, bodyTint: "#9ba08c" },
-  { kind: "ranch",        label: "Calico Boarding House",     x: -55.0, y: 13.0, color: "#86683e", size: 0.8, bodyTint: "#9c9276" },
+  // cool stone-tinted so the law out-masses the bars. The Boarding House wears a
+  // verdigris (aged-copper) trim accent.
+  { kind: "storefront",   label: "Calico Sheriff's Office",  x: -51.0, y: 12.6, color: "#8a6a3c", size: 1.0, bodyTint: "#9ba08c", trimTint: "#7e8270", roofTint: "#4e5a5e" },
+  { kind: "ranch",        label: "Calico Boarding House",     x: -55.0, y: 13.0, color: "#86683e", size: 0.8, bodyTint: "#9c9276", trimTint: "#5f8a72", roofTint: "#5a5e60" },
   // Vertical landmark — closes the west end of the street, reads at range (bleached
   // tank to match the town).
   { kind: "waterTower",   label: "Calico Water Tower",        x: -62.0, y: 9.2,  color: "#8a7a5e", size: 1.1 },
@@ -726,6 +727,53 @@ const CALICO_FLATS = [
   // an unlit ~12u corridor. North shoulder, off the y≈9 walk path.
   { kind: "lampLow",      label: "Tower Base Lantern",        x: -59.5, y: 7.4,  color: "#ffe0a0", size: 0.52 },
   { kind: "hitchingRail", label: "Saloon Hitching Rail",      x: -51.6, y: 7.0,  color: "#4a3526", size: 0.7,  yaw: 0.04 },
+];
+
+// CALICO FLATS — composition dressing (M0-safe authored props, Dustward's proven
+// vocabulary; NOT a scatter swarm). Turns the skeleton into a composed free town:
+// boardwalks + warm window-glow + signage give the street life, the gallows is the
+// grim civic landmark the eye lands on ("where bodies get found"), the Sheriff's
+// warm lamp + readable "SHERIFF" sign set the law against the saloons' pink neon,
+// and a back rank breaks the skyline with depth. Road lane (y≈9, band 6.4–11.6)
+// stays clear; props hug the shoulders / boardwalk edges. Silhouettes are flat,
+// dark, intentionally non-realistic SCENERY (art direction) — not NPCs (post-M0).
+const CALICO_DRESSING = [
+  // The gallows — centerpiece, south shoulder just past the gate; noose faces the
+  // street (north). First grim thing you meet in the free town.
+  { kind: "gallows",      label: "Calico Gallows",            x: -46.5, y: 12.6, color: "#4a3526", size: 1.0 },
+  { kind: "lampLow",      label: "Gallows Lantern",           x: -45.8, y: 11.6, color: "#ffd6a0", size: 0.52 },
+  // North boardwalk — continuous walk fronting the saloon row (null footprint).
+  { kind: "productionBoardwalk", label: "North Boardwalk", x: -47.5, y: 6.6, color: "#5d3f24", size: 0.9 },
+  { kind: "productionBoardwalk", label: "North Boardwalk", x: -51.0, y: 6.6, color: "#5d3f24", size: 0.9 },
+  { kind: "productionBoardwalk", label: "North Boardwalk", x: -54.5, y: 6.6, color: "#5d3f24", size: 0.9 },
+  // South boardwalk — fronts the sheriff + boarding house.
+  { kind: "productionBoardwalk", label: "South Boardwalk", x: -51.0, y: 11.6, color: "#5d3f24", size: 0.9 },
+  { kind: "productionBoardwalk", label: "South Boardwalk", x: -54.5, y: 11.6, color: "#5d3f24", size: 0.9 },
+  // Warm window-glow — occupied-at-dusk read on every street-facing building.
+  { kind: "windowGlowPanel", label: "Neutral Ground Glow", x: -48.0, y: 6.1,  color: "#ffbf72", size: 0.9 },
+  { kind: "windowGlowPanel", label: "Drovers Glow",        x: -51.7, y: 5.95, color: "#ffad63", size: 0.85 },
+  { kind: "windowGlowPanel", label: "Mercantile Glow",     x: -55.4, y: 6.4,  color: "#ffbf72", size: 0.85 },
+  { kind: "windowGlowPanel", label: "Sheriff Glow",        x: -51.0, y: 11.9, color: "#ffce8a", size: 0.8 },
+  // Saloon signage — hanging boards reinforce the neon row.
+  { kind: "hangingSign",  label: "Neutral Ground Sign",      x: -47.4, y: 6.4,  color: "#ffc66e", size: 0.82 },
+  { kind: "hangingSign",  label: "Drovers Sign",             x: -51.1, y: 6.3,  color: "#ffc66e", size: 0.8 },
+  // Civic contrast — a readable gold "SHERIFF" board + a tall warm lamp set the
+  // law's warmth against the saloons' pink neon (signLines renders the text).
+  { kind: "sign",         label: "Sheriff Board",            x: -49.3, y: 11.8, color: "#ffd77b", size: 0.74, signLines: ["SHERIFF"] },
+  { kind: "lampTall",     label: "Sheriff Lamp",             x: -49.0, y: 11.5, color: "#ffe0a0", size: 0.8 },
+  // Cargo = activity.
+  { kind: "barrelCrateCluster", label: "Saloon Cargo",       x: -46.6, y: 6.5,  color: "#7a5230", size: 0.82, yaw: 0.2 },
+  { kind: "barrelCrateCluster", label: "Sheriff Cargo",      x: -53.4, y: 11.8, color: "#7a5230", size: 0.78, yaw: -0.2 },
+  // Stylized shadow-figure silhouettes — SCENERY, off the lane, on boardwalk edges.
+  { kind: "npcSilhouette", label: "Saloon Lounger",          x: -48.3, y: 6.5,  color: "#17100c", size: 0.82, yaw: 2.9 },
+  { kind: "npcSilhouette", label: "Sheriff's Deputy",        x: -50.4, y: 11.8, color: "#17100c", size: 0.8,  yaw: -0.2 },
+  { kind: "npcSilhouette", label: "Drifter",                 x: -53.5, y: 6.5,  color: "#120c09", size: 0.74, yaw: 2.95 },
+  // Wheel ruts at the road margins (flat decals).
+  { kind: "mudRutDecal",  label: "Calico Wheel Rut",         x: -49.0, y: 10.7, color: "#5a3923", size: 0.95, yaw: 0.05 },
+  { kind: "mudRutDecal",  label: "West Run Wheel Rut",       x: -56.0, y: 7.4,  color: "#5a3923", size: 0.85, yaw: -0.1 },
+  // Back rank — set-back small buildings break the north skyline (depth).
+  { kind: "productionSaloon", label: "Back Lot Saloon",       x: -49.5, y: 2.3,  color: "#7a5230", size: 0.6, yaw: 0.05 },
+  { kind: "productionStore",  label: "Back Lot Granary",      x: -54.0, y: 2.1,  color: "#634330", size: 0.62, yaw: -0.06 },
 ];
 
 // Far navigation landmarks — big verticals that read across the range and give
@@ -871,6 +919,7 @@ const ABSOLUTE_ZONES = [
   // OPEN RANGE (P4) — the world beyond the first road
   ...WEST_PASS,
   ...CALICO_FLATS,
+  ...CALICO_DRESSING,
   ...EASTWATER_RANCH,
   ...PROSPECTORS_FOLLY,
   ...SUNKEN_WASH,

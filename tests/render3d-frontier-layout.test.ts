@@ -221,6 +221,23 @@ describe("Calico Flats — town 2 (the free town, west of the Pass)", () => {
     expect(marker?.signLines).toEqual(["CALICO FLATS"]);
   });
 
+  it("dresses Calico to a composed-town floor (boardwalks, glow, depth, the gallows)", () => {
+    // Mirrors FIRST_ROAD_ART_STYLE's intent for town 2: lock the composition pass so
+    // a future edit can't silently strip Calico back to a bare skeleton.
+    const CALICO_FLOORS = { boardwalks: 4, windowLights: 3, silhouettes: 3, backRank: 2 };
+    const calico = placements.filter(
+      (p) => p.x <= -34 && p.x >= -68 && p.y >= 0 && p.y <= 18,
+    );
+    const count = (k: string) => calico.filter((p) => p.kind === k).length;
+    expect(count("productionBoardwalk")).toBeGreaterThanOrEqual(CALICO_FLOORS.boardwalks);
+    expect(count("windowGlowPanel")).toBeGreaterThanOrEqual(CALICO_FLOORS.windowLights);
+    expect(count("npcSilhouette")).toBeGreaterThanOrEqual(CALICO_FLOORS.silhouettes);
+    expect(
+      calico.filter((p) => ["productionStore", "productionSaloon"].includes(p.kind)).length,
+    ).toBeGreaterThanOrEqual(CALICO_FLOORS.backRank);
+    expect(calico.some((p) => p.kind === "gallows")).toBe(true);
+  });
+
   it("keeps wilderness scatter out of the Calico street (the clearing holds)", () => {
     // RANGE_CLEARINGS {x:-52,y:9,r:17} is the SOLE defense west of x<-16
     // (RANGE_PROTECT_RECT does not reach Calico). Assert no procedurally-scattered

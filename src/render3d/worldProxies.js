@@ -116,6 +116,7 @@ const FOOTPRINTS = {
   dustSmokePlume: null,
   bountyEmblem: null,
   storefront:  (p) => box(p, 2.6 * p.size, 1.2 * p.size),
+  gallows:     (p) => box(p, 1.9 * p.size, 1.4 * p.size),   // the platform is solid; walk around it
   walkInSaloon: saloonWalls,                     // returns an ARRAY of wall AABBs (door gap open)
   // Gateway arch: collide on the two posts only — the road lane under the beam
   // stays walkable. Posts sit at ±4.0*size along y from the placement center.

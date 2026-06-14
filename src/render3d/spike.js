@@ -712,8 +712,8 @@ function buildWesternBuilding(group, p, spec = {}) {
   // p.bodyTint overrides the shared WESTERN_SPECS body color per placement (Calico
   // Flats uses it for its sun-bleached palette; Dustward placements omit it).
   const body = standard(p.bodyTint ?? spec.body ?? "#7a5536", { roughness: 1 });
-  const trim = standard(spec.trim ?? "#b08a52", { roughness: 1 });
-  const roofMat = standard(spec.roof ?? "#37271a", { roughness: 1 });
+  const trim = standard(p.trimTint ?? spec.trim ?? "#b08a52", { roughness: 1 });
+  const roofMat = standard(p.roofTint ?? spec.roof ?? "#37271a", { roughness: 1 });
   const dark = standard("#241910", { roughness: 1 });
   const pane = standard("#ffd190", { emissive: "#b9762e", emissiveIntensity: 0.32 });
   const shutterMat = standard(spec.shutter ?? spec.roof ?? "#3a2a1a", { roughness: 1 });
@@ -1112,6 +1112,58 @@ function buildSteelMustang(group, p) {
   group.add(mustang);
 }
 
+// The town gallows — Calico Flats' grim civic landmark ("where bodies get found,"
+// the free town's whole identity). A raised plank platform with a trapdoor, two
+// posts + crossbeam, and a hanging noose. Authored to read as a confident, grim
+// silhouette at range (art-bible pillar 1, procedural — no Blender). p.yaw rotates
+// it (default noose faces -z, toward the street); the platform is the solid
+// footprint in worldProxies. One hero object, M0-safe.
+function buildGallows(group, p) {
+  const s = p.size || 1;
+  const g = new THREE.Group();
+  g.position.copy(toVec(p.x, p.y));
+  if (p.yaw) g.rotation.y = p.yaw;
+  const wood = standard(p.color || "#4a3526", { roughness: 0.98 });
+  const woodDark = standard("#2c1d12", { roughness: 0.98 });
+  const rope = standard("#8a7038", { roughness: 0.9 });
+
+  const deckW = 2.0 * s, deckD = 1.5 * s, deckH = 0.66 * s;
+  // platform on four stout legs
+  for (const [lx, lz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    addBox(g, 0.17 * s, deckH, 0.17 * s, woodDark,
+      new THREE.Vector3(lx * (deckW / 2 - 0.17 * s), deckH / 2, lz * (deckD / 2 - 0.17 * s)));
+  }
+  addBox(g, deckW, 0.17 * s, deckD, wood, new THREE.Vector3(0, deckH, 0));                 // deck top
+  addBox(g, 0.62 * s, 0.05 * s, 0.62 * s, woodDark, new THREE.Vector3(0, deckH + 0.1 * s, -0.28 * s)); // trapdoor hint
+  // steps up the back (south) side
+  addBox(g, deckW * 0.5, 0.22 * s, 0.32 * s, woodDark, new THREE.Vector3(0, 0.22 * s, deckD / 2 + 0.2 * s));
+  addBox(g, deckW * 0.5, 0.44 * s, 0.32 * s, woodDark, new THREE.Vector3(0, 0.22 * s, deckD / 2 + 0.5 * s));
+
+  // two posts rising from the deck (spanning x), crossbeam across the top
+  const postH = 3.2 * s, postTop = deckH + postH, postX = deckW / 2 - 0.22 * s, postZ = -0.12 * s;
+  for (const sx of [-1, 1]) {
+    addBox(g, 0.22 * s, postH, 0.22 * s, wood, new THREE.Vector3(sx * postX, deckH + postH / 2, postZ));
+    const brace = new THREE.Mesh(new THREE.BoxGeometry(0.13 * s, 0.95 * s, 0.13 * s), woodDark);
+    brace.position.set(sx * (postX - 0.34 * s), deckH + postH - 0.52 * s, postZ);
+    brace.rotation.z = sx * 0.72;
+    brace.castShadow = true;
+    g.add(brace);
+  }
+  addBox(g, postX * 2 + 0.44 * s, 0.24 * s, 0.24 * s, wood, new THREE.Vector3(0, postTop, postZ)); // crossbeam
+
+  // the noose — rope from the beam to a loop at neck height, on the -z (street) face
+  const ropeTop = postTop - 0.12 * s, ropeLen = 1.45 * s;
+  addBox(g, 0.06 * s, ropeLen, 0.06 * s, rope, new THREE.Vector3(0, ropeTop - ropeLen / 2, postZ));
+  const loop = new THREE.Mesh(new THREE.TorusGeometry(0.17 * s, 0.04 * s, 6, 12), rope);
+  loop.position.set(0, ropeTop - ropeLen - 0.15 * s, postZ); // vertical ring, faces the street
+  loop.castShadow = true;
+  g.add(loop);
+
+  group.add(g);
+  addContactShadow(group, p.x, p.y, deckW * 0.58, deckD * 0.58);
+  return g;
+}
+
 function buildPlacement(group, p) {
   // Guard size once here: every per-kind builder multiplies p.size, so an entry
   // missing it (undefined * k = NaN) would silently produce zero-scaled geometry.
@@ -1153,6 +1205,7 @@ function buildPlacement(group, p) {
     case "brokenWagon":
     case "wagonSalvage": return buildWagon(group, p);
     case "gravesite": return buildGravesite(group, p);
+    case "gallows": return buildGallows(group, p);
     case "steelMustang": return buildSteelMustang(group, p);
     case "roadSlime": return buildSlime(group, p);
     case "walkInSaloon": return buildWalkInSaloon(group, p);
