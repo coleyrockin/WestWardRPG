@@ -34,28 +34,31 @@ const NPC_SPECS_BY_LOCALE = {
   westward: [
     // Diversified tints + wider height range so the street reads as a distinct cast
     // (rust coat / dark duster / pale linen / warm mids), not a sea of beige clones.
-    { id: "mabel", name: "Mabel", variant: "vest", scale: 0.92, tint: "#6b3822", speed: 1.2, pause: 1.8, waypoints: [{ x: 3, z: 4 }, { x: 7, z: 4 }, { x: 7.5, z: 2 }, { x: 3, z: 2.2 }] },
-    { id: "cole", name: "Cole", variant: "drifter", scale: 1.12, tint: "#1c1410", speed: 1.45, pause: 1.1, waypoints: [{ x: 5, z: 3.2 }, { x: 8, z: 5 }, { x: 6, z: 1.6 }] },
-    { id: "rosa", name: "Rosa", variant: "vendor", scale: 0.9, tint: "#f5eed8", speed: 1.0, pause: 2.2, waypoints: [{ x: 2.6, z: 5.2 }, { x: 4.4, z: 3.4 }] },
-    { id: "hank", name: "Hank", variant: "drifter", scale: 1.04, tint: "#7a3020", speed: 1.35, pause: 1.5, waypoints: [{ x: 10.5, z: 6.8 }, { x: 16, z: 6.4 }, { x: 16, z: 7.6 }, { x: 11, z: 7.2 }] },
-    { id: "pearl", name: "Pearl", variant: "vendor", scale: 0.98, tint: "#cdb39a", speed: 1.15, pause: 2.0, waypoints: [{ x: 13, z: 5.4 }, { x: 15.5, z: 6.6 }, { x: 12.5, z: 6.8 }] },
+    // Home-ground townsfolk read as Civic (the town that keeps the lamps lit).
+    { id: "mabel", name: "Mabel", variant: "vest", scale: 0.92, tint: "#6b3822", faction: "civic", speed: 1.2, pause: 1.8, waypoints: [{ x: 3, z: 4 }, { x: 7, z: 4 }, { x: 7.5, z: 2 }, { x: 3, z: 2.2 }] },
+    { id: "cole", name: "Cole", variant: "drifter", scale: 1.12, tint: "#1c1410", faction: "civic", speed: 1.45, pause: 1.1, waypoints: [{ x: 5, z: 3.2 }, { x: 8, z: 5 }, { x: 6, z: 1.6 }] },
+    { id: "rosa", name: "Rosa", variant: "vendor", scale: 0.9, tint: "#f5eed8", faction: "civic", speed: 1.0, pause: 2.2, waypoints: [{ x: 2.6, z: 5.2 }, { x: 4.4, z: 3.4 }] },
+    { id: "hank", name: "Hank", variant: "drifter", scale: 1.04, tint: "#7a3020", faction: "civic", speed: 1.35, pause: 1.5, waypoints: [{ x: 10.5, z: 6.8 }, { x: 16, z: 6.4 }, { x: 16, z: 7.6 }, { x: 11, z: 7.2 }] },
+    { id: "pearl", name: "Pearl", variant: "vendor", scale: 0.98, tint: "#cdb39a", faction: "civic", speed: 1.15, pause: 2.0, waypoints: [{ x: 13, z: 5.4 }, { x: 15.5, z: 6.6 }, { x: 12.5, z: 6.8 }] },
   ],
   calico: [
     // Marisol Vega — saloon owner of the Neutral Ground, your competitor (§133).
-    // Works the north boardwalk fronting the saloon row (saloons at y≈5.4).
-    { id: "marisol", name: "Marisol Vega", variant: "vendor", scale: 0.98, tint: "#7a4a55", speed: 1.05, pause: 2.1, waypoints: [{ x: -47.4, z: 6.7 }, { x: -49.2, z: 6.7 }, { x: -48.3, z: 7.5 }] },
+    // Works the north boardwalk fronting the saloon row (saloons at y≈5.4). Civic —
+    // a free-town keeper, not a corp hand.
+    { id: "marisol", name: "Marisol Vega", variant: "vendor", scale: 0.98, tint: "#7a4a55", faction: "civic", speed: 1.05, pause: 2.1, waypoints: [{ x: -47.4, z: 6.7 }, { x: -49.2, z: 6.7 }, { x: -48.3, z: 7.5 }] },
     // Silas Tally — yes, that Tally (§136). The collector works the gallows end of
     // the street; lean, dark, unhurried. They don't take scrip.
-    { id: "silas", name: "Silas Tally", variant: "drifter", scale: 1.14, tint: "#15171c", speed: 1.3, pause: 1.0, waypoints: [{ x: -47.6, z: 11.0 }, { x: -50.2, z: 11.2 }, { x: -48.6, z: 10.1 }] },
+    { id: "silas", name: "Silas Tally", variant: "drifter", scale: 1.14, tint: "#15171c", faction: "tally", speed: 1.3, pause: 1.0, waypoints: [{ x: -47.6, z: 11.0 }, { x: -50.2, z: 11.2 }, { x: -48.6, z: 10.1 }] },
     // Dr. Adaeze Okafor — your iron doctor, knows the Executor better than anyone
     // (§135). Anchored to the iron-doctor wagon on the eastern approach (-39.5,5.5).
-    { id: "adaeze", name: "Dr. Okafor", variant: "vest", scale: 0.96, tint: "#2f6b66", speed: 1.0, pause: 2.3, waypoints: [{ x: -40.6, z: 6.2 }, { x: -41.9, z: 6.9 }, { x: -39.5, z: 6.6 }] },
+    // Iron doctors are the Circuit Riders' hands on the chrome.
+    { id: "adaeze", name: "Dr. Okafor", variant: "vest", scale: 0.96, tint: "#2f6b66", faction: "circuit", speed: 1.0, pause: 2.3, waypoints: [{ x: -40.6, z: 6.2 }, { x: -41.9, z: 6.9 }, { x: -39.5, z: 6.6 }] },
     // The elected sheriff — Calico's civic anchor (§27). Steel-blue law, patrols the
     // south shoulder in front of the Sheriff's Office (-51,12.6). Role, not a named.
-    { id: "sheriff_calico", name: "Calico Sheriff", variant: "vest", scale: 1.06, tint: "#4a5a6e", speed: 1.2, pause: 1.6, waypoints: [{ x: -50.0, z: 11.9 }, { x: -52.6, z: 12.0 }, { x: -51.0, z: 11.2 }] },
+    { id: "sheriff_calico", name: "Calico Sheriff", variant: "vest", scale: 1.06, tint: "#4a5a6e", faction: "civic", speed: 1.2, pause: 1.6, waypoints: [{ x: -50.0, z: 11.9 }, { x: -52.6, z: 12.0 }, { x: -51.0, z: 11.2 }] },
     // A Caldera freeholder — off-grid, devout, armed (§28), down from the rim and
     // wary of the Cross name. Drifts the unlit west run by the water tower.
-    { id: "freeholder", name: "Caldera Freeholder", variant: "drifter", scale: 1.0, tint: "#8a6f3e", speed: 1.1, pause: 1.9, waypoints: [{ x: -56.0, z: 7.6 }, { x: -58.6, z: 7.8 }, { x: -55.0, z: 7.2 }] },
+    { id: "freeholder", name: "Caldera Freeholder", variant: "drifter", scale: 1.0, tint: "#8a6f3e", faction: "freeholder", speed: 1.1, pause: 1.9, waypoints: [{ x: -56.0, z: 7.6 }, { x: -58.6, z: 7.8 }, { x: -55.0, z: 7.2 }] },
   ],
 };
 
@@ -101,7 +104,7 @@ export async function createTownsfolk(scene, opts = {}) {
       character.group.position.set(s.waypoints[0].x, 0, s.waypoints[0].z);
       scene.add(character.group);
       const lines = GREETINGS[s.id] || { neutral: "Howdy, stranger.", warm: "Good to see you again." };
-      return { character, wander, start: s.waypoints[0], name: s.name, id: s.id, met: 0, lines };
+      return { character, wander, start: s.waypoints[0], name: s.name, id: s.id, faction: s.faction ?? null, met: 0, lines };
     }),
   );
 
@@ -153,7 +156,7 @@ export async function createTownsfolk(scene, opts = {}) {
     if (!interactable) return null;
     interactable.met += 1;
     const line = interactable.met < 3 ? interactable.lines.neutral : interactable.lines.warm;
-    return { name: interactable.name, line };
+    return { name: interactable.name, line, id: interactable.id, faction: interactable.faction };
   }
 
   return { npcs, update, getInteractable, talk };

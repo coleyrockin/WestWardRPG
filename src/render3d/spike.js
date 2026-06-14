@@ -65,6 +65,8 @@ import {
   lootBeat,
   claimBoardReward,
   recordNpcGreeting,
+  adjustFactionRep,
+  adjustExecutorApproval,
   activeJobLine,
   playerHudView,
   makeRng,
@@ -2944,6 +2946,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     npcSpeechMsg = line; // the loop's npcSpeech block renders it (cyan, 5s)
     npcSpeechT = 5;
   };
+  // How Abram's ghost reads each faction when Ezra builds ties there: he respects
+  // collectors (Tally), shrugs at town-keepers (Civic) and the wire-priests
+  // (Circuit), and curdles when you cozy up to the Caldera freeholders — the
+  // people his Founding Crime drowned. Standing builds toward the warmth threshold
+  // (npcMemory fires faction-aware lines at |rep| >= 40); ~10 greetings to get there.
+  const EXECUTOR_FACTION_BIAS = { tally: 2, helios: 1, circuit: 0, civic: 0, freeholder: -2 };
   if (typeof window !== "undefined") {
     window.addEventListener("keydown", (e) => {
       if (e.code !== "KeyE") return;
@@ -2954,6 +2962,13 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         // Greeting memory rides the RPG tree so townsfolk remember the player
         // across saves (visit counts feed first-meeting vs returning lines).
         recordNpcGreeting(game, r.name.toLowerCase(), { at: runElapsed });
+        // Relationships build faction standing, and the company you keep feeds (or
+        // starves) the Executor — the social system IS the moral instrument.
+        if (r.faction) {
+          adjustFactionRep(game, r.faction, 4);
+          const bias = EXECUTOR_FACTION_BIAS[r.faction] ?? 0;
+          if (bias) adjustExecutorApproval(game, bias);
+        }
         onRunMutated();
       }
     });
