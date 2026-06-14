@@ -90,6 +90,12 @@ const GROUNDABLE_KINDS = new Set([
   "wagonSalvage", "cart", "crate", "barrelCrateCluster", "rock", "boulder",
   "cactus", "deadTree", "hitchingRail", "horseHitched", "cattle",
 ]);
+// B4 — flora/prop wind-sway: a SMALL set of authored hero placements get a tiny
+// seeded rotation sway in stepWorld (gated fdt>0, so frozen under capture). Only
+// these stake-mounted props; NOT the InstancedMesh scatter (deferred). Each tagged
+// node carries userData.windSway and the loop sways node.rotation.z as a delta off
+// its stored base rotation, so it never drifts.
+const WIND_SWAY_KINDS = new Set(["sign", "roadSign", "deadTree"]);
 // M0 perf — shadow-caster culling (roadmap §M0). Boundary/distant silhouettes and
 // flora read fine without casting onto the playable area; dropping their castShadow
 // shrinks the WebGPU shadow pass with no visible loss. Foreground/midground hero
@@ -2619,6 +2625,19 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
             }
             placementNodes.push({ kind: p.kind, node });
             recordModelLoad(p.kind, entry.url, true);
+            // B4 — tag hero stake-props (sign / roadSign / deadTree) for wind-sway.
+            // Position-seeded freq/phase keep neighbours out of unison; no Math.random
+            // (determinism). The windSwayers collector below reads the tag; the loop is
+            // fdt-gated so capture never sways. Authored yaw lives on node.rotation.y,
+            // so swaying rotation.z (lean) is orthogonal and won't fight the yaw jitter.
+            if (WIND_SWAY_KINDS.has(p.kind)) {
+              const s = hashYaw(p.x * 2.3 + 1.7, p.y * 1.9 - 0.7); // 0..2π
+              node.userData.windSway = {
+                freq: 0.55 + (s / (Math.PI * 2)) * 0.5, // 0.55–1.05 rad/s
+                amp: p.kind === "deadTree" ? 0.05 : 0.035, // dead trees lean more
+                phase: s,
+              };
+            }
             // lamps/beacon/board carried their PointLight inside the old builder;
             // re-add it here for the model path (height is in local model units).
             if (entry.light) attachLight(props, p, entry.light, effScale);
@@ -2705,6 +2724,34 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // excluded by the intensity ceiling; the golden-image capture skips this entirely
   // so the ?visual baseline stays deterministic.
   const lampFlickers = [];
+  // B4 — wind-sway swayers, collected once. Each stores the node + its tag + the
+  // node's base rotation.z, so the stepWorld loop applies a sin() delta off the
+  // base instead of drifting absolutely. Same collector idiom as lampFlickers;
+  // fdt-gated in stepWorld so capture (fdt=0) never sways. Under ?visual the model
+  // stream is still in flight here, so this collects none — fine: capture is frozen.
+  const windSwayers = [];
+  // B2 — lamp-personality tiers. Derive a deterministic `kind` per lamp at collect
+  // time (NO Math.random). "forge" = the blacksmith coal light, read by proximity to
+  // the blacksmith placement (conversion-independent) backed by its hot, fully
+  // saturated, mid-lightness orange (HSL is colorspace-independent, unlike the linear
+  // r/g/b channels). The brightest/main lamps read "steady"; a seeded share of the
+  // rest also hold steady so the street isn't uniformly guttering; the remainder
+  // "gutter". The per-tier waveform lives in the stepWorld flicker loop. Intensity
+  // (and forge hue) only — lights never move, no geometry changes, so the freeze
+  // keeps the golden baseline byte-identical.
+  const forgeProp = snapshot.worldObjects.find((p) => p.kind === "blacksmith");
+  const _hsl = { h: 0, s: 0, l: 0 };
+  const lampTierOf = (light, seed) => {
+    light.color.getHSL(_hsl, THREE.SRGBColorSpace);
+    const hotOrange = _hsl.s > 0.98 && _hsl.l < 0.66 && _hsl.h < 0.09; // forge coal hue
+    const nearForge = forgeProp
+      && Math.hypot(light.position.x - forgeProp.x, light.position.z - forgeProp.y) < 2.5;
+    if (hotOrange && nearForge) return "forge";
+    // Main street lamps burn bright + clean — steady. Plus a seeded share of the
+    // rest hold steady so the street isn't uniformly guttering.
+    if (light.intensity >= 4 || seed > Math.PI * 1.45) return "steady";
+    return "guttering";
+  };
   // Window-glow schedule targets (panes + their warmth lights), collected once and
   // ramped by clock.dayTime in stepWorld so buildings read as occupied at night /
   // quiet by day. Runs even under the freeze (dayTime is pinned to dusk), so the
@@ -2723,7 +2770,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     }
     if (!visualCapture && obj.isPointLight && obj.intensity <= 12) {
       const seed = (obj.position.x * 7.31 + obj.position.z * 13.73) % (Math.PI * 2);
-      lampFlickers.push({ light: obj, base: obj.intensity, seed });
+      lampFlickers.push({ light: obj, base: obj.intensity, seed, kind: lampTierOf(obj, seed) });
+    }
+    // B4 — collect tagged stake-props. Store the base rotation.z so sway is a delta.
+    if (obj.userData?.windSway) {
+      windSwayers.push({ node: obj, cfg: obj.userData.windSway, baseZ: obj.rotation.z });
     }
   });
   windowGlows.panes = [...paneSet];
@@ -2983,6 +3034,76 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     createBirdFlock({ x: 2, y: -18 }, 13.2), // northwest rampart
   ];
 
+  // B1 — chimney smoke. A tiny pool (weather-pool idiom from weatherView): grey-
+  // violet PlaneGeometry quads that rise (+Y) and drift downwind (+windX) over ~3 s,
+  // then recycle. GOLDEN-SAFE BY CONSTRUCTION: the pool starts EMPTY — every quad is
+  // visible=false / opacity 0 and `alive=false`. Quads are only ever born inside the
+  // live (fdt>0) update via the seeded emit timer; under capture fdt=0, so emit never
+  // fires and nothing is ever drawn. The frozen first frame therefore renders ZERO
+  // smoke quads regardless of where the source sits, so the dusk baseline is unchanged.
+  const createSmokeEmitter = (source) => {
+    const POOL = reducedFidelity ? 4 : 6;
+    const group = new THREE.Group();
+    const quadGeo = new THREE.PlaneGeometry(0.7, 0.7);
+    const puffs = [];
+    for (let i = 0; i < POOL; i++) {
+      // Each quad owns its material (per-mesh, M0-compliant single-source dressing) so
+      // opacity fades independently. Grey-violet, additive-free, no depth write.
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x6a5d72, transparent: true, opacity: 0, depthWrite: false,
+      });
+      const m = new THREE.Mesh(quadGeo, mat);
+      m.visible = false; // born invisible — capture (fdt=0) never flips this
+      group.add(m);
+      puffs.push({ mesh: m, mat, age: 0, life: 0, alive: false, drift: 0, seed: 0 });
+    }
+    scene.add(group);
+    let emitTimer = 0.6; // first puff after a beat — never at the frozen first frame
+    const base = toVec(source.x, source.y, source.h); // chimney-mouth world point
+    const step = (fdt, windX) => {
+      if (fdt <= 0) return; // FROZEN: no emit, no advance — pool stays all-invisible
+      emitTimer -= fdt;
+      // Advance live puffs; rise + drift + fade, recycle when spent.
+      for (const pf of puffs) {
+        if (!pf.alive) continue;
+        pf.age += fdt;
+        const k = pf.age / pf.life; // 0→1 over lifetime
+        if (k >= 1) { pf.alive = false; pf.mesh.visible = false; pf.mat.opacity = 0; continue; }
+        const rise = pf.age * (0.55 + 0.15 * pf.seed); // +Y climb
+        const drift = (windX * 0.6 + 0.2) * pf.age + Math.sin(pf.age * 1.3 + pf.seed * 6.0) * 0.12;
+        pf.mesh.position.set(base.x + drift, base.y + rise, base.z + pf.drift);
+        const grow = 1 + k * 1.8; // billow outward as it rises
+        pf.mesh.scale.setScalar(grow);
+        // Fade in over the first 15%, out over the rest. Peak ~0.16 (low, smoky).
+        pf.mat.opacity = 0.16 * Math.min(1, k / 0.15) * (1 - k);
+        pf.mesh.rotation.z += fdt * (0.2 + pf.seed * 0.3); // lazy curl
+      }
+      if (emitTimer <= 0) {
+        emitTimer = 0.7 + Math.random() * 0.5; // ~0.7–1.2 s cadence (live-only)
+        const pf = puffs.find((q) => !q.alive);
+        if (pf) {
+          pf.alive = true; pf.age = 0; pf.life = 2.8 + Math.random() * 0.6;
+          pf.seed = Math.random();
+          pf.drift = (Math.random() - 0.5) * 0.18; // small lateral spread (world z)
+          pf.mesh.visible = true;
+          pf.mesh.position.copy(base);
+          pf.mesh.scale.setScalar(1);
+          pf.mesh.rotation.set(0, 0, Math.random() * Math.PI);
+          pf.mat.opacity = 0;
+        }
+      }
+    };
+    return { step };
+  };
+  // Two hero sources: the blacksmith stovepipe (24.8, 13.8) and the hotel chimney
+  // (18.4, 13.6). Heights land at each building's pipe/chimney mouth. Even though the
+  // hotel sits inside the eastward capture frustum, smoke is provably absent under
+  // capture (pool born empty, emit is fdt>0-only) so the dusk baseline is safe.
+  const smokeEmitters = [
+    createSmokeEmitter({ x: 24.95, y: 13.92, h: 5.4 }), // blacksmith stone stovepipe top
+    createSmokeEmitter({ x: 18.4, y: 12.4, h: 6.0 }),   // hotel roofline / chimney mouth
+  ];
+
   const stepWorld = (dt) => {
     const frozen = visualCapture || _devCaptureFrozen;
     const fdt = frozen ? 0 : dt;
@@ -2997,13 +3118,41 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     atmosphere.driftClouds(fdt, 1 + weather.wind * 2);
     waterTime += fdt;
     water.uniforms.time.value = waterTime;
-    // Lamp flicker — gentle per-lamp intensity pulse; seeds keep adjacent lamps
-    // out of phase. Skipped when frozen (captureMode / visualCapture sets fdt=0).
+    // Lamp flicker — per-lamp intensity pulse with personality tiers (B2). Seeds keep
+    // adjacent lamps out of phase. Skipped when frozen (captureMode / visualCapture
+    // sets fdt=0), so the golden baseline holds every lamp at its authored intensity.
+    // Intensity-only (forge also warms hue) — lights never move, no geometry touched.
     if (fdt > 0 && lampFlickers.length) {
       for (const lf of lampFlickers) {
-        lf.light.intensity = lf.base * (0.92 + 0.08 * Math.sin(waterTime * 3.2 + lf.seed));
+        const t = waterTime + lf.seed;
+        let mul;
+        if (lf.kind === "steady") {
+          mul = 0.92 + 0.08 * Math.sin(t * 3.2);
+        } else if (lf.kind === "forge") {
+          // Warmer two-frequency flicker, slightly larger amplitude (live coals).
+          mul = 0.86 + 0.14 * (0.6 * Math.sin(t * 3.1) + 0.4 * Math.sin(t * 7.3));
+        } else {
+          // guttering: a steady-ish base with a seeded slow gutter — a brief dip
+          // toward ~0.6 roughly every several seconds. Phase is per-lamp via seed.
+          const base = 0.9 + 0.06 * Math.sin(t * 2.6);
+          const cyc = ((t * 0.13) % 1 + 1) % 1; // 0..1 over ~7.7 s, seed-shifted
+          const dip = cyc < 0.06 ? (1 - Math.sin((cyc / 0.06) * Math.PI)) : 1; // brief gutter
+          mul = base * (0.6 + 0.4 * dip);
+        }
+        lf.light.intensity = lf.base * mul;
       }
     }
+    // B4 — wind-sway: tiny lean on tagged stake-props, applied as a delta off each
+    // node's stored base rotation.z so it never drifts. fdt-gated → frozen under
+    // capture (and the model stream often isn't even collected yet at capture time).
+    if (fdt > 0 && windSwayers.length) {
+      for (const sw of windSwayers) {
+        sw.node.rotation.z = sw.baseZ + Math.sin(waterTime * sw.cfg.freq + sw.cfg.phase) * sw.cfg.amp;
+      }
+    }
+    // B1 — chimney smoke: rises + drifts downwind. Pool is empty until the first
+    // live emit, so fdt=0 (capture) renders zero quads — the golden frame is clean.
+    for (const sm of smokeEmitters) sm.step(fdt, weather.windSpeed);
     // Window-glow schedule — panes + their warmth lights light up from dusk through
     // night and quiet down by day. Driven by clock.dayTime (NOT fdt-gated) so it's
     // correct under the freeze too: dusk pins to p=0.5 → glow 1.0 → the authored
