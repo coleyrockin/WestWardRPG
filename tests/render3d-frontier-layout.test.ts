@@ -213,6 +213,14 @@ describe("Calico Flats — town 2 (the free town, west of the Pass)", () => {
     expect(calicoPoi?.x).toBeLessThan(-34);
   });
 
+  it("gives the town a READABLE marker (kind:sign + signLines, not blank)", () => {
+    // The marker stays kind:"sign" (NOT "roadSign" — that kind is gameplay-keyed);
+    // buildSign renders its text from signLines. A blank panel = the bug we fixed.
+    const marker = byLabel.get("Calico Flats Marker");
+    expect(marker?.kind).toBe("sign");
+    expect(marker?.signLines).toEqual(["CALICO FLATS"]);
+  });
+
   it("keeps wilderness scatter out of the Calico street (the clearing holds)", () => {
     // RANGE_CLEARINGS {x:-52,y:9,r:17} is the SOLE defense west of x<-16
     // (RANGE_PROTECT_RECT does not reach Calico). Assert no procedurally-scattered
@@ -221,7 +229,7 @@ describe("Calico Flats — town 2 (the free town, west of the Pass)", () => {
       (p) => typeof p.label === "string" && p.label.startsWith("Range "),
     );
     const intruders = scatter.filter(
-      (p) => Math.hypot(p.x - -52, p.y - 9) < 15,
+      (p) => Math.hypot(p.x - -52, p.y - 9) < 17, // match the actual clearing radius
     );
     expect(intruders).toEqual([]);
   });

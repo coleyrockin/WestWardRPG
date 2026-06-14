@@ -322,22 +322,31 @@ function makeSignTexture(lines) {
 function buildSign(group, p) {
   addBox(group, 0.1, 1.0, 0.1, standard("#3a2a1c"), toVec(p.x, p.y));
   const isHeroRoadSign = p.kind === "roadSign";
+  const pw = isHeroRoadSign ? 0.92 : 0.7;
+  const ph = isHeroRoadSign ? 0.5 : 0.42;
   const panel = new THREE.Mesh(
-    new THREE.BoxGeometry(isHeroRoadSign ? 0.92 : 0.7, isHeroRoadSign ? 0.5 : 0.42, 0.06),
+    new THREE.BoxGeometry(pw, ph, 0.06),
     standard(p.color, { emissive: p.color, emissiveIntensity: 0.5 }),
   );
   panel.position.copy(toVec(p.x, p.y, 1.05));
   panel.castShadow = true;
   group.add(panel);
-  if (isHeroRoadSign) {
-    // Readable directions on a plane just proud of the panel (single face, so
-    // the box's other sides stay clean for the ink pass).
+  // Readable lettering: hero road signs carry directions; ANY sign can override
+  // its text via p.signLines (e.g. the Calico Flats town marker — kept kind:"sign"
+  // so it doesn't collide with the gameplay-keyed "roadSign" kind). Single-face
+  // plane just proud of the panel, so the box's other sides stay clean for the ink.
+  const lines = p.signLines || (isHeroRoadSign ? ["CACHE ROAD →", "DUSTWARD ½ MI"] : null);
+  if (lines) {
+    // Keep the hero road sign's face EXACTLY 0.86×0.44 (it's in the golden frame);
+    // other signs size their face to the smaller panel.
+    const fw = isHeroRoadSign ? 0.86 : pw * 0.93;
+    const fh = isHeroRoadSign ? 0.44 : ph * 0.88;
     const face = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.86, 0.44),
+      new THREE.PlaneGeometry(fw, fh),
       // near-white tint: the painted texture IS the colour (nprMaterial
       // multiplies map × tint before the cel ramp)
       standard("#f5ecd8", {
-        map: makeSignTexture(["CACHE ROAD →", "DUSTWARD ½ MI"]),
+        map: makeSignTexture(lines),
         emissive: "#9a7a4a",
         emissiveIntensity: 0.22,
         rimStrength: 0,

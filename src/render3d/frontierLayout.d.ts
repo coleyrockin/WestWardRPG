@@ -10,6 +10,13 @@ export interface Placement {
   size: number;
   depthLane?: string;
   yaw?: number;
+  // Optional per-placement render overrides (read by spike.js builders).
+  signLines?: string[];
+  bodyTint?: string;
+  trimTint?: string;
+  roofTint?: string;
+  heightMul?: number;
+  heroPeak?: boolean;
 }
 
 export const FRONTIER_ANCHOR: { x: number; y: number };

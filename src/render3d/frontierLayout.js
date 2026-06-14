@@ -719,7 +719,7 @@ const CALICO_FLATS = [
   // tank to match the town).
   { kind: "waterTower",   label: "Calico Water Tower",        x: -62.0, y: 9.2,  color: "#8a7a5e", size: 1.1 },
   // Street fixtures.
-  { kind: "sign",         label: "Calico Flats Marker",       x: -45.0, y: 7.4,  color: "#ffd77b", size: 0.72 },
+  { kind: "sign",         label: "Calico Flats Marker",       x: -45.0, y: 7.4,  color: "#ffd77b", size: 0.72, signLines: ["CALICO FLATS"] },
   { kind: "lampLow",      label: "Gate Lantern",              x: -45.5, y: 10.3, color: "#ffe0a0", size: 0.56 },
   { kind: "lampLow",      label: "Saloon Row Lantern",        x: -50.5, y: 6.9,  color: "#ffe0a0", size: 0.52 },
   // Lights the dark west run — the Sheriff + water-tower (vista terminus) end sat in
