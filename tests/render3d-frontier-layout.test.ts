@@ -6,7 +6,9 @@ import {
   getArtDirectionLayoutMetrics,
   getProductionFrameLayoutMetrics,
   getRouteMetrics,
+  OPEN_RANGE_BOUNDS,
   PLAYER_SPAWN,
+  WORLD_MAP_POIS,
 } from "../src/render3d/frontierLayout.js";
 
 describe("render3d frontier layout", () => {
@@ -152,5 +154,75 @@ describe("render3d frontier layout", () => {
     expect(metrics.totalDistance).toBeGreaterThan(95);
     expect(metrics.estimatedPlaySeconds).toBeGreaterThanOrEqual(240);
     expect(metrics.estimatedPlaySeconds).toBeLessThanOrEqual(360);
+  });
+});
+
+describe("Calico Flats — town 2 (the free town, west of the Pass)", () => {
+  const placements = buildFrontierPlacements();
+  const byLabel = new Map(placements.map((p) => [p.label, p]));
+  // Everything west of the West Pass corridor (x ≤ -34) — the Calico zone.
+  const westOfPass = placements.filter((p) => p.x <= -34);
+
+  it("places the Calico anchor buildings west of the West Pass", () => {
+    expect(byLabel.get("Calico Flats Gate")?.kind).toBe("townGate");
+    expect(byLabel.get("The Neutral Ground Saloon")?.kind).toBe("saloonFacade");
+    expect(byLabel.get("Calico Sheriff's Office")?.kind).toBe("storefront");
+    expect(byLabel.get("Calico Water Tower")?.kind).toBe("waterTower");
+    for (const label of [
+      "Calico Flats Gate",
+      "The Neutral Ground Saloon",
+      "Calico Sheriff's Office",
+      "Calico Water Tower",
+    ]) {
+      expect(byLabel.get(label)!.x).toBeLessThan(-34);
+    }
+  });
+
+  it("keeps every Calico western building on a shoulder, off the y≈9 street", () => {
+    // saloonFacade/storefront/ranch route through buildWesternBuilding, whose front
+    // rule is (8.9 - y) >= 0. A building in the lane would face ambiguously and block
+    // the walk path — assert each sits clearly on one shoulder.
+    const buildings = westOfPass.filter((p) =>
+      ["saloonFacade", "storefront", "ranch"].includes(p.kind),
+    );
+    expect(buildings.length).toBeGreaterThanOrEqual(4);
+    for (const b of buildings) {
+      expect(Math.abs(b.y - 8.9)).toBeGreaterThan(1.5);
+    }
+  });
+
+  it("spaces Calico building masses so they do not overlap", () => {
+    const buildings = westOfPass.filter((p) =>
+      ["saloonFacade", "storefront", "ranch", "waterTower"].includes(p.kind),
+    );
+    for (let i = 0; i < buildings.length; i++) {
+      for (let j = i + 1; j < buildings.length; j++) {
+        const d = Math.hypot(
+          buildings[i].x - buildings[j].x,
+          buildings[i].y - buildings[j].y,
+        );
+        expect(d).toBeGreaterThanOrEqual(3.5);
+      }
+    }
+  });
+
+  it("pins the world wiring that makes Calico reachable and mapped", () => {
+    expect(OPEN_RANGE_BOUNDS.minX).toBe(-78);
+    const calicoPoi = WORLD_MAP_POIS.find((p) => p.id === "calico");
+    expect(calicoPoi?.label).toBe("Calico Flats");
+    expect(calicoPoi?.x).toBeLessThan(-34);
+  });
+
+  it("keeps wilderness scatter out of the Calico street (the clearing holds)", () => {
+    // RANGE_CLEARINGS {x:-52,y:9,r:17} is the SOLE defense west of x<-16
+    // (RANGE_PROTECT_RECT does not reach Calico). Assert no procedurally-scattered
+    // range flora lands inside the town footprint.
+    const scatter = placements.filter(
+      (p) => typeof p.label === "string" && p.label.startsWith("Range "),
+    );
+    const intruders = scatter.filter(
+      (p) => Math.hypot(p.x - -52, p.y - 9) < 15,
+    );
+    expect(intruders).toEqual([]);
   });
 });

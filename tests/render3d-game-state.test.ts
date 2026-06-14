@@ -161,7 +161,7 @@ describe("gameState — HUD views", () => {
     grantGold(s, 42);
     grantXp(s, 40);
     const hud = playerHudView(s);
-    expect(hud.subtitle).toBe("Level 1 Road Bounty Hunter");
+    expect(hud.subtitle).toBe("Level 1 Cross Heir");
     expect(hud.gold).toBe(42);
     expect(hud.xpRatio).toBeCloseTo(0.5);
   });

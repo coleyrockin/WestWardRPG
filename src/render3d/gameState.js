@@ -33,8 +33,8 @@ import {
 } from "../npcMemory.js";
 
 export const REGION_ID = "frontier";
-export const PLAYER_NAME = "Rowan Vale";
-export const PLAYER_CLASS = "Road Bounty Hunter";
+export const PLAYER_NAME = "Ezra Cross";
+export const PLAYER_CLASS = "Cross Heir";
 
 // Level curve — the original tuned numbers, kept exact:
 // start at nextXp 80; each level: nextXp = round(nextXp * 1.34 + 28).

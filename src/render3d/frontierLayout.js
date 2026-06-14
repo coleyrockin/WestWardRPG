@@ -578,7 +578,7 @@ function world(anchor, dx, dy, depthLane) {
 // everything below dresses the range AROUND it. All generation is deterministic
 // (hash01) so layouts are stable across boots and testable.
 
-export const OPEN_RANGE_BOUNDS = Object.freeze({ minX: -40, maxX: 150, minY: -60, maxY: 90 });
+export const OPEN_RANGE_BOUNDS = Object.freeze({ minX: -78, maxX: 150, minY: -60, maxY: 90 });
 
 // Dirt roads continuing past the authored slice — drawn by buildGround with the
 // same ribbon materials as the first road, and used as keep-clear corridors by
@@ -588,9 +588,13 @@ export const OPEN_RANGE_ROADS = Object.freeze([
   { from: { x: 60.5, y: 12.2 }, to: { x: 88, y: 13.6 }, width: 5.4 },
   { from: { x: 88, y: 13.6 }, to: { x: 114, y: 13.2 }, width: 5.2 },
   { from: { x: 114, y: 13.2 }, to: { x: 131, y: 14.0 }, width: 5.6 },
-  // west: Dustward gate → the West Pass (Ashfall tease)
+  // west: Dustward gate → the West Pass → Calico Flats (the free town, town 2)
   { from: { x: 7.6, y: 8.9 }, to: { x: -14, y: 8.6 }, width: 5.6 },
   { from: { x: -14, y: 8.6 }, to: { x: -34, y: 8.2 }, width: 5.0 },
+  { from: { x: -34, y: 8.2 }, to: { x: -44, y: 9.0 }, width: 5.0 },
+  // Calico Flats main street — the dirt ribbon under the gate, a leading line
+  // running the length of the town to the water tower (the vista terminus).
+  { from: { x: -44, y: 9.0 }, to: { x: -62, y: 9.1 }, width: 5.2 },
   // north spur: main road → Prospector's Folly (threads the old north-rim gap x 30..37)
   { from: { x: 30.5, y: 6.5 }, to: { x: 33.5, y: -27.5 }, width: 3.4 },
   // south spur: marsh edge → the Sunken Wash (threads the old south-rim gap x 51..55)
@@ -605,6 +609,7 @@ export const WORLD_MAP_POIS = Object.freeze([
   { id: "folly",      label: "Prospector's Folly", x: 33.5,  y: -29.5 },
   { id: "wash",       label: "Sunken Wash",         x: 76.5,  y: 58.5 },
   { id: "westPass",   label: "West Pass",           x: -20,   y: 8.6  },
+  { id: "calico",     label: "Calico Flats",       x: -52,   y: 9    },
 ]);
 
 // Second settlement on the eastern road — a working ranch outpost. Buildings
@@ -677,6 +682,52 @@ const WEST_PASS = [
   { kind: "lampLow",  label: "Pass Lamp",         x: -13.6, y: 7.2,  color: "#ffc88d", size: 0.6 },
 ];
 
+// CALICO FLATS — town 2, the free town (no corp charter, elected sheriff, neutral
+// saloon row). A LEAN hero-object skeleton built west past the West Pass while the
+// M0 perf reset is pending: procedural builders only, no scatter/NPC swarm. The
+// main street runs east–west at y≈9 so the hardcoded building auto-facing rule
+// (front = 8.9 - y; spike.js) orients every front to the street with no manual yaw.
+// The road enters from the east under the gate arch; the water tower closes the
+// west end as the town's vertical landmark. Density + a Calico region identity
+// come post-M0.
+const CALICO_FLATS = [
+  // East entrance — the gate arch spans the incoming road (posts collide, lane clear).
+  // signLines overrides the gate board text (default "WESTWARD") so Calico wears its
+  // own name, not town 1's.
+  { kind: "townGate",     label: "Calico Flats Gate",       x: -44.0, y: 9.0,  color: "#6b4a2c", size: 0.95, signLines: ["CALICO FLATS"] },
+  // Foreground frame — a snag + cart flank the eastern approach like theater wings,
+  // adding depth to the flat frontal view (mirrors Dustward's FOREGROUND_FRAME). Off
+  // the road lane (band y≈6.4–11.6 at width 5.2); east of the gate posts.
+  { kind: "deadTree",     label: "Calico Approach Snag",     x: -41.0, y: 5.0,  color: "#3e3224", size: 1.2 },
+  { kind: "cart",         label: "Calico Approach Cart",     x: -41.0, y: 12.2, color: "#a87542", size: 0.78, yaw: 0.5 },
+  // Neutral saloon row — NORTH shoulder (y < 8.9 → fronts face south to the street).
+  // Centers pulled to ~3.7u so the three masses read as one contiguous row (the
+  // town's identity-defining "neutral saloon row"), not detached boxes.
+  // NORTH shoulder (y < 8.9 → fronts face south to the street). Bleached, sun-
+  // scoured bodies (bodyTint) set Calico apart from Dustward's warm amber; the two
+  // saloons wear neon-on-clapboard signs (the free town's lawless glow).
+  { kind: "saloonFacade", label: "The Neutral Ground Saloon", x: -48.0, y: 5.4, color: "#a87848", size: 0.95, bodyTint: "#b3a585" },
+  { kind: "saloonFacade", label: "Drovers' Rest Saloon",     x: -51.7, y: 5.2,  color: "#9c6f43", size: 0.9, bodyTint: "#a89a78" },
+  { kind: "porch",        label: "Saloon Row Porch",         x: -48.0, y: 6.6,  color: "#5a4327", size: 0.6 },
+  { kind: "storefront",   label: "Flats Mercantile",         x: -55.4, y: 5.8,  color: "#9a7840", size: 0.9, bodyTint: "#ab9d80" },
+  // SOUTH shoulder (y > 8.9 → fronts face north). The elected Sheriff's Office is
+  // the civic anchor — set across the street FACING the saloon row, up-sized and
+  // cool stone-tinted so the law out-masses the bars.
+  { kind: "storefront",   label: "Calico Sheriff's Office",  x: -51.0, y: 12.6, color: "#8a6a3c", size: 1.0, bodyTint: "#9ba08c" },
+  { kind: "ranch",        label: "Calico Boarding House",     x: -55.0, y: 13.0, color: "#86683e", size: 0.8, bodyTint: "#9c9276" },
+  // Vertical landmark — closes the west end of the street, reads at range (bleached
+  // tank to match the town).
+  { kind: "waterTower",   label: "Calico Water Tower",        x: -62.0, y: 9.2,  color: "#8a7a5e", size: 1.1 },
+  // Street fixtures.
+  { kind: "sign",         label: "Calico Flats Marker",       x: -45.0, y: 7.4,  color: "#ffd77b", size: 0.72 },
+  { kind: "lampLow",      label: "Gate Lantern",              x: -45.5, y: 10.3, color: "#ffe0a0", size: 0.56 },
+  { kind: "lampLow",      label: "Saloon Row Lantern",        x: -50.5, y: 6.9,  color: "#ffe0a0", size: 0.52 },
+  // Lights the dark west run — the Sheriff + water-tower (vista terminus) end sat in
+  // an unlit ~12u corridor. North shoulder, off the y≈9 walk path.
+  { kind: "lampLow",      label: "Tower Base Lantern",        x: -59.5, y: 7.4,  color: "#ffe0a0", size: 0.52 },
+  { kind: "hitchingRail", label: "Saloon Hitching Rail",      x: -51.6, y: 7.0,  color: "#4a3526", size: 0.7,  yaw: 0.04 },
+];
+
 // Far navigation landmarks — big verticals that read across the range and give
 // every horizon a destination.
 const RANGE_LANDMARKS = [
@@ -700,8 +751,15 @@ function openRangeBoundaryRing() {
     { from: { x: maxX, y: maxY }, to: { x: minX, y: maxY }, name: "South Rim" },
     { from: { x: minX, y: maxY }, to: { x: minX, y: minY }, name: "West Rim" },
   ];
+  // Cool blue-grey reads as distant haze on the far rims, but directly behind Calico
+  // (West Rim) it rendered as a row of cold monoliths against the warm desert. The
+  // West Rim gets a warm sandstone palette instead — buildMesa still cool-shifts it
+  // ~38% with distance, landing on a warm taupe rather than blue-grey.
+  const COOL_RIM = ["#3c4658", "#424c5e", "#4a5466", "#525c6e"];
+  const WARM_RIM = ["#7a5e40", "#6e5238", "#82664a", "#765a42"];
   let n = 0;
   for (const edge of edges) {
+    const palette = edge.name === "West Rim" ? WARM_RIM : COOL_RIM;
     const len = Math.hypot(edge.to.x - edge.from.x, edge.to.y - edge.from.y);
     const count = Math.ceil(len / SPACING);
     for (let i = 0; i < count; i++) {
@@ -713,7 +771,7 @@ function openRangeBoundaryRing() {
         label: `${edge.name} ${i}`,
         x: edge.from.x + (edge.to.x - edge.from.x) * t,
         y: edge.from.y + (edge.to.y - edge.from.y) * t,
-        color: ["#3c4658", "#424c5e", "#4a5466", "#525c6e"][n % 4],
+        color: palette[n % 4],
         size: 3.9 + hash01(n * 31.7) * 1.7,
         heightMul: 0.9 + hash01(n * 47.1) * 0.95,
         yaw: (hash01(n * 59.3) - 0.5) * 0.6,
@@ -731,6 +789,7 @@ const RANGE_CLEARINGS = [
   { x: 33.5, y: -30, r: 12 }, // Prospector's Folly
   { x: 76, y: 58, r: 12 },    // Sunken Wash
   { x: -22, y: 8.6, r: 11 },  // West Pass corridor
+  { x: -52, y: 9, r: 17 },    // Calico Flats (town 2)
 ];
 
 function distToSegment(px, py, a, b) {
@@ -811,6 +870,7 @@ const ABSOLUTE_ZONES = [
   ...BOUNDARY_RING,
   // OPEN RANGE (P4) — the world beyond the first road
   ...WEST_PASS,
+  ...CALICO_FLATS,
   ...EASTWATER_RANCH,
   ...PROSPECTORS_FOLLY,
   ...SUNKEN_WASH,

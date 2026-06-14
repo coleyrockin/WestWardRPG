@@ -198,6 +198,7 @@ const WORLD_POI_STYLES = Object.freeze({
   folly:     { color: "#c9a96e", size: 5.4 },
   wash:      { color: "#b8c49a", size: 5.4 },
   westPass:  { color: "#c8b07a", size: 5.6 },
+  calico:    { color: "#cdb185", size: 6.2 },
 });
 
 // Build the four corner points of OPEN_RANGE_BOUNDS so createProjector can
@@ -549,7 +550,7 @@ export function syncFieldMapDom(refs, loopState = {}, options = {}) {
   if (typeof svg.replaceChildren === "function") svg.replaceChildren();
   while (svg.firstChild && typeof svg.removeChild === "function") svg.removeChild(svg.firstChild);
 
-  setAttrs(svg, { viewBox: "0 0 220 142", role: "img", "aria-label": "Dustward first-road field map" });
+  setAttrs(svg, { viewBox: "0 0 220 142", role: "img", "aria-label": "Dustward field map" });
   const layer = svgNode(refs, "g");
   svg.appendChild(layer);
 

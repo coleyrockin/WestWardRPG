@@ -115,7 +115,7 @@ const FOOTPRINTS = {
   mudRutDecal: null,
   dustSmokePlume: null,
   bountyEmblem: null,
-  storefront:  (p) => box(p, 1.3 * p.size, 1.3 * p.size),
+  storefront:  (p) => box(p, 2.6 * p.size, 1.2 * p.size),
   walkInSaloon: saloonWalls,                     // returns an ARRAY of wall AABBs (door gap open)
   // Gateway arch: collide on the two posts only — the road lane under the beam
   // stays walkable. Posts sit at ±4.0*size along y from the placement center.

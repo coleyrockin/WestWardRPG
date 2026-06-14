@@ -700,7 +700,9 @@ function buildWesternBuilding(group, p, spec = {}) {
   const front = (8.9 - p.y) >= 0 ? 1 : -1;   // +1 → front faces +z (road on the south)
   const fz = p.y + front * depth / 2;        // front-face world z
   const cz = p.y;
-  const body = standard(spec.body ?? "#7a5536", { roughness: 1 });
+  // p.bodyTint overrides the shared WESTERN_SPECS body color per placement (Calico
+  // Flats uses it for its sun-bleached palette; Dustward placements omit it).
+  const body = standard(p.bodyTint ?? spec.body ?? "#7a5536", { roughness: 1 });
   const trim = standard(spec.trim ?? "#b08a52", { roughness: 1 });
   const roofMat = standard(spec.roof ?? "#37271a", { roughness: 1 });
   const dark = standard("#241910", { roughness: 1 });
@@ -773,7 +775,7 @@ function buildWesternBuilding(group, p, spec = {}) {
 
   // sign: a flat false-front board, or (variety) a hanging board on a bracket
   if (spec.sign) {
-    const isNeonSaloon = p.kind && p.kind.includes("Saloon");
+    const isNeonSaloon = p.kind && (p.kind.includes("Saloon") || p.kind === "saloonFacade");
     const isNeonStore = p.kind && p.kind.includes("Store");
     const isNeonAssay = p.kind && p.kind.includes("Assay");
 
@@ -847,7 +849,9 @@ function buildTownGate(group, p) {
   addBox(group, 0.26 * s, 0.3 * s, halfSpan * 2 + 0.9 * s, mBeam, toVec(p.x, p.y, postH - 0.3 * s));
   // hanging town board, lettered via the shared canvas sign painter; faces east
   // (back toward town) so it reads over the shoulder and in the wide push-in.
-  const signTex = makeSignTexture(["WESTWARD"]);
+  // Each town's gate wears its own name — Dustward keeps "WESTWARD" (the public
+  // title), Calico Flats overrides via p.signLines.
+  const signTex = makeSignTexture(p.signLines || ["WESTWARD"]);
   const sign = new THREE.Mesh(
     new THREE.BoxGeometry(0.09 * s, 0.62 * s, 2.1 * s),
     standard("#6e4f2e", { roughness: 0.9, map: signTex }),
@@ -965,7 +969,7 @@ function buildWindmill(group, p) {
 function buildWaterTower(group, p) {
   const ox = p.x, oy = p.y, s = p.size || 1;
   const matLeg = standard("#4f3a26", { roughness: 0.98 });
-  const matTank = standard("#6e5236", { roughness: 0.95 });
+  const matTank = standard(p.color ?? "#6e5236", { roughness: 0.95 });
   const matBand = standard("#3a2c1c", { roughness: 0.85 });
   const matLid = standard("#5a4128", { roughness: 0.97 });
   const legH = 4.6 * s, spread = 1.5 * s, topSpread = 0.85 * s, tankR = 1.3 * s, tankH = 2.4 * s, tankY = legH;
@@ -2494,7 +2498,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     }
   }
 
-  // Connect buildings with power cables (Calico Flats procedural dressing; WebGPU only — WebGL2 bans lines)
+  // Connect buildings with power cables (Dustward procedural dressing; WebGPU only — WebGL2 bans lines)
   if (backend === "webgpu") {
     for (let i = 1; i < buildingsList.length; i++) {
       const b1 = buildingsList[i - 1];

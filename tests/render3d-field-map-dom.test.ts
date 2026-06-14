@@ -71,9 +71,9 @@ describe("world minimap model", () => {
   const SVG_H = 142;
   const PADDING = 17;
 
-  it("projects all 5 POIs to finite coords inside the 220×142 viewBox with padding", () => {
+  it("projects all 6 POIs to finite coords inside the 220×142 viewBox with padding", () => {
     const model = buildFieldMapWorldModel({}, {});
-    expect(model.pois).toHaveLength(5);
+    expect(model.pois).toHaveLength(6);
     for (const poi of model.pois) {
       expect(Number.isFinite(poi.x)).toBe(true);
       expect(Number.isFinite(poi.y)).toBe(true);
@@ -93,7 +93,9 @@ describe("world minimap model", () => {
     expect(byId.has("folly")).toBe(true);
     expect(byId.has("wash")).toBe(true);
     expect(byId.has("westPass")).toBe(true);
+    expect(byId.has("calico")).toBe(true);
     expect(byId.get("dustward")?.label).toBe("Dustward");
+    expect(byId.get("calico")?.label).toBe("Calico Flats");
     expect(byId.get("eastwater")?.label).toBe("Eastwater Ranch");
     expect(byId.get("folly")?.label).toBe("Prospector's Folly");
   });
@@ -118,8 +120,8 @@ describe("world minimap model", () => {
 
   it("roads array contains at least one path string per OPEN_RANGE_ROADS segment plus FIRST_FIVE_ROUTE", () => {
     const model = buildFieldMapWorldModel({}, {});
-    // 7 OPEN_RANGE_ROADS segments + 1 FIRST_FIVE_ROUTE polyline = 8 total
-    expect(model.roads.length).toBe(8);
+    // 9 OPEN_RANGE_ROADS segments + 1 FIRST_FIVE_ROUTE polyline = 10 total
+    expect(model.roads.length).toBe(10);
     for (const d of model.roads) {
       expect(d).toContain("M");
     }
