@@ -6,8 +6,19 @@ is now canon. Read, in order: the treatment → [`roadmap.md`](roadmap.md) (M0�
 plan + the binding carry-over map) → `CLAUDE.md` (engine truths). The old WestWard push
 (S1–S11) is **superseded as a priority queue but preserved as patterns** — details below.
 
-Last updated: 2026-06-14 · main green (740 vitest, CI incl. loop smoke + golden) ·
+Last updated: 2026-06-14 · main green (761 vitest, CI incl. loop smoke + golden) ·
 live: westward-rpg.vercel.app · local play: `npm run play` → http://127.0.0.1:5191/
+
+## 2026-06-14 (pm) — The Meridian water system shipped (NOW phase)
+Full design + rationale: **`docs/water-plan.md`**. One connected system — Cross Reservoir → Cross
+Dam (rusted-chrome hero) → Meridian River (east corridor, one walkable ford, folds the marsh in
+as a backwater) → Ocean (far-S boundary). Built on the extended `water.js` TSL engine; single
+source of truth in `src/render3d/waterLayout.js` (data + collision); riverbed/reservoir carved
+flat in `ground.js` (`waterBasin`). Golden-safe by construction (all bodies far from the dusk
+frame). Reads clearly at dusk; **daytime river punch/saturation wants an owner foreground tuning
+pass** (`npm run play`). NEXT here: planar reflections + in-shader→particle foam (WebGPU, behind a
+quality flag), the Calico east canal, and the Caldera headwaters as a real N region (all "LATER"
+in water-plan.md).
 
 ## 2026-06-14 — Character + World pass (shipped to main, 5 commits f71c776→7d929d0)
 The town stopped being five beige wanderers; it's a place with a cast and a ghost. All

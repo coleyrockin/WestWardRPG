@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error — JS module, no types
-import { valueNoise2, groundFbm, reliefMask, groundHeight, createGroundMaterial, biomeAt, localFogBoost } from "../src/game/world/ground.js";
+import { valueNoise2, groundFbm, reliefMask, groundHeight, createGroundMaterial, biomeAt, localFogBoost, waterBasin } from "../src/game/world/ground.js";
 import { FIRST_FIVE_ROUTE } from "../src/render3d/frontierLayout.js";
 
 describe("ground", () => {
@@ -110,6 +110,44 @@ describe("R2.3 — FIRST_FIVE_ROUTE waypoints within ±0.1u of zero", () => {
       // frontierLayout uses (x, y) where y maps to world Z
       const h = Math.abs(groundHeight(wp.x, wp.y));
       expect(h).toBeLessThanOrEqual(0.1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Meridian basins — the riverbed + reservoir flatten so water never gets pierced
+// ---------------------------------------------------------------------------
+describe("waterBasin — riverbed + reservoir flatten", () => {
+  it("flattens the upper riverbed (x≈47, north of the marsh)", () => {
+    expect(waterBasin(47, 0)).toBeCloseTo(1, 6); // mid upper channel
+    expect(waterBasin(47, -10)).toBeCloseTo(1, 6);
+    expect(groundHeight(47, 0)).toBeCloseTo(0, 6); // terrain carved flat under the river
+  });
+
+  it("flattens the Cross Reservoir bed (far north)", () => {
+    expect(waterBasin(47, -32)).toBeCloseTo(1, 6); // reservoir centre
+    expect(groundHeight(47, -32)).toBeCloseTo(0, 6);
+  });
+
+  it("leaves the dusk-frame ground and the open range untouched", () => {
+    // dusk frame (Westward street) — must be 0 so the golden baseline holds
+    for (let x = 6; x <= 25; x += 2) {
+      for (let z = 5; z <= 11; z += 2) {
+        expect(waterBasin(x, z), `(${x},${z})`).toBeCloseTo(0, 6);
+      }
+    }
+    // a relief flank well away from any water
+    expect(waterBasin(0, 2)).toBeCloseTo(0, 6);
+    expect(waterBasin(120, 40)).toBeCloseTo(0, 6);
+  });
+
+  it("stays within [0,1]", () => {
+    for (let x = -10; x < 90; x += 7) {
+      for (let z = -55; z < 40; z += 7) {
+        const b = waterBasin(x, z);
+        expect(b).toBeGreaterThanOrEqual(0);
+        expect(b).toBeLessThanOrEqual(1);
+      }
     }
   });
 });

@@ -39,6 +39,7 @@ import { sunArc, calcWindowGlowFactor } from "./timeOfDay.js";
 import { footDustStep } from "./footDust.js";
 import { createWorldClock, tickClock, pinClock, cycleClock, dayTimeToKey } from "../game/world/worldClock.js";
 import { createWater } from "../game/world/water.js";
+import { waterBodies, DAM, waterCollisionBoxes } from "./waterLayout.js";
 import { createGroundMaterial, groundHeight, localFogBoost } from "../game/world/ground.js";
 import { createScatter } from "../game/world/scatter.js";
 import { createPlaceholderCharacter } from "../game/world/character.js";
@@ -1325,6 +1326,30 @@ function buildAntennaMast(group, p) {
   // ground masts get a contact shadow; rooftop masts (baseH>0) sit on a building
   // that already grounds itself, so skip the floating disc.
   if (bh === 0) addContactShadow(group, p.x, p.y, 0.3 * s, 0.3 * s);
+}
+
+// The Cross Dam — rusted-chrome hero megastructure spanning the Meridian's mouth at
+// the reservoir's south edge (the Water War flashpoint). "Nothing is sleek": scoured
+// concrete + sun-bleached chrome, a cyan spillway glow and an amber control-house
+// window for the cyberpunk-western read. ~8 boxes (one hero landmark; M0 allows it).
+function buildCrossDam(desc) {
+  const g = new THREE.Group();
+  const { x, y, width: W, depth: D, height: H } = desc;
+  const rust = standard("#5b574e", { rimColor: "#cfe6ff", rimStrength: 0.3 });
+  const rustDark = standard("#46423a", { rimStrength: 0.25 });
+  const chrome = standard("#8d97a0", { rimColor: "#dff0ff", rimStrength: 0.5 });
+  addBox(g, W, H, D, rust, toVec(x, H / 2, y)); // main wall (spans east–west)
+  addBox(g, W + 0.4, 0.5, D + 0.9, rustDark, toVec(x, H + 0.2, y + 0.1)); // crest walkway
+  addBox(g, 3.2, H * 0.7, D + 0.5, rustDark, toVec(x, H * 0.35, y + 0.15)); // spillway notch (recessed)
+  const glow = standard("#0c2a30", { emissive: "#39c6d8", emissiveIntensity: 1.6, rimStrength: 0.1 });
+  addBox(g, 2.6, 0.5, 0.4, glow, toVec(x, 0.5, y + D / 2 + 0.35)); // spillway outfall glow (downstream lip)
+  addBox(g, 0.9, H * 0.92, 1.6, rustDark, toVec(x - W / 3, H * 0.46, y + D / 2 + 0.7)); // buttress W
+  addBox(g, 0.9, H * 0.92, 1.6, rustDark, toVec(x + W / 3, H * 0.46, y + D / 2 + 0.7)); // buttress E
+  addBox(g, 2.4, 2.0, 2.0, chrome, toVec(x + W / 2 + 0.4, H + 1.0, y)); // control house (east end)
+  const win = standard("#2a1c0c", { emissive: "#ffb347", emissiveIntensity: 1.4 });
+  addBox(g, 0.5, 0.7, 0.12, win, toVec(x + W / 2 + 0.4, H + 1.1, y + 1.06)); // amber window
+  addContactShadow(g, x, y, W * 0.6, D * 1.3);
+  return g;
 }
 
 function buildPlacement(group, p) {
@@ -2672,6 +2697,23 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   water.mesh.position.set(48, 0.05, 19);
   scene.add(water.mesh);
 
+  // The Meridian water system — reservoir → dam → river → ocean (waterLayout.js),
+  // folding the marsh in as a backwater. Each body is a flat cel plane on the shared
+  // water factory; small per-id y offsets avoid z-fighting where bodies overlap.
+  // Reduced fidelity (WebGL2) flattens the surfaces. Collected for per-frame
+  // time/skyTint updates alongside the marsh. All bodies sit far from the dusk frame.
+  const WATER_Y = { reservoir: 0.035, river_upper: 0.04, river_ford: 0.052, river_low1: 0.04, river_low2: 0.04, river_low3: 0.04, ocean: 0.03 };
+  const meridianWaters = [];
+  for (const body of waterBodies()) {
+    const w = createWater({ width: body.w, height: body.h, skyTint: appliedPalette.sky.horizon, reduced: reducedFidelity, ...body.look });
+    w.mesh.rotation.x = -Math.PI / 2;
+    w.mesh.position.set(body.x, WATER_Y[body.id] ?? 0.04, body.y);
+    w.mesh.renderOrder = -1; // draw under the marsh/props so transparency layers read right
+    scene.add(w.mesh);
+    meridianWaters.push(w);
+  }
+  scene.add(buildCrossDam(DAM));
+
   const props = new THREE.Group();
   const heroMeshes = {};
   const placementNodes = [];
@@ -3274,6 +3316,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     atmosphere.driftClouds(fdt, 1 + weather.wind * 2);
     waterTime += fdt;
     water.uniforms.time.value = waterTime;
+    for (const mw of meridianWaters) mw.uniforms.time.value = waterTime;
     // Lamp flicker — per-lamp intensity pulse with personality tiers (B2). Seeds keep
     // adjacent lamps out of phase. Skipped when frozen (captureMode / visualCapture
     // sets fdt=0), so the golden baseline holds every lamp at its authored intensity.
@@ -3323,6 +3366,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       }
     }
     water.uniforms.skyTint.value.set(appliedPalette.sky.horizon);
+    for (const mw of meridianWaters) mw.uniforms.skyTint.value.set(appliedPalette.sky.horizon);
     const { flash } = weatherSys.update(weather, fdt, {
       frozen,
       cx: camera.position.x,
@@ -3639,7 +3683,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     player.setPosition({ x: 15, z: 0.5 });
     player.resetCameraBehind(0);
   }
-  const proxies = buildProxies(snapshot.worldObjects);
+  // Deep water blocks; the ford is the one walkable crossing. The collision boxes
+  // come from the SAME waterLayout records that built the meshes, so the water you
+  // see is the water that stops you.
+  const proxies = buildProxies(snapshot.worldObjects).concat(waterCollisionBoxes());
   const promptEl = document.getElementById("prompt");
   const beatToast = createBeatToast(document);
   let currentPromptText = "";

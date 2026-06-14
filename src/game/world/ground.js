@@ -98,6 +98,24 @@ export function reliefMask(z) {
   return corridor * marsh;
 }
 
+// The Meridian basins — flatten the upper riverbed (a north–south band at the
+// marsh's longitude) and the Cross Reservoir lake bed so dune relief never pierces
+// the water surface (exactly why the marsh basin is flattened). Returns 1 inside a
+// basin (relief OFF), 0 outside. Both zones are disjoint from the dusk-frame ground
+// (x∈[6,25] z∈[5,11]) so the golden baseline is untouched. Mirrors the TSL graph.
+const RIVER_FLAT = { xLo: 43, xHi: 51, zTop: 13, fade: 3 };
+const RESV_FLAT = { xLo: 22, xHi: 72, zLo: -50, zHi: -15, fade: 4 };
+
+function softBand(v, lo, hi, fade) {
+  return smooth01(lo - fade, lo, v) * (1 - smooth01(hi, hi + fade, v));
+}
+
+export function waterBasin(x, z) {
+  const river = softBand(x, RIVER_FLAT.xLo, RIVER_FLAT.xHi, RIVER_FLAT.fade) * (1 - smooth01(RIVER_FLAT.zTop, RIVER_FLAT.zTop + RIVER_FLAT.fade, z));
+  const resv = softBand(x, RESV_FLAT.xLo, RESV_FLAT.xHi, RESV_FLAT.fade) * softBand(z, RESV_FLAT.zLo, RESV_FLAT.zHi, RESV_FLAT.fade);
+  return Math.min(1, river + resv);
+}
+
 // ---------------------------------------------------------------------------
 // R2.1 — Biome zone masks (pure, mirrors the TSL smoothstep masks in
 // createGroundMaterial exactly — same centres, radii, and smooth01 math).
@@ -160,7 +178,7 @@ export function localFogBoost(x, z) {
 // World-space terrain height at (x,z). Pure + deterministic so props/scatter seat
 // exactly on the rendered surface. Zero along the corridor; ±AMP on the flanks.
 export function groundHeight(x, z, amp = AMP) {
-  return (groundFbm(x, z) - 0.5) * 2 * amp * reliefMask(z);
+  return (groundFbm(x, z) - 0.5) * 2 * amp * reliefMask(z) * (1 - waterBasin(x, z));
 }
 
 const tslHash = (p) => fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453));
@@ -236,7 +254,19 @@ export function createGroundMaterial(opts = {}) {
   const wp = vec2(wx, wz);
   const corridorM = clamp(smoothstep(MASK_LO, MASK_HI, abs(wz.sub(ROAD_Z))), 0, 1);
   const marshM = clamp(smoothstep(MARSH_LO, MARSH_HI, wz), 0, 1).oneMinus();
-  const reliefH = corridorM.mul(marshM);
+  // Meridian basins (mirror waterBasin): flatten the upper riverbed + reservoir.
+  const rivXf = smoothstep(RIVER_FLAT.xLo - RIVER_FLAT.fade, RIVER_FLAT.xLo, wx).mul(
+    smoothstep(RIVER_FLAT.xHi, RIVER_FLAT.xHi + RIVER_FLAT.fade, wx).oneMinus(),
+  );
+  const rivZf = smoothstep(RIVER_FLAT.zTop, RIVER_FLAT.zTop + RIVER_FLAT.fade, wz).oneMinus();
+  const resXf = smoothstep(RESV_FLAT.xLo - RESV_FLAT.fade, RESV_FLAT.xLo, wx).mul(
+    smoothstep(RESV_FLAT.xHi, RESV_FLAT.xHi + RESV_FLAT.fade, wx).oneMinus(),
+  );
+  const resZf = smoothstep(RESV_FLAT.zLo - RESV_FLAT.fade, RESV_FLAT.zLo, wz).mul(
+    smoothstep(RESV_FLAT.zHi, RESV_FLAT.zHi + RESV_FLAT.fade, wz).oneMinus(),
+  );
+  const basinM = clamp(rivXf.mul(rivZf).add(resXf.mul(resZf)), 0, 1).oneMinus();
+  const reliefH = corridorM.mul(marshM).mul(basinM);
   const h = tslFbm(wp).sub(0.5).mul(2.0 * amp).mul(reliefH);
   mat.positionNode = positionLocal.add(vec3(0, 0, h));
 
