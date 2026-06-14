@@ -32,6 +32,7 @@ export const POI_DEFINITIONS = {
       dangerHint: "Low danger: close to town, but green slime burns mark the road edge.",
       mysteryLine: "The cargo straps were cut from the inside.",
       returnReason: "The map scrap can open Boone's road survey work.",
+      loreHint: "Tally Men script, half-burned. Even out here, the marker finds you.",
     },
     {
       id: "frontier_wayside_shrine",
@@ -48,6 +49,7 @@ export const POI_DEFINITIONS = {
       dangerHint: "Low danger: a safe breath before the south road opens up.",
       mysteryLine: "The candle is fresh, but the wax runs uphill.",
       returnReason: "A quick stamina blessing makes early patrol and courier work less punishing.",
+      loreHint: "Circuit Riders keep these lit — part church, part relay tower for the debt the Severance left behind.",
     },
     {
       id: "frontier_abandoned_lunchfire",
@@ -76,6 +78,7 @@ export const POI_DEFINITIONS = {
       dangerHint: "Low danger: old boards, thirsty slimes, and one useful cache.",
       mysteryLine: "The bucket rope is wet even when the desert wind is dry.",
       returnReason: "Good first stop for potion money and a water-rights clue.",
+      loreHint: "Before the Severance this well fed the first Cross claim — water was the only law that ever held out here.",
     },
     {
       id: "frontier_drifter_camp",
@@ -116,6 +119,7 @@ export const POI_DEFINITIONS = {
       dangerHint: "Medium danger: broken cover, open angles, and scavenger tracks.",
       mysteryLine: "A marshal seal is carved into the coach door from the inside.",
       returnReason: "Map scraps can point future jobs toward better routes.",
+      loreHint: "A drowned-valley relic, hauled up from the Caldera salt. They say the water there has a long memory.",
     },
     {
       id: "frontier_dry_gulch_hideout",
@@ -129,6 +133,7 @@ export const POI_DEFINITIONS = {
       dangerHint: "High danger: outlaw cover and poor retreat lanes.",
       mysteryLine: "The badge is Boone's style, but the scratches are newer.",
       returnReason: "A recovered badge should change what law-minded NPCs say later.",
+      loreHint: "Helios-Pacific posts bounties on freeholders who never signed the charter — out here, a debt is just a leash with a longer rope.",
     },
     {
       id: "frontier_saltback_stranger",
@@ -492,6 +497,7 @@ export function resolveRoadDiscoveryLead(regions, regionId, x, y, options = {}) 
   const dangerHint = best.poi.dangerHint || fallbackDangerHint(best.poi);
   const mysteryLine = best.poi.mysteryLine || fallbackMysteryLine(best.poi);
   const returnReason = best.poi.returnReason || fallbackReturnReason(best.poi);
+  const loreHint = best.poi.loreHint || null;
   const urgentKinds = new Set(["hideout", "mine"]);
   return {
     id: best.poi.id,
@@ -514,6 +520,7 @@ export function resolveRoadDiscoveryLead(regions, regionId, x, y, options = {}) 
     dangerHint,
     mysteryLine,
     returnReason,
+    loreHint,
     rewardHint,
     objectiveLine: `${best.poi.label}: ${best.poi.roadside ? "inspect" : "investigate"} ${distanceLine} on the ${regionHint}.`,
     secondaryLine: `${dangerHint} ${returnReason}`,

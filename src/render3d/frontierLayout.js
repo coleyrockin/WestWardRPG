@@ -783,6 +783,16 @@ const CALICO_DRESSING = [
   // of the dusk capture frame, so they don't touch the golden baseline.
   { kind: "antennaMast",  label: "Neutral Ground Mast",       x: -48.0, y: 5.7,  color: "#7d8270", size: 0.78, baseH: 3.1, beacon: "cyan" },
   { kind: "antennaMast",  label: "Sheriff Roof Mast",         x: -51.0, y: 12.4, color: "#7d8270", size: 0.72, baseH: 3.2, beacon: "red" },
+  // Lore signs — the free town says its own canon (treatment WORLD section). Same
+  // shape as the Sheriff Board (signLines renders via makeSignTexture). Small far-west
+  // props (x<-44), hugging shoulders OFF the lane band (y≈6.4–11.6); not slabs, not in
+  // the spawn wedge — so firstFrameSlabBlockers stays [] and the dusk frame is untouched.
+  // 1) Free-town code, south of the gallows (gallows x:-46.5,y:12.6) — clear of the lane.
+  { kind: "sign",         label: "Free Town Code Sign",       x: -46.0, y: 13.4, color: "#ffd77b", size: 0.7,  signLines: ["FREE TOWN OF", "CALICO FLATS", "NO CHARTER · NO MASTER"] },
+  // 2) Water-rights / Severance, north shoulder at the water-tower base (tower x:-62,y:9.2).
+  { kind: "sign",         label: "Water Rights Sign",         x: -61.0, y: 7.6,  color: "#ffd77b", size: 0.7,  signLines: ["WATER IS LAW", "SHARES HONORED HERE", "SINCE THE SEVERANCE"] },
+  // 3) Neutral-ground pledge, street-side of the saloon row (saloons y≈5.4) — off the lane.
+  { kind: "sign",         label: "Neutral Ground Pledge",     x: -47.0, y: 7.6,  color: "#ffd77b", size: 0.7,  signLines: ["NEUTRAL GROUND", "CHECK YOUR WAR", "AT THE DOOR"] },
 ];
 
 // CYBERPUNK-WESTERN IDENTITY DRESSING — the "nothing is sleek" props that mark this

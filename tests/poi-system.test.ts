@@ -254,4 +254,27 @@ describe("poiSystem — road discovery lead", () => {
 
     expect(lead).toBeNull();
   });
+
+  it("surfaces loreHint canon on a POI that has one, and stays null-safe for one that doesn't", () => {
+    // frontier_broken_wagon is the first roadside hook from town and carries a loreHint.
+    const withLore = resolveRoadDiscoveryLead({}, "frontier", 9.5, 8.5, { maxDistance: 40 });
+    expect(withLore?.id).toBe("frontier_broken_wagon");
+    expect(withLore?.loreHint).toBe("Tally Men script, half-burned. Even out here, the marker finds you.");
+
+    // frontier_drifter_camp has no loreHint — the lead must expose loreHint as null,
+    // not undefined or a thrown read. Discover the nearer roadside finds so the camp
+    // becomes the resolved lead from its own coordinates.
+    const r: any = {
+      poisDiscovered: [
+        "frontier_broken_wagon",
+        "frontier_wayside_shrine",
+        "frontier_abandoned_lunchfire",
+        "frontier_old_well",
+        "frontier_sunken_coach",
+      ],
+    };
+    const withoutLore = resolveRoadDiscoveryLead(r, "frontier", 30.5, 14.5, { maxDistance: 40 });
+    expect(withoutLore?.id).toBe("frontier_drifter_camp");
+    expect(withoutLore?.loreHint).toBeNull();
+  });
 });
