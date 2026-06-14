@@ -21,7 +21,7 @@ const HERO_WAYPOINTS: Record<string, [number, number]> = {
   slimeTell: [48.2, 16.4],
   roadSlime: [53.5, 15],
   brokenWagon: [60.5, 12.2],
-  gravesite: [15, -4],
+  gravesite: [15, -14],
   steelMustang: [16.2, 12],
 };
 
@@ -102,7 +102,7 @@ describe("waterLayout — body table + geometry helpers", () => {
     expect(distPointToRect(10, 0, r)).toBeCloseTo(5, 6); // 5u east of the +x edge
   });
 
-  it("the reservoir sits well north of the gravesite (15,-4)", () => {
-    expect(distPointToRect(15, -4, { id: RESERVOIR.id, x: RESERVOIR.x, y: RESERVOIR.y, w: RESERVOIR.w, h: RESERVOIR.h })).toBeGreaterThan(5);
+  it("the reservoir stays clear of the open-range gravesite (15,-14)", () => {
+    expect(distPointToRect(15, -14, { id: RESERVOIR.id, x: RESERVOIR.x, y: RESERVOIR.y, w: RESERVOIR.w, h: RESERVOIR.h })).toBeGreaterThan(5);
   });
 });

@@ -214,7 +214,7 @@ const HERO_OBJECTS = [
   { kind: "slimeTell",   label: "Slime Trail",       x: 48.2, y: 16.4, color: "#75d06b", size: 1.0 },
   { kind: "roadSlime",   label: "Road Slime",        x: 53.5, y: 15.0, color: "#7fd06a", size: 0.9 },
   { kind: "brokenWagon", label: "Broken Wagon",      x: 60.5, y: 12.2, color: "#b9824d", size: 1.2 },
-  { kind: "gravesite",   label: "Abram's Casket",    x: 15.0, y: -4.0, color: "#4f3a2c", size: 1.0 },
+  { kind: "gravesite",   label: "Abram's Casket",    x: 15.0, y: -14.0, color: "#4f3a2c", size: 1.0 },
   { kind: "steelMustang", label: "Steel Mustang Mount", x: 16.2, y: 12.0, color: "#8a8f7d", size: 1.1, yaw: -1.2 },
 ];
 

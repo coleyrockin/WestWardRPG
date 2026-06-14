@@ -3677,14 +3677,21 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (Number.isFinite(resumeRun.player?.yaw)) player.resetCameraBehind(resumeRun.player.yaw);
   } else if (loopState.phase === "funeral") {
     // Dust to Dust opens at the graveside — and you're in control from frame one.
-    // Stand on the OPEN EASTERN APPROACH to Abram's casket (15,-4), facing WEST
-    // toward it (yaw +π/2 = forward (-1,0)). The east is the one clear sightline (the
-    // Back Row boxes the grave to the south, mesas to the north), so the normal
-    // follow-cam reads as a clean establishing shot down the approach. Walk west and
-    // press E to pay respects; the implant beat then carries you into town.
-    player.setPosition({ x: 21.5, z: -4 });
-    player.resetCameraBehind(Math.PI / 2);
-    player.setCameraPreset("shoulder");
+    // Stand out in the OPEN NORTH RANGE, north of Abram's casket (15,-4), facing
+    // SOUTH toward it (yaw π = forward (0,1)). Looking west/east jams the eye into
+    // the packed north edge of town; from the open north the casket reads against
+    // ground and a distant town skyline — air around it, not a wall. A pulled-back,
+    // elevated follow-cam looks down over the range so the shot breathes. Walk south
+    // and press E to pay respects; the implant beat then carries you into town.
+    // Abram's grave now sits out on the open range NORTH of town (15,-14) — a lone
+    // frontier baron's plot. Stand a few paces NORTH of it on the open ground, facing
+    // SOUTH (yaw π) so the establishing shot reads across open range → the casket →
+    // Westward as a distant skyline on the horizon → sky: the empire he built, framed
+    // behind the man who built it. Air everywhere, no clogged closet. Walk south, press
+    // E to pay respects; the implant beat then carries you down into town.
+    player.setPosition({ x: 15, z: -19 });
+    player.resetCameraBehind(Math.PI);
+    player.setCameraPreset("shoulder", { distance: 8, height: 4.5, lookHeight: 1.5, shoulder: 0.35 });
   }
   // Deep water blocks; the ford is the one walkable crossing. The collision boxes
   // come from the SAME waterLayout records that built the meshes, so the water you
