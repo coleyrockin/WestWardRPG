@@ -1287,11 +1287,15 @@ function attachBuildingWarmth(group, p, wl) {
   const paneMat = standard(wl.color, {
     emissive: wl.color,
     // Dim ambient tier — below bloom threshold so only reserved objective lights pop.
+    // 0.28 is the DUSK value (the golden baseline); the window-glow schedule
+    // (stepWorld) ramps it down toward day and holds it at dusk/night so windows
+    // read as "occupied at night, quiet by day". Tagged so the schedule can find it.
     emissiveIntensity: 0.28,
     transparent: true,
     opacity: 0.82,
     rimStrength: 0,
   });
+  paneMat.userData.windowPaneBase = 0.28;
   const frameMat = standard("#17100b", { rimStrength: 0.05 });
   const glassDepth = 0.025;
 
@@ -1333,6 +1337,10 @@ function attachBuildingWarmth(group, p, wl) {
 
   const l = new THREE.PointLight(col(wl.color), (wl.intensity ?? 1) * 1.3, wl.distance ?? 8, 2);
   l.position.set(p.x, wl.height ?? 1.5, p.y + roadSide * 0.42);
+  // Scheduled, not flickered: the window-glow ramp owns this light (day→night),
+  // so the lamp-flicker collector skips it (userData.windowGlow) to avoid a fight.
+  l.userData.windowGlow = true;
+  l.userData.baseIntensity = l.intensity;
   group.add(l);
 }
 
@@ -2654,13 +2662,24 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // excluded by the intensity ceiling; the golden-image capture skips this entirely
   // so the ?visual baseline stays deterministic.
   const lampFlickers = [];
-  if (!visualCapture) {
-    scene.traverse((obj) => {
-      if (!obj.isPointLight || obj.intensity > 12) return;
+  // Window-glow schedule targets (panes + their warmth lights), collected once and
+  // ramped by clock.dayTime in stepWorld so buildings read as occupied at night /
+  // quiet by day. Runs even under the freeze (dayTime is pinned), so the dusk
+  // capture holds at the authored 0.28 and the golden baseline is unchanged.
+  const windowGlows = { panes: [], lights: [] };
+  scene.traverse((obj) => {
+    if (obj.isPointLight && obj.userData?.windowGlow) {
+      windowGlows.lights.push({ light: obj, base: obj.userData.baseIntensity ?? obj.intensity });
+      return; // scheduled, not flickered
+    }
+    if (obj.isMesh && obj.material && !Array.isArray(obj.material) && obj.material.userData?.windowPaneBase !== undefined) {
+      windowGlows.panes.push(obj.material);
+    }
+    if (!visualCapture && obj.isPointLight && obj.intensity <= 12) {
       const seed = (obj.position.x * 7.31 + obj.position.z * 13.73) % (Math.PI * 2);
       lampFlickers.push({ light: obj, base: obj.intensity, seed });
-    });
-  }
+    }
+  });
 
   const objectiveGuidance = createObjectiveGuidance(snapshot);
   scene.add(objectiveGuidance.group);
@@ -2936,6 +2955,22 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (fdt > 0 && lampFlickers.length) {
       for (const lf of lampFlickers) {
         lf.light.intensity = lf.base * (0.92 + 0.08 * Math.sin(waterTime * 3.2 + lf.seed));
+      }
+    }
+    // Window-glow schedule — panes + their warmth lights light up from dusk through
+    // night and quiet down by day. Driven by clock.dayTime (NOT fdt-gated) so it's
+    // correct under the freeze too: dusk pins to p=0.5 → glow 1.0 → the authored
+    // 0.28 emissive, leaving the golden dusk baseline byte-identical.
+    if (windowGlows.panes.length || windowGlows.lights.length) {
+      const p = clock.dayTime;
+      const rise = THREE.MathUtils.smoothstep(p, 0.30, 0.48); // off through golden, full by dusk
+      const fall = 1 - THREE.MathUtils.smoothstep(p, 0.93, 1.0); // ease back down toward dawn
+      const glow = Math.min(rise, fall);
+      for (const mat of windowGlows.panes) {
+        mat.emissiveIntensity = mat.userData.windowPaneBase * (0.16 + 0.84 * glow);
+      }
+      for (const wg of windowGlows.lights) {
+        wg.light.intensity = wg.base * (0.12 + 0.88 * glow);
       }
     }
     water.uniforms.skyTint.value.set(appliedPalette.sky.horizon);
@@ -3396,6 +3431,57 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const hitStop = createHitStop();
   const camShake = createCameraShake();
   const burst = createBurstPool(scene, { count: 28 });
+  // Footfall dust — small tan puffs kicked up at the player's feet while walking.
+  // Its own pool (combat's burst pool throws debris-like chunks, wrong for dust):
+  // flat ground discs that rise a little, expand, and fade. Emits on distance
+  // travelled so cadence matches stride, not framerate. Only runs in live play
+  // (gated !visualCapture by the caller), so the frozen golden frame is untouched.
+  const footDust = (() => {
+    const N = 10;
+    const geo = new THREE.CircleGeometry(0.14, 12);
+    const grp = new THREE.Group();
+    const slots = [];
+    for (let i = 0; i < N; i++) {
+      const m = new THREE.Mesh(
+        geo,
+        new THREE.MeshBasicMaterial({ color: col("#c2a878"), transparent: true, opacity: 0, depthWrite: false }),
+      );
+      m.rotation.x = -Math.PI / 2;
+      m.visible = false;
+      m.renderOrder = -1;
+      grp.add(m);
+      slots.push({ m, life: 0, max: 0, vy: 0 });
+    }
+    scene.add(grp);
+    let cur = 0, sinceEmit = 0, lastX = null, lastZ = null;
+    return {
+      update(pos, moving, running, dt) {
+        if (moving) {
+          if (lastX === null) { lastX = pos.x; lastZ = pos.z; }
+          sinceEmit += Math.hypot(pos.x - lastX, pos.z - lastZ);
+          lastX = pos.x; lastZ = pos.z;
+          const stride = running ? 0.8 : 1.1; // emit per ~stride of travel
+          if (sinceEmit >= stride) {
+            sinceEmit = 0;
+            const sl = slots[cur]; cur = (cur + 1) % N;
+            sl.m.position.set(pos.x + (Math.random() - 0.5) * 0.22, 0.05, pos.z + (Math.random() - 0.5) * 0.22);
+            sl.m.scale.setScalar(0.6);
+            sl.max = 0.55; sl.life = sl.max; sl.vy = 0.5;
+            sl.m.visible = true;
+          }
+        } else { lastX = pos.x; lastZ = pos.z; }
+        for (const sl of slots) {
+          if (sl.life <= 0) continue;
+          sl.life -= dt;
+          if (sl.life <= 0) { sl.m.visible = false; continue; }
+          const k = sl.life / sl.max; // 1 → 0
+          sl.m.material.opacity = 0.32 * k;
+          sl.m.scale.setScalar(0.6 + (1 - k) * 1.2); // expand as it settles
+          sl.m.position.y += sl.vy * dt; sl.vy *= 0.9;
+        }
+      },
+    };
+  })();
   let slimeAI = heroMeshes.roadSlime
     ? createSlimeState({ x: heroMeshes.roadSlime.position.x, z: heroMeshes.roadSlime.position.z })
     : null;
@@ -4177,6 +4263,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     }
     updateBeatVisibility();
     character.update(visualCapture ? 0 : dt, player.moving && !visualCapture, player.running && !visualCapture);
+    if (!visualCapture) footDust.update(player.position, player.moving, player.running, dt);
     playerReadability.update(now / 1000);
     heroSilhouetteAccent.update(player, now / 1000);
     openingLightPools.update(now / 1000);
