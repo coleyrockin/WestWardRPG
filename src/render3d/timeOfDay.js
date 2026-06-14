@@ -27,16 +27,21 @@ export const PALETTES = Object.freeze({
     // Shadow fill is sky bounce: cool slate-blue from above, neutral slate from
     // the ground. Chroma is deliberately LOW — at #bcd2f0 the bounce painted
     // every shadowed wall violet; shadows should read as cool light, not paint.
-    hemi: { sky: "#b6c4da", ground: "#6b6d5f", intensity: 1.1 }, // ground warmed from #5a6478 — ground-bounce warms unlit faces; sky stays cool to block violet creep
+    hemi: { sky: "#a6b6d2", ground: "#6b6d5f", intensity: 1.1 }, // sky deepened from #b6c4da for cooler shadow fill (still low-chroma to block violet creep); ground warm
     rim: { color: "#9cacc8", intensity: 0.42, dir: { x: 8, y: 6, z: 6 } },
     fill: { color: "#d8dce4", intensity: 0.4 },
-    exposure: 1.18,
+    // Pulled back from 1.18 — the overexposure washed midtones flat and crushed the
+    // neon's headroom. Lower exposure + stronger grade gives day the warm-key/cool-
+    // shadow drama dusk already has, without touching the (dusk-pinned) golden frame.
+    exposure: 1.12,
     stars: 0,
-    bloom: 0.3,
+    bloom: 0.4, // was 0.3 — more glow budget so authored neon signs read as neon in daylight
     grade: {
-      tint: "#ffd9a0", amount: 0.02, contrast: 1.1, saturation: 1.08,
+      tint: "#ffd9a0", amount: 0.02, contrast: 1.18, saturation: 1.13,
       shadowTint: "#2e3c6e", highlightTint: "#fff0c8",
-      splitStrength: 0.22, godrayStrength: 0.06, vignetteStrength: 0.05, bloomThreshold: 0.9,
+      // splitStrength 0.22→0.30 (warm-highlight/cool-shadow separation); bloomThreshold
+      // 0.9→0.85 so neon emissives (intensity 2.2) cross into bloom under bright day.
+      splitStrength: 0.30, godrayStrength: 0.06, vignetteStrength: 0.05, bloomThreshold: 0.85,
     },
     bodyBg: "#1e2433",
   },
