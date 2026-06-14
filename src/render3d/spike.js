@@ -3676,12 +3676,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     player.setPosition({ x: resumeRun.player.x, z: resumeRun.player.z });
     if (Number.isFinite(resumeRun.player?.yaw)) player.resetCameraBehind(resumeRun.player.yaw);
   } else if (loopState.phase === "funeral") {
-    // Dust to Dust opens at the graveside: stand a few paces south of Abram's
-    // casket (15,-4) by the chapel, facing north (yaw 0 = forward (0,-1)) so the
-    // establishing push-in frames the grave. The implant beat then walks you to
-    // town. setPosition reseeds the follow-cam to gameplay framing.
-    player.setPosition({ x: 15, z: 0.5 });
-    player.resetCameraBehind(0);
+    // Dust to Dust opens at the graveside — and you're in control from frame one.
+    // Stand on the OPEN EASTERN APPROACH to Abram's casket (15,-4), facing WEST
+    // toward it (yaw +π/2 = forward (-1,0)). The east is the one clear sightline (the
+    // Back Row boxes the grave to the south, mesas to the north), so the normal
+    // follow-cam reads as a clean establishing shot down the approach. Walk west and
+    // press E to pay respects; the implant beat then carries you into town.
+    player.setPosition({ x: 21.5, z: -4 });
+    player.resetCameraBehind(Math.PI / 2);
+    player.setCameraPreset("shoulder");
   }
   // Deep water blocks; the ford is the one walkable crossing. The collision boxes
   // come from the SAME waterLayout records that built the meshes, so the water you
@@ -4581,24 +4584,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     // profile look down the casket toward the headstone cross, mourner in frame,
     // long golden-hour shadows. Held wide behind the title, eases in once the player
     // Rides. visualCapture boots at the road (not funeral), so the baseline is safe.
-    if (graveLookTarget && !visualCapture && (loopState.phase === "funeral" || loopState.phase === "implant")) {
-      let e; // 0 = wide establishing, 1 = settled
-      if (titleOpen) {
-        e = 0; // hold the wide establishing frame behind the title
-      } else {
-        if (funeralCamStart === null) funeralCamStart = now; // first frame after Ride
-        const t = Math.min(1, (now - funeralCamStart) / FUNERAL_INTRO_DUR);
-        e = 1 - Math.pow(1 - t, 2); // ease-out
-      }
-      const g = graveLookTarget;
-      const w = 1 - e; // wide-establishing weight
-      camera.position.set(
-        g.x + funeralCam.dx + w * funeralCam.wdx, // east of the grave, drifting in
-        funeralCam.dy + w * funeralCam.wdy,       // low profile, settling lower
-        g.z + funeralCam.dz + w * funeralCam.wdz, // just north of the back row → clear sightline
-      );
-      if (camera.lookAt) camera.lookAt(g.x, funeralCam.lookY, g.z);
-    }
+    // The funeral now plays in the player's hands: the normal third-person follow-cam
+    // (set to "shoulder" at funeral init) frames the walk west to the casket down the
+    // open east approach — no locked cinematic cam. graveLookTarget/funeralCam remain
+    // for the dev dial (__spike.setFuneralCam) but no longer drive the cold-open.
+    void graveLookTarget;
+    void funeralCamStart;
     // The tight ±18u shadow frustum rides with the player — without this the
     // marsh/wagon half of the 95u route renders with NO sun shadows at all.
     atmosphere.setShadowFocus(player.position.x, player.position.z);
