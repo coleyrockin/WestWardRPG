@@ -1,6 +1,10 @@
 export const RUN_SLOT: string;
 export const RUN_SCHEMA: string;
 export const RUN_VERSION: number;
+/** Save-load timeout (ms). A timeout or a thrown readSave makes loadRun REJECT
+ *  (load failed, existing save may be unread) — distinct from a resolved null
+ *  (genuinely empty / unmigratable, safe to start fresh). */
+export const LOAD_TIMEOUT_MS: number;
 
 export interface RunLoopState {
   phase: string;

@@ -37,7 +37,7 @@ function makeFakeDocument() {
 describe("interactionSystem — INTERACTABLE_KINDS", () => {
   it("includes first-road loop interactables", () => {
     expect(new Set(INTERACTABLE_KINDS)).toEqual(
-      new Set(["jobBoard", "roadSign", "townBark", "smokeCache", "slimeTell", "brokenWagon", "roadSlime", "gravesite"]),
+      new Set(["jobBoard", "roadSign", "townBark", "smokeCache", "slimeTell", "brokenWagon", "roadSlime", "gravesite", "mountHorse"]),
     );
   });
 });

@@ -26,6 +26,9 @@ import {
   GRAVESIDE_SPAWN,
 } from "./frontierLayout.js";
 import { createPlayerController, CAMERA_PRESETS } from "./playerController.js";
+import { MOUNT_GAITS } from "./mountController.js";
+import { resolveDiscovery } from "./discoveryRuntime.js";
+import { ensurePoiDefaults, POI_DEFINITIONS } from "../poiSystem.js";
 import { buildProxies, SALOON_DIMS, clampResumedPosition } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
 import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine, getPhaseProgress } from "./phaseState.js";
@@ -52,6 +55,7 @@ import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
 import { gustAt } from "../game/world/windGusts.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
 import { createSaveStateManager } from "../saveStateManager.js";
+import { createSaveHealth } from "./saveHealth.js";
 import { buildRunPayload, loadRun, writeRun, sealRun, clearRun } from "./runSave.js";
 import { stagger } from "./animationHelpers.js";
 import { createPlayerCombat, hitboxHitsTarget } from "./combat/playerCombat.js";
@@ -61,6 +65,8 @@ import { createAudioView } from "./audioView.js";
 import {
   createGameState,
   hydrateGameState,
+  grantGold,
+  grantXp,
   reconcileWithLoopPhase,
   buildGameSaveSlice,
   acceptStarterJob,
@@ -2598,7 +2604,23 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     typeof location !== "undefined" && new URLSearchParams(location.search).has("visual");
   // Ironman load-on-start: a "playing" run resumes in place; a "sealed" run shows
   // its summary over a fresh scene; no/corrupt save → fresh run.
-  const loadedRun = visualCapture ? null : await loadRun().catch(() => null); // belt-and-braces: resume can never block boot
+  // CRITICAL save-safety seam: loadRun() REJECTS on a timed-out / failed read (vs a
+  // resolved null = genuinely empty slot). A failed read may mean a real save EXISTS
+  // but couldn't be read (slow IndexedDB under load). If we treated that as "no save"
+  // and let the session autosave, the first write would clobber the unread ironman
+  // run forever. So: catch the failure, set saveLoadFailed, and below we SUPPRESS all
+  // persistence for the session so an existing-but-unread save is never overwritten.
+  // Resume must never block boot — a failed load still boots a (non-persisting) scene.
+  let loadedRun = null;
+  let saveLoadFailed = false;
+  if (!visualCapture) {
+    try {
+      loadedRun = await loadRun();
+    } catch {
+      saveLoadFailed = true;
+      loadedRun = null;
+    }
+  }
   const resumeRun = loadedRun && loadedRun.mode === "playing" ? loadedRun : null;
   // Restore persisted region/POI discovery into the live snapshot (symmetric with
   // the world.poisDiscovered we write in currentRunPayload).
@@ -2669,6 +2691,41 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
 
   // --- Ironman run persistence (frontier-ironman slot) ---
   const saveMgr = createSaveStateManager({ interval: 90 });
+  // Tracks autosave reliability so persistent write failures surface to the player
+  // instead of being swallowed silently in production builds.
+  const saveHealth = createSaveHealth();
+  // Subtle, persistent, non-blocking HUD note shown only while saves are "failing".
+  // Built with createElement/textContent (no parser sinks), default hidden.
+  let _saveFailNote = null;
+  function ensureSaveFailNote() {
+    if (_saveFailNote || typeof document === "undefined" || !document.body) return _saveFailNote;
+    const note = document.createElement("div");
+    note.id = "save-fail-note";
+    note.textContent = "⚠ Save failing — progress may not be recorded";
+    note.setAttribute("role", "status");
+    note.style.position = "fixed";
+    note.style.right = "12px";
+    note.style.bottom = "12px";
+    note.style.zIndex = "40";
+    note.style.padding = "4px 9px";
+    note.style.font = "600 11px/1.4 system-ui, sans-serif";
+    note.style.letterSpacing = "0.02em";
+    note.style.color = "#ffd9b0";
+    note.style.background = "rgba(60, 22, 14, 0.78)";
+    note.style.border = "1px solid rgba(255, 150, 90, 0.55)";
+    note.style.borderRadius = "4px";
+    note.style.pointerEvents = "none";
+    note.style.opacity = "0.9";
+    note.hidden = true;
+    document.body.appendChild(note);
+    _saveFailNote = note;
+    return note;
+  }
+  function syncSaveHealthHud() {
+    const failing = saveHealth.status === "failing";
+    const note = failing ? ensureSaveFailNote() : _saveFailNote;
+    if (note) note.hidden = !failing;
+  }
   let runMode = loadedRun && loadedRun.mode === "sealed" ? "sealed" : "playing";
   const runSeed = resumeRun && Number.isFinite(resumeRun.seed) ? resumeRun.seed : Date.now();
   let runElapsed = resumeRun && Number.isFinite(resumeRun.time) ? resumeRun.time : 0;
@@ -2679,6 +2736,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // else built fresh and reconciled against the saved loop phase (v1 saves).
   const game = resumeRun?.game ? hydrateGameState(resumeRun.game) : createGameState();
   reconcileWithLoopPhase(game, resumeRun?.loopState || {});
+  // Free-roam discovery state lives on snapshot.regions.poisDiscovered (the field
+  // we persist/restore in currentRunPayload); ensure its defaults before the loop
+  // drives resolveDiscovery off it.
+  ensurePoiDefaults(snapshot.regions);
   // Loot rolls ride the run seed so a given run's drops are reproducible.
   const lootRng = makeRng((runSeed >>> 0) || 1);
   let appliedPalette = sunArc(clock.dayTime);
@@ -3313,7 +3374,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     // windSpeed scales the rate. fdt=0 under ?visual keeps the golden baseline
     // at the build pose.
     for (const w of WINDMILL_ROTORS) w.rotor.rotation.z -= fdt * weather.windSpeed * (1.1 + 0.45 * Math.sin(waterTime * 0.31 + w.seed));
-    tickClock(clock, fdt);
+    // Slice mood: hold golden hour — advance the day clock very slowly so a
+    // free-roam session stays in warm light instead of rolling to night.
+    tickClock(clock, fdt * 0.15);
     applyDayTime();
     atmosphere.driftClouds(fdt, 1 + weather.wind * 2);
     waterTime += fdt;
@@ -3489,10 +3552,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   scene.add(character.group);
   const heroSilhouetteAccent = createHeroSilhouetteAccent();
   scene.add(heroSilhouetteAccent.group);
-  // F → play the one-shot "draw" clip (no-op on the placeholder fallback)
+  // F → play the one-shot "draw" clip (no-op on the placeholder fallback).
+  // Suppressed while mounted: F is also the dismount key, and drawing a weapon
+  // while climbing off the horse reads as a bug.
   if (typeof window !== "undefined") {
     window.addEventListener("keydown", (e) => {
-      if (e.code === "KeyF") character.playOnce?.("draw");
+      if (e.code === "KeyF" && !player.isMounted) character.playOnce?.("draw");
     });
   }
 
@@ -3571,6 +3636,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         return wp || null;
       },
       waypoints: () => FIRST_FIVE_ROUTE.map((p) => p.kind),
+      // --- Mounted free-roam (the Open Range slice) — inspect without driving ---
+      mount: () => { player.setMounted(true); setRiderVisual(true); return player.isMounted; },
+      dismount: () => { player.setMounted(false); setRiderVisual(false); return player.isMounted; },
+      // Teleport to a frontier POI to test the discovery loop (e.g. __spike.rideTo("frontier_old_well")).
+      rideTo: (poiId) => {
+        const poi = (POI_DEFINITIONS.frontier || []).find((p) => p.id === poiId);
+        if (poi) player.setPosition({ x: poi.x, z: poi.y });
+        return poi || null;
+      },
       // Snap the follow-cam to sit behind a given heading (radians; 0 = facing
       // forward (0,-1) = north, +PI/2 = east). For establishing captures.
       setHeading: (yaw = 0) => { player.resetCameraBehind(yaw); return yaw; },
@@ -3678,6 +3752,26 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // see is the water that stops you. (Built here, before the spawn block, so the
   // resume sanity-clamp below can test the saved position against world collision.)
   const proxies = buildProxies(snapshot.worldObjects).concat(waterCollisionBoxes());
+  // The rideable horse sits at the steelMustang mark by spawn (16.2, 12.0).
+  const MOUNT_SPOT = { x: 16.2, y: 12.0 };
+  const mountObjects = snapshot.worldObjects.concat([
+    { kind: "mountHorse", label: "Steel Mustang", x: MOUNT_SPOT.x, y: MOUNT_SPOT.y },
+  ]);
+  // Rideable horse — reuse the hitched-horse model as the mount.
+  let horseNode = null;
+  try {
+    const horseEntry = modelFor("horseHitched"); // { url: "/models/horse_hitched.glb", scale: 1.0, vary: true }
+    horseNode = await instanceModel(horseEntry.url, {
+      x: MOUNT_SPOT.x,
+      z: MOUNT_SPOT.y,
+      y: groundHeight(MOUNT_SPOT.x, MOUNT_SPOT.y),
+      yaw: -1.2,
+      scale: horseEntry.scale,
+    });
+    scene.add(horseNode);
+  } catch (err) {
+    console.warn("[render3d] rideable horse model failed to load", err);
+  }
   // Spawn placement. The funeral/implant cold-open ALWAYS opens at the canonical
   // graveside — it wins over resume on purpose: there is no value in restoring a
   // drifted position during the funeral beat, and doing so is exactly what re-pinned
@@ -3719,7 +3813,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   };
   let encounter = null;
   const interaction = createInteractionSystem({
-    worldObjects: snapshot.worldObjects,
+    worldObjects: mountObjects,
     setPromptText,
     isTargetEnabled: (target) => loopState.isTargetEnabled(target),
     getPromptText: (target) => {
@@ -4173,6 +4267,29 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   interaction.registerHandler("roadSlime", handleRoadSlime);
   interaction.registerHandler("brokenWagon", handleBrokenWagon);
 
+  function setRiderVisual(mountedNow) {
+    if (horseNode) horseNode.visible = !mountedNow; // rail horse hides while you ride it
+    // The hero stays visible as the rider; the saddle camera lifts to frame both.
+  }
+  interaction.registerHandler("mountHorse", () => {
+    player.setMounted(true);
+    setRiderVisual(true);
+    audioView?.play("uiTick");
+  });
+
+  let horseCalled = false; // whistle-to-call latch (on-foot only)
+  const onHorseKeys = (e) => {
+    if (e.code === "KeyF" && player.isMounted) {
+      player.setMounted(false);
+      setRiderVisual(false); // horse stays visible at the spot you dismounted
+      audioView?.play("uiTick");
+    } else if (e.code === "KeyH" && !player.isMounted) {
+      horseCalled = true; // the horse will ease toward you in the loop
+      audioView?.play("uiTick");
+    }
+  };
+  document.addEventListener("keydown", onHorseKeys);
+
   const updateBeatVisibility = () => {
     if (heroMeshes.slimeTell) {
       heroMeshes.slimeTell.visible = ["slime_tell", "slime_fight", "wagon_salvage", "return_to_boone", "survey_teaser"].includes(loopState.phase);
@@ -4444,22 +4561,39 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       ...overrides,
     });
   }
+  // Save-safety: when the boot load FAILED (saveLoadFailed), a real ironman save may
+  // exist but couldn't be read. Every write path below no-ops for the rest of the
+  // session so a fresh session can't clobber that existing-but-unread save. A clean
+  // null (no save) leaves saveLoadFailed false and autosaves normally.
   function persistRun() {
-    if (visualCapture || runMode !== "playing") return;
+    if (visualCapture || saveLoadFailed || runMode !== "playing") return;
     writeRun(currentRunPayload())
-      .then(() => saveMgr.onSaveSuccess())
-      .catch((err) => { if (import.meta.env?.DEV) console.warn("[render3d] run save failed", err); });
+      .then(() => {
+        saveMgr.onSaveSuccess();
+        saveHealth.recordSuccess();
+        syncSaveHealthHud();
+      })
+      .catch((err) => {
+        // Record the miss regardless of DEV — a streak must surface to the player.
+        saveHealth.recordFailure();
+        syncSaveHealthHud();
+        if (import.meta.env?.DEV) console.warn("[render3d] run save failed", err);
+      });
   }
   function onRunMutated() {
-    if (visualCapture || runMode !== "playing") return;
+    if (visualCapture || saveLoadFailed || runMode !== "playing") return;
     saveMgr.markDirty();
     persistRun();
   }
   function sealCurrentRun(cause) {
     if (visualCapture || runMode !== "playing") return;
     runMode = "sealed";
-    sealRun(currentRunPayload({ mode: "sealed" }), cause)
-      .catch((err) => { if (import.meta.env?.DEV) console.warn("[render3d] seal failed", err); });
+    // Don't seal-over an existing-but-unread save either: a failed load means the slot
+    // may hold a live run we never saw. Still surface the summary; just skip the write.
+    if (!saveLoadFailed) {
+      sealRun(currentRunPayload({ mode: "sealed" }), cause)
+        .catch((err) => { if (import.meta.env?.DEV) console.warn("[render3d] seal failed", err); });
+    }
     showRunSummary({ cause, phaseReached: loopState.phase, time: runElapsed });
   }
   function prettyPhase(phase) {
@@ -4529,6 +4663,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     window.addEventListener("visibilitychange", () => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") flush();
     });
+    // Tear down the mount/whistle keydown listener on page teardown so a
+    // re-run of startSpike (dev hot path) doesn't stack duplicate listeners.
+    window.addEventListener("pagehide", () => document.removeEventListener("keydown", onHorseKeys));
   }
   // A loaded sealed run shows its summary over the fresh scene.
   if (!visualCapture && loadedRun && loadedRun.mode === "sealed") {
@@ -4543,6 +4680,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   let prevTs = performance.now();
   let wasDodging = false; // rising-edge detector for the dodge whoosh
   let fieldMapLiveSyncT = 0;
+  let discoveryHoldT = 0; // holds a fresh discovery line on screen before the prompt restores
   // Establishing push-in: for the first CAM_INTRO_DUR seconds at spawn the camera
   // eases from a wide/high vantage into the gameplay framing. Gated to spawn (no
   // active beat focus, no modal, not visual capture) so it never fights focusBeat or
@@ -4604,6 +4742,27 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       }
     }
     if (!boardModalController.isOpen()) player.update(dt, proxies);
+    if (horseNode) {
+      if (player.isMounted) {
+        // Mounted: the horse rides under you, facing your heading.
+        horseNode.position.set(player.position.x, groundHeight(player.position.x, player.position.z), player.position.z);
+        horseNode.rotation.y = player.yaw;
+      } else if (horseCalled) {
+        // Whistle-to-call: ease the horse toward you; stop when it arrives.
+        const dx = player.position.x - horseNode.position.x;
+        const dz = player.position.z - horseNode.position.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist <= 2.5) {
+          horseCalled = false;
+        } else {
+          const stepLen = Math.min(dist, MOUNT_GAITS.trotSpeed * dt);
+          const nx = horseNode.position.x + (dx / dist) * stepLen;
+          const nz = horseNode.position.z + (dz / dist) * stepLen;
+          horseNode.position.set(nx, groundHeight(nx, nz), nz);
+          horseNode.rotation.y = Math.atan2(-dx, -dz); // face its travel direction
+        }
+      }
+    }
     // Bespoke graveside camera for the funeral cold-open — overrides the follow-cam
     // (whose behind-the-player vantage jams against a town wall). The grave (15,-4)
     // is boxed in: the Back Row buildings sit between the player and the grave to the
@@ -4634,7 +4793,36 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         ? graveFocusPoint
         : null;
     updateOcclusionFades(placementNodes, camera, player.position, funeralFocus);
-    interaction.update(player.position);
+    // While a discovery line is held, skip the per-frame prompt refresh so the
+    // 'Discovered — ...' text survives the hold window (interactionSystem.update
+    // always overwrites the prompt with the nearest one or ""). When the hold
+    // expires the restore below re-establishes the normal prompt for that frame.
+    if (discoveryHoldT <= 0) interaction.update(player.position);
+    // Free-roam discovery: ride within a POI radius -> surface its lore + reward.
+    if (!boardModalController.isOpen()) {
+      const found = resolveDiscovery(
+        snapshot.regions,
+        "frontier",
+        player.position.x,
+        player.position.z,
+      );
+      if (found) {
+        setPromptText(`Discovered — ${found.label}: ${found.line}`);
+        discoveryHoldT = 4.0; // hold the line on screen for 4s (drained below)
+        audioView?.play("chime");
+        if (found.loot?.gold) grantGold(game, found.loot.gold);
+        if (found.renown) {
+          if (found.renown.gold) grantGold(game, found.renown.gold);
+          if (found.renown.xp) grantXp(game, found.renown.xp);
+          audioView?.play("resolveChime");
+        }
+        onRunMutated();
+      }
+    }
+    if (discoveryHoldT > 0) {
+      discoveryHoldT -= dt;
+      if (discoveryHoldT <= 0) interaction.update(player.position); // restore normal prompt
+    }
     fieldMapLiveSyncT -= dt;
     if (fieldMapLiveSyncT <= 0) {
       syncLiveFieldMap();
@@ -4651,9 +4839,16 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       heroMeshes.roadSlime.position.z = slimeAI.pos.z;
       applySlimeTelegraph(heroMeshes.roadSlime, slimeAI.mode, slimeAI.telegraphT, now / 1000);
       if (slimeAI.contact) {
+        // Only fire hurt feedback when a lunge actually lands. applyLungeContact()
+        // is now cooldown-gated, so during sustained contact most frames deal no
+        // damage — shaking/playing the hurt SFX every frame would machine-gun the
+        // feedback. Gate shake + SFX on a real HP drop.
+        const hpBefore = encounter.getState().playerHp;
         encounter.applyLungeContact();
-        camShake.add(0.6);
-        audioView?.play("playerHurt");
+        if (encounter.getState().playerHp < hpBefore) {
+          camShake.add(0.6);
+          audioView?.play("playerHurt");
+        }
       }
     }
     if (!visualCapture) {

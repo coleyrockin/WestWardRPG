@@ -119,19 +119,37 @@ export function migrateRunPayload(payload) {
   return out;
 }
 
-// Load the ironman run. Returns the migrated payload, or null when there is no
-// valid save (missing / corrupt / wrong schema / IDB unavailable).
+// How long to wait for the IndexedDB read before declaring the load FAILED.
+// 8000ms: real IndexedDB reads complete well under this except under severe device
+// load. The old 1000ms was far too aggressive — a single slow read tripped the
+// timeout, the caller read that as "no save", and the first autosave clobbered the
+// ironman slot. A failed/timed-out load now RE-THROWS so the caller can tell
+// "load FAILED" (existing save may be unread — must not overwrite) from "empty slot"
+// (null — safe to start fresh).
+export const LOAD_TIMEOUT_MS = 8000;
+
+// Load the ironman run.
+//   - Resolves to a migrated payload when a valid save exists.
+//   - Resolves to null ONLY when readSave cleanly resolves with no/!ok result OR the
+//     payload is unmigratable (corrupt but safe to start fresh).
+//   - REJECTS (re-throws) on a timeout or a thrown readSave error — a failed read is
+//     NOT an empty slot. The caller must treat a rejection as "load failed" and
+//     suppress overwriting, so an existing-but-unread save is never clobbered by a
+//     fresh session.
 export async function loadRun() {
   let result;
   try {
     const readPromise = readSave(RUN_SLOT);
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Save load timed out")), 1000)
+      setTimeout(() => reject(new Error("Save load timed out")), LOAD_TIMEOUT_MS)
     );
     result = await Promise.race([readPromise, timeoutPromise]);
   } catch (err) {
-    console.warn("[runSave] readSave failed or timed out", err);
-    return null;
+    // Timeout or a thrown readSave: the read FAILED — an existing save may simply be
+    // unread. Re-throw so the boot can guard against overwriting it. (Do NOT collapse
+    // this to null; that's what destroyed real runs under load.)
+    console.warn("[runSave] readSave failed or timed out — load FAILED (not empty)", err);
+    throw err;
   }
   if (!result || !result.ok) return null;
   // A stale/corrupt payload (an old build's save shape) must NEVER kill boot —

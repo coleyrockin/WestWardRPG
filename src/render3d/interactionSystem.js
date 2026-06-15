@@ -19,6 +19,7 @@ const PROMPTS = {
   brokenWagon: { radius: 2.5, text: "E — Inspect Wagon" },
   roadSlime:   { radius: 2.2, text: "E — Strike Road Slime" },
   gravesite:   { radius: 2.5, text: "E — Attend Abram's Funeral" },
+  mountHorse:  { radius: 2.6, text: "E — Mount Up" },
 };
 
 // All interactable kinds, exported for spike.js / debug overlays.

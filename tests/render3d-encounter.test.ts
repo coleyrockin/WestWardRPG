@@ -161,13 +161,72 @@ describe("render3d encounter system — real-time combat", () => {
     e.applyLungeContact(); // 20 - 14 → 6
     expect(e.getState().playerHp).toBe(6);
     invuln = true;
-    e.applyLungeContact(); // i-frames negate it
+    e.applyLungeContact(); // i-frames negate it (and never arm the cooldown)
     expect(e.getState().playerHp).toBe(6);
     invuln = false;
+    e.update({ x: 10, z: 5 }, 1); // clear the lunge cooldown from the first hit
     e.applyLungeContact(); // 6 - 14 → 0 → death
     expect(e.getState().playerDefeated).toBe(true);
     expect(onPlayerDeath).toHaveBeenCalledTimes(1);
+    e.update({ x: 10, z: 5 }, 1);
     e.applyLungeContact(); // already dead → not re-fired
+    expect(onPlayerDeath).toHaveBeenCalledTimes(1);
+  });
+
+  it("a connected lunge only deducts damage once per cooldown window, not per frame", () => {
+    const onPlayerDeath = vi.fn();
+    const e = createEncounterSystem(null, SNAPSHOT, {
+      initialPlayerHp: 40,
+      lungeDamage: 14,
+      canDamagePlayer: () => true,
+      playerInvulnerable: () => false,
+      onPlayerDeath,
+      slimeMesh: fakeSlimeMesh(),
+    });
+
+    // Several rapid per-frame contact calls within one cooldown window must
+    // only land a single 14-damage hit — not drain the player to 0 (the bug).
+    for (let i = 0; i < 8; i += 1) e.applyLungeContact();
+    expect(e.getState().playerHp).toBe(26);
+    expect(onPlayerDeath).not.toHaveBeenCalled();
+
+    // Cooldown still active just under the window → no further damage.
+    e.update({ x: 10, z: 5 }, 0.5);
+    for (let i = 0; i < 5; i += 1) e.applyLungeContact();
+    expect(e.getState().playerHp).toBe(26);
+
+    // Advance the encounter clock past the cooldown → next contact bites again.
+    e.update({ x: 10, z: 5 }, 0.5);
+    e.applyLungeContact();
+    expect(e.getState().playerHp).toBe(12);
+  });
+
+  it("lunge cooldown still respects the i-frame and player-dead guards", () => {
+    const onPlayerDeath = vi.fn();
+    let invuln = true;
+    const e = createEncounterSystem(null, SNAPSHOT, {
+      initialPlayerHp: 20,
+      lungeDamage: 14,
+      canDamagePlayer: () => true,
+      playerInvulnerable: () => invuln,
+      onPlayerDeath,
+      slimeMesh: fakeSlimeMesh(),
+    });
+
+    // i-frames negate contact and must NOT consume/start the cooldown.
+    e.applyLungeContact();
+    expect(e.getState().playerHp).toBe(20);
+    invuln = false;
+    e.applyLungeContact(); // first real hit lands immediately
+    expect(e.getState().playerHp).toBe(6);
+
+    // Drop below zero on a fresh window, then confirm dead short-circuits.
+    e.update({ x: 10, z: 5 }, 1);
+    e.applyLungeContact(); // 6 - 14 → 0 → death
+    expect(e.getState().playerDefeated).toBe(true);
+    expect(onPlayerDeath).toHaveBeenCalledTimes(1);
+    e.update({ x: 10, z: 5 }, 1);
+    e.applyLungeContact(); // playerHp <= 0 guard → no re-fire
     expect(onPlayerDeath).toHaveBeenCalledTimes(1);
   });
 

@@ -485,3 +485,47 @@ describe("playerController — DOM shell", () => {
     ctrl.dispose();
   });
 });
+
+describe("playerController — saddle camera preset", () => {
+  it("exposes a saddle preset pulled back and lifted vs shoulder, with an fov", () => {
+    expect(CAMERA_PRESETS.saddle).toBeDefined();
+    expect(CAMERA_PRESETS.saddle.distance).toBeGreaterThan(CAMERA_PRESETS.shoulder.distance);
+    expect(CAMERA_PRESETS.saddle.height).toBeGreaterThan(CAMERA_PRESETS.shoulder.height);
+    expect(Number.isFinite(CAMERA_PRESETS.saddle.fov)).toBe(true);
+  });
+
+  it("resolveCameraPreset('saddle') returns the saddle framing", () => {
+    const p = resolveCameraPreset("saddle");
+    expect(p.distance).toBe(CAMERA_PRESETS.saddle.distance);
+  });
+});
+
+describe("playerController — mounted mode", () => {
+  it("defaults to on-foot; setMounted(true) flips isMounted", () => {
+    const doc = makeFakeDocument();
+    const camera = makeFakeCamera();
+    const ctrl = createPlayerController(camera, { document: doc as any });
+    expect(ctrl.isMounted).toBe(false);
+    ctrl.setMounted(true);
+    expect(ctrl.isMounted).toBe(true);
+    ctrl.setMounted(false);
+    expect(ctrl.isMounted).toBe(false);
+    ctrl.dispose();
+  });
+
+  it("mounted + forward accelerates the rig from rest (momentum, not instant)", () => {
+    const doc = makeFakeDocument();
+    const camera = makeFakeCamera();
+    const ctrl = createPlayerController(camera, { document: doc as any });
+    ctrl.setMounted(true);
+    // Hold forward via the same real key-handler seam every other movement test
+    // uses — keydown sets input.forward through the actual code path.
+    doc.dispatch("keydown", { code: "KeyW" });
+    const before = ctrl.position;
+    ctrl.update(0.1, null);
+    const after = ctrl.position;
+    const moved = Math.hypot(after.x - before.x, after.z - before.z);
+    expect(moved).toBeGreaterThan(0);
+    ctrl.dispose();
+  });
+});
