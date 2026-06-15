@@ -485,3 +485,17 @@ describe("playerController — DOM shell", () => {
     ctrl.dispose();
   });
 });
+
+describe("playerController — saddle camera preset", () => {
+  it("exposes a saddle preset pulled back and lifted vs shoulder, with an fov", () => {
+    expect(CAMERA_PRESETS.saddle).toBeDefined();
+    expect(CAMERA_PRESETS.saddle.distance).toBeGreaterThan(CAMERA_PRESETS.shoulder.distance);
+    expect(CAMERA_PRESETS.saddle.height).toBeGreaterThan(CAMERA_PRESETS.shoulder.height);
+    expect(Number.isFinite(CAMERA_PRESETS.saddle.fov)).toBe(true);
+  });
+
+  it("resolveCameraPreset('saddle') returns the saddle framing", () => {
+    const p = resolveCameraPreset("saddle");
+    expect(p.distance).toBe(CAMERA_PRESETS.saddle.distance);
+  });
+});

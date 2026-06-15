@@ -105,6 +105,18 @@ export const CAMERA_PRESETS = Object.freeze({
     shoulder: 0.55,
     smoothing: 10.5,
   }),
+  // Mounted free-roam: pulled back and lifted off the shoulder so the horse +
+  // rider read as a silhouette against the range, with a wider fov that the
+  // FOV-breathe opens further at a gallop.
+  saddle: Object.freeze({
+    distance: 7.8,
+    height: 4.2,
+    lookHeight: 2.1,
+    lookAhead: 6.0,
+    shoulder: 0.5,
+    smoothing: 8.0,
+    fov: 60,
+  }),
   town: Object.freeze({
     distance: 7.6,
     height: 5.0,
