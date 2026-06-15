@@ -55,6 +55,7 @@ import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
 import { gustAt } from "../game/world/windGusts.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
 import { createSaveStateManager } from "../saveStateManager.js";
+import { createSaveHealth } from "./saveHealth.js";
 import { buildRunPayload, loadRun, writeRun, sealRun, clearRun } from "./runSave.js";
 import { stagger } from "./animationHelpers.js";
 import { createPlayerCombat, hitboxHitsTarget } from "./combat/playerCombat.js";
@@ -2690,6 +2691,41 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
 
   // --- Ironman run persistence (frontier-ironman slot) ---
   const saveMgr = createSaveStateManager({ interval: 90 });
+  // Tracks autosave reliability so persistent write failures surface to the player
+  // instead of being swallowed silently in production builds.
+  const saveHealth = createSaveHealth();
+  // Subtle, persistent, non-blocking HUD note shown only while saves are "failing".
+  // Built with createElement/textContent (no parser sinks), default hidden.
+  let _saveFailNote = null;
+  function ensureSaveFailNote() {
+    if (_saveFailNote || typeof document === "undefined" || !document.body) return _saveFailNote;
+    const note = document.createElement("div");
+    note.id = "save-fail-note";
+    note.textContent = "⚠ Save failing — progress may not be recorded";
+    note.setAttribute("role", "status");
+    note.style.position = "fixed";
+    note.style.right = "12px";
+    note.style.bottom = "12px";
+    note.style.zIndex = "40";
+    note.style.padding = "4px 9px";
+    note.style.font = "600 11px/1.4 system-ui, sans-serif";
+    note.style.letterSpacing = "0.02em";
+    note.style.color = "#ffd9b0";
+    note.style.background = "rgba(60, 22, 14, 0.78)";
+    note.style.border = "1px solid rgba(255, 150, 90, 0.55)";
+    note.style.borderRadius = "4px";
+    note.style.pointerEvents = "none";
+    note.style.opacity = "0.9";
+    note.hidden = true;
+    document.body.appendChild(note);
+    _saveFailNote = note;
+    return note;
+  }
+  function syncSaveHealthHud() {
+    const failing = saveHealth.status === "failing";
+    const note = failing ? ensureSaveFailNote() : _saveFailNote;
+    if (note) note.hidden = !failing;
+  }
   let runMode = loadedRun && loadedRun.mode === "sealed" ? "sealed" : "playing";
   const runSeed = resumeRun && Number.isFinite(resumeRun.seed) ? resumeRun.seed : Date.now();
   let runElapsed = resumeRun && Number.isFinite(resumeRun.time) ? resumeRun.time : 0;
@@ -4532,8 +4568,17 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   function persistRun() {
     if (visualCapture || saveLoadFailed || runMode !== "playing") return;
     writeRun(currentRunPayload())
-      .then(() => saveMgr.onSaveSuccess())
-      .catch((err) => { if (import.meta.env?.DEV) console.warn("[render3d] run save failed", err); });
+      .then(() => {
+        saveMgr.onSaveSuccess();
+        saveHealth.recordSuccess();
+        syncSaveHealthHud();
+      })
+      .catch((err) => {
+        // Record the miss regardless of DEV — a streak must surface to the player.
+        saveHealth.recordFailure();
+        syncSaveHealthHud();
+        if (import.meta.env?.DEV) console.warn("[render3d] run save failed", err);
+      });
   }
   function onRunMutated() {
     if (visualCapture || saveLoadFailed || runMode !== "playing") return;
