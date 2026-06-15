@@ -2,8 +2,8 @@
 // real frontier layout so a regression in either module is caught here.
 
 import { describe, expect, it } from "vitest";
-import { buildProxies, resolveCollision } from "../src/render3d/worldProxies.js";
-import { buildFrontierPlacements, PLAYER_SPAWN } from "../src/render3d/frontierLayout.js";
+import { buildProxies, resolveCollision, clampResumedPosition } from "../src/render3d/worldProxies.js";
+import { buildFrontierPlacements, PLAYER_SPAWN, OPEN_RANGE_BOUNDS } from "../src/render3d/frontierLayout.js";
 
 const KINDS_THAT_BLOCK = new Set([
   "town", "ranch", "gate", "watchtower", "landmark",
@@ -228,5 +228,36 @@ describe("worldProxies — diagonal sprint tunneling", () => {
       out.x > inflated.minX && out.x < inflated.maxX &&
       out.z > inflated.minZ && out.z < inflated.maxZ;
     expect(stillInside).toBe(false);
+  });
+});
+
+describe("worldProxies — clampResumedPosition", () => {
+  const proxies = buildProxies(buildFrontierPlacements());
+
+  it("returns the safe fallback for non-finite coords", () => {
+    expect(clampResumedPosition({ x: NaN, z: 3 }, proxies, OPEN_RANGE_BOUNDS)).toEqual({ x: 9.5, z: 8.5 });
+    expect(clampResumedPosition({ x: 3 }, proxies, OPEN_RANGE_BOUNDS)).toEqual({ x: 9.5, z: 8.5 });
+    expect(clampResumedPosition(null, proxies, OPEN_RANGE_BOUNDS)).toEqual({ x: 9.5, z: 8.5 });
+  });
+
+  it("clamps an out-of-bounds position back inside the playable bounds", () => {
+    const out = clampResumedPosition({ x: 9999, z: -9999 }, proxies, OPEN_RANGE_BOUNDS);
+    expect(out.x).toBeLessThanOrEqual(OPEN_RANGE_BOUNDS.maxX);
+    expect(out.x).toBeGreaterThanOrEqual(OPEN_RANGE_BOUNDS.minX);
+    expect(out.z).toBeLessThanOrEqual(OPEN_RANGE_BOUNDS.maxY);
+    expect(out.z).toBeGreaterThanOrEqual(OPEN_RANGE_BOUNDS.minY);
+  });
+
+  it("ejects a position that landed inside a collider", () => {
+    const box = { minX: -1, maxX: 1, minZ: -1, maxZ: 1, source: { kind: "town", x: 0, y: 0, size: 1 } as any };
+    const out = clampResumedPosition({ x: 0, z: 0 }, [box], OPEN_RANGE_BOUNDS);
+    const inf = { minX: -1.3, maxX: 1.3, minZ: -1.3, maxZ: 1.3 };
+    const stillInside = out.x > inf.minX && out.x < inf.maxX && out.z > inf.minZ && out.z < inf.maxZ;
+    expect(stillInside).toBe(false);
+  });
+
+  it("leaves a valid in-bounds position untouched when nothing blocks it", () => {
+    const safe = { x: PLAYER_SPAWN.x, z: PLAYER_SPAWN.y };
+    expect(clampResumedPosition(safe, [], OPEN_RANGE_BOUNDS)).toEqual(safe);
   });
 });

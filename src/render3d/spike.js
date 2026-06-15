@@ -21,10 +21,12 @@ import {
   getProductionFrameLayoutMetrics,
   getRouteMetrics,
   OPEN_RANGE_ROADS,
+  OPEN_RANGE_BOUNDS,
   PLAYER_SPAWN,
+  GRAVESIDE_SPAWN,
 } from "./frontierLayout.js";
 import { createPlayerController, CAMERA_PRESETS } from "./playerController.js";
-import { buildProxies, SALOON_DIMS } from "./worldProxies.js";
+import { buildProxies, SALOON_DIMS, clampResumedPosition } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
 import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine, getPhaseProgress } from "./phaseState.js";
 import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
@@ -50,7 +52,7 @@ import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
 import { gustAt } from "../game/world/windGusts.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
 import { createSaveStateManager } from "../saveStateManager.js";
-import { buildRunPayload, loadRun, writeRun, sealRun } from "./runSave.js";
+import { buildRunPayload, loadRun, writeRun, sealRun, clearRun } from "./runSave.js";
 import { stagger } from "./animationHelpers.js";
 import { createPlayerCombat, hitboxHitsTarget } from "./combat/playerCombat.js";
 import { createSlimeState, stepSlime } from "./combat/slimeBehavior.js";
@@ -3671,32 +3673,38 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       },
     };
   }
-  // Ironman resume: restore saved player position + heading (best-effort).
-  if (resumeRun && Number.isFinite(resumeRun.player?.x) && Number.isFinite(resumeRun.player?.z)) {
-    player.setPosition({ x: resumeRun.player.x, z: resumeRun.player.z });
-    if (Number.isFinite(resumeRun.player?.yaw)) player.resetCameraBehind(resumeRun.player.yaw);
-  } else if (loopState.phase === "funeral") {
-    // Dust to Dust opens at the graveside — and you're in control from frame one.
-    // Stand out in the OPEN NORTH RANGE, north of Abram's casket (15,-4), facing
-    // SOUTH toward it (yaw π = forward (0,1)). Looking west/east jams the eye into
-    // the packed north edge of town; from the open north the casket reads against
-    // ground and a distant town skyline — air around it, not a wall. A pulled-back,
-    // elevated follow-cam looks down over the range so the shot breathes. Walk south
-    // and press E to pay respects; the implant beat then carries you into town.
-    // Abram's grave now sits out on the open range NORTH of town (15,-14) — a lone
-    // frontier baron's plot. Stand a few paces NORTH of it on the open ground, facing
-    // SOUTH (yaw π) so the establishing shot reads across open range → the casket →
-    // Westward as a distant skyline on the horizon → sky: the empire he built, framed
-    // behind the man who built it. Air everywhere, no clogged closet. Walk south, press
-    // E to pay respects; the implant beat then carries you down into town.
-    player.setPosition({ x: 15, z: -19 });
-    player.resetCameraBehind(Math.PI);
-    player.setCameraPreset("shoulder", { distance: 8, height: 4.5, lookHeight: 1.5, shoulder: 0.35 });
-  }
   // Deep water blocks; the ford is the one walkable crossing. The collision boxes
   // come from the SAME waterLayout records that built the meshes, so the water you
-  // see is the water that stops you.
+  // see is the water that stops you. (Built here, before the spawn block, so the
+  // resume sanity-clamp below can test the saved position against world collision.)
   const proxies = buildProxies(snapshot.worldObjects).concat(waterCollisionBoxes());
+  // Spawn placement. The funeral/implant cold-open ALWAYS opens at the canonical
+  // graveside — it wins over resume on purpose: there is no value in restoring a
+  // drifted position during the funeral beat, and doing so is exactly what re-pinned
+  // returning players to the old "clogged closet" (the saved position survived the
+  // graveside relocation). Every other phase restores the saved position, snapped
+  // out of any collider / out-of-bounds drift by clampResumedPosition.
+  if (loopState.phase === "funeral" || loopState.phase === "implant") {
+    // Abram's grave sits out on the open range north of town — a lone frontier
+    // baron's plot. Stand a few paces NORTH of the casket, facing SOUTH (yaw π) so the
+    // establishing shot reads across open range → the casket → Westward as a distant
+    // skyline → sky: the empire he built, framed behind the man who built it. Walk
+    // south and press E to pay respects; the implant beat then carries you into town.
+    player.setPosition({ x: GRAVESIDE_SPAWN.x, z: GRAVESIDE_SPAWN.z });
+    player.resetCameraBehind(GRAVESIDE_SPAWN.yaw);
+    player.setCameraPreset("shoulder", { distance: 10, height: 6, lookHeight: 1.2, shoulder: 0.3 });
+  } else if (resumeRun && Number.isFinite(resumeRun.player?.x) && Number.isFinite(resumeRun.player?.z)) {
+    // Ironman resume: restore saved position + heading (best-effort), but eject any
+    // position that drifted inside a collider or outside the playable bounds so a
+    // corrupt/legacy save can never strand the player inside geometry.
+    const safe = clampResumedPosition(
+      { x: resumeRun.player.x, z: resumeRun.player.z },
+      proxies,
+      OPEN_RANGE_BOUNDS,
+    );
+    player.setPosition(safe);
+    if (Number.isFinite(resumeRun.player?.yaw)) player.resetCameraBehind(resumeRun.player.yaw);
+  }
   const promptEl = document.getElementById("prompt");
   const beatToast = createBeatToast(document);
   let currentPromptText = "";
@@ -4147,6 +4155,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       player.setPosition({ x: PLAYER_SPAWN.x, z: PLAYER_SPAWN.y });
       player.resetCameraBehind(-0.9);
       player.setCameraPreset("shoulder");
+      // Re-arm the establishing push-in so the camera EASES into the road framing
+      // instead of hard-snapping across the ~28u teleport from the graveside. Now
+      // that the phase has left funeral/implant, the spawn push-in branch owns the
+      // camera and glides it in (and reveals the job board on a fresh run).
+      camIntroSettled = false;
+      camIntroStart = null;
     }
   };
 
@@ -4491,14 +4505,21 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       mode: "playing",
       seed: Date.now(),
       time: 0,
-      player: { x: snapshot.player.x, z: snapshot.player.y, yaw: 0 },
+      // The fresh run opens at the funeral cold-open, so seed the saved position at the
+      // graveside (not the road spawn) — keeps the persisted run self-consistent even
+      // though the funeral/implant spawn block overrides it on boot.
+      player: { x: GRAVESIDE_SPAWN.x, z: GRAVESIDE_SPAWN.z, yaw: GRAVESIDE_SPAWN.yaw },
       // Match the fresh-boot path (line ~2432): a new run must carry the dust_to_dust
       // mission so the respawn replays the funeral cold-open instead of booting at "spawn".
       loopState: createLoopStateMachine({ activeMission: "dust_to_dust" }).state,
       world: { dayTime: 0.25, weatherKind: snapshot.weather?.kind || "clear" }, // golden-hour opening, same as a fresh boot
       runStats: { startedAt: Date.now() },
     });
-    writeRun(fresh).finally(() => { if (typeof location !== "undefined") location.reload(); });
+    // Wipe the slot (primary + rotated backups) BEFORE writing the fresh run so a stale
+    // funeral position can't be resurrected from a backup, then reload into the new run.
+    clearRun()
+      .then(() => writeRun(fresh))
+      .finally(() => { if (typeof location !== "undefined") location.reload(); });
   }
   // On-quit best-effort flush, fire-and-forget. pagehide + visibilitychange
   // cover tab close/switch.

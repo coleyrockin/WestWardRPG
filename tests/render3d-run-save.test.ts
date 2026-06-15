@@ -11,6 +11,7 @@ import {
 } from "../src/render3d/runSave.js";
 import { readSave } from "../src/savePersistence.js";
 import { createLoopStateMachine } from "../src/render3d/phaseState.js";
+import { GRAVESIDE_SPAWN } from "../src/render3d/frontierLayout.js";
 
 function sampleCtx(overrides: Record<string, any> = {}) {
   return {
@@ -80,19 +81,45 @@ describe("buildRunPayload", () => {
 });
 
 describe("migrateRunPayload", () => {
-  it("is identity for a current v2 payload", () => {
+  it("is identity for a current (v3) payload", () => {
     const p = buildRunPayload(sampleCtx(), 1700000000000);
     expect(p.version).toBe(RUN_VERSION);
     expect(migrateRunPayload(p)).toBe(p);
   });
 
-  it("backfills a v1 payload to v2 with game:null (loader builds + reconciles)", () => {
+  it("backfills a v1 payload to v3 with game:null, keeping position + progress", () => {
     const v1 = { ...buildRunPayload(sampleCtx(), 1700000000000), version: 1 };
     delete (v1 as Record<string, unknown>).game;
     const migrated = migrateRunPayload(v1);
     expect(migrated?.version).toBe(RUN_VERSION);
     expect(migrated?.game).toBeNull();
     expect(migrated?.loopState.phase).toBe(v1.loopState.phase); // run progress kept
+    expect(migrated?.player).toEqual(v1.player); // non-funeral phase → position kept
+  });
+
+  it("v2 → v3 resets a stale funeral position to the graveside, keeps other phases", () => {
+    // A v2 save taken during the funeral cold-open stored a position at the OLD
+    // graveside (the "clogged closet"). v3 relocated the grave, so the migration must
+    // snap funeral/implant positions back to GRAVESIDE_SPAWN — and leave everything else.
+    const funeralV2 = {
+      ...buildRunPayload(
+        sampleCtx({
+          player: { x: 21.5, z: -4, yaw: Math.PI / 2 },
+          loopState: { ...sampleCtx().loopState, phase: "funeral" },
+        }),
+        1700000000000,
+      ),
+      version: 2,
+    };
+    const migrated = migrateRunPayload(funeralV2);
+    expect(migrated?.version).toBe(RUN_VERSION);
+    expect(migrated?.player).toEqual({ x: GRAVESIDE_SPAWN.x, z: GRAVESIDE_SPAWN.z, yaw: GRAVESIDE_SPAWN.yaw });
+
+    // A non-funeral v2 save keeps its position through the same version bump.
+    const roadV2 = { ...buildRunPayload(sampleCtx(), 1700000000000), version: 2 };
+    const roadMigrated = migrateRunPayload(roadV2);
+    expect(roadMigrated?.version).toBe(RUN_VERSION);
+    expect(roadMigrated?.player).toEqual(roadV2.player);
   });
 
   it("rejects non-frontier-run / malformed / future payloads", () => {
@@ -167,7 +194,7 @@ describe("new-run payload carries the funeral mission (regression: startNewRun)"
         mode: "playing",
         seed: 1,
         time: 0,
-        player: { x: 15, z: 0.5, yaw: 0 },
+        player: { x: GRAVESIDE_SPAWN.x, z: GRAVESIDE_SPAWN.z, yaw: GRAVESIDE_SPAWN.yaw },
         loopState: createLoopStateMachine({ activeMission: "dust_to_dust" }).state,
         world: { dayTime: 0.25, weatherKind: "clear" },
       },

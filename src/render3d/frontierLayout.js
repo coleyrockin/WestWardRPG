@@ -13,6 +13,13 @@ export const FRONTIER_ANCHOR = { x: 9.5, y: 8.5 };
 // Player spawn — camera origin, looking east down the road.
 export const PLAYER_SPAWN = { x: 9.5, y: 8.5 };
 
+// Funeral cold-open spawn — a few paces NORTH of Abram's casket (the "gravesite"
+// HERO_OBJECT), facing SOUTH (yaw π). Kept in LOCKSTEP with the casket placement:
+// move the grave and you move this. Applied unconditionally for the funeral/implant
+// beats (render3d/spike.js) so a resumed run can never re-pin you to the old
+// "clogged closet", and it is the reset target for stale funeral saves (runSave.js).
+export const GRAVESIDE_SPAWN = Object.freeze({ x: 15, z: -37, yaw: Math.PI });
+
 export const ROUTE_BEAT_SECONDS = Object.freeze({
   board_choice: 55,
   road_sign: 24,
@@ -214,7 +221,7 @@ const HERO_OBJECTS = [
   { kind: "slimeTell",   label: "Slime Trail",       x: 48.2, y: 16.4, color: "#75d06b", size: 1.0 },
   { kind: "roadSlime",   label: "Road Slime",        x: 53.5, y: 15.0, color: "#7fd06a", size: 0.9 },
   { kind: "brokenWagon", label: "Broken Wagon",      x: 60.5, y: 12.2, color: "#b9824d", size: 1.2 },
-  { kind: "gravesite",   label: "Abram's Casket",    x: 15.0, y: -14.0, color: "#4f3a2c", size: 1.0 },
+  { kind: "gravesite",   label: "Abram's Casket",    x: 15.0, y: -32.0, color: "#4f3a2c", size: 1.0 },
   { kind: "steelMustang", label: "Steel Mustang Mount", x: 16.2, y: 12.0, color: "#8a8f7d", size: 1.1, yaw: -1.2 },
 ];
 

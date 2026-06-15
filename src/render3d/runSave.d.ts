@@ -54,3 +54,4 @@ export function migrateRunPayload(payload: any): RunPayload | null;
 export function loadRun(): Promise<RunPayload | null>;
 export function writeRun(payload: RunPayload): Promise<any>;
 export function sealRun(payload: RunPayload, cause?: string, now?: number): Promise<RunPayload>;
+export function clearRun(): Promise<any>;

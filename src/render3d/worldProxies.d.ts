@@ -20,3 +20,10 @@ export function resolveCollision(
   proxies: AABB[] | null | undefined,
   radius?: number,
 ): { x: number; z: number };
+
+export function clampResumedPosition(
+  point: { x?: number; z?: number } | null | undefined,
+  proxies: AABB[] | null | undefined,
+  bounds?: { minX: number; maxX: number; minY: number; maxY: number } | null,
+  radius?: number,
+): { x: number; z: number };

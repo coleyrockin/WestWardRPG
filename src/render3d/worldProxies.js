@@ -89,8 +89,11 @@ const FOOTPRINTS = {
   // --- bigger-world expansion (zone props) ---
   mesa:        (p) => box(p, 3.2 * p.size, 3.2 * p.size),
   mesaSilhouette: (p) => box(p, 3.2 * p.size, 3.2 * p.size),
-  mesaSkyline: (p) => box(p, 4.8 * p.size, 1.0 * p.size),
-  heroMesaSkyline: (p) => box(p, 5.6 * p.size, 1.0 * p.size),
+  // Depth matches the visible mesh in spike.js buildMesa (d = 2.9*size) so you stop
+  // at the silhouette instead of phasing two-thirds of the way into it. Width stays
+  // wide for a continuous boundary wall (BOUNDARY_RING overlap math assumes it).
+  mesaSkyline: (p) => box(p, 4.8 * p.size, 2.9 * p.size),
+  heroMesaSkyline: (p) => box(p, 5.6 * p.size, 2.9 * p.size),
   cliff:       (p) => box(p, 2.4 * p.size, 1.4 * p.size),
   rock:        (p) => box(p, 0.9 * p.size, 0.9 * p.size),
   boulder:     (p) => box(p, 1.4 * p.size, 1.4 * p.size),
@@ -228,8 +231,14 @@ export function resolveCollision({ from, to }, proxies, radius = PLAYER_RADIUS_D
   }
   z = attemptZ;
 
-  // Stuck-inside fallback. Bounded iterations — a few passes are enough to
-  // resolve overlapping proxies; we'd rather give up than spin.
+  return ejectFromColliders(x, z, proxies, radius);
+}
+
+// Shared stuck-inside fallback. Bounded iterations — a few passes are enough to
+// resolve overlapping proxies; we'd rather give up than spin. Pushes a penetrating
+// point out along its smallest axis, fractionally past the boundary so next-frame
+// sweep tests (strict <, >) see it as outside the inflated extent.
+function ejectFromColliders(x, z, proxies, radius) {
   for (let iter = 0; iter < 4; iter++) {
     let pushed = false;
     for (const p of proxies || []) {
@@ -240,8 +249,6 @@ export function resolveCollision({ from, to }, proxies, radius = PLAYER_RADIUS_D
         const dzMin = z - inf.minZ;
         const dzMax = inf.maxZ - z;
         const min = Math.min(dxLeft, dxRight, dzMin, dzMax);
-        // Push fractionally past the boundary so next-frame sweep tests
-        // (strict <, >) see this point as outside the inflated extent.
         if (min === dxLeft) x = inf.minX - BOUNDARY_EPSILON;
         else if (min === dxRight) x = inf.maxX + BOUNDARY_EPSILON;
         else if (min === dzMin) z = inf.minZ - BOUNDARY_EPSILON;
@@ -251,6 +258,27 @@ export function resolveCollision({ from, to }, proxies, radius = PLAYER_RADIUS_D
     }
     if (!pushed) break;
   }
-
   return { x, z };
+}
+
+// Town road spawn — always-safe ground used when a resumed position is unusable.
+const SAFE_FALLBACK = Object.freeze({ x: 9.5, z: 8.5 });
+
+// Snap a resumed/loaded player position to safe ground before it's applied on boot:
+//   1. non-finite coords  → the safe fallback,
+//   2. out-of-bounds drift → clamped inside `bounds` (with a small margin),
+//   3. inside a collider   → ejected via the shared stuck-inside fallback.
+// `bounds` is OPEN_RANGE_BOUNDS-shaped ({ minX, maxX, minY, maxY }); world y maps to
+// the position's z. Without this, a legacy/corrupt save can strand the player inside
+// a building wall (or off the map) the moment it's restored.
+export function clampResumedPosition(point, proxies, bounds, radius = PLAYER_RADIUS_DEFAULT) {
+  let x = Number(point?.x);
+  let z = Number(point?.z);
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return { ...SAFE_FALLBACK };
+  if (bounds) {
+    const m = 2; // keep off the literal world edge
+    x = Math.min(Math.max(x, bounds.minX + m), bounds.maxX - m);
+    z = Math.min(Math.max(z, bounds.minY + m), bounds.maxY - m);
+  }
+  return ejectFromColliders(x, z, proxies, radius);
 }

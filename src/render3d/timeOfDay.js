@@ -112,7 +112,10 @@ export const PALETTES = Object.freeze({
       // reads as wood. contrast lifted 1.15→1.2 for darker, more committed shadows.
       tint: "#ffb060", amount: 0.02, contrast: 1.2, saturation: 1.04,
       shadowTint: "#0f1f4a", highlightTint: "#ffc880",
-      splitStrength: 0.32, godrayStrength: 0.2, vignetteStrength: 0.06, bloomThreshold: 0.86,
+      // Vignette eased 0.06 → 0.035: the opening boots at golden hour, and a heavy
+      // edge-darken made the open-range funeral frame feel small/closed-in. (The
+      // golden-image baseline pins DUSK, not golden hour, so this is baseline-safe.)
+      splitStrength: 0.32, godrayStrength: 0.2, vignetteStrength: 0.035, bloomThreshold: 0.86,
     },
     bodyBg: "#2a1f2e",
   },

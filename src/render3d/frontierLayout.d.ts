@@ -21,6 +21,7 @@ export interface Placement {
 
 export const FRONTIER_ANCHOR: { x: number; y: number };
 export const PLAYER_SPAWN: { x: number; y: number };
+export const GRAVESIDE_SPAWN: Readonly<{ x: number; z: number; yaw: number }>;
 export const ROUTE_BEAT_SECONDS: Readonly<Record<string, number>>;
 export const FIRST_ROAD_ART_STYLE: Readonly<{
   roadWidth: number;

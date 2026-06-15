@@ -13,13 +13,17 @@
 // fields are carried forward so a future step can reconstruct the run purely from
 // (seed, input-log) — they are unused on resume right now.
 
-import { writeSave, readSave } from "../savePersistence.js";
+import { writeSave, readSave, deleteSave } from "../savePersistence.js";
+import { GRAVESIDE_SPAWN } from "./frontierLayout.js";
 
 export const RUN_SLOT = "frontier-ironman";
 export const RUN_SCHEMA = "frontier-run";
 // v2: adds `game` — the RPG state slice (player gold/xp/level, inventory,
 // progression, job board, loot, npc memory) from render3d/gameState.js.
-export const RUN_VERSION = 2;
+// v3: the graveside relocated to the open range — funeral/implant positions
+// stored by v2 are stale and re-pin the player to the old "clogged closet", so
+// migrateRunPayload resets those beats back to GRAVESIDE_SPAWN.
+export const RUN_VERSION = 3;
 
 // Strip view-layer fields off a loopState snapshot, keeping only what must persist.
 // (createLoopStateMachine().state returns the persistent fields PLUS derived view
@@ -91,13 +95,28 @@ export function migrateRunPayload(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
   if (payload.schema !== RUN_SCHEMA) return null;
   if (!Number.isFinite(payload.version) || payload.version > RUN_VERSION) return null;
-  if (payload.version < 2) {
+  let out = payload;
+  if (out.version < 2) {
     // v1 → v2: no game slice existed. `game: null` makes the loader build a
     // fresh state and reconcile it against the saved loop phase
     // (gameState.reconcileWithLoopPhase), so old runs keep their progress.
-    return { ...payload, version: RUN_VERSION, game: null };
+    out = { ...out, version: 2, game: null };
   }
-  return payload;
+  if (out.version < 3) {
+    // v2 → v3: the graveside moved out to the open range. A position stored during
+    // the funeral/implant cold-open now points at the old "clogged closet", so reset
+    // those beats to the canonical graveside spawn. Every other phase keeps its
+    // saved position untouched (run progress is preserved).
+    const staleFuneral = out.loopState?.phase === "funeral" || out.loopState?.phase === "implant";
+    out = {
+      ...out,
+      version: RUN_VERSION,
+      player: staleFuneral
+        ? { x: GRAVESIDE_SPAWN.x, z: GRAVESIDE_SPAWN.z, yaw: GRAVESIDE_SPAWN.yaw }
+        : out.player,
+    };
+  }
+  return out;
 }
 
 // Load the ironman run. Returns the migrated payload, or null when there is no
@@ -130,6 +149,18 @@ export async function loadRun() {
 // recovery from savePersistence). Returns the stored envelope.
 export async function writeRun(payload) {
   return writeSave(RUN_SLOT, payload);
+}
+
+// Wipe the ironman slot entirely — primary + all backups. Used by "Begin a New
+// Run" so a fresh run can't be contaminated by a stale position resurrected from
+// a rotated backup. Swallows errors: clearing must never block starting over.
+export async function clearRun() {
+  try {
+    return await deleteSave(RUN_SLOT);
+  } catch (err) {
+    console.warn("[runSave] clearRun failed (continuing fresh anyway)", err);
+    return null;
+  }
 }
 
 // Seal the run on death: flip mode to "sealed" and stamp runStats. Writes to the
