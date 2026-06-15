@@ -4708,7 +4708,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         ? graveFocusPoint
         : null;
     updateOcclusionFades(placementNodes, camera, player.position, funeralFocus);
-    interaction.update(player.position);
+    // While a discovery line is held, skip the per-frame prompt refresh so the
+    // 'Discovered — ...' text survives the hold window (interactionSystem.update
+    // always overwrites the prompt with the nearest one or ""). When the hold
+    // expires the restore below re-establishes the normal prompt for that frame.
+    if (discoveryHoldT <= 0) interaction.update(player.position);
     // Free-roam discovery: ride within a POI radius -> surface its lore + reward.
     if (!boardModalController.isOpen()) {
       const found = resolveDiscovery(
