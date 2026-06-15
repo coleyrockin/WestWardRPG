@@ -27,6 +27,8 @@ import {
 } from "./frontierLayout.js";
 import { createPlayerController, CAMERA_PRESETS } from "./playerController.js";
 import { MOUNT_GAITS } from "./mountController.js";
+import { resolveDiscovery } from "./discoveryRuntime.js";
+import { ensurePoiDefaults } from "../poiSystem.js";
 import { buildProxies, SALOON_DIMS, clampResumedPosition } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
 import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine, getPhaseProgress } from "./phaseState.js";
@@ -62,6 +64,8 @@ import { createAudioView } from "./audioView.js";
 import {
   createGameState,
   hydrateGameState,
+  grantGold,
+  grantXp,
   reconcileWithLoopPhase,
   buildGameSaveSlice,
   acceptStarterJob,
@@ -2680,6 +2684,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // else built fresh and reconciled against the saved loop phase (v1 saves).
   const game = resumeRun?.game ? hydrateGameState(resumeRun.game) : createGameState();
   reconcileWithLoopPhase(game, resumeRun?.loopState || {});
+  // Free-roam discovery state lives on snapshot.regions.poisDiscovered (the field
+  // we persist/restore in currentRunPayload); ensure its defaults before the loop
+  // drives resolveDiscovery off it.
+  ensurePoiDefaults(snapshot.regions);
   // Loot rolls ride the run seed so a given run's drops are reproducible.
   const lootRng = makeRng((runSeed >>> 0) || 1);
   let appliedPalette = sunArc(clock.dayTime);
@@ -4587,6 +4595,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   let prevTs = performance.now();
   let wasDodging = false; // rising-edge detector for the dodge whoosh
   let fieldMapLiveSyncT = 0;
+  let discoveryHoldT = 0; // holds a fresh discovery line on screen before the prompt restores
   // Establishing push-in: for the first CAM_INTRO_DUR seconds at spawn the camera
   // eases from a wide/high vantage into the gameplay framing. Gated to spawn (no
   // active beat focus, no modal, not visual capture) so it never fights focusBeat or
@@ -4700,6 +4709,31 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         : null;
     updateOcclusionFades(placementNodes, camera, player.position, funeralFocus);
     interaction.update(player.position);
+    // Free-roam discovery: ride within a POI radius -> surface its lore + reward.
+    if (!boardModalController.isOpen()) {
+      const found = resolveDiscovery(
+        snapshot.regions,
+        "frontier",
+        player.position.x,
+        player.position.z,
+      );
+      if (found) {
+        setPromptText(`Discovered — ${found.label}: ${found.line}`);
+        discoveryHoldT = 4.0; // hold the line on screen for 4s (drained below)
+        audioView?.play("chime");
+        if (found.loot?.gold) grantGold(game, found.loot.gold);
+        if (found.renown) {
+          if (found.renown.gold) grantGold(game, found.renown.gold);
+          if (found.renown.xp) grantXp(game, found.renown.xp);
+          audioView?.play("resolveChime");
+        }
+        onRunMutated();
+      }
+    }
+    if (discoveryHoldT > 0) {
+      discoveryHoldT -= dt;
+      if (discoveryHoldT <= 0) interaction.update(player.position); // restore normal prompt
+    }
     fieldMapLiveSyncT -= dt;
     if (fieldMapLiveSyncT <= 0) {
       syncLiveFieldMap();
