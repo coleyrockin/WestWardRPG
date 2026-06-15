@@ -4839,9 +4839,16 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       heroMeshes.roadSlime.position.z = slimeAI.pos.z;
       applySlimeTelegraph(heroMeshes.roadSlime, slimeAI.mode, slimeAI.telegraphT, now / 1000);
       if (slimeAI.contact) {
+        // Only fire hurt feedback when a lunge actually lands. applyLungeContact()
+        // is now cooldown-gated, so during sustained contact most frames deal no
+        // damage — shaking/playing the hurt SFX every frame would machine-gun the
+        // feedback. Gate shake + SFX on a real HP drop.
+        const hpBefore = encounter.getState().playerHp;
         encounter.applyLungeContact();
-        camShake.add(0.6);
-        audioView?.play("playerHurt");
+        if (encounter.getState().playerHp < hpBefore) {
+          camShake.add(0.6);
+          audioView?.play("playerHurt");
+        }
       }
     }
     if (!visualCapture) {
