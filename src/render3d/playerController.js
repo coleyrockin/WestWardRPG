@@ -18,6 +18,7 @@
 //   createPlayerController(...) — thin DOM/Three shell wiring real listeners.
 
 import { resolveCollision } from "./worldProxies.js";
+import { stepMount, MOUNT_GAITS } from "./mountController.js";
 
 const DEFAULT_SPEEDS = { walk: 4, run: 8 };
 const DEFAULT_SENSITIVITY = 0.0035; // radians per pixel of mouse drag
@@ -393,6 +394,9 @@ export function createPlayerController(camera, opts = {}) {
   let activeCameraPreset = resolveCameraPreset(cameraPreset, presetOverrides);
   let moving = false;
   let running = false; // moving AND sprint held — drives the Run animation blend
+  let mounted = false;
+  let mountSpeed = 0;
+  let priorPreset = cameraPreset; // restore this on dismount
   // Dodge-roll state: elapsed === null means not rolling; otherwise seconds into the roll.
   let dodge = { dir: { x: 0, z: 1 }, elapsed: null };
   let thirdPersonCameraSeeded = false;
@@ -562,34 +566,51 @@ export function createPlayerController(camera, opts = {}) {
   }
 
   function update(dt, proxies = null) {
-    const stepped = stepPlayer({ position, yaw, pitch, input, dt, speeds, sensitivity });
-    yaw = stepped.yaw;
-    pitch = stepped.pitch;
-    let nextPos = stepped.position;
+    let nextPos;
+    if (mounted) {
+      // Look-pitch still tracks the mouse so you can glance up/down from the saddle.
+      pitch = Math.max(
+        -MAX_PITCH,
+        Math.min(MAX_PITCH, pitch - (input.lookDy || 0) * sensitivity),
+      );
+      const m = stepMount({ position, yaw, speed: mountSpeed, input, dt, sensitivity });
+      yaw = m.yaw;
+      mountSpeed = m.speed;
+      nextPos = m.position;
+      input.dodge = false; // no dodge-roll while mounted
+    } else {
+      const stepped = stepPlayer({ position, yaw, pitch, input, dt, speeds, sensitivity });
+      yaw = stepped.yaw;
+      pitch = stepped.pitch;
+      nextPos = stepped.position;
 
-    // Dodge-roll: edge-triggered by Space. Locks direction from the current WASD
-    // heading (or facing if idle) and OVERRIDES normal movement for DODGE.duration.
-    // Look (yaw/pitch from stepPlayer) is preserved so you can steer while rolling.
-    if (input.dodge && dodge.elapsed === null) {
-      const f = (input.forward ? 1 : 0) - (input.back ? 1 : 0);
-      const r = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-      const fwd = forwardVector(yaw);
-      const rt = rightVector(yaw);
-      let dx = fwd.x * f + rt.x * r;
-      let dz = fwd.z * f + rt.z * r;
-      const m = Math.hypot(dx, dz);
-      if (m < 1e-6) { dx = fwd.x; dz = fwd.z; } else { dx /= m; dz /= m; }
-      dodge = { dir: { x: dx, z: dz }, elapsed: 0 };
-    }
-    input.dodge = false; // consume the edge
-    if (dodge.elapsed !== null) {
-      const rolled = stepDodge({ position, dir: dodge.dir, elapsed: dodge.elapsed }, dt, DODGE);
-      nextPos = rolled.position;
-      dodge.elapsed = rolled.done ? null : rolled.elapsed;
+      // Dodge-roll: edge-triggered by Space (on-foot only).
+      if (input.dodge && dodge.elapsed === null) {
+        const f = (input.forward ? 1 : 0) - (input.back ? 1 : 0);
+        const r = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+        const fwd = forwardVector(yaw);
+        const rt = rightVector(yaw);
+        let dx = fwd.x * f + rt.x * r;
+        let dz = fwd.z * f + rt.z * r;
+        const m2 = Math.hypot(dx, dz);
+        if (m2 < 1e-6) { dx = fwd.x; dz = fwd.z; } else { dx /= m2; dz /= m2; }
+        dodge = { dir: { x: dx, z: dz }, elapsed: 0 };
+      }
+      input.dodge = false; // consume the edge
+      if (dodge.elapsed !== null) {
+        const rolled = stepDodge({ position, dir: dodge.dir, elapsed: dodge.elapsed }, dt, DODGE);
+        nextPos = rolled.position;
+        dodge.elapsed = rolled.done ? null : rolled.elapsed;
+      }
     }
 
-    moving = !!(input.forward || input.back || input.left || input.right);
-    running = moving && !!input.shift; // sprint speed already applied in stepPlayer
+    if (mounted) {
+      moving = mountSpeed > 0.1;
+      running = mountSpeed > MOUNT_GAITS.trotSpeed + 0.1; // galloping → FOV widen + hot cadence
+    } else {
+      moving = !!(input.forward || input.back || input.left || input.right);
+      running = moving && !!input.shift; // sprint speed already applied in stepPlayer
+    }
 
     // Drain mouse deltas — they're per-frame, not held state.
     input.lookDx = 0;
@@ -730,6 +751,21 @@ export function createPlayerController(camera, opts = {}) {
     resetCameraBehind,
     releasePointerFocus,
     dispose,
+    setMounted(on) {
+      const next = !!on;
+      if (next === mounted) return;
+      mounted = next;
+      mountSpeed = 0;
+      if (mounted) {
+        priorPreset = activeCameraPreset;
+        activeCameraPreset = resolveCameraPreset("saddle", presetOverrides);
+      } else {
+        activeCameraPreset = priorPreset || resolveCameraPreset(cameraPreset, presetOverrides);
+      }
+    },
+    get isMounted() { return mounted; },
+    // Test-only seam: the DOM shell normally writes `input`; tests poke it here.
+    pressForTest(partial = {}) { Object.assign(input, partial); },
     get position() { return { x: position.x, z: position.z }; },
     get yaw() { return yaw; },
     get isDodging() { return dodge.elapsed !== null; },

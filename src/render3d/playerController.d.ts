@@ -109,6 +109,11 @@ export interface PlayerController {
   resetCameraBehind(yaw?: number | null): void;
   releasePointerFocus(): void;
   dispose(): void;
+  /** Toggle mounted mode: swaps the movement model to the horse momentum step and the saddle camera preset. */
+  setMounted(on: boolean): void;
+  readonly isMounted: boolean;
+  /** Test-only seam: merge the given fields into the controller's internal input buffer. */
+  pressForTest(partial?: PlayerInput): void;
   readonly position: Vec2;
   readonly yaw: number;
   readonly pitch: number;
