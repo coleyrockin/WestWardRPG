@@ -2603,7 +2603,23 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     typeof location !== "undefined" && new URLSearchParams(location.search).has("visual");
   // Ironman load-on-start: a "playing" run resumes in place; a "sealed" run shows
   // its summary over a fresh scene; no/corrupt save → fresh run.
-  const loadedRun = visualCapture ? null : await loadRun().catch(() => null); // belt-and-braces: resume can never block boot
+  // CRITICAL save-safety seam: loadRun() REJECTS on a timed-out / failed read (vs a
+  // resolved null = genuinely empty slot). A failed read may mean a real save EXISTS
+  // but couldn't be read (slow IndexedDB under load). If we treated that as "no save"
+  // and let the session autosave, the first write would clobber the unread ironman
+  // run forever. So: catch the failure, set saveLoadFailed, and below we SUPPRESS all
+  // persistence for the session so an existing-but-unread save is never overwritten.
+  // Resume must never block boot — a failed load still boots a (non-persisting) scene.
+  let loadedRun = null;
+  let saveLoadFailed = false;
+  if (!visualCapture) {
+    try {
+      loadedRun = await loadRun();
+    } catch {
+      saveLoadFailed = true;
+      loadedRun = null;
+    }
+  }
   const resumeRun = loadedRun && loadedRun.mode === "playing" ? loadedRun : null;
   // Restore persisted region/POI discovery into the live snapshot (symmetric with
   // the world.poisDiscovered we write in currentRunPayload).
@@ -4509,22 +4525,30 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       ...overrides,
     });
   }
+  // Save-safety: when the boot load FAILED (saveLoadFailed), a real ironman save may
+  // exist but couldn't be read. Every write path below no-ops for the rest of the
+  // session so a fresh session can't clobber that existing-but-unread save. A clean
+  // null (no save) leaves saveLoadFailed false and autosaves normally.
   function persistRun() {
-    if (visualCapture || runMode !== "playing") return;
+    if (visualCapture || saveLoadFailed || runMode !== "playing") return;
     writeRun(currentRunPayload())
       .then(() => saveMgr.onSaveSuccess())
       .catch((err) => { if (import.meta.env?.DEV) console.warn("[render3d] run save failed", err); });
   }
   function onRunMutated() {
-    if (visualCapture || runMode !== "playing") return;
+    if (visualCapture || saveLoadFailed || runMode !== "playing") return;
     saveMgr.markDirty();
     persistRun();
   }
   function sealCurrentRun(cause) {
     if (visualCapture || runMode !== "playing") return;
     runMode = "sealed";
-    sealRun(currentRunPayload({ mode: "sealed" }), cause)
-      .catch((err) => { if (import.meta.env?.DEV) console.warn("[render3d] seal failed", err); });
+    // Don't seal-over an existing-but-unread save either: a failed load means the slot
+    // may hold a live run we never saw. Still surface the summary; just skip the write.
+    if (!saveLoadFailed) {
+      sealRun(currentRunPayload({ mode: "sealed" }), cause)
+        .catch((err) => { if (import.meta.env?.DEV) console.warn("[render3d] seal failed", err); });
+    }
     showRunSummary({ cause, phaseReached: loopState.phase, time: runElapsed });
   }
   function prettyPhase(phase) {

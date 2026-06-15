@@ -1,8 +1,22 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+
+// Mock savePersistence so the failure-mode suite can force readSave to hang (timeout)
+// or reject (thrown read). Everything else delegates to the REAL implementation, so the
+// round-trip / seal suites below still exercise real fake-indexeddb writes + reads.
+// `readSaveMock` defaults to passthrough; a test sets `.mockImplementationOnce(...)` to
+// override a single load.
+const { readSaveMock } = vi.hoisted(() => ({ readSaveMock: vi.fn() }));
+vi.mock("../src/savePersistence.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/savePersistence.js")>();
+  readSaveMock.mockImplementation((slot?: string) => actual.readSave(slot));
+  return { ...actual, readSave: readSaveMock };
+});
+
 import {
   RUN_SLOT,
   RUN_SCHEMA,
   RUN_VERSION,
+  LOAD_TIMEOUT_MS,
   buildRunPayload,
   migrateRunPayload,
   loadRun,
@@ -208,5 +222,59 @@ describe("new-run payload carries the funeral mission (regression: startNewRun)"
     const resumed = createLoopStateMachine(fresh.loopState as any).state;
     expect(resumed.activeMission).toBe("dust_to_dust");
     expect(resumed.phase).toBe("funeral");
+  });
+});
+
+describe("loadRun failure modes (a slow/failed read must NOT masquerade as empty)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    // Restore passthrough so later runs of the suite (and round-trip tests) are clean.
+    vi.mocked(readSaveMock).mockReset();
+    vi.mocked(readSaveMock).mockImplementation(async (slot?: string) => {
+      const actual = await vi.importActual<typeof import("../src/savePersistence.js")>(
+        "../src/savePersistence.js",
+      );
+      return actual.readSave(slot);
+    });
+  });
+
+  it("uses the raised 8000ms timeout, not the dangerous 1000ms", () => {
+    expect(LOAD_TIMEOUT_MS).toBe(8000);
+    expect(LOAD_TIMEOUT_MS).not.toBe(1000);
+  });
+
+  it("still resolves to null when the slot is genuinely empty (start-fresh path)", async () => {
+    // Clean !ok read = no save. Must remain a null (boot a fresh run normally).
+    readSaveMock.mockImplementationOnce(async () => ({ ok: false }));
+    expect(await loadRun()).toBeNull();
+  });
+
+  it("still resolves to null for an unmigratable (corrupt-but-safe) payload", async () => {
+    // ok read whose payload isn't a frontier-run → migrateRunPayload returns null →
+    // safe to start fresh. (Distinct from a FAILED read, which must reject.)
+    readSaveMock.mockImplementationOnce(async () => ({
+      ok: true,
+      payload: { schema: "some-other-schema", version: 1 },
+    }));
+    expect(await loadRun()).toBeNull();
+  });
+
+  it("REJECTS (not silent null) when readSave throws — a real save may exist unread", async () => {
+    // The danger: a transient IndexedDB read error must be DISTINGUISHABLE from empty,
+    // so the caller can suppress overwriting an existing-but-unread save.
+    readSaveMock.mockImplementationOnce(async () => {
+      throw new Error("IndexedDB read blew up");
+    });
+    await expect(loadRun()).rejects.toThrow(/IndexedDB read blew up/);
+  });
+
+  it("REJECTS (not silent null) when the read times out — slow device, save still present", async () => {
+    vi.useFakeTimers();
+    // A read that never settles: the 8000ms timeout must fire and REJECT, not resolve null.
+    readSaveMock.mockImplementationOnce(() => new Promise(() => {}));
+    const pending = loadRun();
+    const assertion = expect(pending).rejects.toThrow(/timed out/i);
+    await vi.advanceTimersByTimeAsync(LOAD_TIMEOUT_MS + 1);
+    await assertion;
   });
 });
