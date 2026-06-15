@@ -3322,7 +3322,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     // windSpeed scales the rate. fdt=0 under ?visual keeps the golden baseline
     // at the build pose.
     for (const w of WINDMILL_ROTORS) w.rotor.rotation.z -= fdt * weather.windSpeed * (1.1 + 0.45 * Math.sin(waterTime * 0.31 + w.seed));
-    tickClock(clock, fdt);
+    // Slice mood: hold golden hour — advance the day clock very slowly so a
+    // free-roam session stays in warm light instead of rolling to night.
+    tickClock(clock, fdt * 0.15);
     applyDayTime();
     atmosphere.driftClouds(fdt, 1 + weather.wind * 2);
     waterTime += fdt;
