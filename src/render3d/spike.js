@@ -3500,10 +3500,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   scene.add(character.group);
   const heroSilhouetteAccent = createHeroSilhouetteAccent();
   scene.add(heroSilhouetteAccent.group);
-  // F → play the one-shot "draw" clip (no-op on the placeholder fallback)
+  // F → play the one-shot "draw" clip (no-op on the placeholder fallback).
+  // Suppressed while mounted: F is also the dismount key, and drawing a weapon
+  // while climbing off the horse reads as a bug.
   if (typeof window !== "undefined") {
     window.addEventListener("keydown", (e) => {
-      if (e.code === "KeyF") character.playOnce?.("draw");
+      if (e.code === "KeyF" && !player.isMounted) character.playOnce?.("draw");
     });
   }
 
@@ -4592,6 +4594,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     window.addEventListener("visibilitychange", () => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") flush();
     });
+    // Tear down the mount/whistle keydown listener on page teardown so a
+    // re-run of startSpike (dev hot path) doesn't stack duplicate listeners.
+    window.addEventListener("pagehide", () => document.removeEventListener("keydown", onHorseKeys));
   }
   // A loaded sealed run shows its summary over the fresh scene.
   if (!visualCapture && loadedRun && loadedRun.mode === "sealed") {
