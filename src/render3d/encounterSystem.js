@@ -123,6 +123,13 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
   let playerDeathNotified = false;
   let flashTimer = 0;
   const FLASH_TIME = 0.18;
+  // A connected lunge deals burst damage ONCE per window, not once per frame —
+  // spike calls applyLungeContact() every frame slimeAI.contact is true, so the
+  // cooldown is what keeps a single lunge from instakilling a standing player.
+  // Tuned for a fair-but-threatening cadence: a few seconds of dawdling in the
+  // contact zone still kills, but one brush is survivable.
+  let lungeCooldown = 0;
+  const LUNGE_COOLDOWN = 0.8;
 
   function animate(dt) {
     if (!slimeMesh) return;
@@ -156,6 +163,7 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
     if (disposed) return getState();
     const safeDt = Number.isFinite(dt) && dt > 0 ? dt : 0;
     elapsed += safeDt;
+    if (lungeCooldown > 0) lungeCooldown = Math.max(0, lungeCooldown - safeDt);
     const nextState = getNextSlimeState({ state, playerPos, slimePos, aggroRadius, attackRadius });
     state = nextState;
     notifyForState(nextState);
@@ -201,6 +209,9 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
   function applyLungeContact() {
     if (disposed || playerHp <= 0) return getState();
     if (!canDamagePlayer() || playerInvulnerable()) return getState();
+    // Already bit this window — the per-frame caller is harmless until it expires.
+    if (lungeCooldown > 0) return getState();
+    lungeCooldown = LUNGE_COOLDOWN;
     playerHp = Math.max(0, playerHp - lungeDamage);
     if (playerHp <= 0 && !playerDeathNotified) {
       playerDeathNotified = true;
