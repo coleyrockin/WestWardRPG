@@ -303,6 +303,7 @@ function harmonicaSting(ctx, out) {
 }
 
 // R1.4 — White-noise gust burst: bandpassed noise swell matching GUST_DURATION.
+const GUST_DURATION = 1.8; // seconds — natural wind-swell length (shorter than the 3.4s howl)
 function fireGustBurst(ctx, out, windSpeed) {
   const gainAmt = 0.18 * Math.max(0.3, (windSpeed - 0.5) / 2.1); // scales with wind
   const bp = ctx.createBiquadFilter();
