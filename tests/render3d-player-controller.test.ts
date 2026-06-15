@@ -501,34 +501,31 @@ describe("playerController — saddle camera preset", () => {
 });
 
 describe("playerController — mounted mode", () => {
-  const makeCam = () => ({
-    position: { x: 0, y: 0, z: 0, set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z; } },
-    rotation: { x: 0, y: 0, z: 0, order: "XYZ" },
-    fov: 56,
-    lookAt() {},
-    updateProjectionMatrix() {},
-    getWorldDirection(o: { set(x: number, y: number, z: number): unknown }) { o.set(0, 0, -1); return o; },
-  });
-
   it("defaults to on-foot; setMounted(true) flips isMounted", () => {
-    const ctrl = createPlayerController(makeCam(), { document: null, window: null });
+    const doc = makeFakeDocument();
+    const camera = makeFakeCamera();
+    const ctrl = createPlayerController(camera, { document: doc as any });
     expect(ctrl.isMounted).toBe(false);
     ctrl.setMounted(true);
     expect(ctrl.isMounted).toBe(true);
     ctrl.setMounted(false);
     expect(ctrl.isMounted).toBe(false);
+    ctrl.dispose();
   });
 
   it("mounted + forward accelerates the rig from rest (momentum, not instant)", () => {
-    const ctrl = createPlayerController(makeCam(), { document: null, window: null });
+    const doc = makeFakeDocument();
+    const camera = makeFakeCamera();
+    const ctrl = createPlayerController(camera, { document: doc as any });
     ctrl.setMounted(true);
-    // Simulate a held-forward frame via the public input seam used by the DOM shell:
-    // setMounted exposes a test seam through update by reading the same input buffer.
-    ctrl.pressForTest({ forward: true });
+    // Hold forward via the same real key-handler seam every other movement test
+    // uses — keydown sets input.forward through the actual code path.
+    doc.dispatch("keydown", { code: "KeyW" });
     const before = ctrl.position;
     ctrl.update(0.1, null);
     const after = ctrl.position;
     const moved = Math.hypot(after.x - before.x, after.z - before.z);
     expect(moved).toBeGreaterThan(0);
+    ctrl.dispose();
   });
 });

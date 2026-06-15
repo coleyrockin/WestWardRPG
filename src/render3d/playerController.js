@@ -764,8 +764,6 @@ export function createPlayerController(camera, opts = {}) {
       }
     },
     get isMounted() { return mounted; },
-    // Test-only seam: the DOM shell normally writes `input`; tests poke it here.
-    pressForTest(partial = {}) { Object.assign(input, partial); },
     get position() { return { x: position.x, z: position.z }; },
     get yaw() { return yaw; },
     get isDodging() { return dodge.elapsed !== null; },
