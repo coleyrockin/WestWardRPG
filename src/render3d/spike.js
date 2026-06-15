@@ -26,6 +26,7 @@ import {
   GRAVESIDE_SPAWN,
 } from "./frontierLayout.js";
 import { createPlayerController, CAMERA_PRESETS } from "./playerController.js";
+import { MOUNT_GAITS } from "./mountController.js";
 import { buildProxies, SALOON_DIMS, clampResumedPosition } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
 import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine, getPhaseProgress } from "./phaseState.js";
@@ -3678,6 +3679,26 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // see is the water that stops you. (Built here, before the spawn block, so the
   // resume sanity-clamp below can test the saved position against world collision.)
   const proxies = buildProxies(snapshot.worldObjects).concat(waterCollisionBoxes());
+  // The rideable horse sits at the steelMustang mark by spawn (16.2, 12.0).
+  const MOUNT_SPOT = { x: 16.2, y: 12.0 };
+  const mountObjects = snapshot.worldObjects.concat([
+    { kind: "mountHorse", label: "Steel Mustang", x: MOUNT_SPOT.x, y: MOUNT_SPOT.y },
+  ]);
+  // Rideable horse — reuse the hitched-horse model as the mount.
+  let horseNode = null;
+  try {
+    const horseEntry = modelFor("horseHitched"); // { url: "/models/horse_hitched.glb", scale: 1.0, vary: true }
+    horseNode = await instanceModel(horseEntry.url, {
+      x: MOUNT_SPOT.x,
+      z: MOUNT_SPOT.y,
+      y: groundHeight(MOUNT_SPOT.x, MOUNT_SPOT.y),
+      yaw: -1.2,
+      scale: horseEntry.scale,
+    });
+    scene.add(horseNode);
+  } catch (err) {
+    console.warn("[render3d] rideable horse model failed to load", err);
+  }
   // Spawn placement. The funeral/implant cold-open ALWAYS opens at the canonical
   // graveside — it wins over resume on purpose: there is no value in restoring a
   // drifted position during the funeral beat, and doing so is exactly what re-pinned
@@ -3719,7 +3740,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   };
   let encounter = null;
   const interaction = createInteractionSystem({
-    worldObjects: snapshot.worldObjects,
+    worldObjects: mountObjects,
     setPromptText,
     isTargetEnabled: (target) => loopState.isTargetEnabled(target),
     getPromptText: (target) => {
@@ -4173,6 +4194,29 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   interaction.registerHandler("roadSlime", handleRoadSlime);
   interaction.registerHandler("brokenWagon", handleBrokenWagon);
 
+  function setRiderVisual(mountedNow) {
+    if (horseNode) horseNode.visible = !mountedNow; // rail horse hides while you ride it
+    // The hero stays visible as the rider; the saddle camera lifts to frame both.
+  }
+  interaction.registerHandler("mountHorse", () => {
+    player.setMounted(true);
+    setRiderVisual(true);
+    audioView?.play("uiTick");
+  });
+
+  let horseCalled = false; // whistle-to-call latch (on-foot only)
+  const onHorseKeys = (e) => {
+    if (e.code === "KeyF" && player.isMounted) {
+      player.setMounted(false);
+      setRiderVisual(false); // horse stays visible at the spot you dismounted
+      audioView?.play("uiTick");
+    } else if (e.code === "KeyH" && !player.isMounted) {
+      horseCalled = true; // the horse will ease toward you in the loop
+      audioView?.play("uiTick");
+    }
+  };
+  document.addEventListener("keydown", onHorseKeys);
+
   const updateBeatVisibility = () => {
     if (heroMeshes.slimeTell) {
       heroMeshes.slimeTell.visible = ["slime_tell", "slime_fight", "wagon_salvage", "return_to_boone", "survey_teaser"].includes(loopState.phase);
@@ -4604,6 +4648,27 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       }
     }
     if (!boardModalController.isOpen()) player.update(dt, proxies);
+    if (horseNode) {
+      if (player.isMounted) {
+        // Mounted: the horse rides under you, facing your heading.
+        horseNode.position.set(player.position.x, groundHeight(player.position.x, player.position.z), player.position.z);
+        horseNode.rotation.y = player.yaw;
+      } else if (horseCalled) {
+        // Whistle-to-call: ease the horse toward you; stop when it arrives.
+        const dx = player.position.x - horseNode.position.x;
+        const dz = player.position.z - horseNode.position.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist <= 2.5) {
+          horseCalled = false;
+        } else {
+          const stepLen = Math.min(dist, MOUNT_GAITS.trotSpeed * dt);
+          const nx = horseNode.position.x + (dx / dist) * stepLen;
+          const nz = horseNode.position.z + (dz / dist) * stepLen;
+          horseNode.position.set(nx, groundHeight(nx, nz), nz);
+          horseNode.rotation.y = Math.atan2(-dx, -dz); // face its travel direction
+        }
+      }
+    }
     // Bespoke graveside camera for the funeral cold-open — overrides the follow-cam
     // (whose behind-the-player vantage jams against a town wall). The grave (15,-4)
     // is boxed in: the Back Row buildings sit between the player and the grave to the
