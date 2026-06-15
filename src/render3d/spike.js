@@ -28,7 +28,7 @@ import {
 import { createPlayerController, CAMERA_PRESETS } from "./playerController.js";
 import { MOUNT_GAITS } from "./mountController.js";
 import { resolveDiscovery } from "./discoveryRuntime.js";
-import { ensurePoiDefaults } from "../poiSystem.js";
+import { ensurePoiDefaults, POI_DEFINITIONS } from "../poiSystem.js";
 import { buildProxies, SALOON_DIMS, clampResumedPosition } from "./worldProxies.js";
 import { createInteractionSystem } from "./interactionSystem.js";
 import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine, getPhaseProgress } from "./phaseState.js";
@@ -3582,6 +3582,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         return wp || null;
       },
       waypoints: () => FIRST_FIVE_ROUTE.map((p) => p.kind),
+      // --- Mounted free-roam (the Open Range slice) — inspect without driving ---
+      mount: () => { player.setMounted(true); setRiderVisual(true); return player.isMounted; },
+      dismount: () => { player.setMounted(false); setRiderVisual(false); return player.isMounted; },
+      // Teleport to a frontier POI to test the discovery loop (e.g. __spike.rideTo("frontier_old_well")).
+      rideTo: (poiId) => {
+        const poi = (POI_DEFINITIONS.frontier || []).find((p) => p.id === poiId);
+        if (poi) player.setPosition({ x: poi.x, z: poi.y });
+        return poi || null;
+      },
       // Snap the follow-cam to sit behind a given heading (radians; 0 = facing
       // forward (0,-1) = north, +PI/2 = east). For establishing captures.
       setHeading: (yaw = 0) => { player.resetCameraBehind(yaw); return yaw; },
