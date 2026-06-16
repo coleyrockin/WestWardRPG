@@ -10,6 +10,7 @@ import {
   acceptStarterJob,
   recordSlimeKill,
   lootBeat,
+  salvageWagon,
   grantInventoryItems,
   claimBoardReward,
   recordNpcGreeting,
@@ -248,6 +249,19 @@ describe("gameState — loot beats", () => {
     lootBeat(s, { source: "slime", rng: makeRng(4) });
     expect(s.world.loot.totalDrops).toBe(2);
     expect(s.inventory.Stone ?? 0).toBeGreaterThanOrEqual(1); // frontier resource_find always adds Stone
+  });
+
+  it("salvageWagon grants the story Map Scrap the objective asks Boone to be returned", () => {
+    const s = createGameState();
+    expect(s.inventory["Map Scrap"] ?? 0).toBe(0); // none held before the wreck is searched
+    const r = salvageWagon(s, { rng: makeRng(3) });
+    // The objective copy promises a Map Scrap ("Return the Map Scrap to Boone") —
+    // the camp loot table never yields one, so the beat must grant it explicitly.
+    expect(s.inventory["Map Scrap"]).toBe(1);
+    expect(r.mapScrap).toEqual({ name: "Map Scrap", count: 1 });
+    // Still runs the underlying camp loot beat alongside the story grant.
+    expect(s.world.loot.totalDrops).toBe(1);
+    expect(typeof r.drop.summary).toBe("string");
   });
 });
 

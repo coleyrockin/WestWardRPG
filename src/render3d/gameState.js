@@ -238,6 +238,16 @@ export function lootBeat(state, { source = "cache", rng = Math.random } = {}) {
   return { drop, gold, gearFinds };
 }
 
+// Wagon-salvage beat: runs the camp loot table (gold/resources) AND grants the
+// story Map Scrap the route objective promises ("Return the Map Scrap to Boone").
+// The camp table never rolls a Map Scrap, so granting it here keeps the toast +
+// objective copy truthful — the player actually holds what Boone asks for.
+export function salvageWagon(state, { rng = Math.random } = {}) {
+  const beat = lootBeat(state, { source: "wagon", rng });
+  const [mapScrap = null] = grantInventoryItems(state, { "Map Scrap": 1 });
+  return { ...beat, mapScrap };
+}
+
 // Bank a map of { itemName: count } into the live inventory — the canonical
 // reward-item grant path shared by board claims and free-roam POI discovery.
 // Accumulates onto existing stacks, floors counts at 0 (zero/negative/non-finite

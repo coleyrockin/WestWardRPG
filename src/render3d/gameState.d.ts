@@ -66,6 +66,15 @@ export function lootBeat(
   state: GameState,
   opts?: { source?: "cache" | "wagon" | "slime"; rng?: () => number },
 ): { drop: { summary: string; gold: number; items: Record<string, number> }; gold: number; gearFinds: number };
+export function salvageWagon(
+  state: GameState,
+  opts?: { rng?: () => number },
+): {
+  drop: { summary: string; gold: number; items: Record<string, number> };
+  gold: number;
+  gearFinds: number;
+  mapScrap: { name: string; count: number } | null;
+};
 export function claimBoardReward(
   state: GameState,
   opts?: { at?: number },

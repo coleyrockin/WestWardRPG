@@ -73,6 +73,7 @@ import {
   acceptStarterJob,
   recordSlimeKill,
   lootBeat,
+  salvageWagon,
   claimBoardReward,
   recordNpcGreeting,
   adjustFactionRep,
@@ -4238,7 +4239,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (loopState.phase !== "wagon_salvage") return;
     focusBeat("inspection", 0.95);
     advance("inspect_wagon");
-    const salvage = lootBeat(game, { source: "wagon", rng: lootRng });
+    // Grant the story Map Scrap the objective asks Boone to be returned, alongside
+    // the camp loot beat — the toast below now reflects what the player actually holds.
+    const salvage = salvageWagon(game, { rng: lootRng });
     syncPlayerHud();
     onRunMutated(); // loot landed after advance()'s save — persist it
     beatToast.show("Map Scrap Found", `+ Map Scrap. ${salvage.drop.summary}`);
