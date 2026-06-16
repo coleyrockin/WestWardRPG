@@ -55,8 +55,8 @@ creates per-mesh materials** (scatter/flora/particle swarms); single hero object
 - `src/game/renderer/` — assetManifest/assetLoader (`.glb` pipeline: `scale` × placement
   `size`, plus `heightMul`/`scaleY`), createRenderer, postStacks (bloom / Sobel ink /
   godrays / grade), materials/nprMaterial (hybrid 5-step cel + classic cel3).
-  `src/game/world/` — ground (exports `biomeAt`), water, scatter, weather, townsfolk,
-  worldClock (day/night arc; boots at day).
+  `src/game/world/` — ground (exports `biomeAt`), water, scatter, flora (route sage field,
+  InstancedMesh-batched), weather, townsfolk, worldClock (day/night arc; boots at day).
 - **Buildings are procedural**: `buildWesternBuilding` + `WESTERN_SPECS` in spike.js, plus
   landmark builders (church/hotel/waterTower/blacksmith/windmill/townGate/walk-in saloon).
 - Models: `public/models/*.glb`, authored in Blender via `tools/blender/` (Blender MCP at
@@ -74,8 +74,14 @@ creates per-mesh materials** (scatter/flora/particle swarms); single hero object
 - **The `?visual` golden-image baseline pins DUSK.** Do **not** change tone mapping
   (`createRenderer.js`), output color space, or the dusk palette without re-blessing
   (`npm run test:visual:update`) — eyeball the new baseline before committing it.
-- WebGL2 fallback quirks (until M0 demotes it): no lines/points/instanced/shared-materials/
-  hand-built indexed geometry — regular meshes + per-mesh materials.
+- WebGL2 fallback (SwiftShader/CI/golden capture): `InstancedMesh` + shared materials render
+  fine on it — the old "no instancing on the fallback" ban was re-probed on three r184
+  (`scripts/backend_caps_probe.mjs`) and is stale. `scatter.js` and `world/flora.js` both
+  batch flora via `InstancedMesh` on BOTH backends and are part of the blessed dusk baseline.
+  The fallback's real reduced-fidelity measures are shadows-off (`createRenderer.js`) and the
+  halved scatter count — not a capability ban. Still avoid lines/points/hand-built indexed
+  geometry on the fallback. The M0 way to add flora/scatter is to batch it (instanced), not
+  to emit per-mesh swarms.
 - **The save persists the world clock** — "it boots dark" usually means an old save; fresh
   runs boot at day. `indexedDB.deleteDatabase('westward')` for a true fresh start.
 - The security test scans DOM modules for parser sinks — build UI with

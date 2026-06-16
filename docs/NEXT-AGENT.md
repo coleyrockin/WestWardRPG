@@ -6,9 +6,10 @@ Durable canon is separate and stays: the design canon is [`rustwater-treatment.m
 (cyberpunk-western open-world RPG — *Red Dead* geography, *Cyberpunk* flesh, *Fable* bones), the
 engine/execution plan is [`roadmap.md`](roadmap.md) (M0–M4), engine truths are in `CLAUDE.md`.
 
-Last updated: **2026-06-15 (pm)** · main green: **833 vitest**, tsc clean, build ok, dusk golden
-PASS (4.11% / 10% threshold) · live: westward-rpg.vercel.app · local play: `npm run play` →
-http://127.0.0.1:5191/ · **deploy is HELD for the owner's word.**
+Last updated: **2026-06-16** · main green: **841 vitest**, tsc clean, build ok, dusk golden
+PASS (4.15% / 10% threshold) · live: westward-rpg.vercel.app · local play: `npm run play` →
+http://127.0.0.1:5191/ · **deploy is HELD for the owner's word.** Phase 3 (M0) STARTED — first
+flora batch landed (see below).
 
 ---
 
@@ -64,12 +65,31 @@ Chrome, `window.__westward3dStats()`), preserved here so it isn't lost:
 **Target: < 400 draw calls in town, ≥5× frame-time.** Ordered, self-contained steps:
 1. Re-measure in a real FOREGROUND tab (preview throttles rAF and lies); fill the `roadmap.md` M0
    table. Probe pattern: a throwaway `scripts/_boot_probe_tmp.mjs` (recreate if gone).
-2. **Flora → `InstancedMesh`** — `buildSagePatch`/`buildBrush`/`buildCactus`/`buildDeadTree`/
-   `buildReeds` (~8 meshes/placement over the 228×150 range = ~1000–1400 open-range meshes alone)
-   → one InstancedMesh per (kind,color) bucket; matrices from seeded world pos+yaw+size (mirror
-   `scatter.js:38-81`, already instanced + golden-safe). **Keep placement deterministic** (no
-   `Math.random()`) so the golden frame stays stable. Extract to `src/game/world/flora.js`
-   (spike.js is ~5000 lines — god-file rule).
+2. **Flora → `InstancedMesh`** — extract to `src/game/world/flora.js`, one InstancedMesh per
+   (kind,color) bucket; matrices from seeded world pos+yaw+size (mirror `scatter.js:38-81`,
+   already instanced + golden-safe). **Keep placement deterministic** (no `Math.random()`) so the
+   golden frame stays stable. (spike.js is ~5000 lines — god-file rule).
+   - ✅ **DONE 2026-06-16 (Increment 1): `createRouteSageField` → `flora.js`.** The first-road
+     sage field was ~605 individual `THREE.Mesh` with the per-blade-material anti-pattern; now 4
+     `InstancedMesh` (one per colour). Placement ported byte-identical (same seedValue sin-hash,
+     same `n`-per-clump order) → golden frame unchanged (PASS 4.15% vs 4.11% baseline noise).
+     Measured WebGPU foreground: **scene meshes 3504 → 2903 (−601)**; town draws ~504 → ~216.
+     Pure helper `routeSageBlades(route)` is unit-tested (`tests/world-flora.test.ts`, 8 cases).
+     0 console errors on boot. **NO reducedFidelity halving** added (full density on both
+     backends) so the blessed baseline didn't move — fallback halving is step 5's job.
+   - ⬜ **STILL TODO: the per-kind procedural flora** — `buildSagePatch`/`buildBrush`/`buildCactus`/
+     `buildDeadTree`/`buildReeds` dispatched per-placement (frontierLayout `openRangeWilderness`
+     + road-shoulder `routeNaturalClusters` + authored arrays; ~962 world flora meshes). Convert
+     to a single `createFloraField`-style builder called once at assembly (like `createScatter`),
+     bucketed by (kind,color). RISK: keep `frontierLayout.js` placement DATA byte-identical (the
+     layout tests assert on kinds/coords/labels, NOT meshes — see
+     `render3d-frontier-layout.test.ts`: `naturalClusterCount>=24`, `firstFrameSlabBlockers===[]`).
+     The near-spawn road-shoulder sage (`ROAD_FLORA` ~x10–13,y6) IS in the dusk frame — reproduce
+     its transforms exactly or the golden gate trips. Cactus/deadTree make contact-shadow discs
+     (2 raw uncached `MeshBasicMaterial` each, 96 total) — fold those into the batch too.
+   - KNOWN CLEANUP (benign): `createScatter` is passed `reducedFidelity` (spike.js call) but
+     `scatter.js` only destructures `backend`; the arg is dead (halving still works off
+     `backend==="webgl"`). Unify scatter + flora on the `reducedFidelity` flag during step 5.
 3. Road ruts/planks → InstancedMesh; tumbleweeds → InstancedMesh (3 today, easy).
 4. **Distance culling** for open-range flora in `stepWorld` — `placementNode.visible=false` beyond
    ~80u with hysteresis (show<75/hide>85). Cuts draws AND the 1158 shadow-casters.

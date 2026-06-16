@@ -47,6 +47,7 @@ import { createWater } from "../game/world/water.js";
 import { waterBodies, DAM, waterCollisionBoxes } from "./waterLayout.js";
 import { createGroundMaterial, groundHeight, localFogBoost } from "../game/world/ground.js";
 import { createScatter } from "../game/world/scatter.js";
+import { createRouteSageField } from "../game/world/flora.js";
 import { createPlaceholderCharacter } from "../game/world/character.js";
 import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
 import { createTownsfolk } from "../game/world/townsfolk.js";
@@ -2370,57 +2371,6 @@ function createRoadDust(snapshot) {
   };
 }
 
-function createRouteSageField(snapshot) {
-  const group = new THREE.Group();
-  group.name = "route-sage-field";
-  const route = FIRST_FIVE_ROUTE.filter((point) => point.kind !== "returnJobBoard");
-  const colors = ["#768a50", "#83925a", "#687d45", "#b19a62"];
-  const bladeGeo = new THREE.ConeGeometry(0.065, 0.62, 5);
-  const seedValue = (x) => {
-    const s = Math.sin(x * 91.7 + 17.13) * 43758.5453;
-    return s - Math.floor(s);
-  };
-  let n = 0;
-
-  for (let seg = 1; seg < route.length; seg++) {
-    const from = route[seg - 1];
-    const to = route[seg];
-    const dx = to.x - from.x;
-    const dz = to.y - from.y;
-    const len = Math.hypot(dx, dz);
-    if (len < 0.1) continue;
-    const nx = -dz / len;
-    const nz = dx / len;
-    const count = Math.max(16, Math.floor(len * 3.8));
-    for (let i = 0; i < count; i++) {
-      const t = (i + 0.35 + seedValue(seg * 19 + i) * 0.4) / count;
-      const side = seedValue(seg * 41 + i * 3) > 0.5 ? 1 : -1;
-      const shoulder = side * (3.8 + seedValue(seg * 13 + i * 5) * 3.4);
-      const alongJitter = (seedValue(seg * 29 + i * 7) - 0.5) * 0.8;
-      const x = from.x + dx * t + nx * shoulder + (dx / len) * alongJitter;
-      const z = from.y + dz * t + nz * shoulder + (dz / len) * alongJitter;
-      const blades = 2 + Math.floor(seedValue(seg * 53 + i * 11) * 3);
-      for (let b = 0; b < blades; b++) {
-        const a = seedValue(n * 7 + b) * Math.PI * 2;
-        const r = seedValue(n * 13 + b) * 0.32;
-        const h = 0.54 + seedValue(n * 17 + b) * 0.58;
-        const mat = standard(colors[(n + b) % colors.length], { roughness: 1, rimStrength: 0 });
-        const blade = new THREE.Mesh(bladeGeo, mat);
-        const sc = 0.82 + seedValue(n * 23 + b) * 0.72;
-        blade.scale.set(sc, h, sc);
-        blade.position.set(x + Math.cos(a) * r, groundHeight(x, z) + h * 0.24, z + Math.sin(a) * r);
-        blade.rotation.set(0.08 * Math.sin(a), a, 0.08 * Math.cos(a));
-        blade.castShadow = false;
-        blade.receiveShadow = true;
-        group.add(blade);
-      }
-      n++;
-    }
-  }
-
-  return group;
-}
-
 function buildGround(scene, snapshot) {
   const spawn = snapshot?.player || PLAYER_SPAWN;
   // Big enough to comfortably hold the full ~30×20 explorable rectangle plus a
@@ -2751,10 +2701,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   buildGround(scene, snapshot);
   const openingLightPools = createOpeningLightPools(snapshot);
   const roadDust = createRoadDust(snapshot);
-  const routeSageField = createRouteSageField(snapshot);
+  createRouteSageField(scene, { route: FIRST_FIVE_ROUTE });
   scene.add(openingLightPools.group);
   scene.add(roadDust.group);
-  scene.add(routeSageField);
   createScatter(scene, { center: { x: 35, z: 13 }, area: 78, count: 850, backend, reducedFidelity });
 
   // Animated marsh water (replaces the flat plane that used to live in buildGround).
