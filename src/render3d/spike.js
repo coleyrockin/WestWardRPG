@@ -4717,11 +4717,16 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   let camIntroStart = null;
   const CAM_INTRO_DUR = 3.2; // a touch longer so the board reveal breathes (wall-clock driven, throttle-safe)
   let camIntroSettled = false;
-  // The opening reveal aims the gaze at Boone's lit job board (the first objective)
-  // as the camera eases in — instead of staring down the empty road past it. Only on
-  // a genuine fresh spawn; a resumed run that repositions the player skips the reveal.
+  // The opening reveal SWEEPS the gaze from the open-range / north-mesa skyline
+  // down to Boone's lit job board (the first objective): the first look is the big
+  // country, then the eye is led to the first job — not a worm's-eye stare into the
+  // frontage wall. Only on a genuine fresh spawn; a resumed run that repositions the
+  // player skips the reveal. The vista is up-and-out (the north mesas sit at world
+  // y≈-6.8, so z is negative and y is lifted above the rooftops to catch the ridge +
+  // sky); x≈board so the sweep reads as a depth/height lift, not a horizontal whip.
   const introRevealEligible = !(resumeRun && Number.isFinite(resumeRun.player?.x) && Number.isFinite(resumeRun.player?.z));
   const introLookTarget = { x: openingTarget.x + 0.3, y: 1.5, z: openingTarget.y + 0.1 };
+  const introVistaTarget = { x: 13.0, y: 6.0, z: -6.0 };
   // Funeral cold-open: a bespoke, fixed graveside camera (NOT the follow-cam, whose
   // behind-the-player vantage sits inside the town and jams against a storefront
   // wall). It looks DOWN at the casket from above the rooftops, so ground + grave +
@@ -4754,10 +4759,19 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       const k = Math.pow(1 - Math.min(1, elapsed / CAM_INTRO_DUR), 2); // ease-out
       const base = CAMERA_PRESETS.shoulder;
       if (k > 0.004) {
-        // Lock the gaze on the board so the push-in REVEALS it. The lookAhead
-        // override is gone — the gaze target now composes the frame, so the eye
-        // is led to the objective rather than overshooting down the road.
-        if (introRevealEligible) player.setLookTarget(introLookTarget);
+        // Sweep the gaze from the north-mesa vista down to the board as the push-in
+        // eases in. The squared `k` drives the camera PULL-IN (snappy); the gaze
+        // wants a steadier sweep, so blend on a LINEAR `gz` (1 = vista → 0 = board)
+        // over the full duration. The controller's own lookAt lerp eases the landing
+        // so it settles onto the board rather than snapping.
+        if (introRevealEligible) {
+          const gz = 1 - Math.min(1, elapsed / CAM_INTRO_DUR);
+          player.setLookTarget({
+            x: introLookTarget.x + (introVistaTarget.x - introLookTarget.x) * gz,
+            y: introLookTarget.y + (introVistaTarget.y - introLookTarget.y) * gz,
+            z: introLookTarget.z + (introVistaTarget.z - introLookTarget.z) * gz,
+          });
+        }
         player.setCameraPreset("shoulder", {
           distance: base.distance + k * 6.0,
           height: base.height + k * 3.2,
