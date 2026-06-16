@@ -3752,11 +3752,13 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // see is the water that stops you. (Built here, before the spawn block, so the
   // resume sanity-clamp below can test the saved position against world collision.)
   const proxies = buildProxies(snapshot.worldObjects).concat(waterCollisionBoxes());
-  // The rideable horse sits at the steelMustang mark by spawn (16.2, 12.0).
+  // The rideable horse sits at the steelMustang mark by spawn (16.2, 12.0). Keep the
+  // placement object as a named, MUTABLE binding: the horse-follow loop rewrites its
+  // x/y each frame from the live mesh so the "E — Mount Up" prompt tracks the horse
+  // (including after a whistle-recall), not the empty original mark.
   const MOUNT_SPOT = { x: 16.2, y: 12.0 };
-  const mountObjects = snapshot.worldObjects.concat([
-    { kind: "mountHorse", label: "Steel Mustang", x: MOUNT_SPOT.x, y: MOUNT_SPOT.y },
-  ]);
+  const mountPlacement = { kind: "mountHorse", label: "Steel Mustang", x: MOUNT_SPOT.x, y: MOUNT_SPOT.y };
+  const mountObjects = snapshot.worldObjects.concat([mountPlacement]);
   // Rideable horse — reuse the hitched-horse model as the mount.
   let horseNode = null;
   try {
@@ -3815,7 +3817,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const interaction = createInteractionSystem({
     worldObjects: mountObjects,
     setPromptText,
-    isTargetEnabled: (target) => loopState.isTargetEnabled(target),
+    // The rideable horse is a free-roam affordance, not a scripted phase beat: it waits
+    // and you can walk up and mount from the first second. So mountHorse is ALWAYS
+    // interactable; every other target stays gated to the active loop phase.
+    isTargetEnabled: (target) => target?.kind === "mountHorse" || loopState.isTargetEnabled(target),
     getPromptText: (target) => {
       const prompt = loopState.getPromptForTarget(target);
       if (target?.kind !== "roadSlime" || loopState.phase !== "slime_fight" || !encounter) return prompt;
@@ -4762,6 +4767,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
           horseNode.rotation.y = Math.atan2(-dx, -dz); // face its travel direction
         }
       }
+      // Keep the "E — Mount Up" prompt anchored to the live horse: mirror the mount
+      // interactable's placement (x → world X, y → world Z) to the mesh every frame so
+      // the prompt follows the horse after it wanders, is recalled by whistle, or is
+      // left where you dismounted — never stranded at the original mark.
+      mountPlacement.x = horseNode.position.x;
+      mountPlacement.y = horseNode.position.z;
     }
     // Bespoke graveside camera for the funeral cold-open — overrides the follow-cam
     // (whose behind-the-player vantage jams against a town wall). The grave (15,-4)

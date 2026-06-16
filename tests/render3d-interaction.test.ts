@@ -1,6 +1,7 @@
 // Unit tests for the proximity-based interaction system. Exercises pickNearest
 // directly and drives createInteractionSystem with a fake document + spy.
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   INTERACTABLE_KINDS,
@@ -8,6 +9,7 @@ import {
   pickNearest,
   promptFor,
 } from "../src/render3d/interactionSystem.js";
+import { createLoopStateMachine } from "../src/render3d/phaseState.js";
 
 const JOB_BOARD    = { kind: "jobBoard",    label: "Boone's Board",   x: 12.35, y: 8.55 };
 const ROAD_SIGN    = { kind: "roadSign",    label: "Road Sign",       x: 13.0,  y: 8.7 };
@@ -204,5 +206,124 @@ describe("interactionSystem — createInteractionSystem", () => {
 
     doc.dispatch("keydown", { code: "KeyE" });
     expect(onBoard).not.toHaveBeenCalled();
+  });
+});
+
+// The rideable horse is a free-roam affordance: it waits at the steel-mustang mark
+// and you walk up and mount from the first second — it is NOT a scripted phase beat.
+// These tests exercise the REAL production gate (loopState.isTargetEnabled), not the
+// permissive default ()=>true, so the unmountable-in-normal-play bug cannot hide as a
+// false green. spike.js wires:
+//   isTargetEnabled: (t) => t.kind === "mountHorse" || loopState.isTargetEnabled(t)
+describe("interactionSystem — mountHorse always-interactable gate", () => {
+  // Reuse the production placement shape (x is world-X, y is world-Z).
+  const MOUNT_HORSE = { kind: "mountHorse", label: "Steel Mustang", x: 16.2, y: 12.0 };
+
+  it("REPRO: the old loop-only gate hides the mount prompt in normal play", () => {
+    // Fresh run boots in the "spawn" phase whose active target is the jobBoard, NOT
+    // mountHorse — so the phase gate alone rejects the horse even when you stand on it.
+    const loopState = createLoopStateMachine();
+    expect(loopState.state.activeTargetKind).not.toBe("mountHorse");
+    expect(loopState.isTargetEnabled({ kind: "mountHorse" })).toBe(false);
+    const oldGate = (t: any) => loopState.isTargetEnabled(t);
+    expect(
+      pickNearest({ x: MOUNT_HORSE.x, z: MOUNT_HORSE.y }, [MOUNT_HORSE], oldGate),
+    ).toBeNull();
+  });
+
+  it("surfaces the mount prompt via the production gate even when another beat is active", () => {
+    const loopState = createLoopStateMachine();
+    // Active phase target is jobBoard (far away), yet the horse must remain mountable.
+    const prodGate = (t: any) => t.kind === "mountHorse" || loopState.isTargetEnabled(t);
+    const near = pickNearest(
+      { x: MOUNT_HORSE.x, z: MOUNT_HORSE.y },
+      [JOB_BOARD, MOUNT_HORSE],
+      prodGate,
+    );
+    expect(near).toBe(MOUNT_HORSE);
+    expect(promptFor(near)).toContain("Mount");
+  });
+
+  it("still honors the phase gate for non-mount targets through the production gate", () => {
+    const loopState = createLoopStateMachine(); // spawn phase → jobBoard active
+    const prodGate = (t: any) => t.kind === "mountHorse" || loopState.isTargetEnabled(t);
+    // Stand on the smoke cache: it is NOT the active beat, so it stays gated out even
+    // though the production gate is wired in — only mountHorse gets the free pass.
+    expect(
+      pickNearest({ x: SMOKE_CACHE.x, z: SMOKE_CACHE.y }, [SMOKE_CACHE], prodGate),
+    ).toBeNull();
+  });
+
+  it("fires the registered mount handler over the real interaction path", () => {
+    const doc = makeFakeDocument();
+    const loopState = createLoopStateMachine();
+    const onMount = vi.fn();
+    const sys = createInteractionSystem({
+      worldObjects: [JOB_BOARD, MOUNT_HORSE],
+      document: doc as any,
+      isTargetEnabled: (t: any) => t.kind === "mountHorse" || loopState.isTargetEnabled(t),
+    });
+    sys.registerHandler("mountHorse", onMount);
+
+    sys.update({ x: MOUNT_HORSE.x, z: MOUNT_HORSE.y });
+    expect(sys.nearest).toBe(MOUNT_HORSE);
+    doc.dispatch("keydown", { code: "KeyE" });
+    expect(onMount).toHaveBeenCalledTimes(1);
+
+    sys.dispose();
+  });
+
+  it("the mount prompt anchor follows the live horse after a whistle-recall", () => {
+    const loopState = createLoopStateMachine();
+    const prodGate = (t: any) => t.kind === "mountHorse" || loopState.isTargetEnabled(t);
+    // The placement object spike.js feeds pickNearest; the per-frame sync rewrites its
+    // x/y from the horse mesh (horseNode.position.x, .z).
+    const placement = { kind: "mountHorse", label: "Steel Mustang", x: 16.2, y: 12.0 };
+
+    // Player has whistled and walked off; the horse eased to the new whistle position.
+    const player = { x: 9.0, z: 7.0 };
+    const horseNode = { position: { x: 9.0, y: 0, z: 7.0 } };
+
+    // Before the sync, the stale anchor sits at the original mark — prompt is nowhere
+    // near the player (the bug: prompt stuck at the empty original spot).
+    expect(pickNearest(player, [placement], prodGate)).toBeNull();
+
+    // The fix: each frame mirror the placement x/y to the live mesh position.
+    placement.x = horseNode.position.x;
+    placement.y = horseNode.position.z;
+
+    const near = pickNearest(player, [placement], prodGate);
+    expect(near).toBe(placement);
+    expect(promptFor(near)).toContain("Mount");
+  });
+});
+
+// Lock the PRODUCTION wiring in spike.js (a WebGPU scene module that can't be imported
+// in node). Without these source assertions the gate/anchor logic above is a true-green
+// model only — these read the real file so the unmountable-horse regression goes red.
+describe("interactionSystem — spike.js mount wiring (source contract)", () => {
+  const spikeSource = readFileSync(
+    new URL("../src/render3d/spike.js", import.meta.url),
+    "utf8",
+  );
+
+  it("makes mountHorse always-interactable regardless of phase gate", () => {
+    // BUG A: the interaction wiring must let mountHorse through even when the active
+    // phase target is something else — kind === "mountHorse" OR the loop gate.
+    const gateRe =
+      /isTargetEnabled:\s*\(target\)\s*=>\s*target\??\.kind\s*===\s*["']mountHorse["']\s*\|\|\s*loopState\.isTargetEnabled\(target\)/;
+    expect(spikeSource).toMatch(gateRe);
+  });
+
+  it("syncs the mountHorse placement anchor to the live horse mesh each frame", () => {
+    // BUG B: the per-frame horse update must rewrite the mountHorse placement x/y from
+    // horseNode.position (x → x, z → y) so the prompt follows a whistled-recalled horse.
+    const mountObj = spikeSource.match(
+      /const\s+mountPlacement\s*=\s*\{[^}]*kind:\s*["']mountHorse["'][^}]*\}/,
+    );
+    // The placement object that feeds pickNearest must be referenced by the anchor sync.
+    expect(spikeSource).toMatch(/mountPlacement\.x\s*=\s*horseNode\.position\.x/);
+    expect(spikeSource).toMatch(/mountPlacement\.y\s*=\s*horseNode\.position\.z/);
+    expect(mountObj, "mountHorse placement must be a named `mountPlacement` binding").not.toBeNull();
   });
 });
