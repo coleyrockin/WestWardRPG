@@ -246,9 +246,9 @@ const HERO_OBJECTS = [
 // sit west of x 5.5 so the slab-blocker audit box never sees them.
 const TOWN_EDGE = [
   { kind: "townGate",       label: "Westward Gate Arch", x: 7.6, y: 8.9,  color: "#6b4a2c", size: 1.0 },
-  { kind: "heroTownSaloon", label: "Westgate Saloon",    x: 2.6, y: 3.4,  color: "#a87848", size: 0.92 },
+  { kind: "heroTownSaloon", label: "Westgate Saloon",    x: 2.6, y: 3.4,  color: "#a87848", size: 0.78 },
   { kind: "heroTownAssay",  label: "Land & Assay",       x: 5.0, y: 13.2, color: "#886038", size: 0.68, yaw: Math.PI },
-  { kind: "heroTownStore",  label: "Pioneer Dry Goods",  x: 2.4, y: 13.1, color: "#9a7840", size: 0.78, yaw: Math.PI },
+  { kind: "heroTownStore",  label: "Pioneer Dry Goods",  x: 2.4, y: 13.1, color: "#9a7840", size: 0.66, yaw: Math.PI },
   { kind: "porch",          label: "Westgate Porch",     x: 2.8, y: 4.9,  color: "#5a4327", size: 0.62 },
   { kind: "lamp",           label: "Westgate Lamp",      x: 5.4, y: 4.8,  color: "#ffe0a0", size: 0.44 },
   { kind: "sign",           label: "Westgate Shingle",   x: 1.6, y: 4.75, color: "#ffd77b", size: 0.56 },
@@ -491,8 +491,12 @@ const SOUTH_BACK_ROW = [
 // Two frame elements only — snag left, cart right — a classic theater frame.
 // (The extra rail + stone at the player's feet were clutter, not composition.)
 const FOREGROUND_FRAME = [
-  { kind: "deadTree", label: "Spawn Frame Snag", x: 7.4, y: 5.1, color: "#3e3224", size: 1.35 },
-  { kind: "cart", label: "Spawn Frame Cart", x: 8.1, y: 12.1, color: "#a87542", size: 0.82, yaw: 0.55 },
+  // Pulled east (x7.4/8.1 → 10.5/10.8) out of the worm's-eye foreground so the
+  // opening vantage isn't peering THROUGH a snag/cart into the frontage wall —
+  // they now frame the mid-ground depth instead. y held outside the spawn→board
+  // wedge (y[6.5..11]) and well off the road's leading line (both ≥2.5u clear).
+  { kind: "deadTree", label: "Spawn Frame Snag", x: 10.5, y: 5.1, color: "#3e3224", size: 1.35 },
+  { kind: "cart", label: "Spawn Frame Cart", x: 10.8, y: 12.1, color: "#a87542", size: 0.82, yaw: 0.55 },
 ];
 
 // Board plaza life — Boone's board (13, 5.65) is the opening focal point + first
