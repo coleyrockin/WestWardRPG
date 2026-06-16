@@ -40,7 +40,9 @@ export function createEncounterSystem(scene?: any, snapshot?: any, options?: {
   attackRadius?: number;
   strikeRadius?: number;
   maxHits?: number;
+  initialSlimeHits?: number;
   initialPlayerHp?: number;
+  maxPlayerHp?: number;
   playerDamagePerSecond?: number;
   canDamagePlayer?: () => boolean;
   getPhase?: () => string | null;

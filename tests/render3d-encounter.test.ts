@@ -255,3 +255,61 @@ describe("render3d encounter system — real-time combat", () => {
     expect(onSlimeDeath).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("render3d encounter system — damaged resume", () => {
+  it("keeps a fixed max HP distinct from the wounded current-HP seed", () => {
+    // Resuming a run wounded: current HP 26, but the bar's max is the fixed 40 —
+    // NOT 26/26 (a full bar at the wrong ceiling that hides a near-death player).
+    const e = createEncounterSystem(null, SNAPSHOT, {
+      initialPlayerHp: 26,
+      maxPlayerHp: 40,
+      slimeMesh: fakeSlimeMesh(),
+    });
+    const st = e.getState();
+    expect(st.playerHp).toBe(26);
+    expect(st.playerMaxHp).toBe(40);
+    expect(st.playerHp / st.playerMaxHp).toBeCloseTo(0.65);
+  });
+
+  it("defaults max HP to 40 when only current HP is seeded", () => {
+    const e = createEncounterSystem(null, SNAPSHOT, {
+      initialPlayerHp: 30,
+      slimeMesh: fakeSlimeMesh(),
+    });
+    expect(e.getState().playerMaxHp).toBe(40);
+  });
+
+  it("resumes the slime at the persisted hit count, not full HP", () => {
+    // The kill ledger already recorded two landed strikes; the slime must resume
+    // at 1 HP (3 - 2) so a single clean hit finishes it — not re-fight from full.
+    const e = createEncounterSystem(null, SNAPSHOT, {
+      initialSlimeHits: 2,
+      slimeMesh: fakeSlimeMesh(),
+    });
+    const st = e.getState();
+    expect(st.hitCount).toBe(2);
+    expect(st.hp).toBe(1);
+    expect(st.maxHp).toBe(3);
+    expect(st.defeated).toBe(false);
+  });
+
+  it("finishes a resumed slime with one more strike and fires death once", () => {
+    const onSlimeDeath = vi.fn();
+    const e = createEncounterSystem(null, SNAPSHOT, {
+      initialSlimeHits: 2,
+      onSlimeDeath,
+      slimeMesh: fakeSlimeMesh(),
+    });
+    const after = e.registerHit();
+    expect(after.hitCount).toBe(3);
+    expect(after.hp).toBe(0);
+    expect(after.slime).toBe("dead");
+    expect(onSlimeDeath).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts a fresh run with the slime at full HP", () => {
+    const e = createEncounterSystem(null, SNAPSHOT, { slimeMesh: fakeSlimeMesh() });
+    expect(e.getState().hitCount).toBe(0);
+    expect(e.getState().hp).toBe(3);
+  });
+});

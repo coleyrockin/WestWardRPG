@@ -3917,7 +3917,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   encounter = createEncounterSystem(scene, snapshot, {
     slimeMesh: heroMeshes.roadSlime,
     maxHits: 3,
+    // Current HP comes from the resume payload; the bar's max stays a fixed 40 so a
+    // wounded resume reads e.g. 26/40 (not 26/26). Slime resumes at the persisted
+    // hit count so a mid-fight quit doesn't re-fight a slime the ledger already credited.
     initialPlayerHp: resumeRun?.loopState?.encounterState?.playerHp ?? 40,
+    maxPlayerHp: 40,
+    initialSlimeHits: resumeRun?.loopState?.encounterState?.slimeHits ?? 0,
     canDamagePlayer: () => loopState.phase === "slime_fight",
     playerInvulnerable: () => player.isInvulnerable,
     onPlayerDeath: () => sealCurrentRun("slain by the roadside slime"),

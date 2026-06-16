@@ -103,6 +103,11 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
   // (spike passes () => phase === "slime_fight"). Default true for unit isolation.
   const canDamagePlayer = typeof options.canDamagePlayer === "function" ? options.canDamagePlayer : () => true;
   const initialPlayerHp = Number.isFinite(options.initialPlayerHp) ? options.initialPlayerHp : DEFAULT_PLAYER_HP;
+  // Fixed bar ceiling, DISTINCT from the current-HP seed. On a wounded resume the
+  // current HP comes in low (e.g. 26) but the max stays 40, so the HUD reads 26/40
+  // — not a full 26/26 bar that hides a near-death player. Defaults to the seed for
+  // unit isolation (full-HP starts pass either constant).
+  const maxPlayerHp = Number.isFinite(options.maxPlayerHp) ? options.maxPlayerHp : DEFAULT_PLAYER_HP;
   const playerDamagePerSecond = Number.isFinite(options.playerDamagePerSecond)
     ? options.playerDamagePerSecond
     : DEFAULT_PLAYER_DAMAGE_PER_SECOND;
@@ -111,9 +116,12 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
   const playerInvulnerable = typeof options.playerInvulnerable === "function" ? options.playerInvulnerable : () => false;
   const lungeDamage = Number.isFinite(options.lungeDamage) ? options.lungeDamage : 14;
 
+  // Resume seed: the kill ledger already recorded these landed strikes, so the
+  // slime must rejoin the fight at the matching HP (maxHits - hits) instead of
+  // resetting to full. A fresh run passes nothing → starts at 0 hits / full HP.
   let state = "patrol";
-  let hitCount = 0;
-  let hp = maxHits;
+  let hitCount = Math.min(maxHits, Math.max(0, Math.round(options.initialSlimeHits ?? 0)));
+  let hp = Math.max(0, maxHits - hitCount);
   let elapsed = 0;
   let disposed = false;
   let engageNotified = false;
@@ -241,7 +249,7 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
         : Infinity,
       engaged: engageNotified,
       playerHp: Math.max(0, playerHp),
-      playerMaxHp: initialPlayerHp,
+      playerMaxHp: maxPlayerHp,
       playerDefeated: playerHp <= 0,
       disposed,
     };
