@@ -10,6 +10,7 @@ import {
   acceptStarterJob,
   recordSlimeKill,
   lootBeat,
+  grantInventoryItems,
   claimBoardReward,
   recordNpcGreeting,
   activeJobLine,
@@ -247,6 +248,38 @@ describe("gameState — loot beats", () => {
     lootBeat(s, { source: "slime", rng: makeRng(4) });
     expect(s.world.loot.totalDrops).toBe(2);
     expect(s.inventory.Stone ?? 0).toBeGreaterThanOrEqual(1); // frontier resource_find always adds Stone
+  });
+});
+
+describe("gameState — grantInventoryItems (POI discovery loot path)", () => {
+  it("banks a discovery's loot.items into the inventory and reports them for toast copy", () => {
+    const s = createGameState();
+    // Shape mirrors a resolved discovery event: found.loot.items from POI_DEFINITIONS
+    // (e.g. Drifter Camp → Wood x2 / Stone x1). The bug: these were silently dropped.
+    const granted = grantInventoryItems(s, { Wood: 2, Stone: 1 });
+    expect(s.inventory.Wood).toBe(2);
+    expect(s.inventory.Stone).toBe(1);
+    // Returns the granted lines so the discovery toast can surface what was found.
+    expect(granted).toEqual([
+      { name: "Wood", count: 2 },
+      { name: "Stone", count: 1 },
+    ]);
+  });
+
+  it("accumulates onto existing stacks and ignores junk counts", () => {
+    const s = createGameState();
+    s.inventory.Potion = 1;
+    const granted = grantInventoryItems(s, { Potion: 1, Wood: 0, Stone: -3, "": 5 });
+    expect(s.inventory.Potion).toBe(2); // accumulates onto the existing stack
+    expect(s.inventory.Wood ?? 0).toBe(0); // zero count is a no-op
+    expect(s.inventory.Stone ?? 0).toBe(0); // negative count is a no-op
+    expect(granted).toEqual([{ name: "Potion", count: 1 }]);
+  });
+
+  it("returns an empty list for missing/empty item maps", () => {
+    const s = createGameState();
+    expect(grantInventoryItems(s, null)).toEqual([]);
+    expect(grantInventoryItems(s, {})).toEqual([]);
   });
 });
 

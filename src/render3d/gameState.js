@@ -238,6 +238,24 @@ export function lootBeat(state, { source = "cache", rng = Math.random } = {}) {
   return { drop, gold, gearFinds };
 }
 
+// Bank a map of { itemName: count } into the live inventory — the canonical
+// reward-item grant path shared by board claims and free-roam POI discovery.
+// Accumulates onto existing stacks, floors counts at 0 (zero/negative/non-finite
+// are no-ops), skips blank names. Returns the granted lines [{ name, count }] in
+// insertion order so the caller can surface what was found in a toast.
+export function grantInventoryItems(state, items) {
+  const granted = [];
+  if (!state || !state.inventory || !items || typeof items !== "object") return granted;
+  for (const [name, count] of Object.entries(items)) {
+    if (typeof name !== "string" || !name.trim()) continue;
+    const safe = Math.max(0, Math.floor(count || 0));
+    if (safe <= 0) continue;
+    state.inventory[name] = (state.inventory[name] || 0) + safe;
+    granted.push({ name, count: safe });
+  }
+  return granted;
+}
+
 // Turn the bounty in at Boone's board: claim reward, bank gold + items, grant
 // XP (with level-ups), and remember the completion for Boone's future greetings.
 export function claimBoardReward(state, { at = 0 } = {}) {
@@ -245,10 +263,7 @@ export function claimBoardReward(state, { at = 0 } = {}) {
   if (!claim.ok || claim.failed) return { ...claim, levelsGained: 0 };
   const reward = claim.reward || { gold: 0, xp: 0, items: {} };
   grantGold(state, reward.gold || 0);
-  for (const [name, count] of Object.entries(reward.items || {})) {
-    const safe = Math.max(0, Math.floor(count || 0));
-    if (safe > 0) state.inventory[name] = (state.inventory[name] || 0) + safe;
-  }
+  grantInventoryItems(state, reward.items || {});
   const { levelsGained } = grantXp(state, reward.xp || 0);
   recordNpcMemoryEvent(state.npcMemory, "warden", {
     type: "job_completed",

@@ -67,6 +67,7 @@ import {
   hydrateGameState,
   grantGold,
   grantXp,
+  grantInventoryItems,
   reconcileWithLoopPhase,
   buildGameSaveSlice,
   acceptStarterJob,
@@ -4834,10 +4835,21 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         player.position.z,
       );
       if (found) {
-        setPromptText(`Discovered — ${found.label}: ${found.line}`);
+        if (found.loot?.gold) grantGold(game, found.loot.gold);
+        // Bank the authored item rewards (Potion/Wood/Stone/etc) into the
+        // inventory via the canonical grant path, and surface them in the toast
+        // so the "arrival pays off" beat is felt, not silently dropped.
+        const grantedItems = grantInventoryItems(game, found.loot?.items);
+        const itemSuffix = grantedItems.length
+          ? `  (+${grantedItems.map((it) => `${it.count} ${it.name}`).join(", +")})`
+          : "";
+        // found.buff (stamina/HP) has no clean destination on game.player —
+        // combat HP/stamina live on the encounter system, not the RPG state tree.
+        // Defer buff application to the progression/stat wiring rather than invent
+        // a half-baked buff here; items are the shipped win. (See concerns.)
+        setPromptText(`Discovered — ${found.label}: ${found.line}${itemSuffix}`);
         discoveryHoldT = 4.0; // hold the line on screen for 4s (drained below)
         audioView?.play("chime");
-        if (found.loot?.gold) grantGold(game, found.loot.gold);
         if (found.renown) {
           if (found.renown.gold) grantGold(game, found.renown.gold);
           if (found.renown.xp) grantXp(game, found.renown.xp);

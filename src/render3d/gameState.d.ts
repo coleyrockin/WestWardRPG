@@ -55,6 +55,10 @@ export function createGameState(): GameState;
 export function normalizeGameState(source?: unknown): GameState;
 export function grantXp(state: GameState, amount: number): { levelsGained: number; level: number; upgradePointsGained: number };
 export function grantGold(state: GameState, amount: number): number;
+export function grantInventoryItems(
+  state: GameState,
+  items: Record<string, number> | null | undefined,
+): Array<{ name: string; count: number }>;
 export function boardChoices(state: GameState): Array<Record<string, unknown>>;
 export function acceptStarterJob(state: GameState, opts?: { time?: number }): Record<string, unknown> & { ok: boolean };
 export function recordSlimeKill(state: GameState): Record<string, unknown> & { ok: boolean; completed: boolean };
