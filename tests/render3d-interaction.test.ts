@@ -348,4 +348,17 @@ describe("interactionSystem — spike.js mount wiring (source contract)", () => 
     expect(spikeSource).toMatch(/mountPlacement\.y\s*=\s*horseNode\.position\.z/);
     expect(mountObj, "mountHorse placement must be a named `mountPlacement` binding").not.toBeNull();
   });
+
+  it("surfaces the mountHorse prompt text — the gate alone left it empty (false-green guard)", () => {
+    // BUG C: the gate let pressing E work, but getPromptText delegated to
+    // loopState.getPromptForTarget, which returns "" for mountHorse (never an active
+    // phase target) — so "E — Mount Up" rendered empty and the affordance was invisible.
+    // getPromptText must short-circuit mountHorse to its static promptFor() text.
+    expect(spikeSource).toMatch(
+      /kind\s*===\s*["']mountHorse["']\)\s*return\s+promptFor\(target\)/,
+    );
+    expect(spikeSource).toMatch(
+      /import\s*\{[^}]*\bpromptFor\b[^}]*\}\s*from\s*["']\.\/interactionSystem\.js["']/,
+    );
+  });
 });
