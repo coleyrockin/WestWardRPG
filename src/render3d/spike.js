@@ -38,7 +38,7 @@ import { questMapTarget } from "./questRuntime.js";
 import { createBoardModalController } from "./boardModal.js";
 import { createBoardDomRefs, syncBoardDom } from "./boardDom.js";
 import { buildBoardView } from "./boardCopy.js";
-import { createEncounterSystem } from "./encounterSystem.js";
+import { createEncounterSystem, PLAYER_MAX_HP } from "./encounterSystem.js";
 import { createAtmosphere } from "./atmosphere.js";
 import { sunArc, calcWindowGlowFactor } from "./timeOfDay.js";
 import { footDustStep } from "./footDust.js";
@@ -56,7 +56,7 @@ import { gustAt } from "../game/world/windGusts.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
 import { createSaveStateManager } from "../saveStateManager.js";
 import { createSaveHealth } from "./saveHealth.js";
-import { buildRunPayload, loadRun, writeRun, sealRun, clearRun } from "./runSave.js";
+import { buildRunPayload, loadRun, writeRun, sealRun, clearRun, overlayLiveEncounterState } from "./runSave.js";
 import { stagger } from "./animationHelpers.js";
 import { createPlayerCombat, hitboxHitsTarget } from "./combat/playerCombat.js";
 import { createSlimeState, stepSlime } from "./combat/slimeBehavior.js";
@@ -3917,11 +3917,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   encounter = createEncounterSystem(scene, snapshot, {
     slimeMesh: heroMeshes.roadSlime,
     maxHits: 3,
-    // Current HP comes from the resume payload; the bar's max stays a fixed 40 so a
-    // wounded resume reads e.g. 26/40 (not 26/26). Slime resumes at the persisted
-    // hit count so a mid-fight quit doesn't re-fight a slime the ledger already credited.
-    initialPlayerHp: resumeRun?.loopState?.encounterState?.playerHp ?? 40,
-    maxPlayerHp: 40,
+    // Current HP comes from the resume payload; the bar's max stays the fixed
+    // PLAYER_MAX_HP so a wounded resume reads e.g. 26/40 (not 26/26). Slime resumes at
+    // the persisted hit count so a mid-fight quit doesn't re-fight a credited slime.
+    initialPlayerHp: resumeRun?.loopState?.encounterState?.playerHp ?? PLAYER_MAX_HP,
+    maxPlayerHp: PLAYER_MAX_HP,
     initialSlimeHits: resumeRun?.loopState?.encounterState?.slimeHits ?? 0,
     canDamagePlayer: () => loopState.phase === "slime_fight",
     playerInvulnerable: () => player.isInvulnerable,
@@ -4074,7 +4074,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   syncPlayerHud();
   function updateHpHud(st) {
     if (!st || !Number.isFinite(st.playerHp)) return;
-    const max = st.playerMaxHp || 40;
+    const max = st.playerMaxHp || PLAYER_MAX_HP;
     const pct = Math.max(0, Math.min(1, st.playerHp / max));
     if (hpFillEl) hpFillEl.style.width = `${(pct * 100).toFixed(1)}%`;
     if (hpLabelEl) {
@@ -4556,10 +4556,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // --- Ironman run helpers (hoisted; read player/encounter/clock at runtime) ---
   function currentRunPayload(overrides = {}) {
     const snap = loopState.state;
-    const livePlayerHp = encounter?.getState?.()?.playerHp;
-    const encounterState = Number.isFinite(livePlayerHp)
-      ? { ...snap.encounterState, playerHp: livePlayerHp }
-      : { ...snap.encounterState };
+    // The phase FSM never records live mid-fight slime hits (slimeHits is 0 until the
+    // killing blow flips it to 3) or live playerHp, so overlay BOTH from the live
+    // encounter — otherwise a wounded, mid-fight quit resumes the slime at full HP
+    // while the kill ledger already credited the strikes.
+    const encounterState = overlayLiveEncounterState(snap.encounterState, encounter?.getState?.());
     const pos = player?.position || { x: 0, z: 0 };
     return buildRunPayload({
       mode: runMode,

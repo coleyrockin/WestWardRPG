@@ -1,3 +1,5 @@
+import { PLAYER_MAX_HP } from "./encounterSystem.js";
+
 export const LOOP_PHASES = Object.freeze([
   "spawn",
   "board_choice",
@@ -352,7 +354,7 @@ export function createInitialLoopState(overrides = {}) {
       slimeHp: 3,
       slimeHits: 0,
       slimeDefeated: false,
-      playerHp: 40,
+      playerHp: PLAYER_MAX_HP,
       ...(overrides.encounterState || {}),
     },
   };

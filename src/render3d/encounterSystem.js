@@ -5,7 +5,11 @@ export const SLIME_STATES = Object.freeze(["patrol", "aggro", "attack", "dead"])
 const DEFAULT_AGGRO_RADIUS = 4;
 const DEFAULT_ATTACK_RADIUS = 1.5;
 const DEFAULT_MAX_HITS = 3;
-const DEFAULT_PLAYER_HP = 40;
+// Single source of truth for the player's full-HP ceiling. Exported so spike's HUD
+// max and resume fallbacks (initialPlayerHp/maxPlayerHp) reference ONE constant
+// instead of repeating the literal 40 (which used to drift across spike + phaseState).
+export const PLAYER_MAX_HP = 40;
+const DEFAULT_PLAYER_HP = PLAYER_MAX_HP;
 // Contact damage per second while locked in the fight (player within the slime's
 // combat range). The slime is static, so we threaten across the whole engaged
 // range — not just the 1.5u attack bubble the player rarely sits in — making the
@@ -105,8 +109,9 @@ export function createEncounterSystem(scene = null, snapshot = null, options = {
   const initialPlayerHp = Number.isFinite(options.initialPlayerHp) ? options.initialPlayerHp : DEFAULT_PLAYER_HP;
   // Fixed bar ceiling, DISTINCT from the current-HP seed. On a wounded resume the
   // current HP comes in low (e.g. 26) but the max stays 40, so the HUD reads 26/40
-  // — not a full 26/26 bar that hides a near-death player. Defaults to the seed for
-  // unit isolation (full-HP starts pass either constant).
+  // — not a full 26/26 bar that hides a near-death player. Defaults to the fixed
+  // full-HP constant (PLAYER_MAX_HP, 40), NOT initialPlayerHp — pass it explicitly
+  // to track a custom seed. (A fresh full-HP run reads the same 40 from either.)
   const maxPlayerHp = Number.isFinite(options.maxPlayerHp) ? options.maxPlayerHp : DEFAULT_PLAYER_HP;
   const playerDamagePerSecond = Number.isFinite(options.playerDamagePerSecond)
     ? options.playerDamagePerSecond

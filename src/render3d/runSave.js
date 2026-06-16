@@ -41,6 +41,21 @@ function pickLoopState(loopState) {
   };
 }
 
+// Overlay the LIVE encounter onto the phase-FSM encounterState before persisting.
+// The first-road loop FSM (phaseState.js) only ever writes slimeHits 0 (slime_appeared)
+// or 3 (defeat_slime) and never touches playerHp during the fight — so its snapshot
+// alone LOSES a mid-fight quit's real progress (a 2-hit slime saves as slimeHits:0 →
+// resume re-fights it from full while the kill ledger already credited the strikes).
+// The encounter system is the source of truth: it exposes live `playerHp` and `hits`.
+// We overlay BOTH (only when finite) so a wounded, mid-fight resume restores the real
+// state. Pure + non-mutating; `live` is encounter.getState() (or null when no fight).
+export function overlayLiveEncounterState(snapEncounterState, live) {
+  const out = { ...(snapEncounterState || {}) };
+  if (Number.isFinite(live?.playerHp)) out.playerHp = live.playerHp;
+  if (Number.isFinite(live?.hits)) out.slimeHits = live.hits;
+  return out;
+}
+
 // Build the full run payload from a live context object. `now` is injectable for
 // deterministic tests. The payload MUST carry a numeric `version` — savePersistence
 // reads it into the envelope's payloadVersion and validates the round-trip.

@@ -22,9 +22,11 @@ import {
   loadRun,
   writeRun,
   sealRun,
+  overlayLiveEncounterState,
 } from "../src/render3d/runSave.js";
 import { readSave } from "../src/savePersistence.js";
 import { createLoopStateMachine } from "../src/render3d/phaseState.js";
+import { createEncounterSystem } from "../src/render3d/encounterSystem.js";
 import { GRAVESIDE_SPAWN } from "../src/render3d/frontierLayout.js";
 
 function sampleCtx(overrides: Record<string, any> = {}) {
@@ -222,6 +224,80 @@ describe("new-run payload carries the funeral mission (regression: startNewRun)"
     const resumed = createLoopStateMachine(fresh.loopState as any).state;
     expect(resumed.activeMission).toBe("dust_to_dust");
     expect(resumed.phase).toBe("funeral");
+  });
+});
+
+describe("mid-fight slime resume round-trip (BUG B — the real save path, not just the unit seed)", () => {
+  const SLIME = { kind: "roadSlime", label: "Road Slime", x: 10, y: 5, size: 1 };
+  const SNAPSHOT = { worldObjects: [SLIME] };
+  function fakeSlimeMesh() {
+    return { position: { x: 10, y: 0, z: 5 }, scale: { y: 1 }, material: { emissiveIntensity: 1 }, userData: {} };
+  }
+
+  it("overlays BOTH live playerHp AND slimeHits onto the persisted encounterState", () => {
+    // The save bug: currentRunPayload overlaid only playerHp, leaving slimeHits at the
+    // phase-FSM value (0 mid-fight) — so resume re-fought a slime the ledger had credited.
+    // The phase snapshot's encounterState has slimeHits:0 mid-fight; the live encounter
+    // is the source of truth for landed strikes (it exposes `hits`).
+    const live = { playerHp: 24, hits: 2 };
+    const snapEncounterState = { slime: "aggro", slimeHp: 3, slimeHits: 0, slimeDefeated: false, playerHp: 40 };
+    const overlaid = overlayLiveEncounterState(snapEncounterState, live);
+    expect(overlaid.playerHp).toBe(24);
+    expect(overlaid.slimeHits).toBe(2);
+    // Non-overlaid fields survive; the source object is not mutated.
+    expect(overlaid.slime).toBe("aggro");
+    expect(snapEncounterState.slimeHits).toBe(0);
+  });
+
+  it("ignores a non-finite/absent live encounter (no live fight → snapshot wins)", () => {
+    const snap = { slime: "idle", slimeHp: 3, slimeHits: 0, slimeDefeated: false, playerHp: 40 };
+    expect(overlayLiveEncounterState(snap, null)).toEqual(snap);
+    expect(overlayLiveEncounterState(snap, {})).toEqual(snap);
+  });
+
+  it("resumes the slime at 1 HP after a real 2-hit mid-fight quit is round-tripped through the save", async () => {
+    // Drive a REAL encounter through two landed strikes (the state the save must capture),
+    // overlay the live encounter onto the phase snapshot exactly as currentRunPayload does,
+    // persist + load, then re-seed a fresh encounter from the loaded slimeHits — the resume path.
+    const fight = createEncounterSystem(null, SNAPSHOT, { initialPlayerHp: 24, maxPlayerHp: 40, slimeMesh: fakeSlimeMesh() });
+    fight.registerHit();
+    fight.registerHit();
+    const liveState = fight.getState();
+    expect(liveState.hits).toBe(2);
+    expect(liveState.hp).toBe(1);
+
+    // The phase FSM only ever writes slimeHits 0 (appeared) or 3 (defeated): mid-fight it is 0.
+    const machine = createLoopStateMachine();
+    const snapEncounterState = machine.state.encounterState;
+    expect(snapEncounterState.slimeHits).toBe(0); // proves the snapshot alone loses the strikes
+
+    const payload = buildRunPayload({
+      mode: "playing",
+      seed: 7,
+      time: 12,
+      player: { x: 9, z: 4, yaw: 0 },
+      loopState: { ...machine.state, phase: "slime_fight", encounterState: overlayLiveEncounterState(snapEncounterState, liveState) },
+      world: { dayTime: 0.3, weatherKind: "clear" },
+    }, 1700000000000);
+
+    await writeRun(payload);
+    const loaded = await loadRun();
+    expect(loaded?.loopState.encounterState.slimeHits).toBe(2);
+    expect(loaded?.loopState.encounterState.playerHp).toBe(24);
+
+    // Resume: spike feeds the persisted slimeHits into initialSlimeHits.
+    const resumed = createEncounterSystem(null, SNAPSHOT, {
+      initialSlimeHits: loaded?.loopState.encounterState.slimeHits ?? 0,
+      initialPlayerHp: loaded?.loopState.encounterState.playerHp ?? 40,
+      slimeMesh: fakeSlimeMesh(),
+    });
+    const st = resumed.getState();
+    expect(st.hp).toBe(1); // NOT a re-fight from full 3
+    expect(st.hitCount).toBe(2);
+    expect(st.playerHp).toBe(24);
+    expect(st.playerMaxHp).toBe(40);
+    // One clean strike finishes it — the ledger already credited the other two.
+    expect(resumed.registerHit().hp).toBe(0);
   });
 });
 

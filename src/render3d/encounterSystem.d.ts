@@ -2,6 +2,10 @@ export type SlimeState = "patrol" | "aggro" | "attack" | "dead";
 
 export const SLIME_STATES: readonly SlimeState[];
 
+/** Player full-HP ceiling. Single source of truth for the HUD bar max and the
+ *  resume HP fallbacks so the value can't drift across modules. */
+export const PLAYER_MAX_HP: number;
+
 export function getNextSlimeState(options?: {
   state?: SlimeState;
   playerPos?: { x: number; z: number } | null;

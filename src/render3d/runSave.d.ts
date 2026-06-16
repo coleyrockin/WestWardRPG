@@ -53,6 +53,14 @@ export interface RunContext {
   game?: Record<string, any> | null;
 }
 
+/** Overlay the live encounter (encounter.getState(): playerHp + hits) onto the
+ *  phase-FSM encounterState before persisting. The FSM never records mid-fight
+ *  slime hits or live playerHp, so this is what makes a wounded, mid-fight quit
+ *  resume at the correct slime HP + player HP. Pure, non-mutating. */
+export function overlayLiveEncounterState(
+  snapEncounterState: Record<string, any> | null | undefined,
+  live: { playerHp?: number; hits?: number } | null | undefined,
+): Record<string, any>;
 export function buildRunPayload(ctx?: RunContext, now?: number): RunPayload;
 export function migrateRunPayload(payload: any): RunPayload | null;
 export function loadRun(): Promise<RunPayload | null>;
