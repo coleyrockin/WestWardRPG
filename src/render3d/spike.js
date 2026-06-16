@@ -30,7 +30,7 @@ import { MOUNT_GAITS } from "./mountController.js";
 import { resolveDiscovery } from "./discoveryRuntime.js";
 import { ensurePoiDefaults, POI_DEFINITIONS } from "../poiSystem.js";
 import { buildProxies, SALOON_DIMS, clampResumedPosition } from "./worldProxies.js";
-import { createInteractionSystem } from "./interactionSystem.js";
+import { createInteractionSystem, promptFor } from "./interactionSystem.js";
 import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine, getPhaseProgress } from "./phaseState.js";
 import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
 import { buildFieldMapRouteModel, createFieldMapDomRefs, syncFieldMapDom, resolveFieldMapMode } from "./fieldMapDom.js";
@@ -3830,6 +3830,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     isTargetEnabled: (target) =>
       (target?.kind === "mountHorse" && !player.isMounted) || loopState.isTargetEnabled(target),
     getPromptText: (target) => {
+      // mountHorse is a free-roam affordance with no active loop phase, so
+      // loopState.getPromptForTarget returns "" — surface its static prompt so the
+      // "E — Mount Up" affordance is actually visible (the gate alone was invisible).
+      if (target?.kind === "mountHorse") return promptFor(target);
       const prompt = loopState.getPromptForTarget(target);
       if (target?.kind !== "roadSlime" || loopState.phase !== "slime_fight" || !encounter) return prompt;
       const state = encounter.getState(player.position);
