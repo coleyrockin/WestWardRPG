@@ -6,6 +6,7 @@ import {
   passesCompletionGate,
   createInitialJobBoardState,
 } from "../src/jobBoard.js";
+import { createInitialInventoryState } from "../src/inventoryState.js";
 
 const EASTWATER_ID = "frontier_eastwater_run";
 
@@ -135,5 +136,28 @@ describe("jobBoard — getJobListings hides/shows eastwater based on slime compl
     expect(listing).toBeDefined();
     expect(listing.rewardLine).toContain("60g");
     expect(listing.progressLine).toBeTruthy();
+  });
+});
+
+// ─── phantom-item regression guard ────────────────────────────────────────────
+// Every reward.items key on every job def must be a canonical inventory item
+// (the keys seeded by createInitialInventoryState). This catches placeholder
+// rewards like "Tonic" that have no inventory/shop backing and would render as
+// incoherent "+1 <phantom>" text on the board.
+
+describe("jobBoard — reward items are all canonical", () => {
+  const CANONICAL_ITEMS = new Set(Object.keys(createInitialInventoryState()));
+
+  it("no job def grants a non-canonical reward item", () => {
+    const offenders: string[] = [];
+    for (const [jobId, def] of Object.entries(JOB_DEFINITIONS)) {
+      const items = def?.reward?.items ?? {};
+      for (const itemName of Object.keys(items)) {
+        if (!CANONICAL_ITEMS.has(itemName)) {
+          offenders.push(`${jobId}: ${itemName}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });

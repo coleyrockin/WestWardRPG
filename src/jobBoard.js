@@ -133,7 +133,7 @@ export const JOB_DEFINITIONS = {
     reward: {
       gold: 45,
       xp: 20,
-      items: { Tonic: 1 },
+      items: { Potion: 1 },
     },
   },
   frontier_map_survey: {
@@ -265,7 +265,7 @@ export const JOB_DEFINITIONS = {
     reward: {
       gold: 28,
       xp: 14,
-      items: { Tonic: 1 },
+      items: { Potion: 1 },
     },
   },
   frontier_supply_run: {
@@ -320,7 +320,7 @@ export const JOB_DEFINITIONS = {
     reward: {
       gold: 42,
       xp: 22,
-      items: { Tonic: 1 },
+      items: { Potion: 1 },
     },
   },
   frontier_settler_escort: {
@@ -415,7 +415,7 @@ export const JOB_DEFINITIONS = {
     reward: {
       gold: 38,
       xp: 19,
-      items: { Tonic: 1 },
+      items: { Potion: 1 },
     },
   },
   frontier_archive_quiet: {

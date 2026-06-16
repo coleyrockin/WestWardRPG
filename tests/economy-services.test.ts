@@ -30,7 +30,7 @@ describe("economyServices", () => {
       regionId: "frontier",
       identity: { attributes: { craft: 3, speech: 2 } },
       house: { workstation: { level: 3 } },
-      activeJob: { title: "Town Watch Patrol", rewardLine: "+28g, +14 XP, +1 Tonic" },
+      activeJob: { title: "Town Watch Patrol", rewardLine: "+28g, +14 XP, +1 Potion" },
     });
 
     expect(snapshot.regionPriceNote).toContain("Westward Frontier");
