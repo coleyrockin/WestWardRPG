@@ -13,8 +13,28 @@
 // fields are carried forward so a future step can reconstruct the run purely from
 // (seed, input-log) — they are unused on resume right now.
 
-import { writeSave, readSave, deleteSave } from "../savePersistence.js";
+import {
+  writeSave,
+  readSave,
+  deleteSave,
+  findMostRecentValidBackup,
+} from "../savePersistence.js";
 import { GRAVESIDE_SPAWN } from "./frontierLayout.js";
+
+// readSave failure reasons that mean the PRIMARY envelope is corrupt but the slot's
+// backups may still be intact (a byte-flip / truncation / double-write / stale-shape
+// primary). validateEnvelope emits exactly these — see savePersistence.validateEnvelope.
+// On any of them loadRun tries backup recovery before declaring the load failed.
+const CORRUPTION_REASONS = new Set([
+  "hash-mismatch",
+  "unknown-storage-version",
+  "missing-savedAt",
+  "missing-payload",
+  "missing-hash",
+  "missing-payload-version",
+  "bad-payload-version",
+  "payload-version-mismatch",
+]);
 
 export const RUN_SLOT = "frontier-ironman";
 export const RUN_SCHEMA = "frontier-run";
@@ -145,12 +165,15 @@ export const LOAD_TIMEOUT_MS = 8000;
 
 // Load the ironman run.
 //   - Resolves to a migrated payload when a valid save exists.
-//   - Resolves to null ONLY when readSave cleanly resolves with no/!ok result OR the
-//     payload is unmigratable (corrupt but safe to start fresh).
-//   - REJECTS (re-throws) on a timeout or a thrown readSave error — a failed read is
-//     NOT an empty slot. The caller must treat a rejection as "load failed" and
-//     suppress overwriting, so an existing-but-unread save is never clobbered by a
-//     fresh session.
+//   - Resolves to null ONLY for a genuinely empty slot (readSave reason "missing") OR
+//     an ok read whose payload is unmigratable (a foreign/stale schema → safe fresh start).
+//   - On a CORRUPT primary (hash-mismatch / validation failure) it first tries to RECOVER
+//     the most recent valid backup and resolves THAT; if no valid backup exists it REJECTS
+//     (so boot suppresses writes rather than clobbering a hand-recoverable primary).
+//   - REJECTS (re-throws) on a timeout, a thrown readSave, a db-unavailable result, or any
+//     other unreadable/unknown failure reason — a failed read is NOT an empty slot. The
+//     caller must treat a rejection as "load failed" and suppress overwriting, so an
+//     existing-but-unread (or backup-recoverable) save is never clobbered by a fresh session.
 export async function loadRun() {
   let result;
   try {
@@ -166,16 +189,47 @@ export async function loadRun() {
     console.warn("[runSave] readSave failed or timed out — load FAILED (not empty)", err);
     throw err;
   }
-  if (!result || !result.ok) return null;
-  // A stale/corrupt payload (an old build's save shape) must NEVER kill boot —
-  // migrate throwing here took startSpike down with it and the game never
-  // reached the title screen. Fall back to a fresh run instead.
-  try {
-    return migrateRunPayload(result.payload);
-  } catch (err) {
-    console.warn("[runSave] unreadable save payload — starting fresh", err);
-    return null;
+  if (result && result.ok) {
+    // A stale/corrupt-but-PARSEABLE payload (an old build's save shape) must NEVER kill
+    // boot — migrate throwing here took startSpike down with it and the game never
+    // reached the title screen. Fall back to a fresh run instead.
+    try {
+      return migrateRunPayload(result.payload);
+    } catch (err) {
+      console.warn("[runSave] unreadable save payload — starting fresh", err);
+      return null;
+    }
   }
+  // !ok read. Classify the reason — only a genuine empty slot is a safe fresh start.
+  const reason = result?.reason;
+  if (reason === "missing") return null;
+  if (CORRUPTION_REASONS.has(reason)) {
+    // The PRIMARY is corrupt but a backup may still be valid. Try to recover the most
+    // recent valid backup and restore it as the live primary. If we find one, resume on
+    // it; if not, the run is unrecoverable here — REJECT so boot suppresses writes (a
+    // fresh session must not autosave over a slot the player could recover by hand).
+    let recovered = null;
+    try {
+      recovered = await findMostRecentValidBackup(RUN_SLOT);
+    } catch (err) {
+      console.warn("[runSave] backup recovery failed for corrupt primary", err);
+      recovered = null;
+    }
+    if (recovered && recovered.ok) {
+      console.warn(`[runSave] primary save corrupt (${reason}) — recovered a valid backup`);
+      try {
+        return migrateRunPayload(recovered.payload);
+      } catch (err) {
+        console.warn("[runSave] recovered backup unmigratable — starting fresh", err);
+        return null;
+      }
+    }
+    throw new Error(`Save corrupt (${reason}) and no valid backup to recover`);
+  }
+  // db-unavailable or any other unreadable/unknown failure reason: NOT an empty slot.
+  // Re-throw so boot sets saveLoadFailed and suppresses writes.
+  console.warn(`[runSave] readSave returned an unreadable result (${reason}) — load FAILED (not empty)`);
+  throw new Error(`Save read failed (${reason ?? "unknown"})`);
 }
 
 // Persist the run payload to the dedicated slot (inherits backup rotation + quota

@@ -24,7 +24,7 @@ import {
   sealRun,
   overlayLiveEncounterState,
 } from "../src/render3d/runSave.js";
-import { readSave } from "../src/savePersistence.js";
+import { readSave, findMostRecentValidBackup } from "../src/savePersistence.js";
 import { createLoopStateMachine } from "../src/render3d/phaseState.js";
 import { createEncounterSystem } from "../src/render3d/encounterSystem.js";
 import { GRAVESIDE_SPAWN } from "../src/render3d/frontierLayout.js";
@@ -320,8 +320,10 @@ describe("loadRun failure modes (a slow/failed read must NOT masquerade as empty
   });
 
   it("still resolves to null when the slot is genuinely empty (start-fresh path)", async () => {
-    // Clean !ok read = no save. Must remain a null (boot a fresh run normally).
-    readSaveMock.mockImplementationOnce(async () => ({ ok: false }));
+    // A genuinely empty slot is readSave reason "missing" — the ONLY !ok result that is a
+    // safe fresh start. (readSave always supplies a reason on !ok; a reasonless/unknown
+    // failure now re-throws so it can't masquerade as empty and clobber a real save.)
+    readSaveMock.mockImplementationOnce(async () => ({ ok: false, reason: "missing", slot: RUN_SLOT }));
     expect(await loadRun()).toBeNull();
   });
 
@@ -352,5 +354,66 @@ describe("loadRun failure modes (a slow/failed read must NOT masquerade as empty
     const assertion = expect(pending).rejects.toThrow(/timed out/i);
     await vi.advanceTimersByTimeAsync(LOAD_TIMEOUT_MS + 1);
     await assertion;
+  });
+});
+
+describe("loadRun corruption recovery + unreadable-read re-throw (BUG: corrupt primary must not discard valid backups)", () => {
+  afterEach(() => {
+    // Restore passthrough so later runs of the suite are clean.
+    vi.mocked(readSaveMock).mockReset();
+    vi.mocked(readSaveMock).mockImplementation(async (slot?: string) => {
+      const actual = await vi.importActual<typeof import("../src/savePersistence.js")>(
+        "../src/savePersistence.js",
+      );
+      return actual.readSave(slot);
+    });
+  });
+
+  it("(A) recovers the most-recent valid backup when the primary read is a hash-mismatch", async () => {
+    // Two writes to the ironman slot: the first envelope rotates into a backup when the
+    // second overwrites the primary. The backup is a genuine, hash-valid frontier-run.
+    const backupPayload = buildRunPayload(sampleCtx({ seed: 4242 }), 1700000000000);
+    await writeRun(backupPayload);
+    await writeRun(buildRunPayload(sampleCtx({ seed: 5050 }), 1700000111111));
+    // Sanity: the real backup machinery (passthrough) sees a recoverable backup.
+    const recoverable = await findMostRecentValidBackup(RUN_SLOT);
+    expect(recoverable?.ok).toBe(true);
+
+    // Now corrupt the PRIMARY read: a single byte-flip / double-write surfaces as
+    // hash-mismatch. Pre-fix, loadRun mapped this straight to null → boot starts fresh
+    // and the next autosave rotates out + deletes the still-valid backups forever.
+    readSaveMock.mockImplementationOnce(async () => ({ ok: false, reason: "hash-mismatch", slot: RUN_SLOT }));
+
+    const loaded = await loadRun();
+    // It must NOT be a clobbering null: the valid backup is restored instead.
+    expect(loaded).not.toBeNull();
+    expect(loaded?.schema).toBe(RUN_SCHEMA);
+    expect(loaded?.seed).toBe(4242); // the recovered backup, not the corrupt primary
+  });
+
+  it("(A2) REJECTS (suppresses overwrite) on a corrupt primary when NO valid backup exists", async () => {
+    // Corruption with nothing to recover from: loadRun must NOT resolve a clobbering
+    // null (that leaves saveLoadFailed false and lets the first autosave overwrite a
+    // possibly-recoverable-by-hand primary). It must signal failure → boot suppresses writes.
+    readSaveMock.mockImplementationOnce(async () => ({ ok: false, reason: "hash-mismatch", slot: RUN_SLOT }));
+    await expect(loadRun()).rejects.toThrow();
+  });
+
+  it("(B) REJECTS (not silent null) when readSave reports reason:db-unavailable", async () => {
+    // A soft db-unavailable result is still a FAILED read — the contract says a failed
+    // read re-throws so boot sets saveLoadFailed and suppresses writes. Only reason
+    // "missing" is a genuine empty slot.
+    readSaveMock.mockImplementationOnce(async () => ({ ok: false, reason: "db-unavailable", error: new Error("idb dead") }));
+    await expect(loadRun()).rejects.toThrow();
+  });
+
+  it("(B2) REJECTS on an unknown/unrecognized failure reason (fail closed, never clobber)", async () => {
+    readSaveMock.mockImplementationOnce(async () => ({ ok: false, reason: "some-future-failure" }));
+    await expect(loadRun()).rejects.toThrow();
+  });
+
+  it("(C) still resolves null when reason is missing — genuine empty slot, start fresh", async () => {
+    readSaveMock.mockImplementationOnce(async () => ({ ok: false, reason: "missing", slot: RUN_SLOT }));
+    expect(await loadRun()).toBeNull();
   });
 });

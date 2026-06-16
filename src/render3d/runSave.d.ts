@@ -63,6 +63,14 @@ export function overlayLiveEncounterState(
 ): Record<string, any>;
 export function buildRunPayload(ctx?: RunContext, now?: number): RunPayload;
 export function migrateRunPayload(payload: any): RunPayload | null;
+/** Load the ironman run.
+ *  - Resolves a migrated payload for a valid save.
+ *  - Resolves null ONLY for a genuinely empty slot (readSave reason "missing") or an
+ *    ok read whose payload is unmigratable (foreign/stale schema → safe fresh start).
+ *  - On a corrupt primary (hash/validation failure) recovers the most recent valid
+ *    backup and resolves THAT; rejects if no valid backup exists.
+ *  - Rejects on timeout, thrown read, db-unavailable, or any other unreadable failure
+ *    reason — a failed read is NOT an empty slot, so boot suppresses overwriting. */
 export function loadRun(): Promise<RunPayload | null>;
 export function writeRun(payload: RunPayload): Promise<any>;
 export function sealRun(payload: RunPayload, cause?: string, now?: number): Promise<RunPayload>;
