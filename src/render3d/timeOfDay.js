@@ -82,7 +82,7 @@ export const PALETTES = Object.freeze({
     sky: { top: "#3a5aa0", mid: "#c0917e", horizon: "#ffcf86" },
     // Neutral dusty haze (was warm tan #bfae98, which tinted every distant building
     // orange) — neutral, not cold-grey, so distance reads hazy not washed-out.
-    fog: { color: "#a8a29c", density: 0.01 }, // aerial perspective — see day
+    fog: { color: "#a8a29c", density: 0.012 }, // aerial perspective — a touch denser so distance reads hazy/deep (see day)
 
     // Key pulled back from 3.1 — at that strength ACES rolled every lit surface to
     // orange-white. 2.5 still dominates as the warm source without nuking the frame.
@@ -91,7 +91,7 @@ export const PALETTES = Object.freeze({
     // break; the GROUND term is the up-bounce — warmed from cool slate (#454a60) to
     // a dim earth tone so golden-hour shadows catch a little ground warmth from
     // below and unlit faces read as lit material, not black silhouette.
-    hemi: { sky: "#a6b8d4", ground: "#4e4a40", intensity: 1.28 },
+    hemi: { sky: "#a6b8d4", ground: "#544c40", intensity: 1.28 },
     rim: { color: "#8da3d4", intensity: 0.85, dir: { x: 9, y: 5, z: 6 } },
     // Camera-side fill: cool-neutral (was a static warm #ffd0a6) so the shadow-side
     // faces crowding the near/left of frame read cool instead of crushed warm-red.
@@ -99,7 +99,7 @@ export const PALETTES = Object.freeze({
     fill: { color: "#bcc6dc", intensity: 0.46 },
     exposure: 1.27,
     stars: 0,
-    bloom: 0.44,
+    bloom: 0.50,
     // Cinematic grade: a strong cool-shadow / warm-highlight split so the golden key
     // reads as warm light against cool shadow rather than a single-hue orange wash.
     // Deeper/cooler shadow tint + harder split is the decisive anti-orange knob;
