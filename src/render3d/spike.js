@@ -51,6 +51,7 @@ import { createPlaceholderCharacter } from "../game/world/character.js";
 import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
 import { createTownsfolk } from "../game/world/townsfolk.js";
 import { pickExecutorBark, approvalCrossingTrigger } from "./executorBarks.js";
+import { hudIsActive, computeHudDimState, HUD_DIM_PANEL_IDS } from "./hudDim.js";
 import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
 import { gustAt } from "../game/world/windGusts.js";
 import { createWeatherSystem } from "../game/world/weatherView.js";
@@ -4706,6 +4707,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   let wasDodging = false; // rising-edge detector for the dodge whoosh
   let fieldMapLiveSyncT = 0;
   let discoveryHoldT = 0; // holds a fresh discovery line on screen before the prompt restores
+  let hudDimState = null; // free-roam HUD melt timer ({dimmed,idleT}); null = visible at boot
   // Establishing push-in: for the first CAM_INTRO_DUR seconds at spawn the camera
   // eases from a wide/high vantage into the gameplay framing. Gated to spawn (no
   // active beat focus, no modal, not visual capture) so it never fights focusBeat or
@@ -4874,6 +4876,26 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       syncLiveFieldMap();
       syncProductionHud(productionHudRefs, loopState.state, encounter.getState(player.position));
       fieldMapLiveSyncT = 0.18;
+    }
+    // HUD melt: in quiet free-roam the bounty toast / field map / job tracker fade
+    // out so the world fills the frame, snapping back near an interactable, with
+    // the board open, or mid-combat. Skipped during the funeral/implant beat (those
+    // panels are hidden by syncProductionHud and must not pre-accumulate idle) and
+    // under visualCapture (the golden frame stays deterministic). Toggles the
+    // opacity-only `hud-dimmed` class — it rides on top of the inline display state.
+    if (!visualCapture && loopState.phase !== "funeral" && loopState.phase !== "implant") {
+      const hudActive = hudIsActive({
+        nearestPresent: interaction.nearest != null,
+        boardOpen: boardModalController.isOpen(),
+        inCombat: loopState.phase === "slime_fight",
+      });
+      const nextDim = computeHudDimState(hudDimState, { active: hudActive, dt });
+      if (!hudDimState || nextDim.dimmed !== hudDimState.dimmed) {
+        for (const id of HUD_DIM_PANEL_IDS) {
+          document.getElementById(id)?.classList.toggle("hud-dimmed", nextDim.dimmed);
+        }
+      }
+      hudDimState = nextDim;
     }
     encounter.update(player.position, visualCapture ? 0 : dt);
     if (

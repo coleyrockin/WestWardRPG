@@ -952,6 +952,17 @@
       .hud-reveal {
         transition: opacity 0.5s ease, transform 0.5s ease;
       }
+      /* HUD melt — during quiet free-roam the road-loop clutter (bounty toast,
+         field map, job tracker) eases to near-invisible so the world fills the
+         frame; it snaps back near an interactable / with the board open / in
+         combat. Opacity-only so it rides on top of the inline display state
+         syncProductionHud sets (no specificity war). Objective/prompt/hero
+         panel are never melted — they keep the player oriented. */
+      .hud-dimmed {
+        opacity: 0.08;
+        pointer-events: none;
+        transition: opacity 1.2s ease;
+      }
     </style>
   </head>
   <body>
