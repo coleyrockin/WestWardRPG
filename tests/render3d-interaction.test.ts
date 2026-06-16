@@ -215,7 +215,7 @@ describe("interactionSystem — createInteractionSystem", () => {
 // permissive default ()=>true, so the unmountable-in-normal-play bug cannot hide as a
 // false green. spike.js wires:
 //   isTargetEnabled: (t) => t.kind === "mountHorse" || loopState.isTargetEnabled(t)
-describe("interactionSystem — mountHorse always-interactable gate", () => {
+describe("interactionSystem — mountHorse off-phase gate (on foot only)", () => {
   // Reuse the production placement shape (x is world-X, y is world-Z).
   const MOUNT_HORSE = { kind: "mountHorse", label: "Steel Mustang", x: 16.2, y: 12.0 };
 
@@ -296,6 +296,25 @@ describe("interactionSystem — mountHorse always-interactable gate", () => {
     expect(near).toBe(placement);
     expect(promptFor(near)).toContain("Mount");
   });
+
+  it("suppresses the mount prompt while already mounted (no E — Mount Up mid-ride)", () => {
+    // Regression: while mounted, spike.js pins horseNode.position to the player every
+    // frame and the anchor sync mirrors that onto the placement — so the mount object
+    // sits exactly on the rider (distance ~0, inside the 2.6 radius). The gate must
+    // also require !isMounted so the prompt does NOT show, and pressing E does not
+    // re-fire the mount handler, the entire time you are riding.
+    const loopState = createLoopStateMachine();
+    const player = { isMounted: true };
+    // Mirror the production gate verbatim (see spike.js isTargetEnabled).
+    const prodGate = (t: any) =>
+      (t?.kind === "mountHorse" && !player.isMounted) || loopState.isTargetEnabled(t);
+    // The horse rides under you: placement == player position (distance 0).
+    const placement = { kind: "mountHorse", label: "Steel Mustang", x: 5.0, y: 5.0 };
+    expect(pickNearest({ x: 5.0, z: 5.0 }, [placement], prodGate)).toBeNull();
+    // On dismount the same spot becomes mountable again.
+    player.isMounted = false;
+    expect(pickNearest({ x: 5.0, z: 5.0 }, [placement], prodGate)).toBe(placement);
+  });
 });
 
 // Lock the PRODUCTION wiring in spike.js (a WebGPU scene module that can't be imported
@@ -307,11 +326,14 @@ describe("interactionSystem — spike.js mount wiring (source contract)", () => 
     "utf8",
   );
 
-  it("makes mountHorse always-interactable regardless of phase gate", () => {
+  it("makes mountHorse interactable off the phase gate but only while ON FOOT", () => {
     // BUG A: the interaction wiring must let mountHorse through even when the active
-    // phase target is something else — kind === "mountHorse" OR the loop gate.
+    // phase target is something else — kind === "mountHorse" OR the loop gate. The
+    // mountHorse free pass is additionally gated on !player.isMounted so the "E — Mount
+    // Up" prompt is suppressed mid-ride (the horse mesh rides under the player, so the
+    // anchor sits on the rider and would otherwise surface the prompt every frame).
     const gateRe =
-      /isTargetEnabled:\s*\(target\)\s*=>\s*target\??\.kind\s*===\s*["']mountHorse["']\s*\|\|\s*loopState\.isTargetEnabled\(target\)/;
+      /isTargetEnabled:\s*\(target\)\s*=>\s*\(?\s*target\??\.kind\s*===\s*["']mountHorse["']\s*&&\s*!player\.isMounted\s*\)?\s*\|\|\s*loopState\.isTargetEnabled\(target\)/;
     expect(spikeSource).toMatch(gateRe);
   });
 

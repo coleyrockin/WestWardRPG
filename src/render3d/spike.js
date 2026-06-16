@@ -3818,9 +3818,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     worldObjects: mountObjects,
     setPromptText,
     // The rideable horse is a free-roam affordance, not a scripted phase beat: it waits
-    // and you can walk up and mount from the first second. So mountHorse is ALWAYS
-    // interactable; every other target stays gated to the active loop phase.
-    isTargetEnabled: (target) => target?.kind === "mountHorse" || loopState.isTargetEnabled(target),
+    // and you can walk up and mount from the first second. So mountHorse is interactable
+    // off the phase gate — but ONLY while on foot. Mid-ride the horse mesh rides under
+    // the player and the per-frame anchor sync (below) mirrors that onto mountPlacement,
+    // so the mount object would sit on the rider (distance ~0, inside the 2.6 radius) and
+    // flash "E — Mount Up" the entire ride. Gating on !player.isMounted (the same latch
+    // the whistle uses) suppresses that and stops a redundant re-fire of the mount
+    // handler. Every other target stays gated to the active loop phase.
+    isTargetEnabled: (target) =>
+      (target?.kind === "mountHorse" && !player.isMounted) || loopState.isTargetEnabled(target),
     getPromptText: (target) => {
       const prompt = loopState.getPromptForTarget(target);
       if (target?.kind !== "roadSlime" || loopState.phase !== "slime_fight" || !encounter) return prompt;
@@ -4757,6 +4763,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         const dx = player.position.x - horseNode.position.x;
         const dz = player.position.z - horseNode.position.z;
         const dist = Math.hypot(dx, dz);
+        // Stop the whistle-recall just INSIDE the mount radius so a recalled horse halts
+        // within mounting range. This 2.5 is coupled to PROMPTS.mountHorse.radius (2.6,
+        // interactionSystem.js) — keep stop < radius or a recalled horse stops out of
+        // reach and becomes unmountable. Bump one, re-check the other.
         if (dist <= 2.5) {
           horseCalled = false;
         } else {

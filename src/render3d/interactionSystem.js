@@ -19,6 +19,10 @@ const PROMPTS = {
   brokenWagon: { radius: 2.5, text: "E — Inspect Wagon" },
   roadSlime:   { radius: 2.2, text: "E — Strike Road Slime" },
   gravesite:   { radius: 2.5, text: "E — Attend Abram's Funeral" },
+  // radius is coupled to the whistle-recall stop distance in spike.js (the horse halts at
+  // dist <= 2.5, just inside this 2.6 so a recalled horse stops in mounting range). Keep
+  // this radius > that stop distance or a whistled horse parks out of reach. Bump one,
+  // re-check the other.
   mountHorse:  { radius: 2.6, text: "E — Mount Up" },
 };
 
