@@ -162,9 +162,11 @@ const HERO_MODEL_SCALE = 1.0; // native rig is ~1.83u tall (feet at 0) — match
 // Height-zoned drifter dress (model-space Y; rig is 1.83u, T-pose). Turns the
 // untextured mannequin into boots → trousers → shirt(+sleeves/hands) → skin.
 const HERO_DRESS = Object.freeze({
-  boots: "#352617", pants: "#5c5038", shirt: "#834d36", skin: "#b07a52",
+  // shirt: dusty brick/oxblood (was bright red) — sits in the sun-bleached palette
+  boots: "#352617", pants: "#5c5038", shirt: "#74433a", skin: "#b07a52",
   yPantsBoots: 0.22, yShirtPants: 0.95, ySkinShirt: 1.52, blend: 0.07,
 });
+const HAT_LIFT = 0.18; // metres above the head-bone origin where the brim rests (tuned by capture)
 const IMPORTANT_MODEL_KINDS = Object.freeze([
   "jobBoard",
   "heroTownSaloon",
@@ -1927,6 +1929,41 @@ function createHeroSilhouetteAccent() {
   return { group, update() {} };
 }
 
+// A low-poly felt cowboy hat: wide flat brim + dark band + tapered crown. Built
+// around its own origin (brim at y≈0, crown above) so it can be lifted onto the
+// head and bone-attached.
+function buildCowboyHat() {
+  const hat = new THREE.Group();
+  hat.name = "cowboy-hat";
+  const felt = standard("#5a4128", { rimStrength: 0.12 });
+  const band = standard("#33251a", { rimStrength: 0.1 });
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.205, 0.215, 0.022, 20), felt);
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.122, 0.03, 16), band);
+  ring.position.y = 0.025;
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.092, 0.118, 0.145, 16), felt);
+  crown.position.y = 0.092;
+  for (const m of [brim, ring, crown]) { m.castShadow = true; m.receiveShadow = true; hat.add(m); }
+  return hat;
+}
+
+// Bone-attach the hat to the rig's head joint so it rides the head through every
+// animation. Placed in world space at the head bone + HAT_LIFT (world-up), then
+// re-parented via Object3D.attach so THREE bakes the correct, pose-independent
+// bone-local transform. No-op on the placeholder fallback (no DEF-head bone).
+function attachCowboyHat(group, scene) {
+  const head = group.getObjectByName("DEF-head");
+  if (!head) return null;
+  group.updateWorldMatrix(true, true);
+  const hat = buildCowboyHat();
+  const hp = new THREE.Vector3();
+  head.getWorldPosition(hp);
+  hat.position.set(hp.x, hp.y + HAT_LIFT, hp.z);
+  scene.add(hat);
+  hat.updateWorldMatrix(true, false);
+  head.attach(hat);
+  return hat;
+}
+
 function createSlimeCombatCue(snapshot) {
   const slime = placementByKind(snapshot, "roadSlime");
   const group = new THREE.Group();
@@ -3517,6 +3554,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   character.group.add(playerReadability.group);
   setPlayerMarkerVisibility(playerReadability, debugPlayerMarker && !visualCapture);
   scene.add(character.group);
+  if (playerModelLoaded) attachCowboyHat(character.group, scene);
   const heroSilhouetteAccent = createHeroSilhouetteAccent();
   scene.add(heroSilhouetteAccent.group);
   // F → play the one-shot "draw" clip (no-op on the placeholder fallback).
