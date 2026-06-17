@@ -27,7 +27,22 @@ function reskin(mesh, tint) {
   mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material);
 }
 
+// Map canonical clip roles (idle/walk/run/draw/turn) onto an asset's actual clip
+// names, so a sourced rig whose clips are named Idle_Loop/Walk_Loop/Jog_Fwd_Loop/
+// Pistol_Shoot still drives our locomotion + one-shot code unchanged. The original
+// lower-cased clip names are preserved; canonical aliases are added on top. A
+// mapping whose target clip is missing is skipped (no bad alias).
+export function resolveClipAliases(actionsByLowerName, clipMap = {}) {
+  const out = { ...actionsByLowerName };
+  for (const [role, assetName] of Object.entries(clipMap || {})) {
+    const action = actionsByLowerName[String(assetName).toLowerCase()];
+    if (action) out[role] = action;
+  }
+  return out;
+}
+
 // opts.tint multiplies every base colour (per-NPC variety reusing one rig).
+// opts.clipMap aliases canonical roles → this asset's clip names (see above).
 export async function createAnimatedCharacter(url = "/models/character.glb", opts = {}) {
   const gltf = await loadTemplate(url);
   const group = cloneSkinned(gltf.scene);
@@ -45,8 +60,9 @@ export async function createAnimatedCharacter(url = "/models/character.glb", opt
   });
 
   const mixer = new THREE.AnimationMixer(group);
-  const actions = {};
-  for (const clip of gltf.animations) actions[clip.name.toLowerCase()] = mixer.clipAction(clip);
+  const rawActions = {};
+  for (const clip of gltf.animations) rawActions[clip.name.toLowerCase()] = mixer.clipAction(clip);
+  const actions = resolveClipAliases(rawActions, opts.clipMap);
   const idle = actions.idle || null;
   const walk = actions.walk || null;
   const run = actions.run || null;

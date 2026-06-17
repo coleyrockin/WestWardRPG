@@ -151,7 +151,14 @@ function cullShadow(node) {
 // goldenHour boot + day/night cycle once the world look is dialed in. The golden
 // gate is unaffected — it still pins dusk via ?visual.
 const DEV_LOCK_DAYLIGHT = true;
-const PLAYER_MODEL_URL = "/models/character_hero.glb";
+// Believable-human hero: Quaternius "Universal Animation Library" rig (CC0) —
+// ~8.5k verts, true human proportions, 53-joint humanoid skeleton, 46 clips.
+// Replaces the 792-vert blocky drifter. Its clips are named Idle_Loop/Walk_Loop/
+// Jog_Fwd_Loop/Pistol_Shoot, so HERO_CLIP_MAP aliases them onto our canonical
+// idle/walk/run/draw roles (resolveClipAliases in animatedCharacter.js).
+const PLAYER_MODEL_URL = "/models/AnimationLibrary_Godot_Standard.gltf";
+const HERO_CLIP_MAP = Object.freeze({ idle: "Idle_Loop", walk: "Walk_Loop", run: "Jog_Fwd_Loop", draw: "Pistol_Shoot" });
+const HERO_MODEL_SCALE = 1.0; // tuned to ~1.8u after measuring native height in-browser
 const IMPORTANT_MODEL_KINDS = Object.freeze([
   "jobBoard",
   "heroTownSaloon",
@@ -1902,46 +1909,16 @@ function createBoardReturnNotice(snapshot) {
   };
 }
 
+// Hero accent props (bedroll / scarf / hip lantern) were fixed-height boxes tuned
+// to the OLD placeholder; on the realistic rigged hero they float detached at
+// mid-torso (a glowing blob by the hip) and read as a bug. Removed for the
+// believable-human pass — proper gear belongs ON the model (dressed in Blender)
+// or bone-attached, not as world-space boxes. Kept as a no-op stub so the call
+// sites stay valid; restore from git history if reintroducing bone-attached gear.
 function createHeroSilhouetteAccent() {
   const group = new THREE.Group();
   group.name = "hero-silhouette-accent";
-
-  const bedroll = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.18, 0.22),
-    standard("#5c3c27", { rimColor: "#d8ad76", rimStrength: 0.22 }),
-  );
-  bedroll.position.set(0, 1.08, 0.2);
-  bedroll.rotation.x = 0.06;
-  group.add(bedroll);
-
-  const scarf = new THREE.Mesh(
-    new THREE.BoxGeometry(0.42, 0.08, 0.08),
-    standard("#9d3b2e", { emissive: "#5a1712", emissiveIntensity: 0.08, rimStrength: 0.16 }),
-  );
-  scarf.position.set(0.02, 1.42, 0.18);
-  group.add(scarf);
-
-  const lantern = new THREE.Mesh(
-    new THREE.SphereGeometry(0.095, 9, 7),
-    standard("#f0b45f", { emissive: "#e07a30", emissiveIntensity: 0.7, rimStrength: 0 }),
-  );
-  lantern.position.set(0.27, 1.18, 0.27);
-  group.add(lantern);
-
-  const lamp = new THREE.PointLight(col("#e07a30"), 0.52, 2.15, 2.1);
-  lamp.position.copy(lantern.position);
-  group.add(lamp);
-
-  return {
-    group,
-    update(player, t = 0) {
-      const pos = player?.position || PLAYER_SPAWN;
-      group.position.set(pos.x, 0, pos.z);
-      group.rotation.y = Number.isFinite(player?.yaw) ? player.yaw : 0;
-      lantern.scale.setScalar(0.92 + Math.sin(t * 3.4) * 0.05);
-      lamp.intensity = 0.42 + Math.max(0, Math.sin(t * 2.6)) * 0.12;
-    },
-  };
+  return { group, update() {} };
 }
 
 function createSlimeCombatCue(snapshot) {
@@ -3516,7 +3493,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     character = createPlaceholderCharacter();
   } else {
     try {
-      character = await createAnimatedCharacter(PLAYER_MODEL_URL);
+      character = await createAnimatedCharacter(PLAYER_MODEL_URL, { clipMap: HERO_CLIP_MAP });
       playerModelLoaded = true;
     } catch (err) {
       console.warn("[render3d] hero character failed, trying base character", err);
@@ -3528,7 +3505,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       }
     }
   }
-  character.group.scale.setScalar(playerModelLoaded ? 1.18 : 1.04);
+  character.group.scale.setScalar(playerModelLoaded ? HERO_MODEL_SCALE : 1.04);
   character.modelUrl = playerModelLoaded ? PLAYER_MODEL_URL : "/models/character.glb";
   const playerReadability = createPlayerReadabilityRig();
   character.group.add(playerReadability.group);
