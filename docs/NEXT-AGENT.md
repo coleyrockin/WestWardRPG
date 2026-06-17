@@ -6,10 +6,62 @@ Durable canon is separate and stays: the design canon is [`rustwater-treatment.m
 (cyberpunk-western open-world RPG — *Red Dead* geography, *Cyberpunk* flesh, *Fable* bones), the
 engine/execution plan is [`roadmap.md`](roadmap.md) (M0–M4), engine truths are in `CLAUDE.md`.
 
-Last updated: **2026-06-16** · main green: **845 vitest**, tsc clean, build ok, dusk golden
-PASS (4.12% / 10% threshold) · live: westward-rpg.vercel.app · local play: `npm run play` →
-http://127.0.0.1:5191/ · **deploy is HELD for the owner's word.** Phase 3 (M0) STARTED — two
-increments landed (see below). **MEASUREMENT CAVEAT — read before claiming draw-call wins.**
+Last updated: **2026-06-16 (pm)** · main green: **850 vitest**, tsc clean, build ok, dusk golden
+PASS (4.11% / 10% threshold) · live: westward-rpg.vercel.app · local play: `npm run play` →
+http://127.0.0.1:5191/ · **deploy is HELD for the owner's word.** 11 commits ahead of origin.
+
+> ## ⭐ DIRECTION PIVOT (2026-06-16 pm) — LOOK before perf
+> The owner played it and called it **laggy, too dark, character looks Roblox, "the map STILL
+> looks like a shitty Reno movie set."** We diagnosed all three live (foreground browser + code map)
+> and pivoted from M0-perf to **the LOOK**. Owner's steer: **realism / believable**, and **lock the
+> game to DAYLIGHT while we build so imperfections show.** Three-symptom root causes (kept so they
+> aren't re-litigated):
+> - **DARK** → the world clock DRIFTED goldenHour→dusk→night over ~12 min and the save persisted it,
+>   so returning sessions booted dark. NOT a broken light. → **FIXED:** `DEV_LOCK_DAYLIGHT` (spike.js,
+>   commit `c2e2466`) boots `day`, no drift, ignores drifted saves. Golden gate still pins dusk.
+>   Flip the flag false to restore the goldenHour boot + day/night cycle when the world look is done.
+> - **CHARACTER "Roblox"** → was a 792-vert blocky drifter + a floating hip-lantern blob. → **FIXED
+>   (hero realism pass, see below).**
+> - **LAGGY** → draw-call/submission-bound, and the BIGGEST untouched cost is the **shadow pass**:
+>   **1158 casters re-rendered into a 1536² map EVERY frame** — no `shadowMap.autoUpdate=false`, and
+>   `setShadowFocus` moves the shadow cam every frame so even standing still pays full cost
+>   (atmosphere.js:131-190, spike.js shadow-focus call). WebGPU-only → lands on the owner's machine.
+>   STILL TODO (highest perf lever; golden-safe — baseline runs WebGL shadows-off). **Also: a true
+>   FPS number is still unmeasured — the Playwright tab background-throttles rAF to 1 Hz, so FPS
+>   readings there are garbage. Need a real foreground probe / in-game FPS HUD before tuning perf.**
+>
+> ### ✅ HERO REALISM PASS — DONE (commits `1195b88`, `54202f7`, `e318d3f`)
+> Blockhead → believable hatted drifter, all golden-safe (the `?visual` capture forces the
+> placeholder hero, so none of this touches the dusk frame). Before/after shots in
+> `~/agents/screenshots/dustwater/fast/` (`char-*` old, `hero3-*` final).
+> 1. **Swapped** the 792-vert blob for the **Quaternius "Universal Animation Library"** rig (CC0,
+>    login-free raw-GitHub download, ~8.5k verts, true human proportions, 53-joint humanoid, 46
+>    clips incl. a pistol set). Files: `public/models/AnimationLibrary_Godot_Standard.gltf`+`.bin`.
+>    `resolveClipAliases` (animatedCharacter.js, unit-tested) maps its `Idle_Loop`/`Walk_Loop`/
+>    `Jog_Fwd_Loop`/`Pistol_Shoot` → our canonical `idle`/`walk`/`run`/`draw` via `HERO_CLIP_MAP`.
+> 2. **Dressed** the untextured mannequin: `createHeroDressMaterial` (nprMaterial.js) — a HEIGHT-ZONED
+>    albedo keyed on bind-pose local Y (positionGeometry) → boots→trousers→shirt(+sleeves)→skin,
+>    smoothstep-blended, smooth-shaded, through the world cel ramp. `HERO_DRESS` zones in spike.js
+>    (tuned to the rig's measured 1.83u T-pose). Killed the garish purple joints.
+> 3. **Cowboy hat** bone-attached to `DEF-head` via `Object3D.attach` (`buildCowboyHat`/
+>    `attachCowboyHat`, spike.js) — rides the head, covers the featureless mannequin head, reads
+>    gunslinger in profile. Removed the floating bedroll/scarf/lantern accents (stubbed).
+> NEXT on the hero (deferred, owner said reassess after the hat): facial features, finer texture,
+> per-garment detail (a Blender UV-paint pass if we want more than the height-zoned read).
+>
+> ### ▶ NEXT BIG THING — THE WORLD ("movie set")
+> The owner's remaining complaint. In daylight the world reads as a cheap staged set:
+> **flat-shaded box buildings in garish near-random colours (purple next to tan), a single flat
+> untextured tan ground plane, no material/texture detail, cluttered with no atmospheric depth,
+> HUD crowding every frame.** This is its own brainstorm/design → realism pass (ground material +
+> variation, building materials/forms/colour discipline, depth/atmosphere, declutter). Bigger than
+> the hero. The owner wants "believable, not a movie set." START with a fresh brainstorm.
+>
+> **MEASUREMENT CAVEAT (still true) — read before claiming draw-call wins.** See the M0 section.
+
+---
+
+## M0 / PERF (deprioritised behind the LOOK, but still real)
 
 ---
 
