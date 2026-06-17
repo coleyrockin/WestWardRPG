@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error — JS module, no types
-import { seedValue, routeSageBlades, createRouteSageField } from "../src/game/world/flora.js";
+import { seedValue, routeSageBlades, createRouteSageField, floraVisibleAt, FLORA_CULL_SHOW, FLORA_CULL_HIDE } from "../src/game/world/flora.js";
 
 // A small synthetic route mirroring FIRST_FIVE_ROUTE's point shape ({ x, y, kind }).
 // flora.js must reproduce the original per-blade placement byte-for-byte so the
@@ -92,5 +92,31 @@ describe("flora — createRouteSageField (InstancedMesh batching)", () => {
     const fakeScene = { added: [] as any[], add(o: any) { this.added.push(o); } };
     const field = createRouteSageField(fakeScene, { route: ROUTE });
     expect(fakeScene.added).toContain(field);
+  });
+});
+
+describe("flora — floraVisibleAt (hysteresis distance cull)", () => {
+  const showSq = FLORA_CULL_SHOW * FLORA_CULL_SHOW;
+  const hideSq = FLORA_CULL_HIDE * FLORA_CULL_HIDE;
+
+  it("has a real hysteresis gap (show radius < hide radius)", () => {
+    expect(FLORA_CULL_SHOW).toBeLessThan(FLORA_CULL_HIDE);
+  });
+
+  it("keeps a visible node visible until it passes the hide radius", () => {
+    expect(floraVisibleAt(true, 50 * 50, showSq, hideSq)).toBe(true);
+    expect(floraVisibleAt(true, 80 * 80, showSq, hideSq)).toBe(true); // inside the gap: sticky
+    expect(floraVisibleAt(true, 90 * 90, showSq, hideSq)).toBe(false); // beyond hide: cull
+  });
+
+  it("keeps a hidden node hidden until it re-enters the show radius", () => {
+    expect(floraVisibleAt(false, 100 * 100, showSq, hideSq)).toBe(false);
+    expect(floraVisibleAt(false, 80 * 80, showSq, hideSq)).toBe(false); // inside the gap: sticky
+    expect(floraVisibleAt(false, 70 * 70, showSq, hideSq)).toBe(true); // within show: re-show
+  });
+
+  it("is boundary-stable at exactly the hide radius (no flicker)", () => {
+    expect(floraVisibleAt(true, FLORA_CULL_HIDE * FLORA_CULL_HIDE)).toBe(true);
+    expect(floraVisibleAt(true, (FLORA_CULL_HIDE + 1) * (FLORA_CULL_HIDE + 1))).toBe(false);
   });
 });

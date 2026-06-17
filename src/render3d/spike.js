@@ -47,7 +47,7 @@ import { createWater } from "../game/world/water.js";
 import { waterBodies, DAM, waterCollisionBoxes } from "./waterLayout.js";
 import { createGroundMaterial, groundHeight, localFogBoost } from "../game/world/ground.js";
 import { createScatter } from "../game/world/scatter.js";
-import { createRouteSageField } from "../game/world/flora.js";
+import { createRouteSageField, floraVisibleAt, FLORA_CULL_SHOW, FLORA_CULL_HIDE } from "../game/world/flora.js";
 import { createPlaceholderCharacter } from "../game/world/character.js";
 import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
 import { createTownsfolk } from "../game/world/townsfolk.js";
@@ -130,6 +130,13 @@ const SHADOW_CULL_KINDS = new Set([
 function shouldCullShadow(p) {
   return p.depthLane === "background" || SHADOW_CULL_KINDS.has(p.kind);
 }
+// M0 perf — discrete-flora distance cull (roadmap §M0). cactus/deadTree (and the
+// model-path sageCluster/roadGrass) land in placementNodes; the procedural brush/
+// sagePatch/reeds builders return null and aren't tracked. We cull only the tall
+// cactus/deadTree for now — they read at distance, so hiding them well past the player
+// stops distant open-range scatter from drawing (sage/grass could join later). The cull
+// pass is SKIPPED under visualCapture, so the blessed dusk frame keeps every flora — golden-safe.
+const FLORA_CULL_KINDS = new Set(["cactus", "deadTree"]);
 // Turn off castShadow on every mesh under a node (it may be a Group of meshes).
 function cullShadow(node) {
   if (!node) return;
@@ -205,20 +212,36 @@ function addBox(group, w, h, d, mat, pos) {
 // Blob shadow projected under a world-space point. Two stacked discs — a darker
 // core inside a wider, fainter penumbra — give a soft-edged grounding shadow that
 // kills the "floating" look without a gradient texture.
+// M0 perf — every contact shadow used to mint its OWN CircleGeometry + two raw
+// MeshBasicMaterials, so the scene carried hundreds of duplicate disc materials
+// (the only un-cached materials in the build). The discs only ever come in two
+// fixed variants (soft penumbra 0.32 / darker core 0.46, same colour), so share
+// one unit-circle geometry + one material per variant across the whole scene.
+// Scale/position stay per-disc, so the look is pixel-identical. Lazy-init keeps
+// it clear of any module load-order dependency on `col`.
+let _contactGeo = null;
+let _contactPenumbraMat = null;
+let _contactCoreMat = null;
+function contactShadowAssets() {
+  if (!_contactGeo) {
+    _contactGeo = new THREE.CircleGeometry(1, 24);
+    _contactPenumbraMat = new THREE.MeshBasicMaterial({ color: col("#1a120c"), transparent: true, opacity: 0.32, depthWrite: false });
+    _contactCoreMat = new THREE.MeshBasicMaterial({ color: col("#1a120c"), transparent: true, opacity: 0.46, depthWrite: false });
+  }
+  return { geo: _contactGeo, penumbra: _contactPenumbraMat, core: _contactCoreMat };
+}
 function addContactShadow(group, x, z, rx = 1.0, rz = 0.7) {
-  const make = (scale, opacity) => {
-    const m = new THREE.Mesh(
-      new THREE.CircleGeometry(1, 24),
-      new THREE.MeshBasicMaterial({ color: col("#1a120c"), transparent: true, opacity, depthWrite: false }),
-    );
+  const { geo, penumbra, core } = contactShadowAssets();
+  const make = (scale, mat) => {
+    const m = new THREE.Mesh(geo, mat);
     m.rotation.x = -Math.PI / 2;
     m.scale.set(rx * scale, 1, rz * scale);
     m.position.set(x, 0.018, z);
     m.renderOrder = -1;
     return m;
   };
-  group.add(make(1.32, 0.32)); // soft penumbra — lifted from 0.22 so props read grounded, not floating (art doc pillar 3)
-  group.add(make(0.92, 0.46)); // darker core — lifted from 0.34; trimmed under the dusk vignette so it doesn't pool
+  group.add(make(1.32, penumbra)); // soft penumbra — lifted from 0.22 so props read grounded, not floating (art doc pillar 3)
+  group.add(make(0.92, core)); // darker core — lifted from 0.34; trimmed under the dusk vignette so it doesn't pool
 }
 
 // Augment an authored building box with western false-front architecture so it
@@ -4793,6 +4816,27 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         ? graveFocusPoint
         : null;
     updateOcclusionFades(placementNodes, camera, player.position, funeralFocus);
+    // M0 — distance-cull far cactus/deadTree so the open range stops drawing distant
+    // flora. Skipped under capture so the dusk golden frame keeps every flora visible.
+    if (!visualCapture) {
+      const showSq = FLORA_CULL_SHOW * FLORA_CULL_SHOW;
+      const hideSq = FLORA_CULL_HIDE * FLORA_CULL_HIDE;
+      const px = player.position.x;
+      const pz = player.position.z;
+      for (const record of placementNodes) {
+        if (!FLORA_CULL_KINDS.has(record.kind)) continue;
+        const node = record.node;
+        const dx = node.position.x - px;
+        const dz = node.position.z - pz;
+        const distSq = dx * dx + dz * dz;
+        const cur = node.userData.floraVisible !== false;
+        const next = floraVisibleAt(cur, distSq, showSq, hideSq);
+        if (next !== cur) {
+          node.userData.floraVisible = next;
+          node.visible = next;
+        }
+      }
+    }
     // While a discovery line is held, skip the per-frame prompt refresh so the
     // 'Discovered — ...' text survives the hold window (interactionSystem.update
     // always overwrites the prompt with the nearest one or ""). When the hold

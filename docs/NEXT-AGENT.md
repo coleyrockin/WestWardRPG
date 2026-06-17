@@ -6,10 +6,10 @@ Durable canon is separate and stays: the design canon is [`rustwater-treatment.m
 (cyberpunk-western open-world RPG — *Red Dead* geography, *Cyberpunk* flesh, *Fable* bones), the
 engine/execution plan is [`roadmap.md`](roadmap.md) (M0–M4), engine truths are in `CLAUDE.md`.
 
-Last updated: **2026-06-16** · main green: **841 vitest**, tsc clean, build ok, dusk golden
-PASS (4.15% / 10% threshold) · live: westward-rpg.vercel.app · local play: `npm run play` →
-http://127.0.0.1:5191/ · **deploy is HELD for the owner's word.** Phase 3 (M0) STARTED — first
-flora batch landed (see below).
+Last updated: **2026-06-16** · main green: **845 vitest**, tsc clean, build ok, dusk golden
+PASS (4.12% / 10% threshold) · live: westward-rpg.vercel.app · local play: `npm run play` →
+http://127.0.0.1:5191/ · **deploy is HELD for the owner's word.** Phase 3 (M0) STARTED — two
+increments landed (see below). **MEASUREMENT CAVEAT — read before claiming draw-call wins.**
 
 ---
 
@@ -62,9 +62,22 @@ Chrome, `window.__westward3dStats()`), preserved here so it isn't lost:
 | open_range (60,12) | 612 | 3504 | 665 | 1158 | 127,319 |
 | marsh (48,16) | 720 | 3504 | 665 | 1158 | 131,209 |
 
+> ⚠️ **MEASUREMENT CAVEAT (found 2026-06-16, the hard way).** `__westward3dStats().calls` is
+> **NOT a reliable per-frame draw count via Playwright** — `renderer.info.render.calls` accumulates
+> across the multi-pass post pipeline and is not reset per frame, so reads swing wildly (e.g. the
+> SAME town pose read 216, 3492, and 10152 depending on timing). The "draw calls" column above is
+> from a foreground DevTools read whose method isn't reproducible here. **Only `meshes` and
+> `materials` (a `scene.traverse` count) and `shadowCasters` are trustworthy and reproducible.**
+> Before claiming a draw-call number, build the proper probe (step 1) that sets
+> `renderer.info.autoReset=false`, calls `renderer.info.reset()` at frame start, and reads
+> `.calls` after exactly one settled frame — OR add a per-frame total to `__westward3dStats`.
+> Until then, prove wins via `meshes`/`materials`/`shadowCasters` deltas, not `.calls`.
+
 **Target: < 400 draw calls in town, ≥5× frame-time.** Ordered, self-contained steps:
-1. Re-measure in a real FOREGROUND tab (preview throttles rAF and lies); fill the `roadmap.md` M0
-   table. Probe pattern: a throwaway `scripts/_boot_probe_tmp.mjs` (recreate if gone).
+1. **DO THIS FIRST — fix the draw-call measurement.** Re-measure in a real FOREGROUND tab, but
+   with a correct per-frame draw count (see caveat above). Probe pattern: a throwaway
+   `scripts/_boot_probe_tmp.mjs` (recreate if gone). Fill the `roadmap.md` M0 table with REAL
+   numbers; the table above's draw-call column is suspect.
 2. **Flora → `InstancedMesh`** — extract to `src/game/world/flora.js`, one InstancedMesh per
    (kind,color) bucket; matrices from seeded world pos+yaw+size (mirror `scatter.js:38-81`,
    already instanced + golden-safe). **Keep placement deterministic** (no `Math.random()`) so the
@@ -73,7 +86,9 @@ Chrome, `window.__westward3dStats()`), preserved here so it isn't lost:
      sage field was ~605 individual `THREE.Mesh` with the per-blade-material anti-pattern; now 4
      `InstancedMesh` (one per colour). Placement ported byte-identical (same seedValue sin-hash,
      same `n`-per-clump order) → golden frame unchanged (PASS 4.15% vs 4.11% baseline noise).
-     Measured WebGPU foreground: **scene meshes 3504 → 2903 (−601)**; town draws ~504 → ~216.
+     Verified WebGPU foreground: **scene meshes 3504 → 2903 (−601)** — the reliable proof (601
+     blade meshes collapsed to 4 InstancedMesh). (An earlier "town draws 504→216" claim was
+     RETRACTED — see the measurement caveat; `.calls` isn't trustworthy here.)
      Pure helper `routeSageBlades(route)` is unit-tested (`tests/world-flora.test.ts`, 8 cases).
      0 console errors on boot. **NO reducedFidelity halving** added (full density on both
      backends) so the blessed baseline didn't move — fallback halving is step 5's job.
@@ -85,19 +100,32 @@ Chrome, `window.__westward3dStats()`), preserved here so it isn't lost:
      layout tests assert on kinds/coords/labels, NOT meshes — see
      `render3d-frontier-layout.test.ts`: `naturalClusterCount>=24`, `firstFrameSlabBlockers===[]`).
      The near-spawn road-shoulder sage (`ROAD_FLORA` ~x10–13,y6) IS in the dusk frame — reproduce
-     its transforms exactly or the golden gate trips. Cactus/deadTree make contact-shadow discs
-     (2 raw uncached `MeshBasicMaterial` each, 96 total) — fold those into the batch too.
+     its transforms exactly or the golden gate trips.
    - KNOWN CLEANUP (benign): `createScatter` is passed `reducedFidelity` (spike.js call) but
      `scatter.js` only destructures `backend`; the arg is dead (halving still works off
      `backend==="webgl"`). Unify scatter + flora on the `reducedFidelity` flag during step 5.
 3. Road ruts/planks → InstancedMesh; tumbleweeds → InstancedMesh (3 today, easy).
-4. **Distance culling** for open-range flora in `stepWorld` — `placementNode.visible=false` beyond
-   ~80u with hysteresis (show<75/hide>85). Cuts draws AND the 1158 shadow-casters.
+4. **Distance culling** for far flora — ✅ **DONE 2026-06-16 (Increment 2).** `floraVisibleAt`
+   hysteresis helper in `flora.js` (show 75u / hide 85u, squared-distance, unit-tested) + a
+   per-frame pass in the loop (after `updateOcclusionFades`) that toggles `node.visible` for
+   `FLORA_CULL_KINDS` = {cactus, deadTree} in `placementNodes`. **Gated on `!visualCapture`** so the
+   dusk golden frame keeps every flora (PASS 4.12%). Adversarially reviewed: golden-safe, no fight
+   with the opacity-based occlusion fade, no permanent-hide path. ⚠️ **Draw-call benefit is
+   UNMEASURED** (see caveat) and the 85u pop-in wants the owner's eye on a real ride — radii are
+   one-line tunable (`FLORA_CULL_SHOW`/`FLORA_CULL_HIDE`). sageCluster/roadGrass are ALSO tracked
+   (model path) and could join `FLORA_CULL_KINDS` later for a bigger cull.
+   - ✅ **Also Increment 2: contact-shadow material/geometry sharing.** `addContactShadow` minted a
+     fresh `CircleGeometry` + 2 raw `MeshBasicMaterial` per call scene-wide (~172 nodes). Now one
+     shared unit-circle geo + 2 shared materials (penumbra 0.32 / core 0.46). Pixel-identical
+     (golden PASS); **materials 665 → 321 (−344)** — reliably measured. Discs stay parented (still
+     cull/move with their node). Full disc→InstancedMesh folding (mesh-count win) deferred:
+     decoupling from parents complicates the cull + occlusion-fade.
 5. Demote the WebGL2 fallback to a `reducedFidelity` flag (halve scatter+weather pools, castShadow
    off); the fallback bans (no instancing/shared-materials/lines/points/hand-built indexed
    geometry) then apply ONLY to the reduced path.
-6. **CI draw-call ceiling** — assert `__westward3dStats().calls < 400` at town in a perf test +
-   smoke wall-time budget.
+6. **CI draw-call ceiling** — assert draw calls `< 400` at town. BLOCKED on step 1: `.calls` isn't
+   a reliable per-frame count yet (see caveat). Until the probe is fixed, gate on the reproducible
+   `meshes`/`materials`/`shadowCasters` traversal counts instead, then add the `.calls` ceiling.
 7. **Then add density** (step 8 = the payoff): with batching landed, raise flora/grass density for
    the lush *Red Dead* look the flat tan plane is currently missing.
 

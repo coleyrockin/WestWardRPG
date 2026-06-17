@@ -17,6 +17,24 @@ import { groundHeight } from "./ground.js";
 const ROUTE_SAGE_COLORS = ["#768a50", "#83925a", "#687d45", "#b19a62"];
 const BLADE_GEOMETRY = () => new THREE.ConeGeometry(0.065, 0.62, 5);
 
+// Distance-cull radii (world units) for discrete far flora (cactus/deadTree).
+// The gap between SHOW and HIDE is hysteresis: a node hides only past HIDE and
+// re-shows only within SHOW, so riding along the boundary never flickers.
+export const FLORA_CULL_SHOW = 75;
+export const FLORA_CULL_HIDE = 85;
+
+// Pure hysteresis decision: given the node's current visibility and its squared
+// distance to the player, return whether it should be visible. Squared distances
+// (showSq/hideSq) keep the caller sqrt-free.
+export function floraVisibleAt(
+  currentlyVisible,
+  distSq,
+  showSq = FLORA_CULL_SHOW * FLORA_CULL_SHOW,
+  hideSq = FLORA_CULL_HIDE * FLORA_CULL_HIDE,
+) {
+  return currentlyVisible ? distSq <= hideSq : distSq < showSq;
+}
+
 // Deterministic fractional sin-hash (the original createRouteSageField seed).
 export function seedValue(x) {
   const s = Math.sin(x * 91.7 + 17.13) * 43758.5453;
