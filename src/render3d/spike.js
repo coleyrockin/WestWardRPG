@@ -144,6 +144,13 @@ function cullShadow(node) {
     if (o.isMesh) o.castShadow = false;
   });
 }
+// DEV: while building the world, lock to bright NEUTRAL DAYLIGHT so test captures
+// reveal every imperfection (owner direction 2026-06-16 — "daylight to see
+// imperfections during our tests"). Boots at the `day` palette and does NOT drift
+// to dusk/night, and ignores a drifted save clock. Flip to false to restore the
+// goldenHour boot + day/night cycle once the world look is dialed in. The golden
+// gate is unaffected — it still pins dusk via ?visual.
+const DEV_LOCK_DAYLIGHT = true;
 const PLAYER_MODEL_URL = "/models/character_hero.glb";
 const IMPORTANT_MODEL_KINDS = Object.freeze([
   "jobBoard",
@@ -2661,8 +2668,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // clouds, water, weather, film grain) for a stable pixelmatch baseline.
   const debugPlayerMarker =
     typeof location !== "undefined" && new URLSearchParams(location.search).has("debugPlayerMarker");
-  const clock = createWorldClock({ dayTime: 0.25 }); // golden-hour boot — warm key/cool shadow, drifts to dusk over ~105s of play
+  const clock = createWorldClock({ dayTime: DEV_LOCK_DAYLIGHT ? 0 : 0.25 }); // day (dev daylight lock) | goldenHour boot
   if (visualCapture) pinClock(clock, "dusk");
+  else if (DEV_LOCK_DAYLIGHT) clock.dayTime = 0; // dev: hold bright daylight, ignore any drifted save clock
   else if (resumeRun && Number.isFinite(resumeRun.world?.dayTime)) clock.dayTime = resumeRun.world.dayTime;
 
   // --- Ironman run persistence (frontier-ironman slot) ---
@@ -3351,7 +3359,8 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     for (const w of WINDMILL_ROTORS) w.rotor.rotation.z -= fdt * weather.windSpeed * (1.1 + 0.45 * Math.sin(waterTime * 0.31 + w.seed));
     // Slice mood: hold golden hour — advance the day clock very slowly so a
     // free-roam session stays in warm light instead of rolling to night.
-    tickClock(clock, fdt * 0.15);
+    // (DEV_LOCK_DAYLIGHT freezes the clock at `day` so test captures stay bright.)
+    if (!DEV_LOCK_DAYLIGHT) tickClock(clock, fdt * 0.15);
     applyDayTime();
     atmosphere.driftClouds(fdt, 1 + weather.wind * 2);
     waterTime += fdt;
