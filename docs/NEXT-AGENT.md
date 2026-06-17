@@ -43,15 +43,41 @@ westward-rpg.vercel.app · play: `npm run play` → :5191 · dev: `npm run dev` 
 >   - ✅ **Foundation (commit `9acac0f`):** `createGroundedMaterial(hex,opts)` in
 >     `src/game/renderer/materials/groundedMaterial.js` — `MeshStandardNodeMaterial` drop-in for the
 >     town builders' `standard()` wrapper; same (hex,opts) contract; real roughness/metalness +
->     emissive + albedo/normal/roughness maps. 9 unit tests. **NOT yet wired → zero visual change yet.**
->   - ⬜ **NEXT (resume here):** route Westward builders (`buildWesternBuilding` + landmark builders,
->     spike.js) through a town-scoped `groundedStandard()`; re-author per-surface roughness/metalness
->     (`roughness:1` defaults read as plaster under PBR); **drop the global ink**
->     (`REGION_POST.frontier.edgeStrength`→0, postStacks.js:32). Then the **wet/muddy main street**
->     (new road-footprint plane, normal+roughness maps, puddle=low-roughness spec — APPROXIMATE, not
->     true SSR; reuse `ground.js` corridor mask). Then **palette discipline** (`WESTERN_SPECS`
->     spike.js:782 + `regionArtKits.frontier.walls`; contain garish neon spike.js:887-892). Keep the
->     `region-visual-identity.test.ts` cue STRINGS intact.
+>     emissive + albedo/normal/roughness maps. 9 unit tests.
+>   - ✅ **Step 6 + light step 8 — WIRED (this session, gate green 861 vitest/tsc/build; reviewed by a
+>     5-lens adversarial workflow).** `standard()` now routes to the grounded factory via a module flag
+>     `_groundedTownBuild`, set ONLY inside `buildPlacement` (save/restored around `_buildPlacementDispatch`
+>     so it never leaks to ground/hero/lamp/god-ray calls) to `isWestwardTown(p) && GROUNDED_TOWN_KINDS.has(p.kind)`.
+>     `isWestwardTown` = x∈[-10,31] → cleanly isolates Westward from Calico (x≤-39) + the eastern open range
+>     (x≥33), which stay cel/ink. Re-authored per-surface roughness/metalness (killed the `roughness:1`
+>     plaster in `buildWesternBuilding`/`buildWalkInSaloon`/`buildPorch`; weathered metal on water tower /
+>     steel-mustang / antenna). Neon contained to warm-saloon-red / cool-store-cyan **gated on the flag**
+>     (Calico keeps its magenta/cyan). **Global ink dropped** (`REGION_POST.frontier.edgeStrength` 2.5→0,
+>     postStacks.js). Before/after WebGL proof in `~/agents/screenshots/dustwater/fast/b6{before,after,fix}-*`;
+>     Calico control confirms no PBR leak west.
+>   - ⚠️ **Two facts the review surfaced — read before continuing:**
+>     1. **Metals need an env map (IBL) to gleam.** There is NO `scene.environment`/PMREM anywhere — only
+>        analytic lights (atmosphere.js: 1 hemi + 3 directional). PBR metals have no diffuse, so under high
+>        metalness they read DARK. Metalness is therefore kept MODEST (0.3–0.45) this pass — believable but
+>        not gleaming. **A cheap golden-hour IBL is the single highest-value next lighting lever** (north
+>        star = lighting first; pairs with the Phase C water-tower cathedral). Implement in `createAtmosphere`
+>        (assign `scene.environment`; tint per-palette in `applyPalette`); verify the PMREM-vs-raw-equirect
+>        path on the WebGPU backend before relying on it. Env reflections DO render headlessly (WebGL2), so
+>        the fast capture can verify it.
+>     2. **The GLB-backed main street keeps its baked materials this pass.** `heroTown*` + `production*` +
+>        `gate`/`watchtower`/`porch`/`landmark` render as GLB models (assetManifest) — `standard()` (and the
+>        PBR pivot) only fires on their GLB-load-FAILURE fallback. So only the WESTERN_SPECS facades +
+>        procedural landmarks (church/hotel/waterTower/blacksmith/walkInSaloon/windmill/townGate/steelMustang/
+>        antennaMast) visibly pivoted to PBR + everything lost the ink. If the main-street GLB masses must
+>        also pivot, that's a separate task (re-author the .glb materials, or replace with procedural).
+>     - Known, ACCEPTED trade: routing adds ~40–65 net scene materials (erodes the 665→321 M0 win ~13–20%) —
+>       fine while LOOK > perf, revisit at M0.
+>   - ⬜ **NEXT (resume here): Phase B step 7 — the wet/muddy main street** (new road-footprint plane,
+>     normal+roughness maps, puddle = low-roughness spec — APPROXIMATE, not true SSR; reuse `ground.js`
+>     corridor mask). Largest genuinely-new build (no UV/texture infra today). Then finish **step 8 palette
+>     discipline** (`WESTERN_SPECS` body/trim/roof + `regionArtKits.frontier.walls`) — judge at golden hour;
+>     keep the `region-visual-identity.test.ts` cue STRINGS intact. The IBL (above) likely slots in first
+>     since it's lighting-first and lifts everything already landed.
 > - **Phase C — signatures + restrained cyber-aging:** water-tower CATHEDRAL (`buildWaterTower`
 >   spike.js:1071, scaffold→tank + WESTWARD banner + tech-ring + holo emblem, scaled to anchor the
 >   vista); arch glow-up (`buildTownGate`:920); SPARSE rusted cyber-aging (`buildAntennaMast` exists;
