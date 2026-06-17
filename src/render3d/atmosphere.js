@@ -174,6 +174,24 @@ export function createAtmosphere(scene, renderer, opts = {}) {
   const _cloudMid = new THREE.Color();
   const _cloudHorizon = new THREE.Color();
 
+  // Shadow-map dirty flag (pairs with createRenderer's `shadowMap.autoUpdate=false`).
+  // Both applyPalette (sun arc) and setShadowFocus (player-follow) reposition the
+  // sun every frame; we only need to re-rasterise the shadow map when that move is
+  // real. Quantise the sun position to ~0.02u (≈1 texel of the 1536² map over the
+  // ±18u frustum) so a stationary player at a fixed time of day produces a constant
+  // key → zero shadow passes, while walking / a live day clock still refresh.
+  let _shadowKey = "";
+  function markShadowIfMoved() {
+    const sm = renderer && renderer.shadowMap;
+    if (!sm || !sm.enabled) return;
+    const q = (v) => Math.round(v * 50) / 50;
+    const key = `${q(sun.position.x)},${q(sun.position.y)},${q(sun.position.z)}`;
+    if (key !== _shadowKey) {
+      _shadowKey = key;
+      sm.needsUpdate = true;
+    }
+  }
+
   // The shadow frustum is a tight ±18u box for crisp shadows, but the route is
   // ~95u long — anchored at town, the marsh/wagon half had NO shadows at all.
   // The focus follows the player (spike calls setShadowFocus per frame), sliding
@@ -187,6 +205,7 @@ export function createAtmosphere(scene, renderer, opts = {}) {
       const d = current.sun.dir;
       sun.position.set(shadowFocus.x + d.x, d.y, shadowFocus.y + d.z);
     }
+    markShadowIfMoved();
   }
 
   function applyPalette(p) {
@@ -214,6 +233,7 @@ export function createAtmosphere(scene, renderer, opts = {}) {
     // the tight shadow frustum stays centered on the action down the whole route.
     sun.position.set(shadowFocus.x + p.sun.dir.x, p.sun.dir.y, shadowFocus.y + p.sun.dir.z);
     sun.target.position.set(shadowFocus.x, 0, shadowFocus.y);
+    markShadowIfMoved();
 
     rim.color.set(p.rim.color);
     rim.intensity = p.rim.intensity;

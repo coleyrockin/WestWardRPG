@@ -76,6 +76,14 @@ export async function createRenderer(canvas, opts = {}) {
   const backend = resolveBackend(renderer);
   renderer.shadowMap.enabled = (backend === "webgpu");
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // Perf (the standing-still lag): with autoUpdate ON, every frame re-rasterised
+  // ~1k+ shadow casters into the 1536² map even when nothing moved. Turn it off
+  // and let atmosphere.js flip `needsUpdate` only when the sun/shadow-focus
+  // actually moves (player walks or the day clock advances). A player standing in
+  // town at a fixed time of day now pays ZERO shadow passes/frame instead of a
+  // full caster re-raster. Harmless on the WebGL2 fallback (shadows are disabled).
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true; // render shadows once on the first frame
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;

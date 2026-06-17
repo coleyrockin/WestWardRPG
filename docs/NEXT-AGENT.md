@@ -6,11 +6,76 @@ Durable canon is separate and stays: the design canon is [`rustwater-treatment.m
 (cyberpunk-western open-world RPG — *Red Dead* geography, *Cyberpunk* flesh, *Fable* bones), the
 engine/execution plan is [`roadmap.md`](roadmap.md) (M0–M4), engine truths are in `CLAUDE.md`.
 
-Last updated: **2026-06-16 (pm)** · main green: **850 vitest**, tsc clean, build ok, dusk golden
-PASS (4.11% / 10% threshold) · live: westward-rpg.vercel.app · local play: `npm run play` →
-http://127.0.0.1:5191/ · **deploy is HELD for the owner's word.** 11 commits ahead of origin.
+Last updated: **2026-06-17** · branch **`feat/westward-believability`** merged to LOCAL `main`
+(NOT pushed — deploy HELD). Gate: **861 vitest, tsc clean, build ok.** Dusk golden gate is
+**pending a DELIBERATE re-bless** — the Phase A lighting below moved the dusk frame on purpose
+(god-rays/split are now live); re-bless once the look is signed off, not before. live:
+westward-rpg.vercel.app · play: `npm run play` → :5191 · dev: `npm run dev` → :5180.
 
-> ## ⭐ DIRECTION PIVOT (2026-06-16 pm) — LOOK before perf
+> ## ⭐ ACTIVE — WESTWARD: THE BELIEVABILITY PASS (brainstormed → planned → underway 2026-06-17)
+> Westward (the town) is the HEART of Dustwater — "the one screenshot that says *Red Dead +
+> Cyberpunk + Fable*." Owner north star: **the most beautiful browser RPG ever — players assume
+> UE5, then 'wait, this is Chrome?'.** Visual canon (owner-provided UE5-grade reference):
+> **`docs/art/westward-target.png`** — duster-and-hat rider on a muddy, puddle-reflective main
+> street; weathered timber wearing rusted future-tech (antenna masts/cables/neon); the **water
+> tower as CATHEDRAL** anchoring the vista in golden god-ray haze. Full approved plan:
+> `~/.claude/plans/tingly-squishing-crystal.md` (essence captured here — the single handoff).
+>
+> **Owner-authorized PIVOTS** (deliberate, supersede prior canon — update CLAUDE.md/art bible in
+> Phase E): (1) illustration/never-photoreal → **grounded & weathered (Red Dead-lite)**; (2) cel/ink
+> NPR → **naturalistic PBR**, applied **Westward-first** (cel/ink stays global default elsewhere this
+> pass). **Blast radius:** lighting + atmosphere + shadow-lag fix went GLOBAL; naturalistic MATERIALS
+> are Westward-scoped via a new factory, rolled outward later (the faint ride-out shading seam is
+> hidden by the shared golden light + fog). **Owner priority order — drives every call: Lighting →
+> Atmosphere → Composition → Materials → Animation → Geometry. No clutter / no asset spam.
+> Believability, not realism.** Recipe-first; judge EVERY step on the hero frame.
+>
+> ### Plan + progress
+> - **Phase A — GLOBAL lighting + lag fix — ✅ DONE (commit `f4df225`).** (1) Shadow-lag fix:
+>   `shadowMap.autoUpdate=false` (createRenderer.js) + atmosphere flips `needsUpdate` ONLY when the
+>   sun/shadow-focus actually moves → standing still pays ZERO shadow passes/frame (was re-rastering
+>   ~1158 casters into the 1536² map every frame). WebGPU-only. (2) **Bug fixed:** `lerpPalette`
+>   DROPPED godray/split/vignette/bloomThreshold — both live play AND the ?visual capture fell back
+>   to postStacks defaults, so every authored cinematic value was DEAD. Now carried (timeOfDay.js).
+>   (3) goldenHour godray 0.2→0.3; NIGHT magic: cool moon-blue fill + bloom 1.2→1.6 / threshold 0.80
+>   (lamps/neon bloom like a lighthouse). +2 regression tests.
+> - **Phase B — naturalistic materials (Westward) + wet street — ◐ IN PROGRESS.**
+>   - ✅ **Foundation (commit `9acac0f`):** `createGroundedMaterial(hex,opts)` in
+>     `src/game/renderer/materials/groundedMaterial.js` — `MeshStandardNodeMaterial` drop-in for the
+>     town builders' `standard()` wrapper; same (hex,opts) contract; real roughness/metalness +
+>     emissive + albedo/normal/roughness maps. 9 unit tests. **NOT yet wired → zero visual change yet.**
+>   - ⬜ **NEXT (resume here):** route Westward builders (`buildWesternBuilding` + landmark builders,
+>     spike.js) through a town-scoped `groundedStandard()`; re-author per-surface roughness/metalness
+>     (`roughness:1` defaults read as plaster under PBR); **drop the global ink**
+>     (`REGION_POST.frontier.edgeStrength`→0, postStacks.js:32). Then the **wet/muddy main street**
+>     (new road-footprint plane, normal+roughness maps, puddle=low-roughness spec — APPROXIMATE, not
+>     true SSR; reuse `ground.js` corridor mask). Then **palette discipline** (`WESTERN_SPECS`
+>     spike.js:782 + `regionArtKits.frontier.walls`; contain garish neon spike.js:887-892). Keep the
+>     `region-visual-identity.test.ts` cue STRINGS intact.
+> - **Phase C — signatures + restrained cyber-aging:** water-tower CATHEDRAL (`buildWaterTower`
+>   spike.js:1071, scaffold→tank + WESTWARD banner + tech-ring + holo emblem, scaled to anchor the
+>   vista); arch glow-up (`buildTownGate`:920); SPARSE rusted cyber-aging (`buildAntennaMast` exists;
+>   solar/cables/flickering neon/broken holo board/peeling ads — emissive-only, no extra lights);
+>   water-scarcity signage. Respect `firstFrameSlabBlockers===[]`.
+> - **Phase D — a little life (visual only):** gathered silhouettes outside the glowing saloon,
+>   musicians, stalls, horses + steel-mustangs at the rail, chimney smoke. Alive, NOT crowded.
+>   Townsfolk suppressed under ?visual → golden-safe.
+> - **Phase E — extraction + docs + verify + ship:** extract the builder fleet (spike.js:296-1494 →
+>   `primitives.js`/`townBuild.js`/`townLandmarks.js`/`cyberAging.js` — the 5k god-file); update the
+>   CLAUDE.md art-direction line + art bible (the pivots); RE-BLESS dusk golden; boot-verify in a
+>   REAL foreground Chrome via the production path; flip `DEV_LOCK_DAYLIGHT`→golden-hour boot. Deploy
+>   HELD for owner.
+>
+> ### ⏸️ OWNER VERIFY before resuming (WebGPU-only — only your Chrome shows it). Dev: http://127.0.0.1:5180
+> Phase A's two big wins don't appear in the headless capture (it runs WebGL: no shadows/god-rays).
+> In real Chrome: (1) stand still in town — did the lag ease? (2) press `T` → golden hour: god-ray
+> shafts down the street? → night: more beautiful (lamp/neon bloom, moon-blue)? (3) **the one risk:**
+> walk around — do shadows still render AND update? (the WebGPU shadow path couldn't be verified
+> headlessly; if broken it's a one-line revert of `shadowMap.autoUpdate=false`).
+
+---
+
+> ## DIRECTION PIVOT (2026-06-16 pm) — LOOK before perf  [historical diagnosis — kept so it isn't re-litigated]
 > The owner played it and called it **laggy, too dark, character looks Roblox, "the map STILL
 > looks like a shitty Reno movie set."** We diagnosed all three live (foreground browser + code map)
 > and pivoted from M0-perf to **the LOOK**. Owner's steer: **realism / believable**, and **lock the
@@ -49,13 +114,10 @@ http://127.0.0.1:5191/ · **deploy is HELD for the owner's word.** 11 commits ah
 > NEXT on the hero (deferred, owner said reassess after the hat): facial features, finer texture,
 > per-garment detail (a Blender UV-paint pass if we want more than the height-zoned read).
 >
-> ### ▶ NEXT BIG THING — THE WORLD ("movie set")
-> The owner's remaining complaint. In daylight the world reads as a cheap staged set:
-> **flat-shaded box buildings in garish near-random colours (purple next to tan), a single flat
-> untextured tan ground plane, no material/texture detail, cluttered with no atmospheric depth,
-> HUD crowding every frame.** This is its own brainstorm/design → realism pass (ground material +
-> variation, building materials/forms/colour discipline, depth/atmosphere, declutter). Bigger than
-> the hero. The owner wants "believable, not a movie set." START with a fresh brainstorm.
+> ### ▶ NEXT BIG THING — THE WORLD ("movie set") → NOW ACTIVE
+> This complaint became the **Westward Believability Pass** at the top of this handoff (brainstormed,
+> planned, underway). The root diagnosis stands: flat-shaded box buildings in garish colours, a flat
+> untextured tan ground, no material/atmospheric depth. The plan fixes it lighting-first.
 >
 > **MEASUREMENT CAVEAT (still true) — read before claiming draw-call wins.** See the M0 section.
 
@@ -238,4 +300,5 @@ Dusk golden baseline re-blessed deliberately only · layout floors only rise ·
 `firstFrameSlabBlockers === []` · spawn wedge x[9.5–16] y[6.5–11] clear of tall buildings ·
 `HERO_OBJECTS` + `FIRST_FIVE_ROUTE` untouched until M1 replaces the loop · WebGL2 fallback =
 per-mesh materials until M0 demotes it · all motion multiplies by the `fdt` freeze · audio
-synthesized-only · owner priority: **PERFORMANCE (M0) first**, after the Phase 2 checkpoint.
+synthesized-only · **owner priority NOW: the LOOK (Westward Believability Pass, top of handoff)** —
+M0/perf is deprioritised behind it (the shadow-lag fix already landed as part of Phase A).
