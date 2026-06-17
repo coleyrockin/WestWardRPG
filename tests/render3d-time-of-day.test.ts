@@ -152,6 +152,35 @@ describe("lerpPalette", () => {
     expect(mid.y).toBeCloseTo((a.rim.dir.y + b.rim.dir.y) / 2, 6);
     expect(mid.z).toBeCloseTo((a.rim.dir.z + b.rim.dir.z) / 2, 6);
   });
+
+  it("carries the cinematic grade knobs (godray/split/vignette/threshold) the renderer reads live", () => {
+    // Regression: these four were dropped here, so the per-frame sun arc + the
+    // ?visual capture silently fell back to the postStacks defaults and every
+    // per-palette value was dead. Endpoints must equal the source palettes' grades.
+    const at0 = lerpPalette(a, b, 0).grade;
+    expect(at0.godrayStrength).toBeCloseTo(a.grade.godrayStrength!, 6);
+    expect(at0.splitStrength).toBeCloseTo(a.grade.splitStrength!, 6);
+    expect(at0.vignetteStrength).toBeCloseTo(a.grade.vignetteStrength!, 6);
+    expect(at0.bloomThreshold).toBeCloseTo(a.grade.bloomThreshold!, 6);
+    const at1 = lerpPalette(a, b, 1).grade;
+    expect(at1.godrayStrength).toBeCloseTo(b.grade.godrayStrength!, 6);
+    expect(at1.bloomThreshold).toBeCloseTo(b.grade.bloomThreshold!, 6);
+    // And they interpolate at the midpoint.
+    const mid = lerpPalette(a, b, 0.5).grade;
+    expect(mid.godrayStrength).toBeCloseTo((a.grade.godrayStrength! + b.grade.godrayStrength!) / 2, 6);
+  });
+
+  it("falls back to the postStacks defaults when a palette omits a knob", () => {
+    // A palette with no cinematic knobs must yield the renderer's constructor
+    // defaults (split 0.06 / godray 0.08 / vignette 0.045 / threshold 0.95) so
+    // omitting them is a true no-op, not an undefined that breaks applyPalette.
+    const bare: Palette = { ...PALETTES.dusk, grade: { tint: "#ffffff", amount: 0.1 } } as Palette;
+    const g = lerpPalette(bare, bare, 0.5).grade;
+    expect(g.godrayStrength).toBeCloseTo(0.08, 6);
+    expect(g.splitStrength).toBeCloseTo(0.06, 6);
+    expect(g.vignetteStrength).toBeCloseTo(0.045, 6);
+    expect(g.bloomThreshold).toBeCloseTo(0.95, 6);
+  });
 });
 
 describe("sunArc — continuous day/night cycle", () => {

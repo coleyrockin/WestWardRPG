@@ -115,7 +115,10 @@ export const PALETTES = Object.freeze({
       // Vignette eased 0.06 → 0.035: the opening boots at golden hour, and a heavy
       // edge-darken made the open-range funeral frame feel small/closed-in. (The
       // golden-image baseline pins DUSK, not golden hour, so this is baseline-safe.)
-      splitStrength: 0.32, godrayStrength: 0.2, vignetteStrength: 0.035, bloomThreshold: 0.86,
+      // godrayStrength 0.2 → 0.3: now that lerpPalette actually carries it, push the
+      // "dust in sunlight" shafts down the street (the reference's golden haze). Wants
+      // the sun disc in-frame to read — tuned for real on the hero frame.
+      splitStrength: 0.32, godrayStrength: 0.3, vignetteStrength: 0.035, bloomThreshold: 0.86,
     },
     bodyBg: "#2a1f2e",
   },
@@ -130,10 +133,21 @@ export const PALETTES = Object.freeze({
     sun: { color: "#bcc6ff", intensity: 0.78, dir: { x: 8, y: 9, z: -3 }, disc: 0.026, glow: 0.1 },
     hemi: { sky: "#32406e", ground: "#1a1f3a", intensity: 0.42 }, // ground lifted from #101522 so unlit night faces read as material, not black murk
     rim: { color: "#7a8aff", intensity: 0.55, dir: { x: -7, y: 4, z: 6 } },
+    // Camera-side fill: COOL moon-blue (night previously inherited the warm DEFAULT_FILL
+    // #ffd0a6 — a warm key at midnight). Dim + blue lifts shadow-side faces with
+    // moonlight, not lantern-warmth, so the warm lamps/neon own the warm accents.
+    fill: { color: "#3a5080", intensity: 0.26 },
     exposure: 0.95,
     stars: 1.0,
-    bloom: 1.2,
-    grade: { tint: "#5a6bd0", amount: 0.05, contrast: 1.1, saturation: 1.08, shadowTint: "#2a3a6a", highlightTint: "#aac0ff" },
+    // Bloom 1.2 → 1.6 + threshold 0.80: Westward should get MORE beautiful at night —
+    // push the authored lamp/neon emissives (intensity ~2.2) to bloom like the
+    // reference's saloon-as-lighthouse. Subtle godray (moon, not sun); moody vignette.
+    bloom: 1.6,
+    grade: {
+      tint: "#5a6bd0", amount: 0.05, contrast: 1.1, saturation: 1.08,
+      shadowTint: "#2a3a6a", highlightTint: "#aac0ff",
+      splitStrength: 0.16, godrayStrength: 0.05, vignetteStrength: 0.12, bloomThreshold: 0.8,
+    },
     bodyBg: "#05060f",
   },
 });
@@ -257,6 +271,17 @@ export function lerpPalette(p1, p2, t) {
       saturation: lerp(p1.grade.saturation ?? 1.4, p2.grade.saturation ?? 1.4, t),
       shadowTint: lerpColor(p1.grade.shadowTint ?? "#1a0a2e", p2.grade.shadowTint ?? "#1a0a2e", t),
       highlightTint: lerpColor(p1.grade.highlightTint ?? "#ffb040", p2.grade.highlightTint ?? "#ffb040", t),
+      // Cinematic knobs the renderer reads LIVE (postStacks.applyPalette). These were
+      // previously dropped here — so the per-frame sun arc AND the ?visual capture both
+      // fell back to the postStacks constructor defaults (split 0.06 / godray 0.08 /
+      // vignette 0.045 / threshold 0.95), making every per-palette value below DEAD.
+      // Carry them with those same defaults so palettes that omit them are unchanged,
+      // and golden hour finally gets its god-rays / dusk its split-tone. (Flows into
+      // the dusk ?visual baseline → re-bless deliberately when the look is signed off.)
+      splitStrength: lerp(p1.grade.splitStrength ?? 0.06, p2.grade.splitStrength ?? 0.06, t),
+      godrayStrength: lerp(p1.grade.godrayStrength ?? 0.08, p2.grade.godrayStrength ?? 0.08, t),
+      vignetteStrength: lerp(p1.grade.vignetteStrength ?? 0.045, p2.grade.vignetteStrength ?? 0.045, t),
+      bloomThreshold: lerp(p1.grade.bloomThreshold ?? 0.95, p2.grade.bloomThreshold ?? 0.95, t),
     },
     bodyBg: lerpColor(p1.bodyBg, p2.bodyBg, t),
   };
