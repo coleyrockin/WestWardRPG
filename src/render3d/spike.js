@@ -41,6 +41,7 @@ import { createBoardDomRefs, syncBoardDom } from "./boardDom.js";
 import { buildBoardView } from "./boardCopy.js";
 import { createEncounterSystem, PLAYER_MAX_HP } from "./encounterSystem.js";
 import { createAtmosphere } from "./atmosphere.js";
+import { installGoldenHourEnv } from "./envLight.js";
 import { sunArc, calcWindowGlowFactor } from "./timeOfDay.js";
 import { footDustStep } from "./footDust.js";
 import { createWorldClock, tickClock, pinClock, cycleClock, dayTimeToKey } from "../game/world/worldClock.js";
@@ -2753,6 +2754,13 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // ground) toward cool blue instead of crushed maroon, so the warm/cool read holds
   // even in the darkest corners of the frame.
   scene.add(new THREE.AmbientLight(col("#acbde6"), 0.52));
+  // Golden-hour IBL (Believability Pass): a prefiltered env map so the town's PBR
+  // surfaces — especially the metals — reflect the warm sky instead of reading dark.
+  // Awaited here, before the render loop's first frame, so the deterministic
+  // ?visual golden capture always sees the env. Degrades to no-IBL on failure.
+  // TODO(believability): modulate scene.environmentIntensity per time-of-day in
+  // atmosphere.applyPalette (dimmer/cooler at night); static golden-hour for now.
+  await installGoldenHourEnv(scene, renderer);
   // Continuous day/night: a slow world clock advances dayTime; sunArc(dayTime)
   // is the live palette so the sun arcs and colours drift. Opens at golden hour
   // and drifts into dusk as you play (readable first frame, moody payoff). The
