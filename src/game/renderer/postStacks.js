@@ -26,10 +26,12 @@ import { ao } from "three/addons/tsl/display/GTAONode.js";
 export const REGION_POST = {
   frontier: {
     inkColor: "#0a0408",
-    // Committed comic linework (art doc: "the look has to be LOUD"). The 1.7
-    // silhouette-only easing read as no style at all — 2.3 keeps interior faces
-    // clean (edgeLo gate) while every silhouette gets a confident line.
-    edgeStrength: 2.5,
+    // Westward Believability Pass (Phase B): the frontier pivots OFF cel/ink to a
+    // grounded, naturalistic read (Red Dead-lite). The screen-space Sobel ink is a
+    // GLOBAL pass, so it's dropped to 0 — the town now reads through PBR materials
+    // + golden-hour light, and the open range simply reads softer without linework.
+    // (Restore ~2.5 to bring the comic outline back if the pivot is reverted.)
+    edgeStrength: 0,
     // Sobel response below `edgeLo` is ignored (kills faint ground gradients) and
     // ramps to full ink by `edgeHi`. Tighter gate (0.06→0.08) culls more faint
     // gradient lines; narrower ramp (0.28→0.25) makes the ink commit harder.

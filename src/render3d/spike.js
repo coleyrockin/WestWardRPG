@@ -9,6 +9,7 @@
 import * as THREE from "three";
 import { createRenderer } from "../game/renderer/createRenderer.js";
 import { createNprMaterial, clearMaterialCache } from "../game/renderer/materials/nprMaterial.js";
+import { createGroundedMaterial, clearGroundedCache } from "../game/renderer/materials/groundedMaterial.js";
 import { createPostProcessing } from "../game/renderer/postStacks.js";
 import { instanceModel, hashYaw } from "../game/renderer/assetLoader.js";
 import { modelFor } from "../game/renderer/assetManifest.js";
@@ -210,11 +211,47 @@ const PRODUCTION_DENSITY_KINDS = new Set([
 // Sky dome, sun/rim/hemi lights, fog, and clouds now live in atmosphere.js,
 // driven by the time-of-day palettes in timeOfDay.js.
 
-// All opaque/translucent surfaces use the NPR cel+rim uber-material (see
-// nprMaterial.js). Kept named `standard` so the ~30 call sites read unchanged;
-// roughness/metalness opts are accepted and ignored (toon has no microfacet).
+// Westward Believability Pass (Phase B): town architecture inside the Westward
+// box renders through the naturalistic PBR factory (createGroundedMaterial),
+// while Calico, the open range, and all world flora/props stay on the cel/ink
+// `standard` material this pass. The pivot is SCOPED by a module flag set only
+// around a town placement (see buildPlacement) — `standard()` calls OUTSIDE a
+// town placement (ground, hero, lamp glow, god-ray shaft) leave the flag false
+// and keep the cel/ink look. The (hex, opts) contract is identical on both
+// factories, so the ~30 call sites read unchanged; under PBR the roughness/
+// metalness opts (ignored by the toon factory) finally do real work.
+let _groundedTownBuild = false;
+
+// Town architecture kinds — the buildings + landmarks that pivot to grounded PBR
+// when they sit in the Westward box. World flora/props (cactus, rock, sage, lamp,
+// sign, wagon…) are deliberately absent so they stay cel/ink and match the open
+// range with no seam.
+const GROUNDED_TOWN_KINDS = new Set([
+  // WESTERN_SPECS facades + houses
+  "saloon", "saloonFacade", "storefront", "town", "ranch",
+  "townFacadeWarm", "townFacadeStore", "townFacadeDark",
+  // generic-box hero buildings
+  "heroTownSaloon", "heroTownStore", "heroTownAssay", "gate",
+  // GLB-backed main street — normally baked GLB materials; these only matter on a
+  // GLB load-failure, where the .catch falls back to a procedural standard() build.
+  // Listing them keeps that degraded fallback grounded instead of a cel/ink seam
+  // next to the grounded landmarks.
+  "productionSaloon", "productionStore", "productionAssay", "productionBoardwalk",
+  // landmark / prop builders
+  "church", "waterTower", "windmill", "blacksmith", "hotel", "townGate",
+  "walkInSaloon", "porch", "gallows", "ironDoctor", "antennaMast",
+  "steelMustang", "watchtower", "landmark",
+]);
+
+// Westward town occupies x ≈ -4..27 (frontierLayout): Calico Flats is far west
+// (x ≤ -39) and the eastern outskirts / open range begin at x ≥ 33, so this
+// x-band cleanly isolates the Westward hero box from both — they keep cel/ink.
+function isWestwardTown(p) {
+  return p.x >= -10 && p.x <= 31;
+}
+
 function standard(hex, opts = {}) {
-  return createNprMaterial(hex, opts);
+  return _groundedTownBuild ? createGroundedMaterial(hex, opts) : createNprMaterial(hex, opts);
 }
 
 function addBox(group, w, h, d, mat, pos) {
@@ -713,7 +750,7 @@ function buildReeds(group, p) {
 
 // Wooden porch deck fronting a town building.
 function buildPorch(group, p) {
-  const mat = standard(p.color, { roughness: 1 });
+  const mat = standard(p.color, { roughness: 0.9 });
   const deck = addBox(group, 1.4 * p.size, 0.18 * p.size, 0.5 * p.size, mat, toVec(p.x, p.y));
   const postMat = standard("#3a2a1c");
   for (const dx of [-0.6 * p.size, 0.6 * p.size]) {
@@ -736,11 +773,11 @@ function buildWalkInSaloon(group, p) {
   const cz = p.y + (df - db) / 2;
   const segW = hw - doorHW;
   addContactShadow(group, p.x, cz, hw * 1.08, depth / 2 * 1.08); // ground the building
-  const wood = standard("#6b4a2c", { roughness: 1 });
-  const woodDark = standard("#4f381f", { roughness: 1 });
-  const trim = standard("#835d38", { roughness: 1 });
+  const wood = standard("#6b4a2c", { roughness: 0.93 });
+  const woodDark = standard("#4f381f", { roughness: 0.9 });
+  const trim = standard("#835d38", { roughness: 0.82 });
 
-  addBox(group, hw * 2, 0.08, depth, standard("#46331e", { roughness: 1 }), toVec(p.x, cz, 0));       // floor
+  addBox(group, hw * 2, 0.08, depth, standard("#46331e", { roughness: 0.95 }), toVec(p.x, cz, 0));    // floor
   addBox(group, hw * 2, wallH, wallT, wood, toVec(p.x, p.y - db, 0));                                  // back wall
   addBox(group, wallT, wallH, depth, wood, toVec(p.x - hw, cz, 0));                                    // left wall
   addBox(group, wallT, wallH, depth, wood, toVec(p.x + hw, cz, 0));                                    // right wall
@@ -804,12 +841,17 @@ function buildWesternBuilding(group, p, spec = {}) {
   const cz = p.y;
   // p.bodyTint overrides the shared WESTERN_SPECS body color per placement (Calico
   // Flats uses it for its sun-bleached palette; Westward placements omit it).
-  const body = standard(p.bodyTint ?? spec.body ?? "#7a5536", { roughness: 1 });
-  const trim = standard(p.trimTint ?? spec.trim ?? "#b08a52", { roughness: 1 });
-  const roofMat = standard(p.roofTint ?? spec.roof ?? "#37271a", { roughness: 1 });
-  const dark = standard("#241910", { roughness: 1 });
-  const pane = standard("#ffd190", { emissive: "#b9762e", emissiveIntensity: 0.32 });
-  const shutterMat = standard(spec.shutter ?? spec.roof ?? "#3a2a1a", { roughness: 1 });
+  // Per-surface PBR (Believability Pass): roughness:1 reads as flat plaster under
+  // the grounded factory, so weathered board-and-batten timber, painted trim, and
+  // the lit glass panes each get a distinct microfacet response. metalness stays 0
+  // for wood — the rusted-metal sheen is reserved for the landmark/cyber pieces.
+  // (Under the cel/ink fallback these opts are ignored, so Calico is unchanged.)
+  const body = standard(p.bodyTint ?? spec.body ?? "#7a5536", { roughness: 0.93 });
+  const trim = standard(p.trimTint ?? spec.trim ?? "#b08a52", { roughness: 0.82 });
+  const roofMat = standard(p.roofTint ?? spec.roof ?? "#37271a", { roughness: 0.85 });
+  const dark = standard("#241910", { roughness: 0.92 });
+  const pane = standard("#ffd190", { emissive: "#b9762e", emissiveIntensity: 0.32, roughness: 0.3 });
+  const shutterMat = standard(spec.shutter ?? spec.roof ?? "#3a2a1a", { roughness: 0.85 });
   const jit2 = hashYaw(p.x * 2.3 - 1.0, p.y * 1.9 + 4.0) / (Math.PI * 2); // independent variety hash
 
   // place a thin panel flat on the front face: u=horizontal from centre, vBase=bottom Y
@@ -884,16 +926,23 @@ function buildWesternBuilding(group, p, spec = {}) {
     let signMat;
     let neonColor = null;
 
+    // Believability Pass step 8 — contain Westward's garish neon to the
+    // reference's restrained accents (warm saloon red / cool store cyan); the
+    // amber assay was already on-palette. Gated on the town flag so Calico, which
+    // shares this builder but stays cel/ink this pass, keeps its original colours.
     if (isNeonSaloon) {
-      neonColor = "#ff00aa"; // pink/magenta
+      neonColor = _groundedTownBuild ? "#ff5638" : "#ff00aa"; // warm saloon red (Westward) / magenta (Calico)
     } else if (isNeonStore) {
-      neonColor = "#00ffc8"; // cyan
+      neonColor = _groundedTownBuild ? "#29c6ff" : "#00ffc8"; // cool store cyan (Westward) / acid cyan (Calico)
     } else if (isNeonAssay) {
-      neonColor = "#ffaa00"; // orange
+      neonColor = "#ffaa00"; // amber (both)
     }
 
     if (neonColor) {
-      signMat = createNprMaterial(neonColor, { emissive: neonColor, emissiveIntensity: 2.2 });
+      // routed through standard() so it picks up the town-scoped factory: a
+      // grounded emissive in Westward, the cel emissive elsewhere. Bloom-driven
+      // either way (threshold 0.95) so the sign reads as lit tube, not paint.
+      signMat = standard(neonColor, { emissive: neonColor, emissiveIntensity: 2.2 });
     } else {
       signMat = standard(spec.sign, { emissive: "#3a2a10", emissiveIntensity: 0.45 });
     }
@@ -1070,10 +1119,14 @@ function buildWindmill(group, p) {
 
 function buildWaterTower(group, p) {
   const ox = p.x, oy = p.y, s = p.size || 1;
-  const matLeg = standard("#4f3a26", { roughness: 0.98 });
-  const matTank = standard(p.color ?? "#6e5236", { roughness: 0.95 });
-  const matBand = standard("#3a2c1c", { roughness: 0.85 });
-  const matLid = standard("#5a4128", { roughness: 0.97 });
+  // Metalness is kept MODEST: there is no IBL/env map yet, so high-metal surfaces
+  // would read dark (metals have no diffuse, only reflections). Weathered galvanized
+  // steel at low metalness stays sun-lit + believable now; the gleam comes when a
+  // golden-hour env map lands (the next lighting lever — pairs with the Phase C tower).
+  const matLeg = standard("#4f3a26", { roughness: 0.95 });                              // timber legs
+  const matTank = standard(p.color ?? "#6e5236", { roughness: 0.7, metalness: 0.3 });   // weathered galvanized steel tank
+  const matBand = standard("#3a2c1c", { roughness: 0.6, metalness: 0.4 });              // rusted iron bands/rings
+  const matLid = standard("#5a4128", { roughness: 0.72, metalness: 0.28 });             // weathered metal cone lid
   const legH = 4.6 * s, spread = 1.5 * s, topSpread = 0.85 * s, tankR = 1.3 * s, tankH = 2.4 * s, tankY = legH;
   for (const [tx, ty, bx, by] of [[-topSpread, -topSpread, -spread, -spread], [topSpread, -topSpread, spread, -spread], [topSpread, topSpread, spread, spread], [-topSpread, topSpread, -spread, spread]]) {
     const leg = addBox(group, 0.14 * s, legH, 0.14 * s, matLeg, toVec(ox + (tx + bx) / 2, oy + (ty + by) / 2, 0));
@@ -1203,8 +1256,12 @@ function buildSteelMustang(group, p) {
   mustang.position.copy(toVec(p.x, p.y));
   if (p.yaw) mustang.rotation.y = p.yaw;
 
-  const chromeMat = standard("#8a8f7d", { rimColor: "#00ffc8", rimStrength: 0.6, rimPower: 2.0 }); // sun-bleached chrome, not factory-grey ("nothing is sleek")
-  const copperMat = standard("#d35400");
+  // Believability Pass: under PBR the cel rim opts are inert, so the "sun-bleached
+  // chrome" read comes from real metalness + roughness. Deliberately WEATHERED (high
+  // roughness, modest metalness) — "nothing is sleek", and with no IBL yet a glossy
+  // mirror would read dark/black instead of chrome.
+  const chromeMat = standard("#8a8f7d", { roughness: 0.65, metalness: 0.45, rimColor: "#00ffc8", rimStrength: 0.6, rimPower: 2.0 }); // sun-bleached chrome ("nothing is sleek")
+  const copperMat = standard("#d35400", { roughness: 0.6, metalness: 0.4 });
   const glowCyan = standard("#00ffc8", { emissive: "#00ffc8", emissiveIntensity: 2.0 });
 
   addBox(mustang, 1.3 * size, 0.6 * size, 0.5 * size, chromeMat, new THREE.Vector3(0, 0.8 * size, 0));
@@ -1359,8 +1416,8 @@ function buildAntennaMast(group, p) {
   const bh = p.baseH || 0; // base height — lifts a rooftop mast onto the building
   const poleW = 0.09 * s;  // < 0.12u: stays a crisp silhouette under the ink pass
   const poleH = 3.6 * s;
-  const metal = standard("#7d8270", { roughness: 0.85 });        // weathered, not chrome-bright
-  const metalDk = standard("#4f5346", { roughness: 0.9 });
+  const metal = standard("#7d8270", { roughness: 0.68, metalness: 0.35 });   // weathered metal, not chrome-bright (modest metalness: no IBL yet)
+  const metalDk = standard("#4f5346", { roughness: 0.75, metalness: 0.3 });
   const beaconHex = p.beacon === "cyan" ? "#00ffc8" : "#ff3b30";
   const beacon = standard(beaconHex, { emissive: beaconHex, emissiveIntensity: 2.4 });
 
@@ -1413,6 +1470,20 @@ function buildPlacement(group, p) {
   // Guard size once here: every per-kind builder multiplies p.size, so an entry
   // missing it (undefined * k = NaN) would silently produce zero-scaled geometry.
   if (typeof p.size !== "number" || !Number.isFinite(p.size)) p = { ...p, size: 1 };
+  // Westward-scoped naturalistic PBR (Believability Pass, Phase B): flip every
+  // standard() call made by this placement's builder to the grounded factory IFF
+  // it is town architecture inside the Westward box. Saved/restored so it can't
+  // leak into the next placement or any standard() call made outside this path.
+  const _prevGrounded = _groundedTownBuild;
+  _groundedTownBuild = isWestwardTown(p) && GROUNDED_TOWN_KINDS.has(p.kind);
+  try {
+    return _buildPlacementDispatch(group, p);
+  } finally {
+    _groundedTownBuild = _prevGrounded;
+  }
+}
+
+function _buildPlacementDispatch(group, p) {
   // Composed western facade (replaces the box .glb) — built into its own sub-group
   // so it's one occlusion/fade node and grounds itself.
   if (WESTERN_SPECS[p.kind]) {
@@ -2601,6 +2672,7 @@ function createSpikeSnapshot() {
 export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   WINDMILL_ROTORS.length = 0; // module-scope registry — reset per boot
   clearMaterialCache();
+  clearGroundedCache(); // reset the PBR town cache symmetrically with the NPR cache
   // Determinism: the golden-image capture (?visual) must always render a fresh
   // fixed scene — never read or write a persisted run.
   const visualCapture =
