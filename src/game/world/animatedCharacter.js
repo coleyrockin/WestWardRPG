@@ -9,7 +9,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
-import { createNprMaterial } from "../renderer/materials/nprMaterial.js";
+import { createNprMaterial, createHeroDressMaterial } from "../renderer/materials/nprMaterial.js";
 
 const templates = new Map(); // url -> Promise<gltf> (per-url cache, shared across instances)
 function loadTemplate(url) {
@@ -17,13 +17,19 @@ function loadTemplate(url) {
   return templates.get(url);
 }
 
-function reskin(mesh, tint) {
+function reskin(mesh, tint, dressMat) {
+  mesh.castShadow = true;
+  // Dressed hero: one shared height-zoned material replaces the mannequin's flat
+  // body/joint materials so it reads boots→trousers→shirt→skin (see nprMaterial).
+  if (dressMat) {
+    mesh.material = dressMat;
+    return;
+  }
   const swap = (src) => {
     const c = src && src.color ? src.color.clone() : new THREE.Color("#9a8f80");
     if (tint) c.multiply(new THREE.Color(tint));
     return createNprMaterial(`#${c.getHexString()}`, { rimStrength: 0.3, map: src && src.map ? src.map : null });
   };
-  mesh.castShadow = true;
   mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material);
 }
 
@@ -51,11 +57,14 @@ export async function createAnimatedCharacter(url = "/models/character.glb", opt
     skinnedMeshCount: 0,
     animationNames: gltf.animations.map((clip) => clip.name),
   };
+  // opts.dress (true | zones object) → swap the mannequin's flat materials for one
+  // shared height-zoned drifter material so it reads as a clothed figure.
+  const dressMat = opts.dress ? createHeroDressMaterial(opts.dress === true ? {} : opts.dress) : null;
   group.traverse((o) => {
     if (o.isMesh || o.isSkinnedMesh) {
       modelStats.meshCount++;
       if (o.isSkinnedMesh) modelStats.skinnedMeshCount++;
-      reskin(o, opts.tint);
+      reskin(o, opts.tint, dressMat);
     }
   });
 

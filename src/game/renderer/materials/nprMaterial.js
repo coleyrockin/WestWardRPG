@@ -22,6 +22,9 @@ import {
   saturate,
   normalView,
   positionViewDirection,
+  positionGeometry,
+  mix,
+  smoothstep,
   texture,
   uv,
 } from "three/tsl";
@@ -83,6 +86,39 @@ const materialCache = new Map();
 
 export function clearMaterialCache() {
   materialCache.clear();
+}
+
+// Height-zoned drifter albedo. The sourced hero is ONE untextured mannequin body
+// (+ a joint band) — no per-garment materials and no painted texture. Colour it
+// by BIND-POSE local Y (positionGeometry, stable across animation) so it reads
+// boots → trousers → shirt → bare skin, turning the artist dummy into a dressed
+// figure. Same cel ramp + fresnel rim as the world, but smooth-shaded (a human
+// form, not faceted facets). Zones cross-fade with smoothstep so the seams aren't
+// hard lines. Thresholds are model-space units (the rig stands ~1.8u tall).
+export function createHeroDressMaterial(zones = {}) {
+  const {
+    boots = "#36281b", // dark leather
+    pants = "#5b5340", // dusty canvas trousers
+    shirt = "#7c4a39", // faded henley / vest
+    skin = "#b07a52",  // weathered skin (neck/head; hat will cover most of it)
+    yPantsBoots = 0.22,
+    yShirtPants = 0.95,
+    ySkinShirt = 1.52,
+    blend = 0.06,
+  } = zones;
+  const v = (hex) => {
+    const c = col(hex);
+    return vec3(c.r, c.g, c.b);
+  };
+  const y = positionGeometry.y;
+  let c = mix(v(boots), v(pants), smoothstep(float(yPantsBoots - blend), float(yPantsBoots + blend), y));
+  c = mix(c, v(shirt), smoothstep(float(yShirtPants - blend), float(yShirtPants + blend), y));
+  c = mix(c, v(skin), smoothstep(float(ySkinShirt - blend), float(ySkinShirt + blend), y));
+  const mat = new MeshToonNodeMaterial({ gradientMap: celGradientMap() });
+  mat.flatShading = false; // smooth normals — the hero is a body, not low-poly dressing
+  mat.colorNode = c;
+  mat.emissiveNode = emissiveNodeFor({ emissive: null, emissiveIntensity: 1, rimColor: "#9fb4ff", rimPower: 2.8, rimStrength: 0.18 });
+  return mat;
 }
 
 // Drop-in replacement for the old `standard(hex, opts)` factory.

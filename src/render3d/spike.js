@@ -158,7 +158,13 @@ const DEV_LOCK_DAYLIGHT = true;
 // idle/walk/run/draw roles (resolveClipAliases in animatedCharacter.js).
 const PLAYER_MODEL_URL = "/models/AnimationLibrary_Godot_Standard.gltf";
 const HERO_CLIP_MAP = Object.freeze({ idle: "Idle_Loop", walk: "Walk_Loop", run: "Jog_Fwd_Loop", draw: "Pistol_Shoot" });
-const HERO_MODEL_SCALE = 1.0; // tuned to ~1.8u after measuring native height in-browser
+const HERO_MODEL_SCALE = 1.0; // native rig is ~1.83u tall (feet at 0) — matches the ~1.8u spec
+// Height-zoned drifter dress (model-space Y; rig is 1.83u, T-pose). Turns the
+// untextured mannequin into boots → trousers → shirt(+sleeves/hands) → skin.
+const HERO_DRESS = Object.freeze({
+  boots: "#352617", pants: "#5c5038", shirt: "#834d36", skin: "#b07a52",
+  yPantsBoots: 0.22, yShirtPants: 0.95, ySkinShirt: 1.52, blend: 0.07,
+});
 const IMPORTANT_MODEL_KINDS = Object.freeze([
   "jobBoard",
   "heroTownSaloon",
@@ -3493,7 +3499,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     character = createPlaceholderCharacter();
   } else {
     try {
-      character = await createAnimatedCharacter(PLAYER_MODEL_URL, { clipMap: HERO_CLIP_MAP });
+      character = await createAnimatedCharacter(PLAYER_MODEL_URL, { clipMap: HERO_CLIP_MAP, dress: HERO_DRESS });
       playerModelLoaded = true;
     } catch (err) {
       console.warn("[render3d] hero character failed, trying base character", err);
