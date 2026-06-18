@@ -1,5 +1,11 @@
 # WestWard 3D — Visual North Star
 
+> ⚠️ **PARTIALLY SUPERSEDED (2026-06).** Westward (the town) pivoted to a grounded, naturalistic PBR
+> look in the "Believability Pass" (golden-hour IBL, wet/puddle street, the water-tower cathedral);
+> cel/ink stays the global default elsewhere. Many of the "todo" gaps below are now shipped. Current
+> state + the art-direction line live in [`NEXT-AGENT.md`](NEXT-AGENT.md) and the repo `CLAUDE.md`.
+
+
 > What will make this demo look *amazing*, not just "a working prototype."
 > Grounded in the current Three.js build (`spikes/render3d.html` → `src/render3d/`),
 > honest about the gap, and ordered by impact-per-effort so it doubles as a punch-list.

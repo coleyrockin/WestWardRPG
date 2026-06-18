@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — Westward Believability Pass (2026-06, local; held for owner WebGPU verify)
+
+The heart town pivots from cel/ink to a grounded, naturalistic look — "the one screenshot that says
+Red Dead + Cyberpunk + Fable." Gate green throughout (878 vitest / tsc / vite build). Held at ~25
+local commits pending the owner's WebGPU verify + a deliberate dusk golden-gate re-bless.
+
+- **Phase A** — global golden-hour lighting + a shadow-lag fix (`shadowMap.autoUpdate=false`; carry
+  the godray/split/vignette/bloom palette knobs that `lerpPalette` was dropping).
+- **Phase B** — Westward pivots to naturalistic PBR (`createGroundedMaterial`, scoped by a town flag);
+  a golden-hour **IBL** (`envLight.js` → `scene.environment`) so metals reflect the warm sky; a
+  wet/puddle-reflective main street (`wetStreet.js`); a weathered palette; the global comic ink dropped.
+- **Phase C** — the water-tower **cathedral** (scaled, gleaming galvanized steel, banner, tech-ring,
+  holo finial); gate glow-up + water-scarcity signage; restrained **cyber-aging** (`cyberAging.js` —
+  flickering neon/holo/solar, emissive-only, `fdt`-gated so the golden frame stays frozen).
+- **Phase D** — a little town life (`townLife.js` — saloon crowd, market stalls, hitched horses, a
+  saloon chimney), suppressed under `?visual` so the dusk baseline is untouched.
+- **Phase E (partial)** — boots at golden hour (`DEV_LOCK_DAYLIGHT=false`); docs updated. The builder-
+  fleet extraction is deferred.
+
 ## Unreleased — first five-minute 3D opening polish
 
 - Started the max-mode polish branch from `6826ce2` on `codex/first-five-minutes-v2` as `codex/first-five-minutes-max-mode`.

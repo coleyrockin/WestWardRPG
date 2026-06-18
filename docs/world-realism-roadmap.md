@@ -1,5 +1,12 @@
 # WestWard 3D — World Realism Roadmap
 
+> ⚠️ **MOSTLY SHIPPED (verified 2026-06-18).** R1 (aliveness) is essentially complete — windmills,
+> tumbleweeds, reactive bird flocks, flora sway, lamp flicker, chimney smoke, walking NPCs, and a full
+> audio layer (ambient wind + gusts, biome sound pockets, cricket/coyote night beds) are all live and
+> `fdt`-gated. The genuine remaining gaps are NPC night-reroute, road-verge scatter, biome flora
+> palettes, ranch livestock, and a dusk owl. Current state lives in [`NEXT-AGENT.md`](NEXT-AGENT.md).
+
+
 > **Companion guide to [`roadmap.md`](roadmap.md) — tactical how-to, not competing direction.**
 > `roadmap.md` is the single source of truth; this doc sequences how the P4 open range
 > (190×150u: Eastwater Ranch, Prospector's Folly, Sunken Wash, West Pass) goes from

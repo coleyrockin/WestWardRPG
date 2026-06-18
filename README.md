@@ -11,7 +11,7 @@ A story-first western RPG rendered as a low-poly graphic novel — *Oblivion mee
 
 ---
 
-![Dustward at dusk — the cel/ink render: false-front buildings, lantern light, the first road](docs/images/westward-3d-dusk.png)
+![Dustward at dusk — the original cel/ink render (Westward has since pivoted to the PBR golden-hour look; a fresh hero shot lands when the Believability Pass deploys)](docs/images/westward-3d-dusk.png)
 
 ---
 
@@ -19,7 +19,7 @@ A story-first western RPG rendered as a low-poly graphic novel — *Oblivion mee
 
 Most indie RPGs are systems demos — procedural dungeons, a combat sandbox, loot tables — with a thin story bolted on at the end. WestWard inverts that. The authored narrative — Marshal Boone's job board, the first-road bounty chain, NPC memory, faction-shaded decisions — is the product. Combat and the economy exist to put pressure on decisions; they're the stakes, not the point.
 
-The renderer is an **NPR cel-shader** (WebGPU + TSL, WebGL2 fallback): ink edges from depth discontinuity, flat cel banding, bloom + split-tone grade, a continuous day/night arc, and Blender-authored low-poly models. The visual direction is committed — graphic-novel illustration, not photoreal. Confident silhouettes and dramatic light are achievable at this scale where photorealism never will be.
+The renderer is WebGPU + TSL (WebGL2 fallback). **Westward — the heart town — now wears a grounded, naturalistic PBR look** (Red Dead-lite, 2026-06 "Believability Pass"): weathered timber and rusted future-tech under a golden-hour image-based light, a wet, puddle-reflective main street, and a water-tower cathedral anchoring the vista. The rest of the world keeps the **NPR cel-shader** base — ink edges from depth discontinuity, flat cel banding, bloom + split-tone grade, a continuous day/night arc, Blender-authored low-poly models — and the PBR look rolls outward from town over time. The game boots at golden hour. Confident silhouettes and dramatic light are the goal at this scale, where photorealism never will be.
 
 The current playable build is the **first-road loop**: spawn into Dustward at golden hour, take the Marsh Slime Bounty from Boone's board, follow the road east past the smoke cache, fight the road slime, salvage the broken wagon, and bring the map scrap back. Wind, footsteps, harmonica sting, and slime SFX are live (Web Audio, no assets).
 
