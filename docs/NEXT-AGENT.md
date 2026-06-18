@@ -6,15 +6,20 @@ Durable canon is separate and stays: the design canon is [`rustwater-treatment.m
 (cyberpunk-western open-world RPG — *Red Dead* geography, *Cyberpunk* flesh, *Fable* bones), the
 engine/execution plan is [`roadmap.md`](roadmap.md) (M0–M4), engine truths are in `CLAUDE.md`.
 
-Last updated: **2026-06-17** · branch **`feat/westward-believability`** merged to LOCAL `main`
-(NOT pushed — deploy HELD). Gate: **878 vitest, tsc clean, build ok.**
-🎯 **THE BELIEVABILITY PASS IS ~COMPLETE: Phases A–D shipped + Phase E (golden-hour boot + docs);
-the ONLY remaining item is the deferred god-file extraction (Phase E, pure refactor).** The game now
-boots at golden hour with: PBR Westward town, golden-hour IBL, wet/puddle street, the water-tower
-cathedral, gate glow-up + water signage, restrained cyber-aging, and ambient town life.
-Dusk golden gate is **pending a DELIBERATE re-bless** — ALL the LOOK changes moved the dusk frame on
-purpose; re-bless once signed off (see the OWNER WEBGPU PASS checklist below), not before. live:
-westward-rpg.vercel.app · play: `npm run play` → :5191 · dev: `npm run dev` → :5180.
+Last updated: **2026-06-18** · `main` **PUSHED + DEPLOYED** (owner said ship). Gate: **881 vitest,
+tsc clean, build ok**; CI browser gates green (loop smoke + the **re-blessed** dusk golden frame).
+🚀 **THE BELIEVABILITY PASS IS LIVE.** Pushed `74c02fb..7ce7c7a`; Vercel deployed; verified on the
+live site (game boots, **0 console errors, 0 CSP/blob-texture errors** — the `connect-src 'self' blob:`
+CSP fix repaired GLB textures). The game boots at golden hour with: PBR Westward town, golden-hour IBL,
+wet/puddle street, water-tower cathedral, gate glow-up + water signage, cyber-aging, town life, and
+**NPCs that go home after dark** (Phase 1.1). The dusk golden baseline was re-blessed to match.
+- **Owner: verify the LIVE WebGPU look at leisure** (westward-rpg.vercel.app) — shadows/god-rays/metal
+  gleam only show on your machine; tune `environmentIntensity` (envLight.js) / cyber `emissiveIntensity`
+  / `WESTERN_SPECS` hexes if anything's loud, then it's a normal commit + re-bless + push.
+- **Remaining (not blocking):** World-Aliveness gaps 1.2 road-verge scatter · 1.3 biome flora palette ·
+  1.4 Eastwater ranch livestock · 1.5 dusk owl audio (plan: `~/.claude/plans/this-is-a-pinned-atomic-map.md`).
+  Phase 2 = the deferred god-file extraction + look fine-tuning.
+live: westward-rpg.vercel.app · play: `npm run play` → :5191 · dev: `npm run dev` → :5180.
 
 > ## ⭐ ACTIVE — WESTWARD: THE BELIEVABILITY PASS (brainstormed → planned → underway 2026-06-17)
 > Westward (the town) is the HEART of Dustwater — "the one screenshot that says *Red Dead +
