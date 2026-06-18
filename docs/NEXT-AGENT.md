@@ -39,7 +39,7 @@ westward-rpg.vercel.app · play: `npm run play` → :5191 · dev: `npm run dev` 
 >   to postStacks defaults, so every authored cinematic value was DEAD. Now carried (timeOfDay.js).
 >   (3) goldenHour godray 0.2→0.3; NIGHT magic: cool moon-blue fill + bloom 1.2→1.6 / threshold 0.80
 >   (lamps/neon bloom like a lighthouse). +2 regression tests.
-> - **Phase B — naturalistic materials (Westward) + wet street — ◐ IN PROGRESS.**
+> - **Phase B — naturalistic materials (Westward) + wet street — ✅ DONE (steps 5–8 + IBL; owner WebGPU verify pending).**
 >   - ✅ **Foundation (commit `9acac0f`):** `createGroundedMaterial(hex,opts)` in
 >     `src/game/renderer/materials/groundedMaterial.js` — `MeshStandardNodeMaterial` drop-in for the
 >     town builders' `standard()` wrapper; same (hex,opts) contract; real roughness/metalness +
@@ -92,10 +92,24 @@ westward-rpg.vercel.app · play: `npm run play` → :5191 · dev: `npm run dev` 
 >     the street so the reflection contrasts, and (b) the grazing horizon-band reflection — the smooth
 >     gradient env gives a soft warm sheen, not a shaped mirror, in the flat WebGL capture (a sun-disc /
 >     richer env / normal-map ripple is deferred Phase-C polish, NOT this pass).
->   - ⬜ **NEXT (resume here): finish Phase B step 8 — palette discipline** (`WESTERN_SPECS` body/trim/
->     roof + `regionArtKits.frontier.walls`) — retune the Westward town palette to weathered Red Dead-lite,
->     judged at golden hour against `docs/art/westward-target.png`. Golden-gate-only (no unit test pins
->     hex); keep the `region-visual-identity.test.ts` cue STRINGS intact. Then Phase B is complete → Phase C.
+>   - ✅ **Step 8 — palette discipline — DONE (this session, gate green 872).** Retuned `WESTERN_SPECS`
+>     bodies (spike.js) off the uniform saturated tan to a weathered Red Dead-lite spread — grey-weathered
+>     timber / sun-bleached boards / warm-dusty — so the street reads as varied aged wood, not one brown
+>     wash; cool blue-grey roofs kept. Westward-only (Calico overrides `body` via `p.bodyTint`). NOTE:
+>     `regionArtKits.frontier.walls` was in the plan but is cue METADATA, not in the render path, so it was
+>     left untouched. Golden-gate-only (no unit test pins hex). ⏸️ **CONSERVATIVE starting point — the final
+>     palette is an owner call judged at golden hour on WebGPU against `docs/art/westward-target.png`;** tune
+>     the body hexes in `WESTERN_SPECS` (spike.js).
+>   - ⏸️ **OWNER WEBGPU PASS (deferred per owner, 2026-06-17) — do all of this in ONE foreground-Chrome
+>     sitting:** (1) Phase A shadow-lag verify (shadows still render+update? else 1-line revert of
+>     `shadowMap.autoUpdate=false`); (2) the IBL + metal read (`environmentIntensity 0.9` tunable in
+>     envLight.js); (3) the wet-street puddle specular down the grazing hero frame; (4) the weathered
+>     palette; then (5) **re-bless the dusk golden gate** (`npm run test:visual:update`, eyeball the new
+>     `scripts/baselines/render3d/frontier-dusk.png` before committing). All four LOOK changes moved the
+>     dusk frame on purpose; the re-bless is the single deliberate sign-off.
+>   - ⬜ **NEXT (resume here): Phase C — signature silhouettes + restrained cyber-aging** (below). Phase B
+>     is structurally complete; with the IBL in place, the water-tower cathedral's metal can now climb
+>     toward real gleam (raise its metalness back up — it was kept modest pre-IBL).
 > - **Phase C — signatures + restrained cyber-aging:** water-tower CATHEDRAL (`buildWaterTower`
 >   spike.js:1071, scaffold→tank + WESTWARD banner + tech-ring + holo emblem, scaled to anchor the
 >   vista); arch glow-up (`buildTownGate`:920); SPARSE rusted cyber-aging (`buildAntennaMast` exists;

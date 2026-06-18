@@ -818,15 +818,21 @@ function buildWalkInSaloon(group, p) {
 // spec + per-instance jitter so no two repeat. Front faces the road (z = 8.9 line).
 // 3-zone albedo: warm key (sunlit siding), cool-leaning shadow (roof/trim/dark
 // facades read blue under the split-tone grade), accent reserved for signs only.
+// Believability Pass step 8 — weathered Westward palette (Red Dead-lite). Bodies
+// desaturated off the uniform saturated tan and SPREAD across tones — grey-weathered
+// timber, sun-bleached boards, warm-dusty — so the street reads as varied aged wood,
+// not one brown wash. Cool blue-grey roofs kept (warm-key / cool-shadow). Calico
+// overrides body via p.bodyTint, so this retune is Westward-only. CONSERVATIVE
+// starting point — final values are an owner call judged at golden hour on WebGPU.
 const WESTERN_SPECS = {
-  saloon:           { stories: 2, body: "#a87848", trim: "#6a5848", roof: "#3a4858", sign: "#d8a64f", porch: true, label: "saloon" },
-  saloonFacade:     { stories: 2, body: "#a87848", trim: "#6a5848", roof: "#3a4858", sign: "#d8a64f", porch: true, label: "saloon" },
-  storefront:       { stories: 2, body: "#9a7840", trim: "#645848", roof: "#384858", sign: "#caa45c", porch: true, label: "store" },
-  town:             { stories: 2, body: "#907040", trim: "#5e5040", roof: "#364656", sign: null,      porch: false, label: "house" },
-  ranch:            { stories: 1, body: "#886840", trim: "#5a4c3c", roof: "#344454", sign: null,      porch: true,  label: "house" },
-  townFacadeWarm:   { stories: 2, body: "#987848", trim: "#625040", roof: "#384656", sign: null,      porch: false, label: "house" },
-  townFacadeStore:  { stories: 2, body: "#9a7842", trim: "#645848", roof: "#3a4656", sign: "#c3a05a", porch: true,  label: "store" },
-  townFacadeDark:   { stories: 2, body: "#5a4838", trim: "#4a4038", roof: "#2a3448", sign: null,      porch: false, label: "house" },
+  saloon:           { stories: 2, body: "#a47b53", trim: "#6a5848", roof: "#3a4858", sign: "#d8a64f", porch: true, label: "saloon" }, // warmest — the lively saloon
+  saloonFacade:     { stories: 2, body: "#a47b53", trim: "#6a5848", roof: "#3a4858", sign: "#d8a64f", porch: true, label: "saloon" },
+  storefront:       { stories: 2, body: "#8f7a56", trim: "#645848", roof: "#384858", sign: "#caa45c", porch: true, label: "store" }, // greyer weathered shopfront
+  town:             { stories: 2, body: "#84745a", trim: "#5e5040", roof: "#364656", sign: null,      porch: false, label: "house" }, // grey-weathered timber
+  ranch:            { stories: 1, body: "#8c7050", trim: "#5a4c3c", roof: "#344454", sign: null,      porch: true,  label: "house" }, // warm-dusty
+  townFacadeWarm:   { stories: 2, body: "#9e8662", trim: "#625040", roof: "#384656", sign: null,      porch: false, label: "house" }, // sun-bleached, lighter
+  townFacadeStore:  { stories: 2, body: "#8a785c", trim: "#645848", roof: "#3a4656", sign: "#c3a05a", porch: true,  label: "store" }, // grey-weathered
+  townFacadeDark:   { stories: 2, body: "#564a3a", trim: "#4a4038", roof: "#2a3448", sign: null,      porch: false, label: "house" }, // dark accent
 };
 
 function buildWesternBuilding(group, p, spec = {}) {
