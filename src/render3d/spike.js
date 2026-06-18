@@ -42,6 +42,7 @@ import { buildBoardView } from "./boardCopy.js";
 import { createEncounterSystem, PLAYER_MAX_HP } from "./encounterSystem.js";
 import { createAtmosphere } from "./atmosphere.js";
 import { installGoldenHourEnv } from "./envLight.js";
+import { createWetStreetMaterial } from "./wetStreet.js";
 import { sunArc, calcWindowGlowFactor } from "./timeOfDay.js";
 import { footDustStep } from "./footDust.js";
 import { createWorldClock, tickClock, pinClock, cycleClock, dayTimeToKey } from "../game/world/worldClock.js";
@@ -2610,6 +2611,27 @@ function buildGround(scene, snapshot) {
       );
     }
     addRoadPlane(from, to, 0.16, 0.045, centerMat);
+  }
+
+  // Wet/muddy main street (Believability Pass step 7): a PBR overlay on the
+  // Westward town road segments only (segment midpoint x ≤ 27 — spawn→jobBoard→
+  // roadSign, the hero view down to the water tower). A world-XZ puddle field
+  // drives wet-vs-dry roughness + wet-mud albedo darkening; the low-roughness
+  // puddles reflect the golden-hour env (scene.environment) as real specular,
+  // strongest at the grazing angle the hero frame looks down the street. One
+  // shared material (world-position TSL) tiles seamlessly across the segments.
+  // Laid just above the dirt road + ruts so it reads as the town's wet surface;
+  // the open range past town keeps its dry dirt ribbon.
+  const wetStreetMat = createWetStreetMaterial();
+  for (let i = 1; i < route.length; i++) {
+    const from = route[i - 1];
+    const to = route[i];
+    if ((from.x + to.x) / 2 > 27) continue; // Westward town only
+    const segmentWidth = i === 1 ? FIRST_ROAD_ART_STYLE.openingRoadWidth : ROAD_W;
+    // Transparent wet layer (alpha = puddle), composited OVER the dirt road dressing
+    // via renderOrder + depthWrite off, so the dry road still reads through.
+    const wet = addRoadPlane(from, to, segmentWidth, 0.055, wetStreetMat);
+    if (wet) wet.renderOrder = 1;
   }
 
   // OPEN RANGE roads — lighter ribbons (road + wash + edges, no ruts/center)

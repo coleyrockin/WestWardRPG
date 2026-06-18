@@ -7,7 +7,7 @@ Durable canon is separate and stays: the design canon is [`rustwater-treatment.m
 engine/execution plan is [`roadmap.md`](roadmap.md) (M0–M4), engine truths are in `CLAUDE.md`.
 
 Last updated: **2026-06-17** · branch **`feat/westward-believability`** merged to LOCAL `main`
-(NOT pushed — deploy HELD). Gate: **866 vitest, tsc clean, build ok.** Dusk golden gate is
+(NOT pushed — deploy HELD). Gate: **872 vitest, tsc clean, build ok.** Dusk golden gate is
 **pending a DELIBERATE re-bless** — the Phase A lighting below moved the dusk frame on purpose
 (god-rays/split are now live); re-bless once the look is signed off, not before. live:
 westward-rpg.vercel.app · play: `npm run play` → :5191 · dev: `npm run dev` → :5180.
@@ -76,12 +76,26 @@ westward-rpg.vercel.app · play: `npm run play` → :5191 · dev: `npm run dev` 
 >        also pivot, that's a separate task (re-author the .glb materials, or replace with procedural).
 >     - Known, ACCEPTED trade: routing adds ~40–65 net scene materials (erodes the 665→321 M0 win ~13–20%) —
 >       fine while LOOK > perf, revisit at M0.
->   - ⬜ **NEXT (resume here): Phase B step 7 — the wet/muddy main street** (new road-footprint plane,
->     normal+roughness maps, puddle = low-roughness spec — APPROXIMATE, not true SSR; reuse `ground.js`
->     corridor mask; the IBL now in place gives the puddle specular something warm to reflect). Largest
->     genuinely-new build (no UV/texture infra today). Then finish **step 8 palette discipline**
->     (`WESTERN_SPECS` body/trim/roof + `regionArtKits.frontier.walls`) — judge at golden hour; keep the
->     `region-visual-identity.test.ts` cue STRINGS intact.
+>   - ✅ **Step 7 — wet/muddy main street — DONE (this session, gate green 872; reviewed by a 3-lens
+>     adversarial workflow, both HIGH findings fixed).** `src/render3d/wetStreet.js`:
+>     `createWetStreetMaterial()` is a TRANSPARENT MeshStandardNodeMaterial laid over the Westward town
+>     road segments (midpoint x≤27: spawn→jobBoard→roadSign, the hero view to the water tower) in
+>     `buildGround`. A world-XZ puddle field (TSL `tslNoise`, mirrors ground.js) drives **alpha = puddle**
+>     (so the dirt road's ruts/edges/centre read through the DRY majority — not a flat overpaint),
+>     **roughness** damp-rim→glassy-centre (`DAMP_ROUGHNESS 0.42`→`WET_ROUGHNESS 0.08`), and **wet-mud
+>     albedo darkening**. The field is **anisotropic** (x stretched ~2.5×) so puddles pool into streaks
+>     down the street, not edge-blobs. Low-roughness dielectric + `scene.environment` → puddles reflect
+>     the warm sky (Fresnel, strongest at the grazing hero angle). depthWrite off + `renderOrder 1` (no
+>     z-fight). Pure `wetnessAt(x,z)` with 6 unit tests (incl. an anisotropy assertion). Captures:
+>     `~/agents/screenshots/dustwater/fast/wet-*` (dry road reads through; wet streaks layered on).
+>     ⏸️ **Owner verify on WebGPU:** the full puddle-MIRROR read is gated on (a) WebGPU shadows darkening
+>     the street so the reflection contrasts, and (b) the grazing horizon-band reflection — the smooth
+>     gradient env gives a soft warm sheen, not a shaped mirror, in the flat WebGL capture (a sun-disc /
+>     richer env / normal-map ripple is deferred Phase-C polish, NOT this pass).
+>   - ⬜ **NEXT (resume here): finish Phase B step 8 — palette discipline** (`WESTERN_SPECS` body/trim/
+>     roof + `regionArtKits.frontier.walls`) — retune the Westward town palette to weathered Red Dead-lite,
+>     judged at golden hour against `docs/art/westward-target.png`. Golden-gate-only (no unit test pins
+>     hex); keep the `region-visual-identity.test.ts` cue STRINGS intact. Then Phase B is complete → Phase C.
 > - **Phase C — signatures + restrained cyber-aging:** water-tower CATHEDRAL (`buildWaterTower`
 >   spike.js:1071, scaffold→tank + WESTWARD banner + tech-ring + holo emblem, scaled to anchor the
 >   vista); arch glow-up (`buildTownGate`:920); SPARSE rusted cyber-aging (`buildAntennaMast` exists;
