@@ -7,9 +7,13 @@ Durable canon is separate and stays: the design canon is [`rustwater-treatment.m
 engine/execution plan is [`roadmap.md`](roadmap.md) (M0–M4), engine truths are in `CLAUDE.md`.
 
 Last updated: **2026-06-17** · branch **`feat/westward-believability`** merged to LOCAL `main`
-(NOT pushed — deploy HELD). Gate: **872 vitest, tsc clean, build ok.** Dusk golden gate is
-**pending a DELIBERATE re-bless** — the Phase A lighting below moved the dusk frame on purpose
-(god-rays/split are now live); re-bless once the look is signed off, not before. live:
+(NOT pushed — deploy HELD). Gate: **878 vitest, tsc clean, build ok.**
+🎯 **THE BELIEVABILITY PASS IS ~COMPLETE: Phases A–D shipped + Phase E (golden-hour boot + docs);
+the ONLY remaining item is the deferred god-file extraction (Phase E, pure refactor).** The game now
+boots at golden hour with: PBR Westward town, golden-hour IBL, wet/puddle street, the water-tower
+cathedral, gate glow-up + water signage, restrained cyber-aging, and ambient town life.
+Dusk golden gate is **pending a DELIBERATE re-bless** — ALL the LOOK changes moved the dusk frame on
+purpose; re-bless once signed off (see the OWNER WEBGPU PASS checklist below), not before. live:
 westward-rpg.vercel.app · play: `npm run play` → :5191 · dev: `npm run dev` → :5180.
 
 > ## ⭐ ACTIVE — WESTWARD: THE BELIEVABILITY PASS (brainstormed → planned → underway 2026-06-17)
@@ -100,29 +104,43 @@ westward-rpg.vercel.app · play: `npm run play` → :5191 · dev: `npm run dev` 
 >     left untouched. Golden-gate-only (no unit test pins hex). ⏸️ **CONSERVATIVE starting point — the final
 >     palette is an owner call judged at golden hour on WebGPU against `docs/art/westward-target.png`;** tune
 >     the body hexes in `WESTERN_SPECS` (spike.js).
->   - ⏸️ **OWNER WEBGPU PASS (deferred per owner, 2026-06-17) — do all of this in ONE foreground-Chrome
->     sitting:** (1) Phase A shadow-lag verify (shadows still render+update? else 1-line revert of
->     `shadowMap.autoUpdate=false`); (2) the IBL + metal read (`environmentIntensity 0.9` tunable in
->     envLight.js); (3) the wet-street puddle specular down the grazing hero frame; (4) the weathered
->     palette; then (5) **re-bless the dusk golden gate** (`npm run test:visual:update`, eyeball the new
->     `scripts/baselines/render3d/frontier-dusk.png` before committing). All four LOOK changes moved the
->     dusk frame on purpose; the re-bless is the single deliberate sign-off.
->   - ⬜ **NEXT (resume here): Phase C — signature silhouettes + restrained cyber-aging** (below). Phase B
->     is structurally complete; with the IBL in place, the water-tower cathedral's metal can now climb
->     toward real gleam (raise its metalness back up — it was kept modest pre-IBL).
-> - **Phase C — signatures + restrained cyber-aging:** water-tower CATHEDRAL (`buildWaterTower`
->   spike.js:1071, scaffold→tank + WESTWARD banner + tech-ring + holo emblem, scaled to anchor the
->   vista); arch glow-up (`buildTownGate`:920); SPARSE rusted cyber-aging (`buildAntennaMast` exists;
->   solar/cables/flickering neon/broken holo board/peeling ads — emissive-only, no extra lights);
->   water-scarcity signage. Respect `firstFrameSlabBlockers===[]`.
-> - **Phase D — a little life (visual only):** gathered silhouettes outside the glowing saloon,
->   musicians, stalls, horses + steel-mustangs at the rail, chimney smoke. Alive, NOT crowded.
->   Townsfolk suppressed under ?visual → golden-safe.
-> - **Phase E — extraction + docs + verify + ship:** extract the builder fleet (spike.js:296-1494 →
->   `primitives.js`/`townBuild.js`/`townLandmarks.js`/`cyberAging.js` — the 5k god-file); update the
->   CLAUDE.md art-direction line + art bible (the pivots); RE-BLESS dusk golden; boot-verify in a
->   REAL foreground Chrome via the production path; flip `DEV_LOCK_DAYLIGHT`→golden-hour boot. Deploy
->   HELD for owner.
+>   - ⏸️ **OWNER WEBGPU PASS (deferred per owner, 2026-06-17) — do the WHOLE pass in ONE foreground-Chrome
+>     sitting (`npm run play`):** (1) Phase A shadow-lag verify (shadows still render+update? else 1-line
+>     revert of `shadowMap.autoUpdate=false`); (2) IBL + metal gleam, esp. the water-tower cathedral
+>     (`environmentIntensity 0.9` tunable in envLight.js); (3) wet-street puddle specular down the grazing
+>     hero frame; (4) the weathered palette (tune `WESTERN_SPECS` body hexes); (5) the cathedral / gate /
+>     signage / cyber-aging emissives (ride at dusk+night to see the flickering neon/holo bloom; tune
+>     emissiveIntensity in cyberAging.js / buildWaterTower if too loud); (6) town life around the saloon
+>     (crowd/horses/stalls/smoke); (7) the golden-hour BOOT (fresh `indexedDB.deleteDatabase('westward')`
+>     → should open golden); then (8) **re-bless the dusk golden gate** (`npm run test:visual:update`,
+>     eyeball the new `scripts/baselines/render3d/frontier-dusk.png` before committing). EVERY LOOK change
+>     A–E moved the dusk frame on purpose; the re-bless is the single deliberate sign-off. THEN push → Vercel.
+> - **Phase C — signatures + restrained cyber-aging — ✅ DONE (this session, gate 878; 3-lens review,
+>   0 critical/high).** Water-tower CATHEDRAL (`buildWaterTower`): scaled to ~14.3u, galvanized-steel
+>   tank (metalness 0.78) gleaming in the IBL, WESTWARD banner, emissive cyan tech-ring + rivets, holo
+>   finial crowning the skyline; Westward record recolored galvanized. Arch glow-up (`buildTownGate`):
+>   2nd line "FREE TOWN · WATER IS LIFE", faint emissive, cyan holo strip; `makeSignTexture` auto-shrinks
+>   long lines. Two water-scarcity signs (south shoulder, readable). `src/render3d/cyberAging.js`: SPARSE
+>   flickering neon/solar (saloon), peeling ad (forge), broken holo + beacon (hotel) — pure
+>   `flickerValue()` (6 tests), fresh emissive mats tagged `userData.cyberFlicker`, collected at assembly,
+>   animated only `fdt>0` (frozen under capture). Transparent holos set `depthWrite:false`.
+> - **Phase D — a little life — ✅ DONE (this session, gate 878).** `src/render3d/townLife.js`
+>   (`addTownLife`): saloon crowd silhouettes, 2 market stalls, 2 hitched horses — added ONLY in the
+>   `if(!visualCapture)` block (suppressed under ?visual like the townsfolk crowd) + a 3rd saloon
+>   chimney `createSmokeEmitter`. Probe-verified: 21 children instantiate, no errors, dusk frame untouched.
+> - **Phase E — ◐ PARTIAL.**
+>   - ✅ **Golden-hour boot:** `DEV_LOCK_DAYLIGHT=false` (spike.js) — boots goldenHour + day/night cycle.
+>     Boot-frame capture confirms golden. (1-line revert to `true` restores the lock.)
+>   - ✅ **Docs:** CLAUDE.md art-direction line records the grounded-PBR-Westward pivot; this handoff updated.
+>   - ⬜ **DEFERRED — extract the builder fleet** (spike.js:296-1494 → `build/primitives.js` [leaf: toVec,
+>     col, standard, addBox, addContactShadow, makeSignTexture + the `_groundedTownBuild` flag +
+>     getter/setter], `build/townBuild.js`, `build/townLandmarks.js`). PURE byte-stable refactor — NOT
+>     done this session because it's high-risk (the flag/shared-`standard` trap: if any builder imports
+>     `standard` from the wrong place, two flag copies exist and the PBR pivot silently dies) and zero
+>     visual value; rushing it could regress the look. Do it as a FOCUSED session: move helpers to the
+>     leaf first, then builders import from it; verify byte-stability via a before/after FAST CAPTURE of
+>     the same pose (must be pixel-identical) since the dusk gate is mid-diff. Full blueprint was captured
+>     in the Phase C/D/E recon (regenerate via a recon agent if needed).
 >
 > ### ⏸️ OWNER VERIFY before resuming (WebGPU-only — only your Chrome shows it). Dev: http://127.0.0.1:5180
 > Phase A's two big wins don't appear in the headless capture (it runs WebGL: no shadows/god-rays).

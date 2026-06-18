@@ -99,6 +99,12 @@ creates per-mesh materials** (scatter/flora/particle swarms); single hero object
 - **Tests are sacred.** Adjust expectations in the same commit; never delete coverage.
 
 ## Art direction (one line)
-Low-poly graphic-novel western with rusted chrome growing through it — confident
-silhouettes, warm-key/cool-shadow light, the cel/ink render, and **nothing sleek**.
-Full spec: `docs/3d-art-direction.md` + the treatment's WORLD section.
+**WESTWARD (the town) is now grounded & weathered — naturalistic PBR (Red Dead-lite):**
+weathered timber + rusted future-tech under a golden-hour key, lit by a real env map
+(IBL), wet/puddle-reflective street, the water tower as a cathedral. Owner-authorized
+pivot (2026-06-17, Believability Pass) that supersedes the old cel/ink line **for
+Westward**. The cel/ink graphic-novel render (confident silhouettes, warm-key/cool-shadow,
+**nothing sleek**) stays the GLOBAL default everywhere else (open range, Calico) until it's
+rolled outward. Priority order: Lighting → Atmosphere → Composition → Materials → Animation →
+Geometry. Full spec: `docs/3d-art-direction.md` + the treatment's WORLD section + the
+Believability Pass section of `docs/NEXT-AGENT.md`.
