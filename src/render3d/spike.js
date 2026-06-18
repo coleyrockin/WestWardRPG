@@ -155,7 +155,7 @@ function cullShadow(node) {
 // to dusk/night, and ignores a drifted save clock. Flip to false to restore the
 // goldenHour boot + day/night cycle once the world look is dialed in. The golden
 // gate is unaffected — it still pins dusk via ?visual.
-const DEV_LOCK_DAYLIGHT = true;
+const DEV_LOCK_DAYLIGHT = false;
 // Believable-human hero: Quaternius "Universal Animation Library" rig (CC0) —
 // ~8.5k verts, true human proportions, 53-joint humanoid skeleton, 46 clips.
 // Replaces the 792-vert blocky drifter. Its clips are named Idle_Loop/Walk_Loop/
