@@ -11,7 +11,7 @@
 // capture flag; no NPC is in interaction range at the spawn framing.
 
 import { createAnimatedCharacter } from "./animatedCharacter.js";
-import { createWander, stepWander } from "./npcWander.js";
+import { createWander, stepWander, stepHome } from "./npcWander.js";
 // NB: a self-contained greeter (below) — deliberately NOT importing the Canvas
 // npcMemory chain, which drags storyLootReactions→storyLoot into the render3d
 // bundle (and that chain has a case-sensitive import that breaks the Vercel
@@ -110,7 +110,10 @@ export async function createTownsfolk(scene, opts = {}) {
 
   let interactable = null; // the in-range NPC the player can greet
 
-  function update(dt, frozen, playerPos = null) {
+  // `night` (from the world clock's window-glow factor) sends the cast home: after
+  // dark each NPC walks to its start corner/doorway and idles, so the street stops
+  // bustling at 2am — the biggest "somebody lives here" tell for the night frame.
+  function update(dt, frozen, playerPos = null, night = false) {
     interactable = null;
     // nearest in-range NPC (skipped while frozen for deterministic capture)
     if (!frozen && playerPos) {
@@ -138,7 +141,7 @@ export async function createTownsfolk(scene, opts = {}) {
         npc.character.update(dt, false);
         continue;
       }
-      const s = stepWander(npc.wander, dt);
+      const s = night ? stepHome(npc.wander, npc.start, dt) : stepWander(npc.wander, dt);
       npc.character.group.position.x = s.x;
       npc.character.group.position.z = s.z;
       npc.character.group.rotation.y = s.yaw;

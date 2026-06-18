@@ -3187,7 +3187,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         console.warn("[render3d] calico townsfolk failed to load", e);
       }
       townsfolk = {
-        update(dt2, frozen2, pos) { for (const g of groups) g.update(dt2, frozen2, pos); },
+        update(dt2, frozen2, pos, night2) { for (const g of groups) g.update(dt2, frozen2, pos, night2); },
         getInteractable() { for (const g of groups) { const r = g.getInteractable(); if (r) return r; } return null; },
         talk() { for (const g of groups) { const r = g.talk?.(); if (r) return r; } return null; },
       };
@@ -5164,7 +5164,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       if (player.moving) saveMgr.markDirty(); // periodic autosave captures position drift
       saveMgr.tick(dt, runMode, { onAutoSave: persistRun });
     }
-    townsfolk.update(visualCapture ? 0 : dt, visualCapture, player.position);
+    // After dark (window-glow factor high), send the cast home so the street stops
+    // bustling at 2am. Never under capture (frozen to start pose anyway).
+    const townNight = !visualCapture && calcWindowGlowFactor(clock.dayTime) > 0.6;
+    townsfolk.update(visualCapture ? 0 : dt, visualCapture, player.position, townNight);
     // Executor place/event barks — Abram's ghost reacts to crossing the territory
     // and clearing the road. Skipped during capture and the opening funeral/implant
     // beats (the funeral lines own the channel there). Once each, via seenExecutorBarks.

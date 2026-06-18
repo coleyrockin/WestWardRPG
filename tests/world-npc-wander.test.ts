@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error — JS module, no types
-import { createWander, stepWander } from "../src/game/world/npcWander.js";
+import { createWander, stepWander, stepHome } from "../src/game/world/npcWander.js";
 
 const square = [
   { x: 0, z: 0 },
@@ -40,6 +40,31 @@ describe("npcWander", () => {
     stepWander(w, 0.1); // next tick detects arrival → advance + re-pause
     expect(w.idx).toBe(1);
     expect(w.wait).toBeGreaterThan(0);
+  });
+
+  it("stepHome walks the NPC toward home and reports moving", () => {
+    const w = createWander({ waypoints: square, speed: 2, pause: 0 });
+    w.x = 4; w.z = 0; // mid-patrol position
+    const s = stepHome(w, { x: 0, z: 0 }, 0.5); // 1 unit toward home (−x)
+    expect(s.moving).toBe(true);
+    expect(s.x).toBeLessThan(4);
+    expect(s.z).toBeCloseTo(0);
+  });
+
+  it("stepHome idles (not moving) once it has arrived home", () => {
+    const w = createWander({ waypoints: square, speed: 2, pause: 0 });
+    w.x = 0.02; w.z = 0.0; // within the 0.08 arrival radius of home
+    const s = stepHome(w, { x: 0, z: 0 }, 0.5);
+    expect(s.moving).toBe(false);
+    expect(s.x).toBeCloseTo(0.02); // held in place, not snapped
+  });
+
+  it("stepHome ignores the wander pause (NPC walks home even mid-pause) and is deterministic", () => {
+    const mk = () => { const w = createWander({ waypoints: square, speed: 1.5, pause: 5 }); w.x = 4; w.z = 4; return w; };
+    const a = stepHome(mk(), { x: 0, z: 0 }, 0.3);
+    const b = stepHome(mk(), { x: 0, z: 0 }, 0.3);
+    expect(a.moving).toBe(true); // moved despite wait=5
+    expect(a.x).toBe(b.x); expect(a.z).toBe(b.z);
   });
 
   it("is deterministic — same inputs produce the same path", () => {

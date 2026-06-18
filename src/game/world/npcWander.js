@@ -35,6 +35,27 @@ function snapshot(w) {
   return { x: w.x, z: w.z, yaw: w.yaw, moving: w.moving };
 }
 
+// Night behaviour — head straight to a `home` point and idle once arrived, so the
+// town stops bustling after dark (instead of looping the daytime patrol at 2am).
+// Pure + deterministic; mutates w in place, returns a snapshot. Ignores w.wait (the
+// NPC walks home even if mid-pause). Resuming the day loop continues from w.idx.
+export function stepHome(w, home, dt) {
+  const step = Number.isFinite(dt) ? dt : 0;
+  const dx = home.x - w.x;
+  const dz = home.z - w.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist < 0.08) {
+    w.moving = false; // arrived → idle at the doorway/corner
+    return snapshot(w);
+  }
+  const move = Math.min(dist, w.speed * step);
+  w.x += (dx / dist) * move;
+  w.z += (dz / dist) * move;
+  w.yaw = Math.atan2(-dx / dist, -dz / dist);
+  w.moving = true;
+  return snapshot(w);
+}
+
 // Advance one step. Mutates w in place (cheap per-frame), returns a snapshot.
 export function stepWander(w, dt) {
   const step = Number.isFinite(dt) ? dt : 0;
