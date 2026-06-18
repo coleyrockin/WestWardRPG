@@ -43,6 +43,7 @@ import { createEncounterSystem, PLAYER_MAX_HP } from "./encounterSystem.js";
 import { createAtmosphere } from "./atmosphere.js";
 import { installGoldenHourEnv } from "./envLight.js";
 import { createWetStreetMaterial } from "./wetStreet.js";
+import { applyCyberAging, flickerValue } from "./cyberAging.js";
 import { sunArc, calcWindowGlowFactor } from "./timeOfDay.js";
 import { footDustStep } from "./footDust.js";
 import { createWorldClock, tickClock, pinClock, cycleClock, dayTimeToKey } from "../game/world/worldClock.js";
@@ -442,7 +443,11 @@ function makeSignTexture(lines) {
   g.fillStyle = "#f3dfae";
   const step = c.height / (lines.length + 1);
   lines.forEach((line, i) => {
-    g.font = `${i === 0 ? "bold 58px" : "44px"} Georgia, 'Times New Roman', serif`;
+    // Auto-shrink long lines (e.g. "FREE TOWN · WATER IS LIFE") so they fit the
+    // 512px board; short names keep their bold display size.
+    let size = i === 0 ? 58 : 44;
+    if (line.length > 15) size = Math.max(26, Math.floor((size * 15) / line.length));
+    g.font = `${i === 0 ? "bold " : ""}${size}px Georgia, 'Times New Roman', serif`;
     g.fillText(line, c.width / 2, step * (i + 1) + 6);
   });
   const tex = new THREE.CanvasTexture(c);
@@ -1012,10 +1017,12 @@ function buildTownGate(group, p) {
   // title), Calico Flats overrides via p.signLines.
   const signTex = makeSignTexture(p.signLines || ["WESTWARD"]);
   const sign = new THREE.Mesh(
-    new THREE.BoxGeometry(0.09 * s, 0.62 * s, 2.1 * s),
-    standard("#6e4f2e", { roughness: 0.9, map: signTex }),
+    new THREE.BoxGeometry(0.09 * s, 0.82 * s, 2.4 * s),
+    // faint warm emissive (0.10, below the 0.95 bloom threshold) so the board reads
+    // lit at golden hour/dusk without glowing.
+    standard("#6e4f2e", { roughness: 0.9, map: signTex, emissive: "#7a5a36", emissiveIntensity: 0.10 }),
   );
-  sign.position.copy(toVec(p.x, p.y, postH - 0.78 * s));
+  sign.position.copy(toVec(p.x, p.y, postH - 0.82 * s));
   sign.castShadow = true;
   group.add(sign);
   for (const side of [-1, 1]) {
@@ -1023,6 +1030,9 @@ function buildTownGate(group, p) {
     chain.position.copy(toVec(p.x, p.y + side * 1.1 * s, postH - 0.62 * s));
     group.add(chain);
   }
+  // Subtle cyber accent — a thin glowing holo strip across the gate under the beam
+  // (emissive 1.35 clears the bloom threshold → a soft cyan line, "free-town" tech).
+  addBox(group, 0.05 * s, 0.05 * s, halfSpan * 2 * 0.78, standard("#bfe9ff", { emissive: "#bfe9ff", emissiveIntensity: 1.35 }), toVec(p.x, p.y, postH - 0.46 * s));
 }
 
 function buildChurch(group, p) {
@@ -1127,35 +1137,70 @@ function buildWindmill(group, p) {
 
 function buildWaterTower(group, p) {
   const ox = p.x, oy = p.y, s = p.size || 1;
-  // Metalness is kept MODEST: there is no IBL/env map yet, so high-metal surfaces
-  // would read dark (metals have no diffuse, only reflections). Weathered galvanized
-  // steel at low metalness stays sun-lit + believable now; the gleam comes when a
-  // golden-hour env map lands (the next lighting lever — pairs with the Phase C tower).
-  const matLeg = standard("#4f3a26", { roughness: 0.95 });                              // timber legs
-  const matTank = standard(p.color ?? "#6e5236", { roughness: 0.7, metalness: 0.3 });   // weathered galvanized steel tank
-  const matBand = standard("#3a2c1c", { roughness: 0.6, metalness: 0.4 });              // rusted iron bands/rings
-  const matLid = standard("#5a4128", { roughness: 0.72, metalness: 0.28 });             // weathered metal cone lid
-  const legH = 4.6 * s, spread = 1.5 * s, topSpread = 0.85 * s, tankR = 1.3 * s, tankH = 2.4 * s, tankY = legH;
+  // THE VISTA CATHEDRAL (Believability Pass Phase C). IBL now lit (envLight.js
+  // scene.environment, intensity 0.9), so galvanized steel at high metalness
+  // reflects the warm golden-hour sky → the tank reads as zinc-coated steel
+  // catching the light, not painted wood. Scaled UP to anchor the street vista,
+  // with a WESTWARD banner, a glowing cyber tech-ring, and a holo-emblem finial.
+  const matLeg = standard("#4f3a26", { roughness: 0.95 });                              // timber legs (matte wood)
+  const matTank = standard(p.color ?? "#8a8170", { roughness: 0.34, metalness: 0.78 }); // galvanized steel — gleams in the env
+  const matBand = standard("#6b4a2c", { roughness: 0.55, metalness: 0.6 });             // rusted iron bands/rings
+  const matLid = standard("#7a7062", { roughness: 0.4, metalness: 0.7 });               // weathered steel cone lid
+  const legH = 6.6 * s, spread = 1.5 * s, topSpread = 0.85 * s, tankR = 1.3 * s, tankH = 3.4 * s, tankY = legH;
   for (const [tx, ty, bx, by] of [[-topSpread, -topSpread, -spread, -spread], [topSpread, -topSpread, spread, -spread], [topSpread, topSpread, spread, spread], [-topSpread, topSpread, -spread, spread]]) {
-    const leg = addBox(group, 0.14 * s, legH, 0.14 * s, matLeg, toVec(ox + (tx + bx) / 2, oy + (ty + by) / 2, 0));
+    const leg = addBox(group, 0.16 * s, legH, 0.16 * s, matLeg, toVec(ox + (tx + bx) / 2, oy + (ty + by) / 2, 0));
     leg.rotation.x = -Math.atan2(by - ty, legH); leg.rotation.z = Math.atan2(bx - tx, legH);
   }
-  for (const [bh, frac] of [[1.4 * s, 1.4 / 4.6], [3.0 * s, 3.0 / 4.6]]) {
+  for (const [bh, frac] of [[1.8 * s, 1.8 / 6.6], [4.4 * s, 4.4 / 6.6]]) {
     const bo = spread - frac * (spread - topSpread);
     addBox(group, bo * 2, 0.1 * s, 0.1 * s, matBand, toVec(ox, oy - bo, bh));
     addBox(group, bo * 2, 0.1 * s, 0.1 * s, matBand, toVec(ox, oy + bo, bh));
     addBox(group, 0.1 * s, 0.1 * s, bo * 2, matBand, toVec(ox - bo, oy, bh));
     addBox(group, 0.1 * s, 0.1 * s, bo * 2, matBand, toVec(ox + bo, oy, bh));
   }
-  const tank = new THREE.Mesh(new THREE.CylinderGeometry(tankR, tankR * 1.04, tankH, 12), matTank);
+  const tank = new THREE.Mesh(new THREE.CylinderGeometry(tankR, tankR * 1.04, tankH, 16), matTank);
   tank.position.copy(toVec(ox, oy, tankY + tankH / 2)); tank.castShadow = true; tank.receiveShadow = true; group.add(tank);
-  for (const ringOffset of [0.45 * s, 1.2 * s, 1.95 * s]) {
-    const ring = new THREE.Mesh(new THREE.CylinderGeometry(tankR + 0.07, tankR + 0.07, 0.1, 14), matBand);
+  for (const ringOffset of [0.5 * s, 1.5 * s, 2.5 * s]) {
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(tankR + 0.07, tankR + 0.07, 0.1, 16), matBand);
     ring.position.copy(toVec(ox, oy, tankY + ringOffset)); ring.castShadow = true; group.add(ring);
   }
-  const lid = new THREE.Mesh(new THREE.ConeGeometry(tankR + 0.12, 0.9 * s, 12), matLid);
-  lid.position.copy(toVec(ox, oy, tankY + tankH + 0.45 * s)); lid.castShadow = true; group.add(lid);
-  addBox(group, 0.12 * s, 0.12 * s, 0.55 * s, matBand, toVec(ox, oy + tankR + 0.2 * s, tankY + 0.38 * s));
+  const lid = new THREE.Mesh(new THREE.ConeGeometry(tankR + 0.12, 1.1 * s, 16), matLid);
+  lid.position.copy(toVec(ox, oy, tankY + tankH + 0.55 * s)); lid.castShadow = true; group.add(lid);
+  addBox(group, 0.12 * s, 0.12 * s, 0.55 * s, matBand, toVec(ox, oy + tankR + 0.2 * s, tankY + 0.38 * s)); // spigot
+
+  // WESTWARD banner on the street-facing (+y, toward spawn) tank face. emissive
+  // 0.18 is below the 0.95 bloom threshold so the lettering stays crisp, not glowing.
+  const bannerTex = makeSignTexture(p.signLines || ["WESTWARD"]);
+  const banner = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.5 * s, 1.15 * s),
+    standard("#f3e3c2", { map: bannerTex, roughness: 0.92, emissive: "#7a5a30", emissiveIntensity: 0.18, rimStrength: 0 }),
+  );
+  banner.position.copy(toVec(ox, oy + (tankR + 0.06 * s), tankY + tankH * 0.5));
+  banner.castShadow = true; group.add(banner);
+  for (const sx of [-1.0 * s, 1.0 * s]) addBox(group, 0.06 * s, 0.5 * s, 0.04 * s, matBand, toVec(ox + sx, oy + (tankR + 0.04 * s), tankY + tankH - 0.2 * s));
+
+  // Glowing cyber tech-ring near the top (emissive, bloom-driven; no real light).
+  const techRing = new THREE.Mesh(
+    new THREE.CylinderGeometry(tankR + 0.1, tankR + 0.1, 0.16 * s, 24, 1, true),
+    standard("#29c6ff", { emissive: "#29c6ff", emissiveIntensity: 1.9 }),
+  );
+  techRing.position.copy(toVec(ox, oy, tankY + tankH * 0.82)); group.add(techRing);
+  const rivetMat = standard("#39d8ff", { emissive: "#39d8ff", emissiveIntensity: 2.2 });
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    addBox(group, 0.1 * s, 0.1 * s, 0.1 * s, rivetMat, toVec(ox + Math.cos(a) * (tankR + 0.12 * s), oy + Math.sin(a) * (tankR + 0.12 * s), tankY + tankH * 0.82));
+  }
+
+  // Holo-emblem finial — the cathedral 'spire': a short mast + a floating holo disc,
+  // the highest point on the skyline, a cyan beacon down the street.
+  addBox(group, 0.09 * s, 0.8 * s, 0.09 * s, matLid, toVec(ox, oy, tankY + tankH + 1.0 * s));
+  const holo = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.55 * s, 0.55 * s, 0.05 * s, 20),
+    standard("#39d8ff", { emissive: "#39d8ff", emissiveIntensity: 2.4, transparent: true, opacity: 0.55 }),
+  );
+  holo.rotation.x = Math.PI / 2;
+  holo.position.copy(toVec(ox, oy, tankY + tankH + 1.9 * s));
+  group.add(holo);
 }
 
 function buildBlacksmith(group, p) {
@@ -1534,13 +1579,13 @@ function _buildPlacementDispatch(group, p) {
     case "ironDoctor": return buildIronDoctor(group, p);
     case "antennaMast": return buildAntennaMast(group, p);
     case "roadSlime": return buildSlime(group, p);
-    case "walkInSaloon": return buildWalkInSaloon(group, p);
+    case "walkInSaloon": { const _r = buildWalkInSaloon(group, p); if (isWestwardTown(p)) applyCyberAging(group, p); return _r; }
     case "townGate": return buildTownGate(group, p);
     case "church": return buildChurch(group, p);
     case "windmill": return buildWindmill(group, p);
     case "waterTower": return buildWaterTower(group, p);
-    case "blacksmith": return buildBlacksmith(group, p);
-    case "hotel": return buildHotel(group, p);
+    case "blacksmith": { const _r = buildBlacksmith(group, p); if (isWestwardTown(p)) applyCyberAging(group, p); return _r; }
+    case "hotel": { const _r = buildHotel(group, p); if (isWestwardTown(p)) applyCyberAging(group, p); return _r; }
     case "saloon":
     case "saloonFacade": return buildBuilding(group, p, 1.15);
     case "storefront": return buildBuilding(group, p, 0.95);
@@ -3090,6 +3135,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // stepWorld rewrites the same material's emissiveIntensity hundreds of times/frame.
   const windowGlows = { panes: [], lights: [] };
   const paneSet = new Set();
+  const cyberFlickerSet = new Set(); // tagged cyber-aging emissives (dying neon/holo)
   scene.traverse((obj) => {
     if (obj.isPointLight && obj.userData?.windowGlow) {
       windowGlows.lights.push({ light: obj, base: obj.userData.baseIntensity ?? obj.intensity });
@@ -3097,6 +3143,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     }
     if (obj.isMesh && obj.material && !Array.isArray(obj.material) && obj.material.userData?.windowPaneBase !== undefined) {
       paneSet.add(obj.material);
+    }
+    if (obj.isMesh && obj.material && !Array.isArray(obj.material) && obj.material.userData?.cyberFlicker) {
+      cyberFlickerSet.add(obj.material);
     }
     if (!visualCapture && obj.isPointLight && obj.intensity <= 12) {
       const seed = (obj.position.x * 7.31 + obj.position.z * 13.73) % (Math.PI * 2);
@@ -3108,6 +3157,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     }
   });
   windowGlows.panes = [...paneSet];
+  const cyberFlickers = [...cyberFlickerSet].map((m) => ({ mat: m, base: m.emissiveIntensity, cfg: m.userData.cyberFlicker }));
 
   const objectiveGuidance = createObjectiveGuidance(snapshot);
   scene.add(objectiveGuidance.group);
@@ -3517,6 +3567,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         }
         lf.light.intensity = lf.base * mul;
       }
+    }
+    // Cyber-aging flicker — dying neon/holo tubes pulse their emissiveIntensity.
+    // fdt-gated → frozen under ?visual (dusk) so the golden frame holds each at its
+    // authored base; the waveform is the pure flickerValue (cyberAging.js).
+    if (fdt > 0 && cyberFlickers.length) {
+      for (const cf of cyberFlickers) cf.mat.emissiveIntensity = cf.base * flickerValue(waterTime, cf.cfg);
     }
     // B4 — wind-sway: tiny lean on tagged stake-props, applied as a delta off each
     // node's stored base rotation.z so it never drifts. fdt-gated → frozen under

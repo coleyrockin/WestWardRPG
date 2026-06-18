@@ -64,6 +64,10 @@ export function createGroundedMaterial(hex, opts = {}) {
     opacity,
   });
   mat.flatShading = resolvedFlatShading;
+  // Transparent decals/holos don't write depth (renderer convention) so they
+  // don't punch a depth hole or occlude props behind them; near-opaque (>0.92)
+  // keeps depthWrite for correct sorting.
+  if (transparent) mat.depthWrite = opacity > 0.92;
   if (map) mat.map = map;
   if (normalMap) mat.normalMap = normalMap;
   if (roughnessMap) mat.roughnessMap = roughnessMap;

@@ -245,7 +245,9 @@ const HERO_OBJECTS = [
 // at x 7.6 — posts on the frontage lines, lane clear. All heroTown* centers
 // sit west of x 5.5 so the slab-blocker audit box never sees them.
 const TOWN_EDGE = [
-  { kind: "townGate",       label: "Westward Gate Arch", x: 7.6, y: 8.9,  color: "#6b4a2c", size: 1.0 },
+  { kind: "townGate",       label: "Westward Gate Arch", x: 7.6, y: 8.9,  color: "#6b4a2c", size: 1.0, signLines: ["WESTWARD", "FREE TOWN · WATER IS LIFE"] },
+  { kind: "sign",           label: "Water Is Life Sign", x: 6.4, y: 11.6, color: "#9fe3ff", size: 0.7, signLines: ["WATER IS LIFE"] },
+  { kind: "sign",           label: "Water Ration Notice", x: 15.5, y: 11.4, color: "#ffd77b", size: 0.7, signLines: ["WATER RATION", "7 GALLONS", "NO EXCEPTIONS"] },
   { kind: "heroTownSaloon", label: "Westgate Saloon",    x: 2.6, y: 3.4,  color: "#a87848", size: 0.78 },
   { kind: "heroTownAssay",  label: "Land & Assay",       x: 5.0, y: 13.2, color: "#886038", size: 0.68, yaw: Math.PI },
   { kind: "heroTownStore",  label: "Pioneer Dry Goods",  x: 2.4, y: 13.1, color: "#9a7840", size: 0.66, yaw: Math.PI },
@@ -537,7 +539,7 @@ const WALKIN_SALOON = [
 const LANDMARK_BUILDINGS = [
   { kind: "church",     label: "Westward Chapel",     x: 26.2, y: 3.4,  color: "#cdb89a", size: 1.1 },
   { kind: "hotel",      label: "The Frontier Hotel",  x: 18.4, y: 13.6, color: "#8a5a3a", size: 1.0, yaw: Math.PI },
-  { kind: "waterTower", label: "Town Water Tower",    x: 20.8, y: 0.6,  color: "#6e5236", size: 1.2 },
+  { kind: "waterTower", label: "Town Water Tower",    x: 20.8, y: 0.6,  color: "#8a8170", size: 1.2 },
   { kind: "blacksmith", label: "Westward Forge",      x: 24.8, y: 13.8, color: "#463528", size: 1.0 },
   { kind: "windmill",   label: "Prairie Windmill",    x: 42.0, y: 0.2,  color: "#7a5c3a", size: 1.1 },
 ];
