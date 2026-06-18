@@ -55,6 +55,7 @@ import { createRouteSageField, floraVisibleAt, FLORA_CULL_SHOW, FLORA_CULL_HIDE 
 import { createPlaceholderCharacter } from "../game/world/character.js";
 import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
 import { createTownsfolk } from "../game/world/townsfolk.js";
+import { addTownLife } from "./townLife.js";
 import { pickExecutorBark, approvalCrossingTrigger } from "./executorBarks.js";
 import { hudIsActive, computeHudDimState, HUD_DIM_PANEL_IDS } from "./hudDim.js";
 import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
@@ -3190,6 +3191,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         getInteractable() { for (const g of groups) { const r = g.getInteractable(); if (r) return r; } return null; },
         talk() { for (const g of groups) { const r = g.talk?.(); if (r) return r; } return null; },
       };
+      // Phase D — static ambient life (saloon crowd, market stalls, hitched horses).
+      // Suppressed under ?visual by living in this !visualCapture block, so the dusk
+      // golden frame never sees it.
+      await addTownLife(scene);
     } catch (err) {
       console.warn("[render3d] townsfolk failed to load", err);
     }
@@ -3524,6 +3529,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const smokeEmitters = [
     createSmokeEmitter({ x: 24.95, y: 13.92, h: 5.4 }), // blacksmith stone stovepipe top
     createSmokeEmitter({ x: 18.4, y: 12.4, h: 6.0 }),   // hotel roofline / chimney mouth
+    createSmokeEmitter({ x: 19.3, y: 1.9, h: 5.6 }),    // Lucky Lantern saloon chimney
   ];
 
   const stepWorld = (dt) => {
