@@ -3018,6 +3018,19 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
                 phase: s,
               };
             }
+            // 1.4 — cattle graze: a slow nose-down head-dip + tiny settle, seeded
+            // per head (no Math.random → determinism) so the paddock reads as a
+            // calm grazing herd. Collected below; the loop is fdt-gated → frozen
+            // under capture, and the ranch sits far east of the dusk frame anyway.
+            if (p.kind === "cattle") {
+              const s = hashYaw(p.x * 1.7 - 0.3, p.y * 2.1 + 1.1); // 0..2π
+              node.userData.graze = {
+                freq: 0.18 + (s / (Math.PI * 2)) * 0.12, // 0.18–0.30 rad/s — unhurried
+                amp: 0.09, // forward pitch (rad) at full dip
+                bob: 0.03, // vertical settle as the head lowers
+                phase: s,
+              };
+            }
             // lamps/beacon/board carried their PointLight inside the old builder;
             // re-add it here for the model path (height is in local model units).
             if (entry.light) attachLight(props, p, entry.light, effScale);
@@ -3110,6 +3123,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // fdt-gated in stepWorld so capture (fdt=0) never sways. Under ?visual the model
   // stream is still in flight here, so this collects none — fine: capture is frozen.
   const windSwayers = [];
+  const cattleGrazers = []; // 1.4 — tagged paddock cattle, animated fdt-gated below
   // B2 — lamp-personality tiers. Derive a deterministic `kind` per lamp at collect
   // time (NO Math.random). "forge" = the blacksmith coal light, read by proximity to
   // the blacksmith placement (conversion-independent) backed by its hot, fully
@@ -3159,6 +3173,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     // B4 — collect tagged stake-props. Store the base rotation.z so sway is a delta.
     if (obj.userData?.windSway) {
       windSwayers.push({ node: obj, cfg: obj.userData.windSway, baseZ: obj.rotation.z });
+    }
+    // 1.4 — collect tagged cattle. Store base pitch + height so graze is a delta.
+    if (obj.userData?.graze) {
+      cattleGrazers.push({ node: obj, cfg: obj.userData.graze, baseX: obj.rotation.x, baseY: obj.position.y });
     }
   });
   windowGlows.panes = [...paneSet];
@@ -3590,6 +3608,16 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     if (fdt > 0 && windSwayers.length) {
       for (const sw of windSwayers) {
         sw.node.rotation.z = sw.baseZ + Math.sin(waterTime * sw.cfg.freq + sw.cfg.phase) * sw.cfg.amp;
+      }
+    }
+    // 1.4 — cattle graze: a slow head-dip. sin mapped to 0..1 so the cow only
+    // pitches DOWN from upright (nose to grass) then rises, settling a touch as it
+    // lowers — phase-offset per head → a calm, non-synchronised herd. fdt-gated.
+    if (fdt > 0 && cattleGrazers.length) {
+      for (const g of cattleGrazers) {
+        const dip = Math.sin(waterTime * g.cfg.freq + g.cfg.phase) * 0.5 + 0.5; // 0..1
+        g.node.rotation.x = g.baseX + dip * g.cfg.amp;
+        g.node.position.y = g.baseY - dip * g.cfg.bob;
       }
     }
     // B1 — chimney smoke: rises + drifts downwind. Pool is empty until the first
