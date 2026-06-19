@@ -38,34 +38,42 @@ Believability Pass is deployed) · play: `npm run play` → :5191.
 
 ---
 
-## ▶ NOW — tonight: build out the world + polish it
+## ▶ NOW — build out the world + polish it
 
-The look + the aliveness are in; the world is still **thin east of town**. Tonight = more *place*
-and more *polish*, each item its own gate-green commit, golden-safe by construction (all content is
-far from the dusk frame, or `fdt`-gated, or non-dusk palette). **World DRESSING is agent-buildable;
-story/naming/economy canon stays the owner's (see "owner-canon" below) — prompt Boyd, don't invent.**
+World build-out + polish, each item its own gate-green, golden-safe commit. Status from the
+2026-06-18 night session:
 
-**World build-out** (the open range east of town reads empty — give it landmarks + reasons to ride):
-1. **The Drift — exploration POIs.** The east badlands are bounty country (treatment): place a small
-   set of hero props — a downed-satellite wreck, a half-buried data-vault hatch, a feral-machine
-   nest — with `discoveryRuntime`/`poiSystem` hooks so riding to them pays off (loot/lore). Single
-   hero meshes or instanced (M0 doctrine); far from the dusk frame.
-2. **Road ruts (R3.1).** The `roadRut` kind exists but is unplaced — lay instanced wheel ruts along
-   the travelled roads so they read worn, not painted. Cheap, grounds every route.
-3. **Eastwater/Crossline ranch build-out.** The paddock has cattle + horses now; give it the rest of
-   a working ranch — rail fences, a water trough, a windmill, hay/feed, worn paths. Dressing only.
-4. **Calico Flats dressing.** West of the Pass — more restrained cyber-western kit (neon on
-   clapboard, antenna/cable, one steel-mustang) on the existing emissive/lamp systems. "Nothing is
-   sleek."
+**World build-out** — ✅ all four shipped (each PASS <0.13% on the dusk gate):
+1. ✅ **The Drift — exploration POIs** (`00af151`). 3 ride-to-discover beats (downed satellite /
+   sealed vault / machine graveyard) east of the wagon, dressed from existing model kinds +
+   loot/lore (`poiSystem` + `DRIFT_BADLANDS`).
+2. ✅ **Road ruts** (`fb960cb`). Worn two-track (rutMat + centre wear) on the whole OPEN_RANGE_ROADS
+   network via the existing `addRoadPlane` idiom.
+3. ✅ **Eastwater ranch** (`59fc2af`). It was already richly dressed — added the missing paddock
+   enclosure (north + west fence line). (Crossline Ranch as a *separate* family-seat region is still
+   unbuilt — a future world item.)
+4. ✅ **Calico cyber dressing** (`2b1aa5d`). Two skyline comms masts + a steel-mustang landmark to
+   thicken the free town's thin cyber layer.
 
 **Polish:**
-5. **Per-time-of-day env intensity.** The golden-hour IBL is installed static at boot; modulate
-   `scene.environmentIntensity` in `atmosphere.applyPalette` (dimmer/cooler at night, warm by day)
-   — **pin dusk at its current value so the golden frame is untouched.**
-6. **God-file extraction.** `spike.js` is ~5,300 lines (CLAUDE.md's flagged anti-pattern). Extract
-   the builder fleet into `src/render3d/build/` modules — **pure refactor, verify byte-stable** via
-   the golden gate + a before/after fast-capture. (A `claude/module-split` branch exists; review it
-   before redoing the work.)
+5. ✅ **Per-time-of-day env intensity** (`f7e5da2`). `palette.envIntensity` (day 1.12 / goldenHour
+   1.0 / dusk 0.9-pinned / night 0.5) carried through `lerpPalette`, written in `applyPalette`.
+6. ⬜ **God-file extraction — DEFERRED (next focused session, not a rushed overnight pass).**
+   `spike.js` is ~5,300 lines. The `claude/module-split` branch is **stale/irrelevant** (reviewed:
+   it splits the long-deleted legacy `game.js`, not spike.js — ignore it). Do it FRESH and
+   **incrementally**: the high-value target is the builder fleet (`buildX(group,p)`, lines ~339–1503)
+   → `src/render3d/build/` modules, but they're coupled through `standard()` + the grounded-material
+   machinery + cross-calls + the `buildPlacement` dispatch, so move them in small batches. **The dusk
+   golden gate only covers the town view** — verify each batch byte-stable with a BROADER fast-capture
+   sweep (town + open_range + marsh + Calico via `__spike.setPos`), not just the dusk frame. Leaf
+   builders with the fewest deps first (e.g. flora/rock/cactus already partly in `world/`); the
+   grounded-material `standard()` + `_groundedTownBuild` flag is the trickiest seam — extract it last
+   or pass it in explicitly.
+
+**Next world items after #6** (agent-buildable dressing, prompt Boyd for any naming/lore): the
+north spur → Prospector's Folly + the south spur → Sunken Wash read thin; Crossline Ranch as a
+distinct family-seat region; more Drift POIs (it's meant to be bounty country); wildlife in the open
+range.
 
 Pick top-down; re-bless dusk only if a change deliberately moves it (eyeball first).
 
