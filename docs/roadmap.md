@@ -1,23 +1,73 @@
-# RUSTWATER — Engine & Execution Roadmap
+# RUSTWATER — The Roadmap
 
-> **Direction (owner decision 2026-06-11):** the project's design canon is
-> [`rustwater-treatment.md`](rustwater-treatment.md) — a cyberpunk-western open-world RPG
-> (Ezra Cross, the Meridian Territory, the Executor). The shipped WestWard engine + Dustward
-> world are its **substrate**: we re-skin and extend progressively, the game stays playable
-> at every commit, and nothing tested gets rewritten from scratch. Public title stays
-> WestWard until the vertical slice exists.
+> **There is ONE roadmap (this file) and ONE handoff ([`NEXT-AGENT.md`](NEXT-AGENT.md)),
+> and they work hand-in-hand:** this doc owns *what gets built and in what order*; the handoff
+> owns *where we are right now / pick-up-here*. The treatment owns *what the game is*. No other
+> roadmap/plan/TODO files — fold and delete, never accrete (owner rule).
 
-**This is the single source of truth for execution.** The treatment owns *what the game is*;
-this doc owns *how it gets built*. No parallel TODO/PLAN files.
+> **Direction (owner, 2026-06-11):** the design canon is [`rustwater-treatment.md`](rustwater-treatment.md)
+> — a cyberpunk-western open-world RPG (Ezra Cross, the Meridian Territory, the Executor). The
+> shipped WestWard engine + Dustward world are its **substrate**: re-skin and extend progressively,
+> playable at every commit, nothing tested rewritten from scratch. Public title stays WestWard
+> until the vertical slice exists.
 
-**Companion guides (tactical how-to):**
-- [`rustwater-treatment.md`](rustwater-treatment.md) — the design canon (story, systems, world).
-- [`map-editing-guide.md`](map-editing-guide.md) — world layout: coordinates, guardrails, `__spike` hooks.
-- [`3d-art-direction.md`](3d-art-direction.md) — composition fundamentals (now bending toward "nothing is sleek").
-- [`world-realism-roadmap.md`](world-realism-roadmap.md) — R1–R4 world-aliveness spec (R3/R4 fold into M1's Calico dressing).
-- [`NEXT-AGENT.md`](NEXT-AGENT.md) — pick-up-here state for the next session.
+**Companion guides (NOT roadmaps — reference, kept):** [`rustwater-treatment.md`](rustwater-treatment.md)
+(design canon) · [`map-editing-guide.md`](map-editing-guide.md) (world layout/coords/`__spike` hooks) ·
+[`3d-art-direction.md`](3d-art-direction.md) (composition) · [`art-bible.md`](art-bible.md) (quality bar) ·
+[`water-plan.md`](water-plan.md) (the Meridian water system).
 
-Last updated: `2026-06-11` · main green at 693 vitest · live: westward-rpg.vercel.app
+Last updated: `2026-06-18` · main green at **896 vitest** · live: westward-rpg.vercel.app (the
+Believability Pass is deployed) · play: `npm run play` → :5191.
+
+---
+
+## Where we are (status of the milestones below)
+
+- **Believability Pass (Westward look) — ✅ SHIPPED + DEPLOYED.** Naturalistic PBR town, golden-hour
+  IBL, wet/puddle street, water-tower cathedral, cyber-aging, town life, golden-hour boot. Dusk
+  golden baseline re-blessed to match.
+- **M0 Performance — 🟡 IN PROGRESS.** Done: route-sage flora → `InstancedMesh`, distance-cull far
+  flora, shared contact-shadow material, shadow-lag fix (`shadowMap.autoUpdate=false`). Remaining:
+  merged/instanced town geometry, the **<400 draw-call ceiling in CI**, the reduced-fidelity WebGL2
+  demotion. (Owner: fill the foreground perf table below.)
+- **World-Aliveness (R1) — ✅ COMPLETE.** Motion + sound + biome identity + occupancy all shipped:
+  windmills, tumbleweeds, bird flocks, flora sway, lamp flicker, chimney smoke, walking NPCs that go
+  home after dark, the full audio layer, road-verge scatter, per-biome flora tint, the Eastwater
+  cattle paddock (grazing) + horses, and the dusk owl cue. Every motion system is `fdt`-gated
+  (frozen under the `?visual` capture → golden-safe).
+
+---
+
+## ▶ NOW — tonight: build out the world + polish it
+
+The look + the aliveness are in; the world is still **thin east of town**. Tonight = more *place*
+and more *polish*, each item its own gate-green commit, golden-safe by construction (all content is
+far from the dusk frame, or `fdt`-gated, or non-dusk palette). **World DRESSING is agent-buildable;
+story/naming/economy canon stays the owner's (see "owner-canon" below) — prompt Boyd, don't invent.**
+
+**World build-out** (the open range east of town reads empty — give it landmarks + reasons to ride):
+1. **The Drift — exploration POIs.** The east badlands are bounty country (treatment): place a small
+   set of hero props — a downed-satellite wreck, a half-buried data-vault hatch, a feral-machine
+   nest — with `discoveryRuntime`/`poiSystem` hooks so riding to them pays off (loot/lore). Single
+   hero meshes or instanced (M0 doctrine); far from the dusk frame.
+2. **Road ruts (R3.1).** The `roadRut` kind exists but is unplaced — lay instanced wheel ruts along
+   the travelled roads so they read worn, not painted. Cheap, grounds every route.
+3. **Eastwater/Crossline ranch build-out.** The paddock has cattle + horses now; give it the rest of
+   a working ranch — rail fences, a water trough, a windmill, hay/feed, worn paths. Dressing only.
+4. **Calico Flats dressing.** West of the Pass — more restrained cyber-western kit (neon on
+   clapboard, antenna/cable, one steel-mustang) on the existing emissive/lamp systems. "Nothing is
+   sleek."
+
+**Polish:**
+5. **Per-time-of-day env intensity.** The golden-hour IBL is installed static at boot; modulate
+   `scene.environmentIntensity` in `atmosphere.applyPalette` (dimmer/cooler at night, warm by day)
+   — **pin dusk at its current value so the golden frame is untouched.**
+6. **God-file extraction.** `spike.js` is ~5,300 lines (CLAUDE.md's flagged anti-pattern). Extract
+   the builder fleet into `src/render3d/build/` modules — **pure refactor, verify byte-stable** via
+   the golden gate + a before/after fast-capture. (A `claude/module-split` branch exists; review it
+   before redoing the work.)
+
+Pick top-down; re-bless dusk only if a change deliberately moves it (eyeball first).
 
 ---
 
@@ -25,122 +75,74 @@ Last updated: `2026-06-11` · main green at 693 vitest · live: westward-rpg.ver
 
 | Shipped WestWard system | RUSTWATER role |
 |---|---|
-| `src/jobBoard.js` + board modal UI | Main missions, faction chains, the **bounty office** (the treatment's infinite procedural board) |
+| `src/jobBoard.js` + board modal UI | Main missions, faction chains, the **bounty office** (infinite procedural board) |
 | `src/render3d/questRuntime.js` | Generic quest wiring for all mission taxonomies |
 | `src/npcMemory.js` | Relationships → courtship → **marriage/family** events |
-| `src/shopCatalog.js` + `tradeWithVendor` + `src/economyServices.js` | **Businesses** (saloon/stable/water-hauling/print shop…) |
+| `shopCatalog` + `tradeWithVendor` + `economyServices` | **Businesses** (saloon/stable/water-hauling/print shop…) |
 | `src/gearCrafting.js` | **Augments/Iron** (slots: eyes/arms/spine/heart/neural) |
 | `src/progressionSystem.js` | The five trees: **GUN / IRON / WIRE / TONGUE / TRAIL** |
-| `src/render3d/gameState.js` | Grows the three meters: **Cash / Standing / Legend** |
-| `frontierLayout.js` + biome ground (`biomeAt`) + the town kit | **Meridian regions** — Dustward → Calico Flats; Providence/Caldera/Drift/Crossline are new zones on the same tooling |
+| `src/render3d/gameState.js` | The three meters: **Cash / Standing / Legend** |
+| `frontierLayout.js` + `biomeAt`/`biome.js` + the town kit | **Meridian regions** — Dustward → Calico Flats; Providence/Caldera/Drift/Crossline on the same tooling |
 | Slime + `encounterSystem` | **Feral machines** (the Drift) — same FSM, new skin |
 | `worldClock` / weather / `savePersistence` (ironman) | Unchanged |
-| First-road loop (`phaseState.js`) | Stays the playable spine until M1 missions replace it beat-for-beat (tripwire: `render3d-phase-state.test.ts`) |
-| Old S6–S10 queue (travelled roads / courier quest / shop UI…) | Superseded as priorities; **preserved as patterns** — S7's courier wiring is M1's mission template, S8's shop UI is M2's business UI template |
+| First-road loop (`phaseState.js`) | Playable spine until M1 missions replace it beat-for-beat (tripwire: `render3d-phase-state.test.ts`) |
 
 ---
 
-## M0 — PERFORMANCE RESET (first, non-negotiable)
+## The milestones
 
-The game is laggy because it is draw-call-bound: ~3k+ individual meshes with per-mesh
-materials — a constraint imposed by the WebGPURenderer's WebGL2 *fallback*, which bans
-instancing/shared materials/merged geometry. The engine is not the problem; the ban is.
-**The owner has flagged lag twice — nothing else lands until this does.**
+### M0 — Performance reset (finish it)
+Draw-call-bound: full fidelity is WebGPU-only; the WebGL2 fallback demotes to reduced mode (halved
+scatter/weather, no shadow casters) instead of dictating the architecture. Batch the world
+(`InstancedMesh` scatter/flora/ruts — done for flora; town geometry next), shadow + distance culling.
+**Targets: ≥5× frame-time, <400 draw calls in town, locked by a CI draw-call ceiling.** Foreground
+perf table (owner fills from a real Chrome tab — the preview throttles and lies):
 
-1. **Measure** — foreground-tab protocol (the throttled preview lies): `perf.now` over 120
-   frames + `window.__westward3dStats()` at town / open range / marsh. Record the numbers
-   below. Headless CI probe: `npm run test:perf:baseline` (`scripts/perf_baseline_probe.mjs`).
+| Pose | ms/120f | Draw calls | Shadow casters | Notes |
+|------|---------|------------|----------------|-------|
+| town (9.5, 8.5) | _TBD_ | _TBD_ | _TBD_ | owner: foreground Chrome |
+| open_range (60, 12) | _TBD_ | _TBD_ | _TBD_ | owner: foreground Chrome |
+| marsh (48, 16) | _TBD_ | _TBD_ | _TBD_ | owner: foreground Chrome |
 
-   **Foreground protocol** (authoritative — run in a real, foreground Chrome tab at
-   `http://127.0.0.1:5191/?n=` + timestamp):
+### M1 — Meridian vertical slice (missions 1.1–1.3, playable)
+Act 1 opening, replacing the first-road loop beat-for-beat. **1.1 Dust to Dust** (funeral + implant +
+first Executor convo — the graveside cold-open already partly exists). **1.2 The Reading** (will +
+holdings tour + holdings UI). **1.3 Lord of the Manor** (the skimming saloon manager — first
+witnessed morality fork). Plus the Calico dressing pass + smart-link revolver v0. Tripwire:
+`render3d-phase-state.test.ts` stays green until the mission machine replaces the loop.
 
-   ```javascript
-   async function samplePose(x, z, label) {
-     window.__spike.setPos(x, z);
-     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-     const t0 = performance.now();
-     for (let i = 0; i < 120; i++) await new Promise(r => requestAnimationFrame(r));
-     const ms = performance.now() - t0;
-     const stats = window.__westward3dStats();
-     return { label, ms120: ms, fps: 120000 / ms, ...stats };
-   }
-   const poses = [
-     await samplePose(9.5, 8.5, "town"),
-     await samplePose(60, 12, "open_range"),
-     await samplePose(48, 16, "marsh"),
-   ];
-   console.table(poses);
-   ```
+### M2 — Systems of wealth
+Cash / Standing / Legend on gameState (+ HUD chips) · Trouble engine v0 (events scaled by Cash ×
+Legend) · Businesses v1 (saloon gossip→leads + bounty office) on shopCatalog/economyServices/jobBoard.
 
-   | Pose | Backend | ms/120f | Draw calls | Shadow casters | Notes |
-   |------|---------|---------|------------|----------------|-------|
-   | town (9.5, 8.5) | _TBD (foreground)_ | _TBD_ | _TBD_ | _TBD_ | Owner: fill from foreground Chrome |
-   | open_range (60, 12) | _TBD (foreground)_ | _TBD_ | _TBD_ | _TBD_ | Owner: fill from foreground Chrome |
-   | marsh (48, 16) | _TBD (foreground)_ | _TBD_ | _TBD_ | _TBD_ | Owner: fill from foreground Chrome |
+### M3 — Act 1 complete, through the Seizure
+Missions 1.4–1.8 · Providence skeleton (the Helios spire) · Director Vance · **The Seizure** with the
+five-asset choice branching Act 2's economy.
 
-   _Headless SwiftShader rows (CI sanity only — not comparable to foreground): run
-   `WESTWARD_URL=http://127.0.0.1:5191 npm run test:perf:baseline` and paste below when
-   available._
-2. **The WebGPU decision** — require WebGPU for full fidelity; demote the WebGL2 fallback to
-   a reduced mode (halved scatter/weather, no shadow casters) instead of letting it dictate
-   the architecture. CI smoke keeps running the fallback path — green by design.
-3. **Batch the world** (WebGPU path): `InstancedMesh` for scatter/flora/tumbleweeds/road
-   ruts (thousands of draws → ~10), merged static town geometry, shared material pools,
-   shadow-caster culling, distance culling. Targets: ≥5× frame-time improvement; draw calls
-   under ~400 in town.
-4. **Lock it in CI** — smoke wall-time budget + a draw-call ceiling assertion via the stats
-   probe, so perf regressions fail the gate.
+### M4+ — The wide game
+Act 2 faction lines · romance chains (npcMemory) · augments (gearCrafting) · full skill trees ·
+Caldera/Drift regions · the Hearing · Act 3 Water War · four endings. **Art-craft track** rides here:
+art-bible as the single quality source → UV/textured `.glb` proven on the WebGL2 backend → a
+Mixamo-hybrid character as the first full proof → per-region kits. Sequenced against the treatment's
+owner-design backlog.
 
-## M1 — MERIDIAN VERTICAL SLICE (missions 1.1–1.3, playable)
-
-The treatment's Act 1 opening, real and playable, replacing the first-road loop beat-for-beat:
-- **1.1 Dust to Dust** — the funeral, the implant, first Executor conversation. Reuses the
-  title→beat machinery (beatToast/phaseState patterns); the Executor speaks through the
-  prompt-bar/npc-speech channel with its own visual treatment.
-- **1.2 The Reading** — the will + holdings tour + holdings UI (seeded from gameState +
-  shopCatalog; boardDom's createElement/textContent pattern).
-- **1.3 Lord of the Manor** — the skimming saloon manager: fire / forgive / make-an-example —
-  first witnessed morality fork (npcMemory + decision pattern); seeds Legend.
-- **Calico dressing pass** — Dustward main street starts reading cyberpunk-western: neon
-  signage on the existing emissive/lamp systems, antenna/cable dressing, one steel-mustang
-  prop. Rule: **nothing is sleek**.
-- **"Westward" town — DECIDED (owner, 2026-06-11):** the free town the slice opens in (the
-  treatment's **Calico Flats**) wears **WESTWARD** on its gate sign — the codename lives on
-  as the place you start. The gate board already reads WESTWARD (`buildTownGate`); the rest
-  of the town-name reconciliation (Dustward → Calico Flats in the HUD + the "DUSTWARD ½ MI"
-  road sign) happens in this M1 reskin pass.
-- **Smart-link revolver v0** — re-skin playerCombat's draw/attack with a slow-mo hook (the
-  GUN tree's Deadeye Protocol seed).
-
-## M2 — SYSTEMS OF WEALTH
-
-- **Cash / Standing / Legend** on gameState (+ HUD chips); Standing gates in interaction/
-  dialogue; Legend feeds bounty prices and Trouble frequency.
-- **Trouble engine v0** — event scheduler scaled by Cash × Legend (lawsuits, kidnap
-  attempts, con artists), delivered through the existing job/encounter systems.
-- **Businesses v1** — saloon (gossip→quest leads) + bounty office (procedural board) on
-  shopCatalog/economyServices/jobBoard; staffing via the board-modal pattern.
-
-## M3 — ACT 1 COMPLETE, THROUGH THE SEIZURE
-
-Missions 1.4–1.8 · Providence region skeleton (the Helios spire on the landmark tooling) ·
-Director Vance · **The Seizure** with the five-asset choice branching Act 2's economy
-(savePersistence already handles divergent run state).
-
-## M4+ — THE WIDE GAME
-
-Act 2 faction lines (questRuntime) · romance chains (npcMemory) · augments (gearCrafting) ·
-full skill trees · Caldera/Drift regions · the Hearing · Act 3 Water War · four endings.
-Sequenced after M3 against the treatment's **"WHAT TO DESIGN NEXT"** backlog (Act 2
-beat-by-beat, skill trees, romance bios, economy math, the Seizure script — owner design
-sessions, not agent improvisation).
+**North star (post-M4, not a sprint target):** an event-sourced `(seed, input-log)` world that
+streams Elder-Scrolls-scale in a browser — radiant systems, a creation kit, optional MMO ghosts. It's
+the horizon the architecture already points at, not the plan.
 
 ---
+
+## Owner-canon vs agent-buildable (so nobody improvises the story)
+- **Owner-design-required (prompt Boyd):** Act 2 mission beats, the Seizure script, all four endings,
+  the Hearing verdict; economy math (the debt number, water-share prices, business income); the eight
+  romance arcs; the five skill trees' perks/costs; region/character NAMES and lore.
+- **Agent-buildable (just do it, golden-safe + gate-green):** regions as world dressing (POIs,
+  landmarks, props, ambient life, biome identity), batching/perf, UI on existing engines, polish.
 
 ## Standing rules
-
-- Every milestone = green gate (vitest · tsc · build · loop smoke · golden) + a playable
-  game at every commit.
-- The golden baseline re-blesses deliberately (eyeball first), never accidentally.
-- Engine modules extend in place; the carry-over map above is binding.
-- The treatment is owner-authored: design questions go to Boyd, not into improvisation.
+- Every commit: green gate (vitest · tsc · build) + golden-safe (dusk frame held, or deliberate
+  re-bless eyeballed first) + playable game.
+- Engine modules extend in place; the carry-over map is binding. `HERO_OBJECTS`/`FIRST_FIVE_ROUTE`
+  untouched until M1 replaces the loop. `firstFrameSlabBlockers === []`. Layout floors only rise.
+- The treatment is owner-authored — design questions go to Boyd, not into improvisation.
+- Deploy is the owner's call (one WebGPU verify + any dusk re-bless, then push).

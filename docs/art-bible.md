@@ -1,8 +1,8 @@
 # WestWard — Art Bible
 
-The committed quality target for characters and worlds. [`art-craft-roadmap.md`](art-craft-roadmap.md)
-is *how* we raise craft over time; this is the *bar each asset is measured against now*. Keep it
-short and enforce it: every asset clears the checklist before it ships.
+The committed quality target for characters and worlds — the *bar each asset is measured against
+now*. (The how-we-raise-craft-over-time track folded into [`roadmap.md`](roadmap.md)'s M4+ art-craft
+line.) Keep it short and enforce it: every asset clears the checklist before it ships.
 
 ## North star
 A **moving graphic novel** — a stylised hardcore western. Think *Sable* / *The Good, the Bad and
