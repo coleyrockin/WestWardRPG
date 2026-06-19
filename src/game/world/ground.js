@@ -18,6 +18,17 @@
 
 import * as THREE from "three";
 import { MeshToonNodeMaterial } from "three/webgpu";
+// biomeAt + the 1.3 biomeFloraTint live in ./biome.js (pure, no THREE) so
+// frontierLayout can tint flora without importing three/webgpu. Imported as
+// locals (localFogBoost/the TSL masks use them) and re-exported for existing
+// importers (tests, spike).
+import {
+  MARSH_CX, MARSH_CZ, MARSH_R_IN, MARSH_R_OUT,
+  BLUFF_CX, BLUFF_CZ, BLUFF_R_IN, BLUFF_R_OUT,
+  RANCH_CX, RANCH_CZ, RANCH_R_IN, RANCH_R_OUT,
+  biomeAt, biomeFloraTint,
+} from "./biome.js";
+export { biomeAt, biomeFloraTint };
 import {
   Fn,
   positionWorld,
@@ -116,44 +127,9 @@ export function waterBasin(x, z) {
   return Math.min(1, river + resv);
 }
 
-// ---------------------------------------------------------------------------
-// R2.1 — Biome zone masks (pure, mirrors the TSL smoothstep masks in
-// createGroundMaterial exactly — same centres, radii, and smooth01 math).
-//
-// Each zone uses a radial smoothstep falloff from its centre:
-//   inner radius → full weight (1.0); inner+fade → 0.0.
-// The three zones are non-overlapping (min centre distance >> outer radii sum).
-// ---------------------------------------------------------------------------
-
-// Marsh — Sunken Wash lowland, centre (76, 58)
-const MARSH_CX = 76, MARSH_CZ = 58, MARSH_R_IN = 16, MARSH_R_OUT = 26;
-// Bluff — Prospector's Folly north bluffs, centre (33.5, -29)
-const BLUFF_CX = 33.5, BLUFF_CZ = -29, BLUFF_R_IN = 14, BLUFF_R_OUT = 24;
-// Ranch — Eastwater Ranch grassland, centre (125, 12)
-const RANCH_CX = 125, RANCH_CZ = 12, RANCH_R_IN = 18, RANCH_R_OUT = 28;
-
-/** Biome classification at world position (x, z).
- *  Returns { key: "marsh"|"bluff"|"ranch"|"range", marsh, bluff, ranch }
- *  where the three numbers are [0,1] mask weights (same values the shader uses).
- */
-export function biomeAt(x, z) {
-  const marshDist = Math.sqrt((x - MARSH_CX) ** 2 + (z - MARSH_CZ) ** 2);
-  const bluffDist = Math.sqrt((x - BLUFF_CX) ** 2 + (z - BLUFF_CZ) ** 2);
-  const ranchDist = Math.sqrt((x - RANCH_CX) ** 2 + (z - RANCH_CZ) ** 2);
-
-  const marsh = 1 - smooth01(MARSH_R_IN, MARSH_R_OUT, marshDist);
-  const bluff = 1 - smooth01(BLUFF_R_IN, BLUFF_R_OUT, bluffDist);
-  const ranch = 1 - smooth01(RANCH_R_IN, RANCH_R_OUT, ranchDist);
-
-  let key = "range";
-  let best = 0;
-  if (marsh > best) { best = marsh; key = "marsh"; }
-  if (bluff > best) { best = bluff; key = "bluff"; }
-  if (ranch > best) { best = ranch; key = "ranch"; }
-  if (best < 0.5) key = "range";
-
-  return { key, marsh, bluff, ranch };
-}
+// R2.1 biome zone centres/radii + biomeAt + the 1.3 biomeFloraTint now live in
+// ./biome.js (pure, no THREE) — imported above for the TSL masks below and
+// re-exported for existing importers.
 
 // ---------------------------------------------------------------------------
 // R2.2 — Per-zone fog density multiplier (pure, for stepWorld to consume).

@@ -8,6 +8,11 @@
 //   +x = east, +y = south. Origin top-left of the world map.
 // The renderer maps world (x, y) -> 3D (X = east, Z = south, Y = up).
 
+// Pure biome helpers (no THREE) — used to tint open-range flora per biome zone
+// so marsh/bluff/ranch read distinct (1.3). biome.js is the shared source of
+// truth with the ground material's TSL biome masks.
+import { biomeAt, biomeFloraTint } from "../game/world/biome.js";
+
 export const FRONTIER_ANCHOR = { x: 9.5, y: 8.5 };
 
 // Player spawn — camera origin, looking east down the road.
@@ -933,12 +938,17 @@ function openRangeWilderness() {
       let flora = RANGE_FLORA[0];
       for (const f of RANGE_FLORA) { pick -= f.w; if (pick <= 0) { flora = f; break; } }
       const mega = flora.kind === "boulder" && hash01(n * 101.9) > 0.94;
+      // 1.3 — shift the flora colour toward its biome so marsh/bluff/ranch read
+      // distinct (rocks/boulders keep their mineral hue — only living flora tints).
+      const tinted = flora.kind === "rock" || flora.kind === "boulder"
+        ? flora.color
+        : biomeFloraTint(flora.color, biomeAt(x, y).key);
       out.push({
         kind: flora.kind,
         label: `Range ${flora.kind} ${n}`,
         x, y,
         yaw: hash01(n * 67.1) * Math.PI * 2,
-        color: flora.color,
+        color: tinted,
         size: mega ? 2.3 : 0.6 + hash01(n * 89.3) * 1.0,
       });
     }

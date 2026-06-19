@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error — JS module, no types
-import { valueNoise2, groundFbm, reliefMask, groundHeight, createGroundMaterial, biomeAt, localFogBoost, waterBasin } from "../src/game/world/ground.js";
+import { valueNoise2, groundFbm, reliefMask, groundHeight, createGroundMaterial, biomeAt, biomeFloraTint, localFogBoost, waterBasin } from "../src/game/world/ground.js";
 import { FIRST_FIVE_ROUTE } from "../src/render3d/frontierLayout.js";
 
 describe("ground", () => {
@@ -236,6 +236,41 @@ describe("R2.1 — biomeAt zone classification", () => {
         expect(b.ranch).toBeLessThanOrEqual(1);
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 1.3 — biomeFloraTint: shift flora colour toward its biome
+// ---------------------------------------------------------------------------
+describe("biomeFloraTint — per-biome flora colouring", () => {
+  it("leaves the base colour untouched in plain range / unknown biome", () => {
+    expect(biomeFloraTint("#70814b", "range")).toBe("#70814b");
+    expect(biomeFloraTint("#70814b", "nope")).toBe("#70814b");
+    expect(biomeFloraTint("#70814b")).toBe("#70814b");
+  });
+
+  it("returns a valid 6-digit hex for every biome", () => {
+    for (const key of ["marsh", "bluff", "ranch", "range"]) {
+      expect(biomeFloraTint("#70814b", key)).toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+
+  it("shifts the colour toward the biome (marsh greener, bluff rustier, ranch golder), not all the way", () => {
+    const base = "#70814b";
+    for (const key of ["marsh", "bluff", "ranch"]) {
+      const out = biomeFloraTint(base, key);
+      expect(out).not.toBe(base); // it moved
+    }
+    // bluff is ochre-rust → red channel rises vs the green base
+    const r = (h: string) => parseInt(h.slice(1, 3), 16);
+    expect(r(biomeFloraTint(base, "bluff"))).toBeGreaterThan(r(base));
+  });
+
+  it("amount 0 = base, amount 1 = the biome target, and is deterministic", () => {
+    const base = "#70814b";
+    expect(biomeFloraTint(base, "marsh", 0)).toBe(base);
+    expect(biomeFloraTint(base, "marsh", 1)).toBe("#7a8a6a"); // the ground marsh tint
+    expect(biomeFloraTint(base, "ranch", 0.4)).toBe(biomeFloraTint(base, "ranch", 0.4));
   });
 });
 
