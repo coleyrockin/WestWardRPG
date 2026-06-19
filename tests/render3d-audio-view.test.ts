@@ -17,7 +17,27 @@ import {
   biomePocketLevels,
   nightBedGainFor,
   NIGHT_BED_GAINS,
+  // 1.5 addition — dusk owl cue
+  duskOnset,
 } from "../src/render3d/audioView.js";
+
+describe("audioView — 1.5 duskOnset (day→night owl cue)", () => {
+  it("fires only on the transition INTO dusk", () => {
+    expect(duskOnset("goldenHour", "dusk")).toBe(true);
+    expect(duskOnset("day", "dusk")).toBe(true);
+    expect(duskOnset("night", "dusk")).toBe(true);
+  });
+  it("does not fire while already in dusk, or on other keys", () => {
+    expect(duskOnset("dusk", "dusk")).toBe(false);
+    expect(duskOnset("dusk", "night")).toBe(false);
+    expect(duskOnset("goldenHour", "goldenHour")).toBe(false);
+    expect(duskOnset("day", "night")).toBe(false);
+  });
+  it("guards empty / undefined prev (no spurious fire on first frame if it boots at dusk)", () => {
+    expect(duskOnset("", "dusk")).toBe(true); // first-ever observation of dusk DOES cue
+    expect(duskOnset(undefined, "goldenHour")).toBe(false);
+  });
+});
 
 describe("audioView — event routing", () => {
   it("freezes the sfx vocabulary and routing table", () => {

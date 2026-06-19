@@ -54,6 +54,8 @@ export function biomePocketLevels(x: number, y: number): BiomePocketLevels;
 export const NIGHT_BED_GAINS: Readonly<Record<string, number>>;
 export function nightBedGainFor(paletteKey: string): number;
 
+export function duskOnset(prevKey: string | undefined, key: string): boolean;
+
 export interface AudioViewUpdate {
   moving?: boolean;
   running?: boolean;

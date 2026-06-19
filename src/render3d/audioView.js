@@ -164,6 +164,12 @@ export function nightBedGainFor(paletteKey) {
   return NIGHT_BED_GAINS[paletteKey] ?? 0;
 }
 
+// 1.5 — dusk onset: true only on the transition INTO dusk (the day→night cue),
+// so the owl hoots once as the light fails, not every frame the palette is dusk.
+export function duskOnset(prevKey, key) {
+  return key === "dusk" && prevKey !== "dusk";
+}
+
 // ---------------------------------------------------------------------------
 // Imperative shell
 // ---------------------------------------------------------------------------
@@ -519,6 +525,41 @@ function fireCoyoteHowl(ctx, out) {
   vib.stop(now + 1.85);
 }
 
+// 1.5 — Owl hoot one-shot: a soft two-note "hoo-hoo" — sine gliding 380→300 Hz,
+// rounder/lower than the coyote (no vibrato, a touch of lowpass), with two gain
+// pulses. The dusk acoustic signature for the day→night handoff. Panned per call.
+function fireOwlHoot(ctx, out) {
+  const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  const target = pan || out;
+  if (pan) {
+    pan.pan.value = (Math.random() * 2 - 1) * 0.55;
+    pan.connect(out);
+  }
+
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(380, now);
+  osc.frequency.exponentialRampToValueAtTime(300, now + 0.9);
+
+  // Soft lowpass rounds the tone toward a breathy hoot (skipped if unavailable).
+  const lp = ctx.createBiquadFilter ? ctx.createBiquadFilter() : null;
+  if (lp) { lp.type = "lowpass"; lp.frequency.value = 900; }
+
+  // Two gain pulses — "hoo … hoo".
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(0, now);
+  env.gain.linearRampToValueAtTime(0.16, now + 0.08);
+  env.gain.exponentialRampToValueAtTime(0.0008, now + 0.42);
+  env.gain.linearRampToValueAtTime(0.14, now + 0.6);
+  env.gain.exponentialRampToValueAtTime(0.0001, now + 1.05);
+
+  osc.connect(env);
+  if (lp) { env.connect(lp); lp.connect(target); } else { env.connect(target); }
+  osc.start(now);
+  osc.stop(now + 1.1);
+}
+
 // createAudioView() — the spike's audio singleton.
 //   unlock()                       call inside a user gesture; idempotent.
 //   update(dt, opts)               per-frame; drives boots, wind, pockets, night.
@@ -556,6 +597,8 @@ export function createAudioView({ contextFactory } = {}) {
   let cattleTimer = 0;
   let saloonTimer = 0;
   let coyoteTimer = 0;
+  let owlTimer = 0;
+  let prevPaletteKey = ""; // tracks dusk onset for the owl cue
 
   // Randomise a timer in [lo, hi] seconds.
   const rng = (lo, hi) => lo + Math.random() * (hi - lo);
@@ -563,6 +606,7 @@ export function createAudioView({ contextFactory } = {}) {
   const resetCattle = () => { cattleTimer = rng(20, 40); };
   const resetSaloon = () => { saloonTimer = rng(15, 30); };
   const resetCoyote = () => { coyoteTimer = rng(60, 120); };
+  const resetOwl    = () => { owlTimer    = rng(35, 70); };
 
   const makeContext = () => {
     if (contextFactory) return contextFactory();
@@ -797,6 +841,20 @@ export function createAudioView({ contextFactory } = {}) {
       // Reset so coyote doesn't instantly howl when night starts.
       if (coyoteTimer < 10) resetCoyote();
     }
+
+    // 1.5 — owl: the dusk acoustic signature. A first hoot cues the day→night
+    // handoff (seeded a beat after dusk onset), then occasional hoots through
+    // dusk on a 35–70 s timer. Gated to dusk so it never overlaps the night
+    // coyote; audio never runs under the ?visual capture (golden-safe).
+    if (duskOnset(prevPaletteKey, paletteKey)) owlTimer = rng(1.5, 4);
+    if (paletteKey === "dusk") {
+      owlTimer -= dt;
+      if (owlTimer <= 0) {
+        fireOwlHoot(ctx, buses.ambient);
+        resetOwl();
+      }
+    }
+    prevPaletteKey = paletteKey;
   };
 
   const onLoopEvent = (event) => {
