@@ -641,6 +641,14 @@ const EASTWATER_RANCH = [
   { kind: "fence",       label: "Paddock Rail W",         x: 128.5, y: 5.6,  color: "#a47b4c", size: 0.62 },
   { kind: "fence",       label: "Paddock Rail C",         x: 132.5, y: 5.4,  color: "#a47b4c", size: 0.62, yaw: 0.12 },
   { kind: "fence",       label: "Paddock Rail E",         x: 136.5, y: 5.8,  color: "#a47b4c", size: 0.6,  yaw: -0.1 },
+  // Enclose the paddock — the grazing herd sat in an open field. A north rail
+  // line + a west return (with the W/C/E rails as the south-east edge) read it as
+  // a kept pasture. E–W rails on the north run (yaw≈0); N–S rails close the west.
+  { kind: "fence",       label: "Paddock Rail N1",        x: 121.0, y: 2.7,  color: "#a47b4c", size: 0.62, yaw: 0.05 },
+  { kind: "fence",       label: "Paddock Rail N2",        x: 125.0, y: 2.6,  color: "#a47b4c", size: 0.62, yaw: -0.06 },
+  { kind: "fence",       label: "Paddock Rail N3",        x: 129.0, y: 2.8,  color: "#a47b4c", size: 0.6,  yaw: 0.08 },
+  { kind: "fence",       label: "Paddock Rail NW",        x: 118.9, y: 4.2,  color: "#a47b4c", size: 0.58, yaw: 1.57 },
+  { kind: "fence",       label: "Paddock Rail SW",        x: 118.7, y: 6.4,  color: "#a47b4c", size: 0.58, yaw: 1.57 },
   { kind: "brokenFence", label: "Gate Rail",              x: 120.8, y: 16.3, color: "#8d6540", size: 0.46 },
   { kind: "cart",        label: "Ranch Supply Cart",      x: 124.4, y: 13.0, color: "#b9824d", size: 0.72, yaw: 0.5 },
   { kind: "crate",       label: "Feed Crates",            x: 127.2, y: 11.9, color: "#b9824d", size: 0.6 },
