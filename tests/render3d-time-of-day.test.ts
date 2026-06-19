@@ -35,9 +35,11 @@ describe("timeOfDay — keys & palette table", () => {
         expect(Number.isFinite(p.sun.dir[axis])).toBe(true);
         expect(Number.isFinite(p.rim.dir[axis])).toBe(true);
       }
-      for (const n of [p.sun.intensity, p.hemi.intensity, p.rim.intensity, p.exposure, p.stars, p.bloom]) {
+      for (const n of [p.sun.intensity, p.hemi.intensity, p.rim.intensity, p.exposure, p.stars, p.bloom, p.envIntensity]) {
         expect(Number.isFinite(n)).toBe(true);
       }
+      // dusk's env intensity must stay pinned to the boot 0.9 (golden frame).
+      if (p.key === "dusk") expect(p.envIntensity).toBe(0.9);
     }
   });
 
@@ -132,6 +134,7 @@ describe("lerpPalette", () => {
     const mid = lerpPalette(a, b, 0.5);
     expect(mid.exposure).toBeCloseTo((a.exposure + b.exposure) / 2, 6);
     expect(mid.bloom).toBeCloseTo((a.bloom + b.bloom) / 2, 6);
+    expect(mid.envIntensity).toBeCloseTo((a.envIntensity + b.envIntensity) / 2, 6);
     expect(mid.sun.dir.x).toBeCloseTo((a.sun.dir.x + b.sun.dir.x) / 2, 6);
   });
 

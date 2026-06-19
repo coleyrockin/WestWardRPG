@@ -22,6 +22,7 @@ export interface Palette {
   exposure: number;
   stars: number;
   bloom: number;
+  envIntensity: number;
   grade: {
     tint: string;
     amount: number;

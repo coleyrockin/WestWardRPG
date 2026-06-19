@@ -250,6 +250,14 @@ export function createAtmosphere(scene, renderer, opts = {}) {
 
     renderer.toneMappingExposure = p.exposure;
 
+    // IBL strength tracks the time of day — the golden-hour env map reflects full
+    // at day/dusk and dims toward night so metals don't glow under moonlight. Only
+    // when an env map is actually installed (envLight); dusk's value equals the boot
+    // 0.9 so the golden frame is unchanged.
+    if (scene.environment && typeof p.envIntensity === "number") {
+      scene.environmentIntensity = p.envIntensity;
+    }
+
     // tint the cloud streaks toward the sky mid color (reuse scratch colours)
     const cloudTint = _cloudMid.set(p.sky.mid).lerp(_cloudHorizon.set(p.sky.horizon), 0.4);
     for (const m of clouds.meshes) {

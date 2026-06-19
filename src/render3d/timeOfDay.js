@@ -36,6 +36,7 @@ export const PALETTES = Object.freeze({
     exposure: 1.12,
     stars: 0,
     bloom: 0.4, // was 0.3 — more glow budget so authored neon signs read as neon in daylight
+    envIntensity: 1.12, // bright daylight sky → metals catch more reflected light
     grade: {
       tint: "#ffd9a0", amount: 0.02, contrast: 1.18, saturation: 1.13,
       shadowTint: "#2e3c6e", highlightTint: "#fff0c8",
@@ -64,6 +65,7 @@ export const PALETTES = Object.freeze({
     exposure: 1.0,
     stars: 0.18,
     bloom: 0.32,
+    envIntensity: 0.9, // PINNED to the boot/blessed value (envLight 0.9) → dusk golden frame unchanged
     grade: {
       // De-orange pass: warm tint eased and split released (0.28 → 0.18) so dusk
       // reads as cool evening light around warm lanterns, not an amber filter.
@@ -100,6 +102,7 @@ export const PALETTES = Object.freeze({
     exposure: 1.27,
     stars: 0,
     bloom: 0.50,
+    envIntensity: 1.0, // golden-hour key — close to the static boot value
     // Cinematic grade: a strong cool-shadow / warm-highlight split so the golden key
     // reads as warm light against cool shadow rather than a single-hue orange wash.
     // Deeper/cooler shadow tint + harder split is the decisive anti-orange knob;
@@ -139,6 +142,7 @@ export const PALETTES = Object.freeze({
     fill: { color: "#3a5080", intensity: 0.26 },
     exposure: 0.95,
     stars: 1.0,
+    envIntensity: 0.5, // dim moonlight → metals read dark; lamps + neon carry the night
     // Bloom 1.2 → 1.6 + threshold 0.80: Westward should get MORE beautiful at night —
     // push the authored lamp/neon emissives (intensity ~2.2) to bloom like the
     // reference's saloon-as-lighthouse. Subtle godray (moon, not sun); moody vignette.
@@ -264,6 +268,9 @@ export function lerpPalette(p1, p2, t) {
     exposure: lerp(p1.exposure, p2.exposure, t),
     stars: lerp(p1.stars, p2.stars, t),
     bloom: lerp(p1.bloom, p2.bloom, t),
+    // IBL strength per time-of-day (dimmer at night). Default 0.9 = the envLight
+    // boot value, so a palette omitting it renders bit-identically to before.
+    envIntensity: lerp(p1.envIntensity ?? 0.9, p2.envIntensity ?? 0.9, t),
     grade: {
       tint: lerpColor(p1.grade.tint, p2.grade.tint, t),
       amount: lerp(p1.grade.amount, p2.grade.amount, t),
