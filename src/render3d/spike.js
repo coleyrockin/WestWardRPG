@@ -50,7 +50,7 @@ import { createWorldClock, tickClock, pinClock, cycleClock, dayTimeToKey } from 
 import { createWater } from "../game/world/water.js";
 import { waterBodies, DAM, waterCollisionBoxes } from "./waterLayout.js";
 import { createGroundMaterial, groundHeight, localFogBoost } from "../game/world/ground.js";
-import { createScatter } from "../game/world/scatter.js";
+import { createScatter, createRoadVergeScatter } from "../game/world/scatter.js";
 import { createRouteSageField, floraVisibleAt, FLORA_CULL_SHOW, FLORA_CULL_HIDE } from "../game/world/flora.js";
 import { createPlaceholderCharacter } from "../game/world/character.js";
 import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
@@ -2910,6 +2910,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   scene.add(openingLightPools.group);
   scene.add(roadDust.group);
   createScatter(scene, { center: { x: 35, z: 13 }, area: 78, count: 850, backend, reducedFidelity });
+  // Road-verge ground cover hugging the open-range corridor shoulders (x≈24–62),
+  // where the broad scatter thins and the route read bare at close range. Batched
+  // (≤4 draws), deterministic, lane stays empty. See scatter.js.
+  createRoadVergeScatter(scene, { route: FIRST_FIVE_ROUTE, backend, reducedFidelity });
 
   // Animated marsh water (replaces the flat plane that used to live in buildGround).
   const water = createWater({ width: 29, height: 6.2, skyTint: appliedPalette.sky.horizon });
