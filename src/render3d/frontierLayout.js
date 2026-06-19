@@ -832,6 +832,26 @@ const CYBER_DRESSING = [
 
 // Far navigation landmarks — big verticals that read across the range and give
 // every horizon a destination.
+// The Drift — badlands bounty country east of the broken wagon (x60.5). Dressed
+// to match the treatment (dead satellites, buried vaults, feral ag-machines) with
+// EXISTING model kinds — no new Blender. Each cluster's hero prop sits at its POI
+// coord (poiSystem `drift_*`) so riding to the silhouette triggers the discovery.
+// All off the east road corridor (band y≈10–16 over x60.5–88) and far east of the
+// dusk frame → golden-safe. Spread x66–82, y6–26 so it reads as country to cross.
+const DRIFT_BADLANDS = [
+  // Downed satellite (POI 70,19.5) — a wreck silhouette + scree.
+  { kind: "brokenWagon", label: "Satellite Wreck",   x: 70.0, y: 19.5, color: "#9aa2ac", size: 1.05, yaw: -0.7 },
+  { kind: "rock",        label: "Satellite Panel",   x: 71.3, y: 18.6, color: "#7d8794", size: 0.9,  yaw: 0.5 },
+  { kind: "deadTree",    label: "Satellite Mast",    x: 69.1, y: 20.4, color: "#4a4640", size: 0.8,  yaw: 1.1 },
+  // Sealed vault (POI 80,7.5) — a half-sunk metal hatch + boulder cap.
+  { kind: "crate",       label: "Vault Hatch",       x: 80.0, y: 7.5,  color: "#5a5048", size: 1.2,  yaw: 0.3 },
+  { kind: "boulder",     label: "Vault Cap",         x: 81.2, y: 8.3,  color: "#6a6058", size: 1.1 },
+  // Machine graveyard (POI 68,24) — rusted hulks: boulders + dead snags.
+  { kind: "boulder",     label: "Harvester Hulk",    x: 68.0, y: 24.0, color: "#5c4f44", size: 1.35 },
+  { kind: "deadTree",    label: "Harvester Snag",    x: 66.6, y: 25.1, color: "#463528", size: 0.95, yaw: 2.2 },
+  { kind: "rock",        label: "Machine Scree",     x: 69.2, y: 25.0, color: "#675c52", size: 0.8 },
+];
+
 const RANGE_LANDMARKS = [
   { kind: "heroMesaSkyline", label: "Sentinel Butte",    x: 105.0, y: -38.0, color: "#4e5870", size: 2.3, heightMul: 1.9, heroPeak: true },
   { kind: "mesaSkyline",     label: "Northwest Rampart", x: -28.0, y: -40.0, color: "#485266", size: 1.6, heightMul: 1.25 },
@@ -988,6 +1008,7 @@ const ABSOLUTE_ZONES = [
   ...EASTWATER_RANCH,
   ...PROSPECTORS_FOLLY,
   ...SUNKEN_WASH,
+  ...DRIFT_BADLANDS,
   ...RANGE_LANDMARKS,
   ...openRangeBoundaryRing(),
   ...openRangeWilderness(),

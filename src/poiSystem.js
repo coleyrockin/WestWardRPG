@@ -148,6 +148,41 @@ export const POI_DEFINITIONS = {
       mysteryLine: "The stranger knows which job you almost accepted.",
       returnReason: "The sealed note can become a non-combat rumor thread.",
     },
+    // The Drift — badlands bounty country east of the wagon (treatment: dead
+    // satellites, buried data vaults, feral ag-machines). Ride-to-discover beats
+    // that pay off the empty open range. Coords match the DRIFT_BADLANDS props in
+    // frontierLayout; all off the east road corridor + far from the dusk frame.
+    {
+      id: "drift_downed_satellite",
+      kind: "ruin",
+      x: 70.0,
+      y: 19.5,
+      label: "Downed Satellite",
+      loot: { gold: 34, items: { "Scrap Coil": 1 } },
+      mysteryLine: "Solar wings half-buried in the dust — and warm to the touch.",
+      loreHint: "Pre-Severance comms array. Someone pried the data core out years ago.",
+    },
+    {
+      id: "drift_sealed_vault",
+      kind: "hideout",
+      x: 80.0,
+      y: 7.5,
+      label: "Sealed Vault",
+      loot: { gold: 48, items: { "Sealed Note": 1 } },
+      buff: { stamina: 8 },
+      mysteryLine: "A bunker hatch, seam glowing faint under the rust.",
+      loreHint: "Helios-Pacific cached more than water out here before the charter.",
+    },
+    {
+      id: "drift_machine_graveyard",
+      kind: "mine",
+      x: 68.0,
+      y: 24.0,
+      label: "Machine Graveyard",
+      loot: { gold: 28, items: { "Scrap Coil": 2 } },
+      mysteryLine: "Oil-black sand and the hulks of harvesters that went feral.",
+      loreHint: "The ag-machines stopped taking orders the year the wells were seized.",
+    },
   ],
   ashfall: [
     {
