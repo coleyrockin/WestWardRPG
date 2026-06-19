@@ -2706,6 +2706,20 @@ function buildGround(scene, snapshot) {
         edgeMat,
       );
     }
+    // Worn two-track: wheel ruts + a faint centre wear, so the open-range roads
+    // read as travelled wagon roads (not flat ribbons) — the same rutMat/centerMat
+    // the first road uses. Offsets scale with road width so the narrow spurs keep
+    // their tracks off the edge. (R3.1; same addRoadPlane idiom as the edges above.)
+    for (const off of [-seg.width * 0.3, seg.width * 0.3]) {
+      addRoadPlane(
+        { x: seg.from.x + nx * off, y: seg.from.y + nz * off },
+        { x: seg.to.x + nx * off, y: seg.to.y + nz * off },
+        0.26,
+        0.044,
+        rutMat,
+      );
+    }
+    addRoadPlane(seg.from, seg.to, 0.15, 0.045, centerMat);
   }
 }
 
