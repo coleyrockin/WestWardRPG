@@ -21,6 +21,9 @@ __pycache__/
 *.pyc
 root/
 
+# Throwaway perf/boot probes (recreate on demand — never commit)
+scripts/_*tmp*
+
 # OS/editor noise
 .DS_Store
 .vscode/
