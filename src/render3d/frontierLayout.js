@@ -836,6 +836,13 @@ const CYBER_DRESSING = [
   // the dusk hero-capture frame (camera at 6.6,3.5,10.2 looking east) — flagged for a
   // golden re-bless. Off the spawn wedge (y 4 < 6.5) and ~1.9u off the jobBoard waypoint.
   { kind: "antennaMast",  label: "Watchtower Comms Mast",     x: 14.0,  y: 4.0,  color: "#7d8270", size: 0.85, beacon: "red" },
+  // Calico's cyber layer — the free town's "neon on clapboard" identity was thin
+  // (just the iron doctor's wagon). Two comms masts break the skyline behind the
+  // saloon row, and a steel-mustang lands as a landmark at the west end by the
+  // water tower. All far west (x<-44) → OUT of the dusk frame. "Nothing is sleek."
+  { kind: "antennaMast",  label: "Saloon Row Mast",           x: -49.0, y: 3.2,  color: "#74796a", size: 0.8,  beacon: "red" },
+  { kind: "antennaMast",  label: "Mercantile Mast",           x: -56.5, y: 3.0,  color: "#6f7468", size: 0.75 },
+  { kind: "steelMustang", label: "Calico Steel Mustang",      x: -59.5, y: 12.4, color: "#8a7d6c", size: 1.0,  yaw: 0.6 },
 ];
 
 // Far navigation landmarks — big verticals that read across the range and give
