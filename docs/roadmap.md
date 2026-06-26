@@ -38,10 +38,34 @@ Believability Pass is deployed) · play: `npm run play` → :5191.
 
 ---
 
-## ▶ NOW — build out the world + polish it
+## ▶ NOW — the Playable Slice (owner reset, 2026-06-18)
 
-World build-out + polish, each item its own gate-green, golden-safe commit. Status from the
-2026-06-18 night session:
+**New top priority: a polished 5-minute RPG slice with the architecture of a larger game** — not more
+world. The world is dressed; what's missing is *RPG feel*. Full audit: [`../SYSTEM_AUDIT.md`](../SYSTEM_AUDIT.md).
+Diagnosis: the opening already has a full arc (funeral → town → bounty → slime → return) but reads as
+a guided tutorial — the job comes from a *sign*, not a person, and the arc ends on a fizzle. Fix it
+with a small dialogue/mission primitive on the clean systems we already have. **No god-file rewrite,
+no world changes, no new deps.**
+
+- **M-Slice-1 — "A Voice, a Job, a Payoff" (FIRST, in progress).** The opening bounty is *given by a
+  character* via a short conversation and ends with a real "BOUNTY COMPLETE" beat (reward + a hook),
+  not a teaser. Clone `boardModal`/`boardDom` → a tiny dialogue modal; conversation + completion lines
+  as DATA; wire at the existing board beat + the return beat. Golden-safe (hidden UI, no town
+  geometry). The biggest visible RPG-feel leap, small + reversible.
+- **M-Slice-2 — mission-as-data seed.** Lift the opening's name/objective/reward/completion into a
+  small `mission` data object + thin runner that frames the existing FSM beats (no FSM rewrite).
+- **M-Slice-3 — one more talkable NPC** with a real (data) conversation + a second short objective —
+  proves the dialogue/mission pattern scales.
+- **M-Struct-1 — god-file decomposition, increment 1** (the deferred #6 below): extract `build*`
+  builders → `src/render3d/build/`. Do AFTER the slice, incrementally, broad-capture-verified.
+
+Then resume world build-out (Folly/Wash spurs, Crossline region, wildlife) once the slice feels good.
+
+---
+
+## Shipped 2026-06-18 night — world build-out + polish (golden-safe, dusk PASS <0.13%)
+
+These landed before the slice reset; kept for reference.
 
 **World build-out** — ✅ all four shipped (each PASS <0.13% on the dusk gate):
 1. ✅ **The Drift — exploration POIs** (`00af151`). 3 ride-to-discover beats (downed satellite /
