@@ -4062,12 +4062,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       // Loaded-interior doors are free-roam affordances (not loop-gated): a street
       // door enters, an interior door leaves. setTargets keeps each visible only in
       // its own location, so allowing both here is safe.
-      target?.kind === "buildingDoor" || target?.kind === "exitDoor" ||
+      target?.kind === "buildingDoor" || target?.kind === "exitDoor" || target?.kind === "npcTalk" ||
       (target?.kind === "mountHorse" && !player.isMounted) || loopState.isTargetEnabled(target),
     getPromptText: (target) => {
-      // Doors + mountHorse are free-roam affordances with no active loop phase, so
-      // loopState.getPromptForTarget returns "" — surface their static prompt.
-      if (target?.kind === "buildingDoor" || target?.kind === "exitDoor") return promptFor(target);
+      // Doors / NPC talk / mountHorse are free-roam affordances with no active loop
+      // phase, so loopState.getPromptForTarget returns "" — surface their static prompt.
+      if (target?.kind === "buildingDoor" || target?.kind === "exitDoor" || target?.kind === "npcTalk") return promptFor(target);
       if (target?.kind === "mountHorse") return promptFor(target);
       const prompt = loopState.getPromptForTarget(target);
       if (target?.kind !== "roadSlime" || loopState.phase !== "slime_fight" || !encounter) return prompt;
@@ -4094,6 +4094,13 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   interaction.registerHandler("buildingDoor", (t) =>
     locationView.enter(t.locationId, { returnTo: { x: t.x, z: t.y, yaw: 0 } }));
   interaction.registerHandler("exitDoor", () => locationView.exit());
+  // Talk to a building's character (slice 2b: Mabel in the saloon). Speaks one
+  // characterful line through the npcSpeech channel (the loop renders npcSpeechMsg).
+  interaction.registerHandler("npcTalk", (t) => {
+    npcSpeechMsg = `${t.name}: "${t.line}"`;
+    npcSpeechT = 4.5;
+    setPromptText(npcSpeechMsg);
+  });
 
   const boardModal = document.getElementById("board-modal");
   const boardAccept = document.getElementById("board-accept");

@@ -86,13 +86,33 @@ function buildSaloonInterior(origin) {
   neonLight.position.set(origin.x, 2.55, origin.z - hd + 0.6);
   group.add(neonLight);
 
+  // Mabel Crane — owner of The Rusty Spur. Ex water-courier; the right arm is
+  // salvaged iron (the cyber note). A simple stylized figure behind the bar.
+  const apron = new THREE.MeshStandardMaterial({ color: "#5a3b34", roughness: 0.85 });
+  const skin = new THREE.MeshStandardMaterial({ color: "#caa07e", roughness: 0.7 });
+  const iron = new THREE.MeshStandardMaterial({ color: "#8a8f98", roughness: 0.4, metalness: 0.8 });
+  const mz = barZ - 0.7; // behind the counter
+  add(new THREE.CylinderGeometry(0.26, 0.34, 1.1, 12), apron, 0, 0.55, mz);          // torso
+  add(new THREE.SphereGeometry(0.22, 16, 12), skin, 0, 1.28, mz);                     // head
+  add(new THREE.CylinderGeometry(0.07, 0.07, 0.7, 8), skin, -0.34, 0.9, mz, 0.3);     // left (flesh) arm
+  add(new THREE.CylinderGeometry(0.08, 0.08, 0.72, 8), iron, 0.34, 0.9, mz, -0.3);    // right (iron) arm
+
+  const exitTarget = { kind: "exitDoor", x: origin.x, y: origin.z + hd - 0.5 };
+  const mabel = {
+    kind: "npcTalk",
+    id: "mabel",
+    name: "Mabel",
+    x: origin.x,
+    y: origin.z + mz,
+    line: "Cross's kid. I'd know that jaw anywhere. Sit — first drink's on the house, the talk never is.",
+  };
+
   proxies.push(
     aabb(origin.x, origin.z + barZ, 8, 0.8),          // bar counter
     aabb(origin.x - 2.8, origin.z + 2.2, 1.3, 1.3),   // table 1
     aabb(origin.x + 2.8, origin.z + 1.6, 1.3, 1.3),   // table 2
   );
-  const exitTarget = { kind: "exitDoor", x: origin.x, y: origin.z + hd - 0.5 };
-  return { group, proxies, exitTarget };
+  return { group, proxies, targets: [exitTarget, mabel] };
 }
 
 // Generic placeholder room — the four not-yet-dressed buildings until 2c+.
@@ -108,7 +128,7 @@ function buildPlaceholderRoom(origin, { tint = "#3a2c1f" } = {}) {
   group.add(lamp);
   proxies.push(aabb(origin.x, origin.z - hd + 1.2, 5.4, 0.8));
   const exitTarget = { kind: "exitDoor", x: origin.x, y: origin.z + hd - 0.5 };
-  return { group, proxies, exitTarget };
+  return { group, proxies, targets: [exitTarget] };
 }
 
 // The interior registry. `spawn` = where the player stands on enter (just inside

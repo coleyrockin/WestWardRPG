@@ -17,10 +17,11 @@ function harness() {
   const streetProxies = [{ id: "street-wall" }];
   const streetTargets = [{ kind: "buildingDoor" }];
 
+  const saloonExit = { kind: "exitDoor", x: 400, y: 4 };
   const saloonRoom = {
     group: { visible: false },
     proxies: [{ id: "saloon-wall" }],
-    exitTarget: { kind: "exitDoor", x: 400, y: 4 },
+    targets: [saloonExit, { kind: "npcTalk", id: "mabel" }],
   };
   const interiors = { saloon: { id: "saloon", spawn: { x: 400, z: 3, yaw: 1.5 }, build: () => saloonRoom } };
 
@@ -45,7 +46,7 @@ describe("locationView — enter", () => {
     expect(h.player.setPosition).toHaveBeenCalledWith({ x: 400, z: 3 });
     expect(h.player.resetCameraBehind).toHaveBeenCalledWith(1.5);
     expect(h.view.activeProxies()).toBe(h.saloonRoom.proxies);
-    expect(h.interaction.setTargets).toHaveBeenCalledWith([h.saloonRoom.exitTarget]);
+    expect(h.interaction.setTargets).toHaveBeenCalledWith(h.saloonRoom.targets);
   });
 
   it("refuses an unknown interior", () => {

@@ -49,7 +49,7 @@ export function createLocationView({
       player?.setPosition?.({ x: def.spawn.x, z: def.spawn.z });
       player?.resetCameraBehind?.(def.spawn.yaw ?? 0);
       activeProxies = room.proxies;
-      interaction?.setTargets?.([room.exitTarget]);
+      interaction?.setTargets?.(room.targets || []);
     });
     return true;
   }

@@ -29,6 +29,8 @@ const PROMPTS = {
   // door from inside a small room.
   buildingDoor: { radius: 2.4, text: "E — Enter" },
   exitDoor:     { radius: 3.0, text: "E — Step Outside" },
+  // Talk to a named NPC inside a building (the target carries name + line).
+  npcTalk:      { radius: 2.2, text: "E — Talk" },
 };
 
 // All interactable kinds, exported for spike.js / debug overlays.
