@@ -32,6 +32,7 @@ import { resolveDiscovery } from "./discoveryRuntime.js";
 import { ensurePoiDefaults, POI_DEFINITIONS } from "../poiSystem.js";
 import { buildProxies, SALOON_DIMS, clampResumedPosition } from "./worldProxies.js";
 import { createInteractionSystem, promptFor } from "./interactionSystem.js";
+import { createLocationView } from "./locationView.js";
 import { BOARD_OPTIONS, LOOP_PHASES, createLoopStateMachine, getPhaseProgress } from "./phaseState.js";
 import { createObjectiveDomRefs, syncObjectiveDom } from "./objectiveDom.js";
 import { buildFieldMapRouteModel, createFieldMapDomRefs, syncFieldMapDom, resolveFieldMapMode } from "./fieldMapDom.js";
@@ -3857,6 +3858,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         return wp || null;
       },
       waypoints: () => FIRST_FIVE_ROUTE.map((p) => p.kind),
+      // --- Loaded interiors (slice) — test the enter/exit loop without walking to
+      // the door. `enterInterior("saloon")` fades inside; `exitInterior()` steps out.
+      enterInterior: (id = "saloon") =>
+        locationView.enter(id, { returnTo: { x: player.position.x, z: player.position.z, yaw: 0 } }),
+      exitInterior: () => locationView.exit(),
+      where: () => locationView.current(),
       // --- Mounted free-roam (the Open Range slice) — inspect without driving ---
       mount: () => { player.setMounted(true); setRiderVisual(true); return player.isMounted; },
       dismount: () => { player.setMounted(false); setRiderVisual(false); return player.isMounted; },
@@ -3979,7 +3986,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // (including after a whistle-recall), not the empty original mark.
   const MOUNT_SPOT = { x: 16.2, y: 12.0 };
   const mountPlacement = { kind: "mountHorse", label: "Steel Mustang", x: MOUNT_SPOT.x, y: MOUNT_SPOT.y };
-  const mountObjects = snapshot.worldObjects.concat([mountPlacement]);
+  // Loaded-interior slice (step 2a): a door on the street the player can enter.
+  // Interaction-only (no collision proxy — it's not in snapshot.worldObjects), so
+  // it never blocks movement; locationView handles the enter on E.
+  const saloonDoor = { kind: "buildingDoor", locationId: "saloon", label: "The Rusty Spur", x: 15.5, y: 8.0 };
+  const streetTargets = snapshot.worldObjects.concat([mountPlacement, saloonDoor]);
+  const mountObjects = streetTargets;
   // Rideable horse — reuse the hitched-horse model as the mount.
   let horseNode = null;
   try {
@@ -4047,11 +4059,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     // the whistle uses) suppresses that and stops a redundant re-fire of the mount
     // handler. Every other target stays gated to the active loop phase.
     isTargetEnabled: (target) =>
+      // Loaded-interior doors are free-roam affordances (not loop-gated): a street
+      // door enters, an interior door leaves. setTargets keeps each visible only in
+      // its own location, so allowing both here is safe.
+      target?.kind === "buildingDoor" || target?.kind === "exitDoor" ||
       (target?.kind === "mountHorse" && !player.isMounted) || loopState.isTargetEnabled(target),
     getPromptText: (target) => {
-      // mountHorse is a free-roam affordance with no active loop phase, so
-      // loopState.getPromptForTarget returns "" — surface its static prompt so the
-      // "E — Mount Up" affordance is actually visible (the gate alone was invisible).
+      // Doors + mountHorse are free-roam affordances with no active loop phase, so
+      // loopState.getPromptForTarget returns "" — surface their static prompt.
+      if (target?.kind === "buildingDoor" || target?.kind === "exitDoor") return promptFor(target);
       if (target?.kind === "mountHorse") return promptFor(target);
       const prompt = loopState.getPromptForTarget(target);
       if (target?.kind !== "roadSlime" || loopState.phase !== "slime_fight" || !encounter) return prompt;
@@ -4059,6 +4075,26 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       return `${prompt} · ${state.hitCount}/${state.maxHp} hits`;
     },
   });
+  // Loaded-interior view (slice 2a). Hides the street's heavy groups + shows the
+  // saloon interior on enter; reverses on exit, behind a screen fade. activeProxies()
+  // feeds collision in the loop so interior walls apply inside, street walls outside.
+  // (worldGroups covers the big draw-call contributors we hold handles to; the rest
+  // of the street is far from the interior's pocket and frustum-culled — 2b completes
+  // the list.)
+  const worldGroups = [props, openingLightPools.group, roadDust.group, water.mesh, ...meridianWaters.map((w) => w.mesh)];
+  const screenFade = document.getElementById("screen-fade");
+  const fadeSwap = (cb) => {
+    if (!screenFade) { cb(); return; }
+    screenFade.style.opacity = "1";
+    setTimeout(() => { cb(); screenFade.style.opacity = "0"; }, 170);
+  };
+  const locationView = createLocationView({
+    scene, worldGroups, player, streetProxies: proxies, streetTargets, interaction, fade: fadeSwap,
+  });
+  interaction.registerHandler("buildingDoor", (t) =>
+    locationView.enter(t.locationId, { returnTo: { x: t.x, z: t.y, yaw: 0 } }));
+  interaction.registerHandler("exitDoor", () => locationView.exit());
+
   const boardModal = document.getElementById("board-modal");
   const boardAccept = document.getElementById("board-accept");
   const boardOptionButtons = Array.from(document.querySelectorAll("[data-option]:not(#board-accept)"));
@@ -5000,7 +5036,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         camIntroSettled = true;
       }
     }
-    if (!boardModalController.isOpen()) player.update(dt, proxies);
+    if (!boardModalController.isOpen()) player.update(dt, locationView.activeProxies());
     if (horseNode) {
       if (player.isMounted) {
         // Mounted: the horse rides under you, facing your heading.

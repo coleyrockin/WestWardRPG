@@ -39,8 +39,23 @@ function makeFakeDocument() {
 describe("interactionSystem — INTERACTABLE_KINDS", () => {
   it("includes first-road loop interactables", () => {
     expect(new Set(INTERACTABLE_KINDS)).toEqual(
-      new Set(["jobBoard", "roadSign", "townBark", "smokeCache", "slimeTell", "brokenWagon", "roadSlime", "gravesite", "mountHorse"]),
+      new Set(["jobBoard", "roadSign", "townBark", "smokeCache", "slimeTell", "brokenWagon", "roadSlime", "gravesite", "mountHorse", "buildingDoor", "exitDoor"]),
     );
+  });
+});
+
+describe("interactionSystem — setTargets (loaded-interior swap)", () => {
+  it("swaps the live interactable set and clears the stale nearest", () => {
+    const doc = makeFakeDocument();
+    const street = [{ kind: "jobBoard", x: 0, y: 0 }];
+    const interior = [{ kind: "exitDoor", x: 0, y: 0 }];
+    const sys = createInteractionSystem({ worldObjects: street, document: doc as any });
+    sys.update({ x: 0, z: 0 });
+    expect(sys.nearest?.kind).toBe("jobBoard");
+    sys.setTargets(interior);
+    expect(sys.nearest).toBeNull(); // cleared so a stale E can't fire
+    sys.update({ x: 0, z: 0 });
+    expect(sys.nearest?.kind).toBe("exitDoor"); // now only the interior's door is in range
   });
 });
 
@@ -332,8 +347,11 @@ describe("interactionSystem — spike.js mount wiring (source contract)", () => 
     // mountHorse free pass is additionally gated on !player.isMounted so the "E — Mount
     // Up" prompt is suppressed mid-ride (the horse mesh rides under the player, so the
     // anchor sits on the rider and would otherwise surface the prompt every frame).
+    // The mountHorse free-pass + !isMounted gate must be present, OR'd with the loop
+    // gate. (Loaded-interior door kinds may be OR'd in BEFORE it, so this matches the
+    // mountHorse clause anywhere in the predicate, not only right after `=>`.)
     const gateRe =
-      /isTargetEnabled:\s*\(target\)\s*=>\s*\(?\s*target\??\.kind\s*===\s*["']mountHorse["']\s*&&\s*!player\.isMounted\s*\)?\s*\|\|\s*loopState\.isTargetEnabled\(target\)/;
+      /isTargetEnabled:[\s\S]*?\(?\s*target\??\.kind\s*===\s*["']mountHorse["']\s*&&\s*!player\.isMounted\s*\)?\s*\|\|\s*loopState\.isTargetEnabled\(target\)/;
     expect(spikeSource).toMatch(gateRe);
   });
 

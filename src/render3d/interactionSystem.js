@@ -24,6 +24,11 @@ const PROMPTS = {
   // this radius > that stop distance or a whistled horse parks out of reach. Bump one,
   // re-check the other.
   mountHorse:  { radius: 2.6, text: "E — Mount Up" },
+  // Loaded interiors: a door on a building facade (enter) and the way back out of
+  // an interior (leave). The exit radius is generous so you can always find the
+  // door from inside a small room.
+  buildingDoor: { radius: 2.4, text: "E — Enter" },
+  exitDoor:     { radius: 3.0, text: "E — Step Outside" },
 };
 
 // All interactable kinds, exported for spike.js / debug overlays.
@@ -80,6 +85,10 @@ export function createInteractionSystem({
 } = {}) {
   const handlers = new Map();
   let nearest = null;
+  // The live target set. Starts as the street's worldObjects; loaded interiors
+  // swap it (via setTargets) so inside a building the player only sees that
+  // room's interactables — never the street's.
+  let activeTargets = Array.isArray(worldObjects) ? worldObjects : [];
 
   const onKeyDown = (e) => {
     if (e.code !== ACTION_KEY) return;
@@ -91,8 +100,15 @@ export function createInteractionSystem({
   if (doc?.addEventListener) doc.addEventListener("keydown", onKeyDown);
 
   function update(playerPos) {
-    nearest = pickNearest(playerPos, worldObjects, isTargetEnabled);
+    nearest = pickNearest(playerPos, activeTargets, isTargetEnabled);
     setPromptText(nearest ? getPromptText(nearest) : "");
+  }
+
+  // Swap the interactable set (loaded-interior enter/exit). Clears `nearest` so a
+  // stale prompt from the old location can't fire on the next E before update().
+  function setTargets(next) {
+    activeTargets = Array.isArray(next) ? next : [];
+    nearest = null;
   }
 
   function registerHandler(kind, fn) {
@@ -109,6 +125,7 @@ export function createInteractionSystem({
   return {
     update,
     registerHandler,
+    setTargets,
     dispose,
     get nearest() { return nearest; },
   };

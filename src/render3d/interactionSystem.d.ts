@@ -21,6 +21,7 @@ export interface CreateInteractionSystemOptions {
 export interface InteractionSystem {
   update(playerPos: { x: number; z: number }): void;
   registerHandler(kind: string, fn: (target: any) => void): void;
+  setTargets(targets: any[]): void;
   dispose(): void;
   readonly nearest: any | null;
 }

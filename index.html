@@ -963,10 +963,22 @@
         pointer-events: none;
         transition: opacity 1.2s ease;
       }
+      /* Loaded-interior transition — a quick black fade hides the scene swap when
+         you step into / out of a building. Starts transparent + click-through. */
+      #screen-fade {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.16s ease;
+        z-index: 45;
+      }
     </style>
   </head>
   <body>
     <canvas id="scene" role="img" aria-label="Playable Three.js preview of Dustwater's first road slice"></canvas>
+    <div id="screen-fade" aria-hidden="true"></div>
     <div id="hero-panel" class="rpg-panel hud-hidden" aria-label="Player status">
       <span class="portrait">EC</span>
       <span>
