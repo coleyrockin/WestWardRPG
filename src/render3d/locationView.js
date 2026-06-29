@@ -17,8 +17,10 @@ export function createLocationView({
   streetTargets = [],        // interaction targets while on the street
   interaction = null,        // setTargets(arr)
   fade = (cb) => cb(),       // fade(cb): run cb at the darkest point (sync default)
+  interiors = INTERIORS,     // injectable for tests (registry of { build() })
+  interiorIds = INTERIOR_IDS,
 } = {}) {
-  const state = createLocationState({ interiors: INTERIOR_IDS });
+  const state = createLocationState({ interiors: interiorIds });
   const built = new Map();   // id -> { group, proxies, exitTarget } (lazy, cached)
   let activeProxies = streetProxies;
   let streetReturn = null;   // where to drop the player when they step back out
@@ -27,7 +29,7 @@ export function createLocationView({
 
   function ensureInterior(id) {
     if (built.has(id)) return built.get(id);
-    const made = INTERIORS[id].build();
+    const made = interiors[id].build();
     made.group.visible = false;
     if (scene?.add) scene.add(made.group);
     built.set(id, made);
@@ -38,7 +40,7 @@ export function createLocationView({
   // (the door you came in by). Returns false on an invalid transition.
   function enter(id, { returnTo = null } = {}) {
     if (!state.enter(id)) return false;
-    const def = INTERIORS[id];
+    const def = interiors[id];
     const room = ensureInterior(id);
     streetReturn = returnTo;
     fade(() => {
