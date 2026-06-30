@@ -3989,8 +3989,18 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // Loaded-interior slice (step 2a): a door on the street the player can enter.
   // Interaction-only (no collision proxy — it's not in snapshot.worldObjects), so
   // it never blocks movement; locationView handles the enter on E.
-  const saloonDoor = { kind: "buildingDoor", locationId: "saloon", label: "The Rusty Spur", x: 15.5, y: 8.0 };
-  const streetTargets = snapshot.worldObjects.concat([mountPlacement, saloonDoor]);
+  // The five enterable buildings (breadth pass). Interaction-only doors (no
+  // collision proxy — not in snapshot.worldObjects), spaced along the street;
+  // locationView loads the matching interior on E. Positions are provisional and
+  // get aligned onto real building facades in the dressing pass.
+  const buildingDoors = [
+    { kind: "buildingDoor", locationId: "saloon", label: "The Rusty Spur", x: 15.5, y: 8.0 },
+    { kind: "buildingDoor", locationId: "bounty", label: "The Marshal's Post", x: 12.0, y: 5.2 },
+    { kind: "buildingDoor", locationId: "clinic", label: "Okafor's Clinic", x: 18.5, y: 5.2 },
+    { kind: "buildingDoor", locationId: "store", label: "Hale's Provisions", x: 9.0, y: 5.2 },
+    { kind: "buildingDoor", locationId: "home", label: "The Cross House", x: 21.5, y: 5.2 },
+  ];
+  const streetTargets = snapshot.worldObjects.concat([mountPlacement, ...buildingDoors]);
   const mountObjects = streetTargets;
   // Rideable horse — reuse the hitched-horse model as the mount.
   let horseNode = null;
