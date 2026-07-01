@@ -23,9 +23,9 @@ async function evaluateWithTimeout(page, fn, arg, timeoutMs = 30000) {
 }
 
 const POSES = [
-  { pose: "town", x: 9.5, y: 8.5 },
-  { pose: "open_range", x: 60, y: 12 },
-  { pose: "marsh", x: 48, y: 16 },
+  { pose: "town", x: 9.5, z: 8.5 },
+  { pose: "open_range", x: 60, z: 12 },
+  { pose: "marsh", x: 48, z: 16 },
 ];
 
 async function waitForGameReady(page) {
@@ -46,13 +46,13 @@ async function waitForGameReady(page) {
   throw new Error("Game failed to initialize (__spike / __westward3dStats) within timeout");
 }
 
-async function samplePose(page, { pose, x, y }) {
+async function samplePose(page, { pose, x, z }) {
   await evaluateWithTimeout(
     page,
-    ({ px, py }) => {
-      window.__spike.setPos(px, py);
+    ({ px, pz }) => {
+      window.__spike.setPos(px, pz);
     },
-    { px: x, py: y },
+    { px: x, pz: z },
   );
 
   await evaluateWithTimeout(
@@ -82,14 +82,26 @@ async function samplePose(page, { pose, x, y }) {
 
   return {
     pose,
-    coords: [x, y],
+    coords: { x, z },
     backend: stats.backend,
+    reducedFidelity: stats.reducedFidelity ?? null,
+    frame: stats.frame ?? null,
     ms120: Math.round(ms120 * 10) / 10,
     fps: Math.round((FRAME_COUNT * 1000) / ms120),
+    drawCalls: stats.drawCalls ?? stats.calls,
     calls: stats.calls,
     triangles: stats.triangles,
+    geometries: stats.geometries ?? null,
+    textures: stats.textures ?? null,
+    meshCount: stats.meshCount ?? stats.meshes,
     meshes: stats.meshes,
+    materialCount: stats.materialCount ?? stats.materials,
+    instancedMeshCount: stats.instancedMeshCount ?? stats.instancedMeshes ?? null,
+    shadowCasterCount: stats.shadowCasterCount ?? stats.shadowCasters,
     shadowCasters: stats.shadowCasters,
+    visibleObjectCount: stats.visibleObjectCount ?? null,
+    sceneObjectCount: stats.sceneObjectCount ?? null,
+    programs: stats.programs ?? null,
   };
 }
 
@@ -105,7 +117,7 @@ async function main() {
   const page = await context.newPage();
 
   try {
-    await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.goto(`${BASE}/`, { waitUntil: "commit", timeout: 60000 });
     await page.waitForSelector("#scene");
     await waitForGameReady(page);
 

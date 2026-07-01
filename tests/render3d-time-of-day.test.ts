@@ -245,14 +245,14 @@ describe("calcWindowGlowFactor — window-glow day/night ramp", () => {
   });
 });
 
-describe("day palette tuning is locked (commit 7a88800 — daylight drama + neon)", () => {
-  it("keeps the tuned exposure/contrast/saturation/bloom/split/threshold", () => {
+describe("day palette tuning is locked — readable foundation daylight", () => {
+  it("keeps the de-yellowed exposure/contrast/saturation/bloom/split/threshold", () => {
     const d = PALETTES.day;
-    expect(d.exposure).toBe(1.12);
-    expect(d.bloom).toBe(0.4);
-    expect(d.grade.contrast).toBe(1.18);
-    expect(d.grade.saturation).toBe(1.13);
-    expect(d.grade.splitStrength).toBe(0.3);
-    expect(d.grade.bloomThreshold).toBe(0.85);
+    expect(d.exposure).toBe(1.0);
+    expect(d.bloom).toBe(0.28);
+    expect(d.grade.contrast).toBe(1.1);
+    expect(d.grade.saturation).toBe(0.98);
+    expect(d.grade.splitStrength).toBe(0.18);
+    expect(d.grade.bloomThreshold).toBe(0.9);
   });
 });

@@ -101,12 +101,12 @@ describe("playerController — camera presets", () => {
 
   it("shoulder is the close over-the-shoulder gameplay framing", () => {
     const s = CAMERA_PRESETS.shoulder;
-    expect(s.distance).toBe(5.6);
-    expect(s.height).toBe(2.9);
-    expect(s.lookHeight).toBe(1.72); // head height — not the old belt-height 1.35
-    expect(s.lookAhead).toBe(4.0);
-    expect(s.shoulder).toBe(0.75);
-    expect(s.fov).toBe(56);
+    expect(s.distance).toBe(4.85);
+    expect(s.height).toBe(2.65);
+    expect(s.lookHeight).toBe(1.48); // upper-body height — not the old belt-height 1.35
+    expect(s.lookAhead).toBe(3.15);
+    expect(s.shoulder).toBe(0.48);
+    expect(s.fov).toBe(52);
     expect(s.distance).toBeLessThan(CAMERA_PRESETS.exploration.distance);
     expect(s.lookHeight).toBeGreaterThan(CAMERA_PRESETS.exploration.lookHeight);
   });
@@ -125,7 +125,7 @@ describe("playerController — camera presets", () => {
     const wide = at(CAMERA_PRESETS.exploration);
     const dist = (p: any) => Math.hypot(p.lookAt.x - 9.5, p.lookAt.z - 8.5);
     expect(dist(near)).toBeLessThan(dist(wide));
-    expect(near.lookAt.y).toBeCloseTo(1.72, 2);
+    expect(near.lookAt.y).toBeCloseTo(1.48, 2);
   });
 });
 
@@ -154,6 +154,18 @@ describe("playerController — camera obstacle avoidance", () => {
 
     expect(adjusted).toBe(desired);
   });
+
+  it("does not let an overlapping player-side proxy collapse the camera", () => {
+    const desired = { x: -8, y: 4, z: 0 };
+    const adjusted = avoidCameraObstacles({
+      from: { x: 0, y: 1.72, z: 0 },
+      desired,
+      proxies: [{ minX: -1, maxX: 1, minZ: -1, maxZ: 1, source: { kind: "townFacadeDark" } }],
+      radius: 0.1,
+    });
+
+    expect(adjusted).toBe(desired);
+  });
 });
 
 describe("playerController — stepPlayer movement", () => {
@@ -166,37 +178,37 @@ describe("playerController — stepPlayer movement", () => {
     expect(next.yaw).toBe(0);
   });
 
-  it("forward at yaw=0 walks toward -Z at 4 u/s", () => {
+  it("forward at yaw=0 walks toward -Z at 3.4 u/s", () => {
     const next = stepPlayer({ ...start, input: { forward: true }, dt: 1 });
     expect(approx(next.position.x, 0)).toBe(true);
-    expect(approx(next.position.z, -4)).toBe(true);
+    expect(approx(next.position.z, -3.4)).toBe(true);
   });
 
-  it("forward + shift sprints at 8 u/s", () => {
+  it("forward + shift sprints at 6.6 u/s", () => {
     const next = stepPlayer({ ...start, input: { forward: true, shift: true }, dt: 1 });
-    expect(approx(next.position.z, -8)).toBe(true);
+    expect(approx(next.position.z, -6.6)).toBe(true);
   });
 
   it("back is opposite of forward", () => {
     const next = stepPlayer({ ...start, input: { back: true }, dt: 1 });
-    expect(approx(next.position.z, 4)).toBe(true);
+    expect(approx(next.position.z, 3.4)).toBe(true);
   });
 
   it("strafe right is orthogonal to forward", () => {
     const next = stepPlayer({ ...start, input: { right: true }, dt: 1 });
-    expect(approx(next.position.x, 4)).toBe(true);
+    expect(approx(next.position.x, 3.4)).toBe(true);
     expect(approx(next.position.z, 0)).toBe(true);
   });
 
   it("diagonal move normalizes — forward+right not faster than forward", () => {
     const diag = stepPlayer({ ...start, input: { forward: true, right: true }, dt: 1 });
     const dist = Math.hypot(diag.position.x, diag.position.z);
-    expect(approx(dist, 4, 1e-6)).toBe(true);
+    expect(approx(dist, 3.4, 1e-6)).toBe(true);
   });
 
   it("dt scales linearly", () => {
     const half = stepPlayer({ ...start, input: { forward: true }, dt: 0.5 });
-    expect(approx(half.position.z, -2)).toBe(true);
+    expect(approx(half.position.z, -1.7)).toBe(true);
   });
 
   it("forward at yaw=-π/2 walks toward +X (east)", () => {
@@ -206,7 +218,7 @@ describe("playerController — stepPlayer movement", () => {
       input: { forward: true },
       dt: 1,
     });
-    expect(approx(next.position.x, 4)).toBe(true);
+    expect(approx(next.position.x, 3.4)).toBe(true);
     expect(approx(next.position.z, 0, 1e-6)).toBe(true);
   });
 });
@@ -261,7 +273,7 @@ describe("playerController — stepPlayer look", () => {
       input: { forward: true },
       dt: 1,
     });
-    expect(approx(next.position.z, -4, 1e-6)).toBe(true);
+    expect(approx(next.position.z, -3.4, 1e-6)).toBe(true);
     expect(approx(next.position.x, 0, 1e-6)).toBe(true);
   });
 
@@ -276,7 +288,7 @@ describe("playerController — stepPlayer look", () => {
       dt: 1,
       sensitivity: 0.01,
     });
-    expect(approx(next.position.x, 4, 1e-6)).toBe(true);
+    expect(approx(next.position.x, 3.4, 1e-6)).toBe(true);
     expect(approx(next.position.z, 0, 1e-6)).toBe(true);
   });
 });
@@ -315,7 +327,7 @@ describe("playerController — DOM shell", () => {
     const ctrl = createPlayerController(camera, { document: doc as any });
     doc.dispatch("keydown", { code: "KeyW" });
     ctrl.update(1);
-    expect(approx(camera.position.z, -4, 1e-6)).toBe(true);
+    expect(approx(camera.position.z, -3.4, 1e-6)).toBe(true);
     expect(camera.position.y).toBe(1.8);
     ctrl.dispose();
   });
@@ -443,7 +455,7 @@ describe("playerController — DOM shell", () => {
     const ctrl = createPlayerController(camera, { document: doc as any, window: win as any });
     doc.dispatch("keydown", { code: "KeyW" });
     ctrl.update(1);
-    expect(approx(camera.position.z, -4, 1e-6)).toBe(true);
+    expect(approx(camera.position.z, -3.4, 1e-6)).toBe(true);
     win.dispatch("blur", {});
     const zAfterBlur = camera.position.z;
     ctrl.update(1);
@@ -482,6 +494,33 @@ describe("playerController — DOM shell", () => {
     expect(camera.lookAt).toHaveBeenCalled();
     expect(character.position.x).toBe(9.5);
     expect(character.position.z).toBe(8.5);
+    ctrl.dispose();
+  });
+
+  it("can offset the visible character yaw for rigs authored facing +Z", () => {
+    const doc = makeFakeDocument();
+    const camera = {
+      ...makeFakeCamera(),
+      position: {
+        x: 0,
+        y: 0,
+        z: 0,
+        set(x: number, y: number, z: number) {
+          this.x = x; this.y = y; this.z = z;
+        },
+      },
+      lookAt: vi.fn(),
+    };
+    const character = { position: { x: 0, z: 0 }, rotation: { y: 0 } };
+    const ctrl = createPlayerController(camera as any, {
+      document: doc as any,
+      thirdPerson: true,
+      character,
+      characterYawOffset: Math.PI,
+    });
+
+    ctrl.update(0);
+    expect(approx(character.rotation.y, Math.PI, 1e-9)).toBe(true);
     ctrl.dispose();
   });
 });

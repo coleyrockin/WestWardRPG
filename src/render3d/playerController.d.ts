@@ -87,6 +87,7 @@ export interface CreatePlayerControllerOptions {
   sensitivity?: number;
   thirdPerson?: boolean;
   character?: any;
+  characterYawOffset?: number;
   cameraPreset?: string;
   camDistance?: number | null;
   camHeight?: number | null;

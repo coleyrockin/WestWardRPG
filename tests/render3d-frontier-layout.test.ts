@@ -78,7 +78,6 @@ describe("render3d frontier layout", () => {
       "hangingSign",
       "hitchingRail",
       "barrelCrateCluster",
-      "npcSilhouette",
       "lanternString",
       "mudRutDecal",
       "dustSmokePlume",
@@ -94,12 +93,11 @@ describe("render3d frontier layout", () => {
 
     expect(metrics.productionStreetPropCount).toBeGreaterThanOrEqual(FIRST_ROAD_ART_STYLE.minProductionStreetProps);
     expect(metrics.storefrontCount).toBeGreaterThanOrEqual(FIRST_ROAD_ART_STYLE.minStorefronts);
-    expect(metrics.npcSilhouetteCount).toBeGreaterThanOrEqual(FIRST_ROAD_ART_STYLE.minNpcSilhouettes);
+    expect(metrics.npcSilhouetteCount).toBe(FIRST_ROAD_ART_STYLE.minNpcSilhouettes);
     expect(metrics.windowLightCount).toBeGreaterThanOrEqual(FIRST_ROAD_ART_STYLE.minWindowLights);
     expect(metrics.productionKinds).toEqual(expect.arrayContaining([
       "productionSaloon",
       "productionBoardwalk",
-      "npcSilhouette",
       "lanternString",
       "bountyEmblem",
     ]));
@@ -224,14 +222,14 @@ describe("Calico Flats — town 2 (the free town, west of the Pass)", () => {
   it("dresses Calico to a composed-town floor (boardwalks, glow, depth, the gallows)", () => {
     // Mirrors FIRST_ROAD_ART_STYLE's intent for town 2: lock the composition pass so
     // a future edit can't silently strip Calico back to a bare skeleton.
-    const CALICO_FLOORS = { boardwalks: 4, windowLights: 3, silhouettes: 3, backRank: 2 };
+    const CALICO_FLOORS = { boardwalks: 4, windowLights: 3, silhouettes: 0, backRank: 2 };
     const calico = placements.filter(
       (p) => p.x <= -34 && p.x >= -68 && p.y >= 0 && p.y <= 18,
     );
     const count = (k: string) => calico.filter((p) => p.kind === k).length;
     expect(count("productionBoardwalk")).toBeGreaterThanOrEqual(CALICO_FLOORS.boardwalks);
     expect(count("windowGlowPanel")).toBeGreaterThanOrEqual(CALICO_FLOORS.windowLights);
-    expect(count("npcSilhouette")).toBeGreaterThanOrEqual(CALICO_FLOORS.silhouettes);
+    expect(count("npcSilhouette")).toBe(CALICO_FLOORS.silhouettes);
     expect(
       calico.filter((p) => ["productionStore", "productionSaloon"].includes(p.kind)).length,
     ).toBeGreaterThanOrEqual(CALICO_FLOORS.backRank);

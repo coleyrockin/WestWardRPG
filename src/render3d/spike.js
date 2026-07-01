@@ -55,8 +55,6 @@ import { createScatter, createRoadVergeScatter } from "../game/world/scatter.js"
 import { createRouteSageField, floraVisibleAt, FLORA_CULL_SHOW, FLORA_CULL_HIDE } from "../game/world/flora.js";
 import { createPlaceholderCharacter } from "../game/world/character.js";
 import { createAnimatedCharacter } from "../game/world/animatedCharacter.js";
-import { createTownsfolk } from "../game/world/townsfolk.js";
-import { addTownLife } from "./townLife.js";
 import { pickExecutorBark, approvalCrossingTrigger } from "./executorBarks.js";
 import { hudIsActive, computeHudDimState, HUD_DIM_PANEL_IDS } from "./hudDim.js";
 import { resolveWeather, nextWeatherKind } from "../game/world/weather.js";
@@ -66,6 +64,7 @@ import { createSaveStateManager } from "../saveStateManager.js";
 import { createSaveHealth } from "./saveHealth.js";
 import { buildRunPayload, loadRun, writeRun, sealRun, clearRun, overlayLiveEncounterState } from "./runSave.js";
 import { stagger } from "./animationHelpers.js";
+import { createFrameTimingSampler, createRenderStatsProbe } from "./renderStats.js";
 import { createPlayerCombat, hitboxHitsTarget } from "./combat/playerCombat.js";
 import { createSlimeState, stepSlime } from "./combat/slimeBehavior.js";
 import { createHitStop, createCameraShake, createBurstPool } from "./combat/hitFx.js";
@@ -93,6 +92,10 @@ import {
 
 // world (x = east, y = south) -> 3D (X = east, Z = south, Y = up)
 const toVec = (x, y, h = 0) => new THREE.Vector3(x, h, y);
+const isLocalBrowserHost = () => {
+  if (typeof location === "undefined") return false;
+  return ["localhost", "127.0.0.1", "::1"].includes(location.hostname);
+};
 // Windmill fan sub-groups registered at build, spun by stepWorld (R1.1).
 // Cleared on every startSpike so reboots don't accumulate stale rotors.
 const WINDMILL_ROTORS = [];
@@ -169,10 +172,10 @@ const HERO_MODEL_SCALE = 1.0; // native rig is ~1.83u tall (feet at 0) — match
 // untextured mannequin into boots → trousers → shirt(+sleeves/hands) → skin.
 const HERO_DRESS = Object.freeze({
   // shirt: dusty brick/oxblood (was bright red) — sits in the sun-bleached palette
-  boots: "#352617", pants: "#5c5038", shirt: "#74433a", skin: "#b07a52",
+  boots: "#2f2116", pants: "#554d3c", shirt: "#6d3f36", skin: "#9d6848",
   yPantsBoots: 0.22, yShirtPants: 0.95, ySkinShirt: 1.52, blend: 0.07,
 });
-const HAT_LIFT = 0.18; // metres above the head-bone origin where the brim rests (tuned by capture)
+const HAT_LIFT = 0.12; // metres above the head-bone origin where the brim rests (tuned by capture)
 const IMPORTANT_MODEL_KINDS = Object.freeze([
   "jobBoard",
   "heroTownSaloon",
@@ -186,7 +189,6 @@ const IMPORTANT_MODEL_KINDS = Object.freeze([
   "hangingSign",
   "hitchingRail",
   "barrelCrateCluster",
-  "npcSilhouette",
   "lanternString",
   "mudRutDecal",
   "dustSmokePlume",
@@ -206,7 +208,6 @@ const PRODUCTION_DENSITY_KINDS = new Set([
   "hangingSign",
   "hitchingRail",
   "barrelCrateCluster",
-  "npcSilhouette",
   "lanternString",
   "mudRutDecal",
   "dustSmokePlume",
@@ -1763,6 +1764,31 @@ function setNodeOpacity(node, opacity) {
   });
 }
 
+function weatherAuthoredTownModel(node) {
+  if (!node || typeof node.traverse !== "function") return;
+  const tone = new THREE.Color();
+  const hsl = { h: 0, s: 0, l: 0 };
+  const tune = (src) => {
+    if (!src) return src;
+    const mat = src.clone ? src.clone() : src;
+    if (mat.color?.getHSL && mat.color?.setHSL) {
+      tone.copy(mat.color);
+      tone.getHSL(hsl);
+      if (hsl.s > 0.32 && hsl.l > 0.36) {
+        mat.color.setHSL(hsl.h, hsl.s * 0.36, Math.min(hsl.l * 0.72, 0.42));
+      }
+    }
+    if (mat.emissive?.isColor) mat.emissive.multiplyScalar(0.38);
+    if (Number.isFinite(mat.emissiveIntensity)) mat.emissiveIntensity = Math.min(mat.emissiveIntensity * 0.35, 0.42);
+    if ("roughness" in mat && Number.isFinite(mat.roughness)) mat.roughness = Math.max(mat.roughness, 0.72);
+    return mat;
+  };
+  node.traverse((o) => {
+    if (!o?.material) return;
+    o.material = Array.isArray(o.material) ? o.material.map(tune) : tune(o.material);
+  });
+}
+
 function updateOcclusionFades(placementNodes, camera, playerPos, focusPoint = null) {
   if (!placementNodes?.length || !camera || !playerPos) return;
   const cameraPoint = camera.position.clone();
@@ -2061,15 +2087,29 @@ function createHeroSilhouetteAccent() {
 function buildCowboyHat() {
   const hat = new THREE.Group();
   hat.name = "cowboy-hat";
-  const felt = standard("#5a4128", { rimStrength: 0.12 });
-  const band = standard("#33251a", { rimStrength: 0.1 });
-  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.205, 0.215, 0.022, 20), felt);
-  const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.122, 0.03, 16), band);
+  const felt = standard("#3f2c1b", { rimStrength: 0.08 });
+  const band = standard("#231812", { rimStrength: 0.06 });
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.275, 0.29, 0.025, 24), felt);
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.145, 0.032, 18), band);
   ring.position.y = 0.025;
-  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.092, 0.118, 0.145, 16), felt);
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.102, 0.13, 0.15, 18), felt);
   crown.position.y = 0.092;
   for (const m of [brim, ring, crown]) { m.castShadow = true; m.receiveShadow = true; hat.add(m); }
   return hat;
+}
+
+function attachHeroNeckShadow(group) {
+  const scarf = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 16, 8),
+    standard("#2a1d16", { rimStrength: 0.08 }),
+  );
+  scarf.name = "hero-neck-shadow";
+  scarf.position.set(0, 1.5, -0.015);
+  scarf.scale.set(1.15, 0.82, 0.85);
+  scarf.castShadow = true;
+  scarf.receiveShadow = true;
+  group.add(scarf);
+  return scarf;
 }
 
 // Bone-attach the hat to the rig's head joint so it rides the head through every
@@ -2586,8 +2626,8 @@ function buildGround(scene, snapshot) {
   const ROAD_W = FIRST_ROAD_ART_STYLE.roadWidth;
   const roadMat = standard("#c08a55", { roughness: 1, emissive: "#5a3a20", emissiveIntensity: 0.08, rimStrength: 0.02 });
   const edgeMat = standard("#e0aa68", { roughness: 1, emissive: "#5f3a20", emissiveIntensity: 0.06, rimStrength: 0.02 });
-  const rutMat = standard("#49301c", { roughness: 1, emissive: "#1a0f08", emissiveIntensity: 0.015, rimStrength: 0.01 }); // darker = worn wheel tracks with weight
-  const centerMat = standard("#a87446", { roughness: 1, emissive: "#3a2415", emissiveIntensity: 0.035, rimStrength: 0.01 });
+  const rutMat = standard("#7b5837", { roughness: 1, emissive: "#3a2418", emissiveIntensity: 0.01, rimStrength: 0.005 });
+  const centerMat = standard("#ba8755", { roughness: 1, emissive: "#4a2f1b", emissiveIntensity: 0.02, rimStrength: 0.005 });
   // The opacity-0.5 dust wash was muddying the whole road to a flat band; dropped
   // to a faint haze so the warm surface + ruts read instead of a cardboard strip.
   const roadWashMat = new THREE.MeshBasicMaterial({
@@ -2767,6 +2807,15 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // fixed scene — never read or write a persisted run.
   const visualCapture =
     typeof location !== "undefined" && new URLSearchParams(location.search).has("visual");
+  const localBrowserHost = isLocalBrowserHost();
+  const localDebugRuntime = import.meta.env.DEV || localBrowserHost;
+  const foundationMode =
+    localBrowserHost &&
+    typeof location !== "undefined" &&
+    new URLSearchParams(location.search).has("foundation");
+  if (typeof document !== "undefined") {
+    document.body?.classList.toggle("foundation-mode", foundationMode);
+  }
   // Ironman load-on-start: a "playing" run resumes in place; a "sealed" run shows
   // its summary over a fresh scene; no/corrupt save → fresh run.
   // CRITICAL save-safety seam: loadRun() REJECTS on a timed-out / failed read (vs a
@@ -2778,7 +2827,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // Resume must never block boot — a failed load still boots a (non-persisting) scene.
   let loadedRun = null;
   let saveLoadFailed = false;
-  if (!visualCapture) {
+  if (!visualCapture && !foundationMode) {
     try {
       loadedRun = await loadRun();
     } catch {
@@ -2797,7 +2846,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // carries activeMission), and a pre-mission save with no activeMission still
   // opens at the default `spawn` phase. Visual capture pins the default loop.
   const loopState = createLoopStateMachine(
-    resumeRun ? resumeRun.loopState : visualCapture ? {} : { activeMission: "dust_to_dust" },
+    resumeRun ? resumeRun.loopState : (visualCapture || foundationMode) ? {} : { activeMission: "dust_to_dust" },
   );
   const objectiveRefs = createObjectiveDomRefs(document);
   const fieldMapRefs = createFieldMapDomRefs(document);
@@ -2806,10 +2855,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   syncFieldMapDom(fieldMapRefs, loopState.state);
   syncProductionHud(productionHudRefs, loopState.state);
   const publishLoopDebug = (state) => {
-    if (!import.meta.env.DEV || typeof window === "undefined") return;
+    if (!localDebugRuntime || typeof window === "undefined") return;
     window.__westward3dLoop = state;
   };
-  if (import.meta.env.DEV && typeof window !== "undefined") {
+  if (localDebugRuntime && typeof window !== "undefined") {
     window.__westwardRenderSnapshot = snapshot;
     publishLoopDebug(loopState.state);
   }
@@ -2822,10 +2871,11 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // future demotion paths key on intent without re-deriving the backend string. It
   // does NOT change current counts — the halving still keys on `backend`.
   const { renderer, backend, reducedFidelity } = await createRenderer(canvas);
-  if (import.meta.env.DEV && typeof window !== "undefined") {
+  const frameTiming = createFrameTimingSampler();
+  if (localDebugRuntime && typeof window !== "undefined") {
     window.__westward3dBackend = backend;
   }
-  if (import.meta.env.DEV && typeof window !== "undefined") {
+  if (localDebugRuntime && typeof window !== "undefined") {
     // Live-tuning aid (roadmap §3.6 T1a): let dev tooling traverse the scene.
     window.__spikeScene = () => scene;
   }
@@ -2857,8 +2907,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // clouds, water, weather, film grain) for a stable pixelmatch baseline.
   const debugPlayerMarker =
     typeof location !== "undefined" && new URLSearchParams(location.search).has("debugPlayerMarker");
-  const clock = createWorldClock({ dayTime: DEV_LOCK_DAYLIGHT ? 0 : 0.25 }); // day (dev daylight lock) | goldenHour boot
+  const clock = createWorldClock({ dayTime: (DEV_LOCK_DAYLIGHT || foundationMode) ? 0 : 0.25 }); // day (foundation/dev daylight lock) | goldenHour boot
   if (visualCapture) pinClock(clock, "dusk");
+  else if (foundationMode) pinClock(clock, "day");
   else if (DEV_LOCK_DAYLIGHT) clock.dayTime = 0; // dev: hold bright daylight, ignore any drifted save clock
   else if (resumeRun && Number.isFinite(resumeRun.world?.dayTime)) clock.dayTime = resumeRun.world.dayTime;
 
@@ -3009,6 +3060,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
         instanceModel(entry.url, { x: p.x, z: p.y, y: groundHeight(p.x, p.y), yaw, scale: effScale, scaleY: effScaleY })
           .then((node) => {
             props.add(node);
+            if (isBuilding && isWestwardTown(p)) weatherAuthoredTownModel(node);
             if (isBuilding) addWesternFacadeDetail(props, node, p);
             // Ground solid models with a contact shadow sized to their footprint —
             // kills the "floating" look. Skip flat cover + the distant boundary ring.
@@ -3208,34 +3260,9 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   scene.add(boardReturnNotice.group);
   scene.add(slimeCombatCue.group);
 
-  // Ambient townsfolk — NPCs reusing the rig, wandering the town to bring the
-  // street to life. Non-blocking fallback so a load failure never breaks the scene.
+  // NPC population is paused for the foundation pass. Keep the facade so the
+  // interaction loop stays stable while the world is recomposed around Ezra.
   let townsfolk = { update() {}, getInteractable: () => null, talk: () => null };
-  if (!visualCapture) {
-    try {
-      // Two region casts share one street: the Westward home-ground crowd and the
-      // Calico Flats free-town cast (named characters from the treatment). A facade
-      // fans update/getInteractable/talk across both; a Calico load failure leaves
-      // the Westward cast intact.
-      const groups = [await createTownsfolk(scene, { count: 5 })];
-      try {
-        groups.push(await createTownsfolk(scene, { locale: "calico" }));
-      } catch (e) {
-        console.warn("[render3d] calico townsfolk failed to load", e);
-      }
-      townsfolk = {
-        update(dt2, frozen2, pos, night2) { for (const g of groups) g.update(dt2, frozen2, pos, night2); },
-        getInteractable() { for (const g of groups) { const r = g.getInteractable(); if (r) return r; } return null; },
-        talk() { for (const g of groups) { const r = g.talk?.(); if (r) return r; } return null; },
-      };
-      // Phase D — static ambient life (saloon crowd, market stalls, hitched horses).
-      // Suppressed under ?visual by living in this !visualCapture block, so the dusk
-      // golden frame never sees it.
-      await addTownLife(scene);
-    } catch (err) {
-      console.warn("[render3d] townsfolk failed to load", err);
-    }
-  }
   // 6C: greet the nearest townsperson with E. A short "speech" timer holds the
   // line in the prompt; the loop shows the "E — Talk to …" cue when in range.
   let npcSpeechT = 0;
@@ -3717,12 +3744,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   const titleScreen = document.getElementById("title-screen");
   let titleOpen = false;
   if (titleScreen) {
-    if (visualCapture) {
+    if (visualCapture || foundationMode) {
       titleScreen.remove(); // golden baseline must never see the overlay
       // No staggered reveal under capture — show the HUD immediately so a manual
       // ?visual load isn't stuck behind .hud-hidden (the capture script also
       // display:none's the panels, so the golden frame is unaffected either way).
-      HUD_PANEL_IDS.forEach((id) => document.getElementById(id)?.classList.remove("hud-hidden"));
+      if (visualCapture) HUD_PANEL_IDS.forEach((id) => document.getElementById(id)?.classList.remove("hud-hidden"));
     } else {
       titleOpen = true;
       const startButton = titleScreen.querySelector("#title-start");
@@ -3753,7 +3780,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     character = createPlaceholderCharacter();
   } else {
     try {
-      character = await createAnimatedCharacter(PLAYER_MODEL_URL, { clipMap: HERO_CLIP_MAP, dress: HERO_DRESS });
+      character = await createAnimatedCharacter(PLAYER_MODEL_URL, {
+        clipMap: HERO_CLIP_MAP,
+        dress: HERO_DRESS,
+        walkTimeScale: 1.14,
+        runTimeScale: 1.03,
+      });
       playerModelLoaded = true;
     } catch (err) {
       console.warn("[render3d] hero character failed, trying base character", err);
@@ -3771,7 +3803,10 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   character.group.add(playerReadability.group);
   setPlayerMarkerVisibility(playerReadability, debugPlayerMarker && !visualCapture);
   scene.add(character.group);
-  if (playerModelLoaded) attachCowboyHat(character.group, scene);
+  if (playerModelLoaded) {
+    attachHeroNeckShadow(character.group);
+    attachCowboyHat(character.group, scene);
+  }
   const heroSilhouetteAccent = createHeroSilhouetteAccent();
   scene.add(heroSilhouetteAccent.group);
   // F → play the one-shot "draw" clip (no-op on the placeholder fallback).
@@ -3794,10 +3829,24 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     canvas,
     thirdPerson: true,
     character: character.group,
+    characterYawOffset: playerModelLoaded ? Math.PI : 0,
     cameraPreset: "shoulder",
     resetYaw: -0.9,
   });
   player.resetCameraBehind(-0.9);
+  if (foundationMode) {
+    player.setPosition({ x: PLAYER_SPAWN.x, z: PLAYER_SPAWN.y });
+    player.resetCameraBehind(-Math.PI / 2);
+    player.setCameraPreset("shoulder", {
+      distance: 4.9,
+      height: 2.72,
+      lookHeight: 1.5,
+      lookAhead: 3.35,
+      shoulder: 0.38,
+      smoothing: 14,
+      fov: 52,
+    });
+  }
   // Dev inspection hook (spike route only): teleport the player/camera to any world
   // point or named route waypoint so the whole loop can be reviewed without driving.
   // Harmless in prod (the spike is a dev route); no effect unless called.
@@ -3818,36 +3867,18 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     return out;
   };
 
-  if (import.meta.env.DEV && typeof window !== "undefined") {
-    // Dev-only debug API (__westward3dStats perf probe + __spike live-tuning/teleport).
-    // DEV-gated like __westward3dTest below so Vite tree-shakes it — and its console
-    // logging — out of the production bundle.
-    // Perf probe for the visual-upgrade stages: draw calls / triangles straight
-    // from renderer.info, plus a scene walk for shadow-caster count.
-    window.__westward3dStats = () => {
-      let casters = 0;
-      let meshes = 0;
-      const mats = new Set();
-      scene.traverse((o) => {
-        if (o.isMesh) {
-          meshes += 1;
-          if (o.castShadow) casters += 1;
-          if (o.material) {
-            if (Array.isArray(o.material)) o.material.forEach((m) => mats.add(m));
-            else mats.add(o.material);
-          }
-        }
-      });
-      return {
-        calls: renderer.info.render.calls,
-        triangles: renderer.info.render.triangles,
-        meshes,
-        materials: mats.size, // distinct material objects in the scene
-        programs: renderer.info.programs?.length ?? null, // compiled shader programs (the compile-storm metric)
-        shadowCasters: casters,
-        backend,
-      };
-    };
+  if (localDebugRuntime && typeof window !== "undefined") {
+    // Local debug API (__westward3dStats perf probe + __spike live-tuning/teleport).
+    // Available in dev and local preview builds; public hosted builds stay clean.
+    window.__westward3dStats = createRenderStatsProbe({
+      scene,
+      renderer,
+      backend,
+      reducedFidelity,
+      frameTiming,
+      getPlayerPosition: () => player.position,
+    });
+    window.__westwardFoundationMode = foundationMode;
     window.__spike = {
       // --- Navigation (existing) ---
       setPos: (x, y) => { player.setPosition({ x, z: y }); return player.position; },
@@ -4620,7 +4651,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   };
   updateBeatVisibility();
 
-  if (import.meta.env.DEV && typeof window !== "undefined") {
+  if (localDebugRuntime && typeof window !== "undefined") {
     const phaseAdvanceEvents = {
       spawn: "board_reached",
       board_choice: { type: "choose_board", optionId: "accept_bounty" },
@@ -4863,7 +4894,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // session so a fresh session can't clobber that existing-but-unread save. A clean
   // null (no save) leaves saveLoadFailed false and autosaves normally.
   function persistRun() {
-    if (visualCapture || saveLoadFailed || runMode !== "playing") return;
+    if (visualCapture || foundationMode || saveLoadFailed || runMode !== "playing") return;
     writeRun(currentRunPayload())
       .then(() => {
         saveMgr.onSaveSuccess();
@@ -4878,12 +4909,12 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
       });
   }
   function onRunMutated() {
-    if (visualCapture || saveLoadFailed || runMode !== "playing") return;
+    if (visualCapture || foundationMode || saveLoadFailed || runMode !== "playing") return;
     saveMgr.markDirty();
     persistRun();
   }
   function sealCurrentRun(cause) {
-    if (visualCapture || runMode !== "playing") return;
+    if (visualCapture || foundationMode || runMode !== "playing") return;
     runMode = "sealed";
     // Don't seal-over an existing-but-unread save either: a failed load means the slot
     // may hold a live run we never saw. Still surface the summary; just skip the write.
@@ -4954,7 +4985,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   }
   // On-quit best-effort flush, fire-and-forget. pagehide + visibilitychange
   // cover tab close/switch.
-  if (!visualCapture && typeof window !== "undefined") {
+  if (!visualCapture && !foundationMode && typeof window !== "undefined") {
     const flush = () => { if (runMode === "playing") persistRun(); };
     window.addEventListener("pagehide", flush);
     window.addEventListener("visibilitychange", () => {
@@ -4965,7 +4996,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
     window.addEventListener("pagehide", () => document.removeEventListener("keydown", onHorseKeys));
   }
   // A loaded sealed run shows its summary over the fresh scene.
-  if (!visualCapture && loadedRun && loadedRun.mode === "sealed") {
+  if (!visualCapture && !foundationMode && loadedRun && loadedRun.mode === "sealed") {
     showRunSummary({
       cause: loadedRun.runStats?.cause || "Your run has ended.",
       phaseReached: loadedRun.runStats?.phaseReached || loadedRun.loopState?.phase || "spawn",
@@ -5012,6 +5043,7 @@ export async function startSpike(canvas, snapshot = createSpikeSnapshot()) {
   // side profile that clears the Back Row buildings between the player and the grave.
   const funeralCam = { dx: 6.5, dy: 2.8, dz: 1.5, wdx: 2.0, wdy: 1.4, wdz: 1.0, lookY: 0.85 };
   function loop(now = performance.now()) {
+    frameTiming.sample(now);
     // dt in seconds, clamped to keep big tab-resume jumps from teleporting.
     // Hit-stop scales the loop dt on a connecting strike (freeze-frame punch); the
     // freeze itself is advanced by real dt. Bypassed under visualCapture.

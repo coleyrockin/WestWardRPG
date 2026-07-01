@@ -85,11 +85,12 @@ export async function createAnimatedCharacter(url = "/models/character.glb", opt
   if (walk) {
     walk.play();
     walk.setEffectiveWeight(0);
-    walk.timeScale = 1.35;
+    walk.timeScale = Number.isFinite(opts.walkTimeScale) ? opts.walkTimeScale : 1.16;
   }
   if (run) {
     run.play();
     run.setEffectiveWeight(0);
+    run.timeScale = Number.isFinite(opts.runTimeScale) ? opts.runTimeScale : 1.04;
   }
 
   let wWalk = 0;

@@ -43,7 +43,7 @@ export const FIRST_ROAD_ART_STYLE = Object.freeze({
   minNaturalClusters: 24,
   minProductionStreetProps: 36,
   minStorefronts: 6,
-  minNpcSilhouettes: 6,
+  minNpcSilhouettes: 0,
   minWindowLights: 10,
 });
 
@@ -316,27 +316,15 @@ const PRODUCTION_MAIN_STREET = [
   { kind: "lanternString", label: "Board Crossing Lanterns", x: 13.6, y: 8.75, color: "#ffb866", size: 0.8, yaw: Math.PI / 2 },
   { kind: "lanternString", label: "Saloon-Hotel Lanterns", x: 18.9, y: 8.6, color: "#ffb866", size: 0.82, yaw: Math.PI / 2 },
 
-  // Bounty street life: silhouettes and props read as inhabited without
-  // becoming gameplay blockers in the main road lane.
-  { kind: "npcSilhouette", label: "Porch Bounty Hunter", x: 7.9, y: 4.55, color: "#17100c", size: 0.88, yaw: 2.85 },
-  { kind: "npcSilhouette", label: "Boardwalk Lookout", x: 11.4, y: 4.4, color: "#17100c", size: 0.78, yaw: 2.95 },
-  // Off the road, onto the boardwalk edges — silhouettes standing mid-lane read
-  // as bugs, not life.
-  { kind: "npcSilhouette", label: "Road Deputy", x: 15.6, y: 4.6, color: "#17100c", size: 0.72, yaw: 2.9 },
-  { kind: "npcSilhouette", label: "Street Traveler", x: 18.9, y: 12.2, color: "#17100c", size: 0.64, yaw: -0.2 },
-  { kind: "npcSilhouette", label: "South Porch Watcher", x: 8.8, y: 12.52, color: "#17100c", size: 0.78, yaw: 0.25 },
-  { kind: "npcSilhouette", label: "Lantern Bystander", x: 14.4, y: 12.35, color: "#17100c", size: 0.72, yaw: -0.15 },
-  { kind: "npcSilhouette", label: "Undertaker Door Guard", x: 19.35, y: 11.82, color: "#120c09", size: 0.7, yaw: -0.25 },
+  // Street dressing stays prop-only for the foundation pass; NPCs are paused
+  // until the town composition and Ezra's movement/camera read cleanly.
   { kind: "hitchingRail", label: "North Hitching Rail", x: 5.2, y: 4.55, color: "#4a3526", size: 0.82, yaw: 0.04 },
   { kind: "hitchingRail", label: "South Hitching Rail", x: 15.6, y: 12.55, color: "#4a3526", size: 0.78, yaw: Math.PI - 0.08 },
   { kind: "barrelCrateCluster", label: "Saloon Cargo", x: 4.8, y: 4.25, color: "#7a5230", size: 0.88, yaw: 0.28 },
   { kind: "barrelCrateCluster", label: "Mercantile Cargo", x: 17.6, y: 4.3, color: "#7a5230", size: 0.82, yaw: -0.18 },
   { kind: "barrelCrateCluster", label: "South Porch Cargo", x: 10.0, y: 12.55, color: "#7a5230", size: 0.84, yaw: 0.12 },
-  // Wheel ruts now run ALONG the road (small yaw following its easterly drift)
-  // — the old random diagonals read as smears, not wagon tracks.
-  { kind: "mudRutDecal", label: "Opening Mud Rut", x: 10.8, y: 8.2, color: "#5a3923", size: 1.1, yaw: 0.06 },
-  { kind: "mudRutDecal", label: "Board Road Mud Rut", x: 14.6, y: 8.6, color: "#5a3923", size: 1.0, yaw: 0.1 },
-  { kind: "mudRutDecal", label: "Boardwalk Wheel Rut", x: 18.2, y: 9.0, color: "#5a3923", size: 0.9, yaw: 0.12 },
+  // Keep the center lane visually clean. Dense dark ruts in the first 20 metres
+  // read as collision bars from the gameplay camera.
   { kind: "mudRutDecal", label: "Far Street Wheel Rut", x: 21.8, y: 8.7, color: "#5a3923", size: 0.78, yaw: -0.58 },
   { kind: "mudRutDecal", label: "Marshal Road Wheel Rut", x: 25.6, y: 9.65, color: "#5a3923", size: 0.8, yaw: -0.42 },
   { kind: "dustSmokePlume", label: "Boardwalk Dust", x: 8.0, y: 4.85, color: "#b88551", size: 0.9, yaw: 0.2 },
@@ -378,10 +366,7 @@ const ROAD_FLORA = [
   { kind: "sageCluster", label: "Roadside Sage", x: 10.9, y: 6.1, color: "#687a42", size: 1.1 },
   { kind: "sageCluster", label: "Board Sage", x: 13.2, y: 6.3, color: "#74864a", size: 0.95 },
   { kind: "roadGrass", label: "South Road Grass", x: 12.2, y: 11.6, color: "#8f8a56", size: 0.98 },
-  // v2: pulled out of the now-dense street lane onto the bend shoulders.
-  { kind: "cactus", label: "Tall Cactus", x: 24.6, y: 10.4, color: "#577538", size: 1.0 },
   { kind: "deadTree", label: "Lone Dead Tree", x: 28.6, y: 7.4, color: "#4a3a28", size: 1.1 },
-  { kind: "sageCluster", label: "Road Scrub", x: 23.4, y: 9.6, color: "#657744", size: 0.85 },
   { kind: "rock", label: "Road Rock", x: 27.8, y: 5.3, color: "#6a5f55", size: 0.9 },
   { kind: "cactus", label: "Twin Cactus", x: 34.0, y: 10.8, color: "#5c7a3a", size: 0.85 },
   { kind: "roadGrass", label: "Cache Grass", x: 38.6, y: 9.3, color: "#8a7a4a", size: 0.82 },
@@ -506,13 +491,10 @@ const FOREGROUND_FRAME = [
   { kind: "cart", label: "Spawn Frame Cart", x: 10.8, y: 12.1, color: "#a87542", size: 0.82, yaw: 0.55 },
 ];
 
-// Board plaza life — Boone's board (13, 5.65) is the opening focal point + first
-// interaction. A couple of townsfolk gathered reading the bounties + a supply stack
-// make it the lively heart of town instead of a lone signpost. Low props only (not
-// slab-blockers), so the spawn→board camera wedge stays clear.
+// Board plaza — Boone's board (13, 5.65) is the opening focal point + first
+// interaction. Keep this pocket prop-only during the foundation pass so the
+// spawn->board camera wedge stays readable.
 const BOARD_PLAZA = [
-  { kind: "npcSilhouette", label: "Bounty Reader", x: 12.3, y: 6.7, color: "#17100c", size: 0.74, yaw: -0.7 },
-  { kind: "npcSilhouette", label: "Board Onlooker", x: 14.4, y: 6.8, color: "#120c09", size: 0.7, yaw: -2.3 },
   { kind: "barrelCrateCluster", label: "Board Supplies", x: 15.2, y: 5.0, color: "#7a5230", size: 0.66, yaw: 0.2 },
   // Civic pocket — low fence rails enclose the plaza without slab blockers.
   { kind: "brokenFence", label: "Plaza Rail North", x: 12.8, y: 5.2, color: "#8d6540", size: 0.58, yaw: 0.08 },
@@ -793,10 +775,6 @@ const CALICO_DRESSING = [
   // Cargo = activity.
   { kind: "barrelCrateCluster", label: "Saloon Cargo",       x: -46.6, y: 6.5,  color: "#7a5230", size: 0.82, yaw: 0.2 },
   { kind: "barrelCrateCluster", label: "Sheriff Cargo",      x: -53.4, y: 11.8, color: "#7a5230", size: 0.78, yaw: -0.2 },
-  // Stylized shadow-figure silhouettes — SCENERY, off the lane, on boardwalk edges.
-  { kind: "npcSilhouette", label: "Saloon Lounger",          x: -48.3, y: 6.5,  color: "#17100c", size: 0.82, yaw: 2.9 },
-  { kind: "npcSilhouette", label: "Sheriff's Deputy",        x: -50.4, y: 11.8, color: "#17100c", size: 0.8,  yaw: -0.2 },
-  { kind: "npcSilhouette", label: "Drifter",                 x: -53.5, y: 6.5,  color: "#120c09", size: 0.74, yaw: 2.95 },
   // Wheel ruts at the road margins (flat decals).
   { kind: "mudRutDecal",  label: "Calico Wheel Rut",         x: -49.0, y: 10.7, color: "#5a3923", size: 0.95, yaw: 0.05 },
   { kind: "mudRutDecal",  label: "West Run Wheel Rut",       x: -56.0, y: 7.4,  color: "#5a3923", size: 0.85, yaw: -0.1 },
@@ -1086,7 +1064,6 @@ const PRODUCTION_FRAME_KINDS = new Set([
   "hangingSign",
   "hitchingRail",
   "barrelCrateCluster",
-  "npcSilhouette",
   "lanternString",
   "mudRutDecal",
   "dustSmokePlume",

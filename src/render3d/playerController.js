@@ -20,12 +20,12 @@
 import { resolveCollision } from "./worldProxies.js";
 import { stepMount, MOUNT_GAITS } from "./mountController.js";
 
-const DEFAULT_SPEEDS = { walk: 4, run: 8 };
+const DEFAULT_SPEEDS = { walk: 3.4, run: 6.6 };
 const DEFAULT_SENSITIVITY = 0.0035; // radians per pixel of mouse drag
 const DEFAULT_EYE_HEIGHT = 1.8;
 const MAX_PITCH = Math.PI / 3; // ±60° — generous; avoids gimbal flip near ±π/2
 const CAMERA_COLLISION_RADIUS = 0.58;
-const SPRINT_FOV_BOOST = 6; // degrees added to the preset fov while sprinting
+const SPRINT_FOV_BOOST = 4.5; // degrees added to the preset fov while sprinting
 
 const CAMERA_BLOCKING_KINDS = new Set([
   "town",
@@ -66,16 +66,16 @@ const CAMERA_BLOCKING_KINDS = new Set([
 export const CAMERA_PRESETS = Object.freeze({
   // The gameplay default: close over-the-shoulder action framing. The hero
   // lands at the left third (right-shoulder offset), the gaze sits at head
-  // height (hero ≈ 1.8u, model scaled 1.18), and the short lookAhead keeps the
+  // height (hero ≈ 1.8u), and the short lookAhead keeps the
   // camera connected to the hero instead of staring past them down the road.
   shoulder: Object.freeze({
-    distance: 5.6,
-    height: 2.9,
-    lookHeight: 1.72,
-    lookAhead: 4.0,
-    shoulder: 0.75,
-    smoothing: 10.5,
-    fov: 56,
+    distance: 4.85,
+    height: 2.65,
+    lookHeight: 1.48,
+    lookAhead: 3.15,
+    shoulder: 0.48,
+    smoothing: 13,
+    fov: 52,
   }),
   // Funeral (mission 1.1): a formal, nearly-centred graveside framing — pulled
   // back and lifted a touch, the gaze low on the casket, the over-shoulder offset
@@ -95,7 +95,7 @@ export const CAMERA_PRESETS = Object.freeze({
     lookHeight: 1.55,
     lookAhead: 3.0,
     shoulder: 0.9,
-    smoothing: 13,
+    smoothing: 15,
     fov: 58,
   }),
   exploration: Object.freeze({
@@ -246,6 +246,10 @@ function segmentEnterAabb2D(from, to, box) {
   return Math.max(0, tMin);
 }
 
+function pointInAabb2D(point, box) {
+  return point.x > box.minX && point.x < box.maxX && point.z > box.minZ && point.z < box.maxZ;
+}
+
 export function avoidCameraObstacles({
   from,
   desired,
@@ -264,6 +268,11 @@ export function avoidCameraObstacles({
       minZ: proxy.minZ - radius,
       maxZ: proxy.maxZ + radius,
     };
+    // If the player's head/current look origin is already inside an inflated
+    // proxy, that collider is too close/too broad to solve against this frame.
+    // Treating it as a blocker clamps the camera into the wall instead of letting
+    // nearby street geometry remain playable.
+    if (pointInAabb2D(from, box)) continue;
     const t = segmentEnterAabb2D(from, desired, box);
     if (t == null) continue;
     bestT = Math.min(bestT, Math.max(0.18, t - padding));
@@ -371,6 +380,7 @@ export function createPlayerController(camera, opts = {}) {
     // movement heading. Falls back to first-person when thirdPerson is false.
     thirdPerson = false,
     character = null, // THREE.Object3D positioned at the player's feet
+    characterYawOffset = 0,
     cameraPreset = "exploration",
     camDistance = null,
     camHeight = null,
@@ -629,7 +639,7 @@ export function createPlayerController(camera, opts = {}) {
     if (character) {
       character.position.x = position.x;
       character.position.z = position.z;
-      character.rotation.y = yaw;
+      character.rotation.y = yaw + characterYawOffset;
     }
 
     if (camera && thirdPerson) {

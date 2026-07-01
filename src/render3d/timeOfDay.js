@@ -18,31 +18,31 @@ export const PALETTES = Object.freeze({
   day: {
     key: "day",
     label: "Day",
-    sky: { top: "#3d6fb8", mid: "#8fa8c8", horizon: "#d8c8a8" },
+    sky: { top: "#4e7fc0", mid: "#a8bed8", horizon: "#d7d3c7" },
     // Density lifted 0.006 → 0.0095: at street scale 0.006 read as no haze at
     // all — distant blocks need to soften into the sky for open-world depth.
-    fog: { color: "#aeb6c0", density: 0.0095 },
+    fog: { color: "#b7c2ce", density: 0.0085 },
     // High sun (y 12) → short grounded shadows; near-white warm disc.
-    sun: { color: "#fff0d8", intensity: 2.2, dir: { x: -4, y: 12, z: -2 }, disc: 0.03, glow: 0.12 },
+    sun: { color: "#fff7e8", intensity: 1.82, dir: { x: -4, y: 12, z: -2 }, disc: 0.03, glow: 0.08 },
     // Shadow fill is sky bounce: cool slate-blue from above, neutral slate from
     // the ground. Chroma is deliberately LOW — at #bcd2f0 the bounce painted
     // every shadowed wall violet; shadows should read as cool light, not paint.
-    hemi: { sky: "#a6b6d2", ground: "#6b6d5f", intensity: 1.1 }, // sky deepened from #b6c4da for cooler shadow fill (still low-chroma to block violet creep); ground warm
-    rim: { color: "#9cacc8", intensity: 0.42, dir: { x: 8, y: 6, z: 6 } },
-    fill: { color: "#d8dce4", intensity: 0.4 },
+    hemi: { sky: "#bed0ec", ground: "#727066", intensity: 0.96 }, // cooler sky bounce, quieter ground bounce so daylight stops reading yellow
+    rim: { color: "#9cb2d2", intensity: 0.36, dir: { x: 8, y: 6, z: 6 } },
+    fill: { color: "#dce5f2", intensity: 0.34 },
     // Pulled back from 1.18 — the overexposure washed midtones flat and crushed the
     // neon's headroom. Lower exposure + stronger grade gives day the warm-key/cool-
     // shadow drama dusk already has, without touching the (dusk-pinned) golden frame.
-    exposure: 1.12,
+    exposure: 1.0,
     stars: 0,
-    bloom: 0.4, // was 0.3 — more glow budget so authored neon signs read as neon in daylight
-    envIntensity: 1.12, // bright daylight sky → metals catch more reflected light
+    bloom: 0.28,
+    envIntensity: 1.0,
     grade: {
-      tint: "#ffd9a0", amount: 0.02, contrast: 1.18, saturation: 1.13,
-      shadowTint: "#2e3c6e", highlightTint: "#fff0c8",
+      tint: "#ffffff", amount: 0.0, contrast: 1.1, saturation: 0.98,
+      shadowTint: "#30476f", highlightTint: "#fff3dc",
       // splitStrength 0.22→0.30 (warm-highlight/cool-shadow separation); bloomThreshold
       // 0.9→0.85 so neon emissives (intensity 2.2) cross into bloom under bright day.
-      splitStrength: 0.30, godrayStrength: 0.06, vignetteStrength: 0.05, bloomThreshold: 0.85,
+      splitStrength: 0.18, godrayStrength: 0.035, vignetteStrength: 0.035, bloomThreshold: 0.9,
     },
     bodyBg: "#1e2433",
   },

@@ -5,51 +5,62 @@
 session; delete stale/dated session docs — never accrete (owner rule). Design canon:
 [`rustwater-treatment.md`](rustwater-treatment.md). Engine truths: `CLAUDE.md`.
 
-Last updated: **2026-06-18 (late night)** · main green: **896 vitest**, tsc clean, build ok, dusk
-golden PASS (~0.1%) · live: westward-rpg.vercel.app (Believability Pass deployed) · play:
+Last updated: **2026-07-01** · branch `stabilize/player-world-camera-foundation` · local gates:
+focused foundation vitest clean, tsc clean, build ok · live: westward-rpg.vercel.app · play:
 `npm run play` → :5191 · dev: `npm run dev` → :5180.
 
 ---
 
 ## Where we are
+The **Player / World / Camera Foundation Stabilization** pass is ready to hand off after
+shelving the prior mixed dialogue/stats work. Scope stayed narrow: make one playable slice feel
+better before adding RPG systems. This pass added a real `__westward3dStats()` helper, kept legacy
+stat aliases for smoke scripts, made the WebGL weather fallback reuse shared particle materials,
+removed visible outdoor NPC population, tuned Ezra's default camera/movement/animation read, and
+added a dev-only `?foundation` boot that skips save loading and mission seeding for clean free-roam
+testing.
+
 The **Believability Pass** (PBR Westward, golden-hour IBL, wet street, water-tower cathedral, town
-life) is **shipped + deployed**. **World-Aliveness (R1) is complete.** This session built out the
-world east/west of town + the env polish (below). **M0 perf is partway** (flora batched + culled;
-town batching + the CI draw-call ceiling remain). Next concrete task: the roadmap's **▶ NOW #6 —
-god-file extraction** (deferred from tonight on purpose; see below).
+life) remains the shipped baseline. **M0 perf is still partway** (flora batched + culled; town
+batching + the CI draw-call ceiling remain). Do not add world/content scope until walking, camera,
+readability, and measured performance are good enough.
 
-### This session shipped (on `main`, NOT pushed — 14 commits)
-- **Cleanup** (`95d7991`): dropped a stray throwaway probe + pruned 20 merged local branches.
-- **World-Aliveness gaps closed**: road-verge scatter (`0c2212d`), per-biome flora tint (`bce2ab1`,
-  extracted pure `biome.js`), dusk owl audio (`4009103`), cattle graze head-dip (`df0d2eb`).
-- **One roadmap + one handoff consolidated** (`3159147`): refreshed `roadmap.md`, deleted the
-  competing roadmaps (world-realism / art-craft / moonshot), locked tonight's plan.
-- **World build-out** (all golden-safe, dusk PASS <0.13%): Drift exploration POIs (`00af151`),
-  open-range road ruts (`fb960cb`), Eastwater paddock enclosure (`59fc2af`), Calico cyber dressing
-  (`2b1aa5d`).
-- **Polish**: per-time-of-day env intensity (`f7e5da2`).
+### Current stabilization changes
+- `src/render3d/renderStats.js`: extracted debug/perf stats from `spike.js`; reports backend,
+  reduced fidelity, frame timing, draw calls, triangles, geometries, textures, mesh/material/
+  instanced/shadow/visible/scene object counts, plus legacy aliases.
+- `scripts/perf_baseline_probe.mjs`: samples town `{ x: 9.5, z: 8.5 }`, open range
+  `{ x: 60, z: 12 }`, and marsh `{ x: 48, z: 16 }` with the richer stat payload.
+- Outdoor NPCs are visually paused: `npcSilhouette` placements were removed from the authored
+  layout and the animated `createTownsfolk` / `addTownLife` load path is disabled in `spike.js`.
+  NPC systems/data remain intact.
+- `src/render3d/playerController.js`: default shoulder camera is closer/lower; walk/run speeds and
+  sprint FOV boost are reduced to cut floatiness; camera collision skips the blocker when the hero
+  is already inside a broad inflated facade proxy.
+- Ezra readability: rigged hero now gets a darker, wider hat/neck silhouette, darker dress tones,
+  explicit walk/run animation time scales, and the model yaw offset keeps him from walking backward.
+- `?foundation` now starts at the real spawn, facing the first-road route, with HUD chrome hidden
+  and save/mission persistence bypassed.
+- World readability: first-road lane clutter was reduced, early dark mud strips were removed,
+  several small prop blockers became walk-through, day lighting was de-yellowed, and glow/sign
+  assets were scaled/dimmed. The town still reads too much like an unfinished movie set.
+- `src/game/world/weatherView.js`: WebGL fallback rain/dust pools now share one material per
+  weather type instead of cloning every particle material.
 
-### ⏸ Owner's pending step (deploy is your call)
-The new look + content render fully only on **your** WebGPU machine (shadows/god-rays/metal gleam),
-and the new world content east/west sits **outside the dusk capture frame** — so it's gate-green but
-unseen by the golden gate. When you want it live: `npm run play`, ride out east (the Drift POIs +
-worn roads + ranch) and west (Calico's new masts/mustang), check the night look now that env dims
-after dark, tune if needed, re-bless dusk only if you deliberately move it, then push `main`.
+## Pick up here
+Use `npm run play`, then inspect `http://127.0.0.1:5191/?foundation&n=...` in a foreground browser.
+The latest in-app-browser capture is materially better: no outdoor NPC crowd, cleaner HUD-free
+spawn frame, Ezra facing correctly, darker hat/neck silhouette, and a closer playable camera.
 
----
+The next problem is visual composition, not systems. The town still has oversized flat colored
+panels and stage-set-like building fronts. The next smallest high-impact branch should be
+`world/opening-town-composition-pass`: replace/reshape those billboard-like building details,
+reduce prop spam further, strengthen the main road silhouette, and make the first 30 seconds feel
+like a believable place. Do not add missions or NPCs yet.
 
-## Pick up here → roadmap **▶ NOW #6: god-file extraction**
-`spike.js` is ~5,300 lines. **The `claude/module-split` branch is stale — ignore it** (it splits the
-long-deleted legacy `game.js`, not spike.js). Do it FRESH and **incrementally** — small batches of
-`buildX(group,p)` builders → `src/render3d/build/` modules. They're coupled through `standard()` +
-the grounded-material machinery + cross-calls + the `buildPlacement` dispatch, so the
-grounded-`standard()` seam comes last or gets passed in explicitly. **Verify each batch byte-stable
-with a BROADER capture sweep** (town + open_range + marsh + Calico via `__spike.setPos`) — the dusk
-golden gate only covers the town view. Leaf builders (flora/rock/cactus) first.
-
-Everything else agent-buildable is in the roadmap's NOW + "Next world items" list (Prospector's
-Folly / Sunken Wash spurs read thin; Crossline Ranch as a distinct region; more Drift POIs; open-
-range wildlife). Story/naming/economy canon stays the owner's — prompt Boyd.
+If checking movement, walk: spawn → Boone board → road sign → smoke cache / marsh direction → turn
+around → starting area. Judge only load, frame stability, character readability, movement, camera
+clipping/framing, collision feel, road readability, lighting, clutter, and composition.
 
 ## How to run + verify
 ```bash

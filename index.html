@@ -963,6 +963,16 @@
         pointer-events: none;
         transition: opacity 1.2s ease;
       }
+      body.foundation-mode #hero-panel,
+      body.foundation-mode #job-toast,
+      body.foundation-mode #field-map,
+      body.foundation-mode #job-tracker,
+      body.foundation-mode #objective,
+      body.foundation-mode #hotbar,
+      body.foundation-mode #command-dock,
+      body.foundation-mode #tag {
+        display: none !important;
+      }
       /* Loaded-interior transition — a quick black fade hides the scene swap when
          you step into / out of a building. Starts transparent + click-through. */
       #screen-fade {

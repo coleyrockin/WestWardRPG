@@ -7,15 +7,15 @@ import { buildFrontierPlacements, PLAYER_SPAWN, OPEN_RANGE_BOUNDS } from "../src
 
 const KINDS_THAT_BLOCK = new Set([
   "town", "ranch", "gate", "watchtower", "landmark",
-  "fence", "sign", "lamp", "lampTall", "lampLow",
-  "jobBoard", "roadSign", "smokeCache", "brokenWagon", "wagonSalvage",
+  "fence",
+  "smokeCache", "brokenWagon", "wagonSalvage",
   "cart", "crate",
   // bigger-world expansion
-  "mesa", "mesaSilhouette", "cliff", "rock", "boulder", "cactus", "deadTree",
-  "saloon", "saloonFacade", "townFacadeWarm", "townFacadeStore", "townFacadeDark", "storefront", "porch",
+  "mesa", "mesaSilhouette", "cliff", "rock", "boulder",
+  "saloon", "saloonFacade", "townFacadeWarm", "townFacadeStore", "townFacadeDark", "storefront",
   "heroTownSaloon", "heroTownStore", "heroTownAssay",
   "brokenFence", "mesaSkyline", "heroMesaSkyline",
-  "productionSaloon", "productionStore", "productionAssay", "hitchingRail", "barrelCrateCluster",
+  "productionSaloon", "productionStore", "productionAssay",
   "church", "windmill", "waterTower", "blacksmith", "hotel",
   // R4.6 ranch animals — solid: the player shouldn't walk through livestock
   "horseHitched", "cattle",
@@ -27,6 +27,8 @@ const KINDS_THAT_BLOCK = new Set([
 const KINDS_THAT_PASS = new Set([
   "road", "roadPlank", "roadRut", "townBark", "slimeTell", "marshCluster", "slimeTrailHero",
   "roadSlime", "brush", "sagePatch", "sageCluster", "roadGrass", "reeds",
+  "sign", "lamp", "lampTall", "lampLow", "jobBoard", "roadSign", "cactus", "deadTree",
+  "hitchingRail", "barrelCrateCluster", "porch",
   "productionBoardwalk", "windowGlowPanel", "hangingSign", "npcSilhouette", "lanternString",
   "mudRutDecal", "dustSmokePlume", "bountyEmblem",
 ]);
@@ -88,9 +90,10 @@ describe("worldProxies — buildProxies", () => {
     expect(covered).toBe(false);
   });
 
-  it("includes the job board, smoke cache, and broken wagon by kind", () => {
+  it("keeps route blockers limited to substantial objects", () => {
     const kinds = new Set(proxies.map((p) => p.source.kind));
-    expect(kinds.has("jobBoard")).toBe(true);
+    expect(kinds.has("jobBoard")).toBe(false);
+    expect(kinds.has("roadSign")).toBe(false);
     expect(kinds.has("smokeCache")).toBe(true);
     expect(kinds.has("brokenWagon")).toBe(true);
   });

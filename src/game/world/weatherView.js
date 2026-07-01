@@ -31,10 +31,11 @@ export function createWeatherSystem(scene, opts = {}) {
   let dustInst = null;
 
   if (isWebGL) {
-    // WebGL fallback: Pool of regular meshes with cloned materials
+    // WebGL fallback: regular mesh pool, but one shared material per weather type.
+    // Opacity is global per type, so clones only inflate material count.
     function createLegacyPool(n, geo, mat, yInit) {
       return Array.from({ length: n }, () => {
-        const m = new THREE.Mesh(geo, mat.clone());
+        const m = new THREE.Mesh(geo, mat);
         const p = spawn(yInit());
         m.position.set(p.x, p.y, p.z);
         m.visible = false;
